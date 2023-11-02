@@ -67,6 +67,7 @@ var eCoolant = {
     }
 };
 
+
 // user-defined properties
 properties = {
   job0_SelectedFirmware : fw,            // Firmware to use in special cases
