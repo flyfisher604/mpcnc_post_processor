@@ -6,7 +6,7 @@ MPCNC posts processor for milling and laser/plasma cutting.
 
 */
 
-description = "MPCNC Milling/Laser - Marlin 2.0, Grbl 1.1, RepRap";
+description = "PRE-RELEASE MPCNC Milling/Laser - Marlin 2.0, Grbl 1.1, RepRap";
 vendor = "flyfisher604";
 vendorUrl = "https://github.com/flyfisher604/mpcnc_post_processor";
 
@@ -1585,34 +1585,42 @@ Firmware3dPrinterLike.prototype.constructor = Firmware3dPrinterLike;
 */
 
 function Start() {
+  // Common GCODE
+
+  // Set absolute positioning and units of measure
+  writeComment(eComment.Info, "   Set Absolute Positioning");
+  writeComment(eComment.Info, "   Units = " + (unit == IN ? "inch" : "mm"));
+
+  writeBlock(gAbsIncModal.format(90)); // Set to Absolute Positioning
+  writeBlock(gUnitModal.format(unit == IN ? 20 : 21)); // Set the units
+
   // Is Grbl?
   if (fw == eFirmware.GRBL) {
-    writeBlock(gAbsIncModal.format(90)); // Set to Absolute Positioning
+    // Set the feedrate mode to units per minute
+    writeComment(eComment.Info, "   Set Feed Rate Mode to units per minute");
     writeBlock(gFeedModeModal.format(94));
+
+    // Select the workspace plane XY for circular motion
+    writeComment(eComment.Info, "   Use the XY plane for circular motion");
     writeBlock(gPlaneModal.format(17));
-    writeBlock(gUnitModal.format(unit == IN ? 20 : 21));
   }
 
-  // Default
+  // Not GRBL
   else {
-    writeComment(eComment.Info, "   Set Absolute Positioning");
-    writeComment(eComment.Info, "   Units = " + (unit == IN ? "inch" : "mm"));
+    // Disable stepper timeout
     writeComment(eComment.Info, "   Disable stepper timeout");
-    if (properties.job1_SetOriginOnStart) {
-      writeComment(eComment.Info, "   Set current position to 0,0,0");
-    }
-
-    writeBlock(gAbsIncModal.format(90)); // Set to Absolute Positioning
-    writeBlock(gUnitModal.format(unit == IN ? 20 : 21)); // Set the units
     writeBlock(mFormat.format(84), sFormat.format(0)); // Disable steppers timeout
+  }
 
-    if (properties.job1_SetOriginOnStart) {
-      writeBlock(gFormat.format(92), xFormat.format(0), yFormat.format(0), zFormat.format(0)); // Set origin to initial position
-    }
+  // Are we setting the orgin on start?
+  if (properties.job1_SetOriginOnStart) {
+    writeComment(eComment.Info, "   Set current position to 0,0,0");
+    writeBlock(gFormat.format(92), xFormat.format(0), yFormat.format(0), zFormat.format(0)); // Set origin to initial position
+  }
 
-    if (properties.probe1_OnStart && tool.number != 0 && !tool.isJetTool()) {
-      onCommand(COMMAND_TOOL_MEASURE);
-    }
+  // Do a Probe on start?
+  if (properties.probe1_OnStart && tool.number != 0 && !tool.isJetTool()) {
+    onCommand(COMMAND_TOOL_MEASURE);
   }
 }
 
@@ -1629,26 +1637,18 @@ function end() {
 }
 
 function spindleOn(_spindleSpeed, _clockwise) {
-  // Is Grbl?
-  if (fw == eFirmware.GRBL) {
+  if (properties.job2_ManualSpindlePowerControl) {
+    // For manual any positive input speed assumed as enabled. so it's just a flag
+    if (!this.spindleEnabled) {
+      writeComment(eComment.Important, " >>> Spindle Speed: Manual");
+      askUser("Turn ON " + speedFormat.format(_spindleSpeed) + "RPM", "Spindle", false);
+    }
+  } else {
     writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed));
     writeBlock(mFormat.format(_clockwise ? 3 : 4), sOutput.format(spindleSpeed));
   }
-
-  // Default
-  else {
-    if (properties.job2_ManualSpindlePowerControl) {
-      // For manual any positive input speed assumed as enabled. so it's just a flag
-      if (!this.spindleEnabled) {
-        writeComment(eComment.Important, " >>> Spindle Speed: Manual");
-        askUser("Turn ON " + speedFormat.format(_spindleSpeed) + "RPM", "Spindle", false);
-      }
-    } else {
-      writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed));
-      writeBlock(mFormat.format(_clockwise ? 3 : 4), sOutput.format(spindleSpeed));
-    }
-    this.spindleEnabled = true;
-  }
+ 
+  this.spindleEnabled = true;
 }
 
 function spindleOff() {
@@ -1665,8 +1665,9 @@ function spindleOff() {
     } else {
       writeBlock(mFormat.format(5));
     }
-    this.spindleEnabled = false;
   }
+
+  this.spindleEnabled = false;
 }
 
 function display_text(txt) {
@@ -1761,8 +1762,14 @@ function askUser(text, title, allowJog) {
     writeBlock(mFormat.format(291), (properties.job8_SeparateWordsWithSpace ? "" : " ") + v1 + v2);
   }
 
+  // GRBL, include the message in a comment prefixed with MSG
+  else if (fw == eFirmware.GRBL) {
+      writeBlock(mFormat.format(0), (properties.job8_SeparateWordsWithSpace ? "" : " ") + "(MSG " + text + ")");
+  }
+  
   // Default
-  else {
+  else
+  {
     writeBlock(mFormat.format(0), (properties.job8_SeparateWordsWithSpace ? "" : " ") + text);
   }
 }
@@ -1809,40 +1816,44 @@ function toolChange() {
 }
 
 function probeTool() {
+  // Command comment block
+  writeComment(eComment.Important, " Probe to Zero Z");
+  writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
+  writeComment(eComment.Info, "   Do Probing");
+  writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(properties.probe3_Thickness)))
+  if (properties.toolChange3_Z != "") {
+    writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(properties.toolChange3_Z));
+  }
+  writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
+  
+  askUser("Attach ZProbe", "Probe", false);
+
   // Is Grbl?
   if (fw == eFirmware.GRBL) {
-    writeComment(eComment.Important, " >>> WARNING: No probing implemented for GRBL");
+    // refer to http://linuxcnc.org/docs/stable/html/gcode/g-code.html#gcode:g38
+    // Note this is not using the optional P parameter available on FluidNC (http://wiki.fluidnc.com/en/config/probe)
+    writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(properties.probe6_G38Speed)), zFormat.format(propertyMmToUnit(properties.probe5_G38Target)));
   }
 
-  // Default
+  // Not GRBL
   else {
-    writeComment(eComment.Important, " Probe to Zero Z");
-    writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
-    writeComment(eComment.Info, "   Do Probing");
-    writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(properties.probe3_Thickness)))
-    if (properties.toolChange3_Z != "") {
-      writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(properties.toolChange3_Z));
-    }
-    writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
-
-    askUser("Attach ZProbe", "Probe", false);
     // refer http://marlinfw.org/docs/gcode/G038.html
     if (properties.probe4_UseHomeZ) {
       writeBlock(gFormat.format(28), 'Z');
     } else {
       writeBlock(gMotionModal.format(38.3), fFormat.format(propertyMmToUnit(properties.probe6_G38Speed)), zFormat.format(propertyMmToUnit(properties.probe5_G38Target)));
     }
-
-    let z = zFormat.format(propertyMmToUnit(properties.probe3_Thickness));
-    writeBlock(gFormat.format(92), z); // Set origin to initial position
-    
-    resetAll();
-    if (properties.toolChange3_Z != "") { // move up tool to safe height again after probing
-      rapidMovementsZ(propertyMmToUnit(properties.toolChange3_Z), false);
-    }
-    
-    flushMotions();
-
-    askUser("Detach ZProbe", "Probe", false);
   }
+
+  let z = zFormat.format(propertyMmToUnit(properties.probe3_Thickness));
+  writeBlock(gFormat.format(92), z); // Set origin to initial position
+  
+  resetAll();
+  if (properties.toolChange3_Z != "") { // move up tool to safe height again after probing
+    rapidMovementsZ(propertyMmToUnit(properties.toolChange3_Z), false);
+  }
+  
+  flushMotions();
+
+  askUser("Detach ZProbe", "Probe", false);
 }
