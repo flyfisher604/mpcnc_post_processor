@@ -163,7 +163,7 @@ Extern: Stop File|File with custom Gcode for footer/end (in nc folder)||
 Extern: Tool File|File with custom Gcode for tool change (in nc folder)||
 Extern: Probe File|File with custom Gcode for tool probe (in nc folder)||
 
-## Group 7: Coolant Control Pin Properties
+## Group 8: Coolant Control Pin Properties
 
 Coolant has two channels, A and B. Each channel can be configured to be off or set to 1 of the 8 coolant modes that Fusion 360 allows on operation. If a tool's collant requirements match a channel's setting then that channel is enabled. A warning is generated if a tool askes for coolant and there is not a channel that matches. 
 
