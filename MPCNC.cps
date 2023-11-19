@@ -891,7 +891,15 @@ function onClose() {
     }
     onCommand(COMMAND_STOP_SPINDLE);
 
-    end(true);  
+    // Is Grbl?
+    if (fw == eFirmware.GRBL) {
+      writeBlock(mFormat.format(30));
+    }
+  
+    // Default
+    else {
+      display_text("Job end");
+    }
     
     writeComment(eComment.Important, " *** STOP end ***");
   } else {
@@ -1621,18 +1629,6 @@ function Start() {
   // Do a Probe on start?
   if (properties.probe1_OnStart && tool.number != 0 && !tool.isJetTool()) {
     onCommand(COMMAND_TOOL_MEASURE);
-  }
-}
-
-function end() {
-  // Is Grbl?
-  if (fw == eFirmware.GRBL) {
-    writeBlock(mFormat.format(30));
-  }
-
-  // Default
-  else {
-    display_text("Job end");
   }
 }
 
