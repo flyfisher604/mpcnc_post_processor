@@ -1841,7 +1841,7 @@ function probeTool() {
     if (properties.probe4_UseHomeZ) {
       writeBlock(gFormat.format(28), 'Z');
     } else {
-      writeBlock(gMotionModal.format(38.3), fFormat.format(propertyMmToUnit(properties.probe6_G38Speed)), zFormat.format(propertyMmToUnit(properties.probe5_G38Target)));
+      writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(properties.probe6_G38Speed)), zFormat.format(propertyMmToUnit(properties.probe5_G38Target)));
     }
   }
 
