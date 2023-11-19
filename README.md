@@ -205,9 +205,14 @@ To be updated
 ```
 
 # Resources
-
+## GCode
 [Marlin G-codes](http://marlinfw.org/meta/gcode/)
 
+[FluidNC Supported Gcodes](http://wiki.fluidnc.com/en/features/supported_gcodes)
+
+[LinuxCNC Supported Gcodes](http://linuxcnc.org/docs/html/gcode/g-code.html)
+
+## Fusion 360 PostProcessor Docs and Guides
 [PostProcessor Class Reference](https://cam.autodesk.com/posts/reference/classPostProcessor.html)
 
 [Post Processor Training Guide (PDF document)](https://cam.autodesk.com/posts/posts/guides/Post%20Processor%20Training%20Guide.pdf)
