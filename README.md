@@ -137,6 +137,7 @@ Probe: Plate thickness|Plate thickness|**0.8**|
 Probe: Use Home Z (G28)|Probe with G28 (Yes) or G38 (No)|**true**|
 Probe: G38 target|G38 Probing's furthest Z position|**-10**|
 Probe: G38 speed|G38 Probing's speed|**30**|
+Probe: Safe Z|Height to return to after a probe|**40**|
 
 ## Group 6: Laser/Plasma Properties
 

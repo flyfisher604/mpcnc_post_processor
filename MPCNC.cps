@@ -108,6 +108,7 @@ properties = {
   probe4_UseHomeZ: true,               // use G28 or G38 for probing 
   probe5_G38Target: -10,               // probing up to pos 
   probe6_G38Speed: 30,                 // probing with speed 
+  probe7_SafeZ: 40,                    // Safe Z to return to after probing
 
   gcodeStartFile: "",                  // File with custom Gcode for header/start (in nc folder)
   gcodeStopFile: "",                   // File with custom Gcode for footer/end (in nc folder)
@@ -293,6 +294,10 @@ propertyDefinitions = {
   probe6_G38Speed: {
     title: "Probe: G38 speed", description: "G38 Probing's speed (mm/min; in/min)", group: 5,
     type: "spatial", default_mm: 30, default_in: 1.2
+  },
+  probe7_SafeZ: {
+    title: "Probe: Safe Z", description: "Safe Z to return to after probing", group: 5,
+    type: "spatial", default_mm: 40, default_in: 1.6
   },
 
   cutter1_OnVaporize: {
@@ -1781,7 +1786,7 @@ function askUser(text, title, allowJog) {
 }
 
 function toolChange() {
-  writeComment(eComment.Important, " --- Tool Change Start")
+  writeComment(eComment.Important, " Tool Change Start")
 
   // If tool changes are not to be include in the NC file then exit
   if (!properties.toolChange0_Enabled)
@@ -1817,7 +1822,7 @@ function toolChange() {
     }
 
     // Ask tool change and wait user to touch lcd button
-    askUser("Tool " + tool.number + " " + tool.comment, "Tool change", true);
+    askUser("Insert Tool #" + tool.number + " " + tool.comment, "Tool change", true);
   }
   else
   {
@@ -1835,7 +1840,7 @@ function toolChange() {
     onCommand(COMMAND_TOOL_MEASURE);
   }
 
-  writeComment(eComment.Important, " --- Tool Change End")
+  writeComment(eComment.Important, " Tool Change End")
 }
 
 function probeTool() {
@@ -1844,8 +1849,8 @@ function probeTool() {
   writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
   writeComment(eComment.Info, "   Do Probing");
   writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(properties.probe3_Thickness)))
-  if (properties.toolChange4_Z != "") {
-    writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(properties.toolChange4_Z));
+  if (properties.probe7_SafeZ != "") {
+    writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(properties.probe7_SafeZ));
   }
   writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
   
@@ -1872,8 +1877,8 @@ function probeTool() {
   writeBlock(gFormat.format(92), z); // Set origin to initial position
   
   resetAll();
-  if (properties.toolChange4_Z != "") { // move up tool to safe height again after probing
-    rapidMovementsZ(propertyMmToUnit(properties.toolChange4_Z), false);
+  if (properties.probe7_SafeZ != "") { // move up tool to safe height again after probing
+    rapidMovementsZ(propertyMmToUnit(properties.probe7_SafeZ), false);
   }
   
   flushMotions();
