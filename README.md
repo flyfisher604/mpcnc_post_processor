@@ -21,7 +21,7 @@ Installation:
 Some design points:
 - Setup operation types: Milling, Water/Laser/Plasma
 - Support mm and Inches units (**but all properties MUST be set in MM**)
-- Rapids movements use two G0 moves. The first moves Z and the second moves XY. Moves are seperate to allow retraction from the work surface prior to horizontal travel. Moves use independent travel speeds for Z and XY.
+- Rapids movements use two G0 moves. The Z moves first and the XY. Moves are seperate to allow retraction from the work surface prior to horizontal travel. Moves use independent travel speeds for Z and XY.
 - Arcs support on XY plane (Marlin/Repetier/RepRap) or all panes (Grbl)
 - Tested with LCD display and SD card (built in tool change require printing from SD and LCD to restart)
 - Support for 3 different laser power using "cutting modes" (through, etch, vaporize)
@@ -119,11 +119,13 @@ Map: Allow Rapid Z|Include the mapping of vertical cuts if they are safe.|**fals
 
 |Title|Description|Default|
 |---|---|---|
-Tool Change: Enable|Include tool change code when tool changes (bultin tool change requires LCD display|**false**|
+Tool Change: Enable|Include tool changes in NC file|**false**|
+Tool Change: Insert Relocation Code|Include code to assist with manual tool change|**false**|
 Tool Change: X|X position for built-in tool change|**0**|
 Tool Change: Y|Y position for built-in tool change|**0**|
 Tool Change: Z|Z position for built-in tool change|**40**|
 Tool Change: Disable Z stepper|Disable Z stepper after reaching tool change location|**false**|
+Tool Change: Do first change|First tool is not already loaded|**false**|
 
 ## Group 5: Z Probe Properties
 
@@ -160,7 +162,8 @@ Laser: Coolant|Force a coolant to be used|**Off**|off, flood, mist, throughTool,
 |---|---|---|
 Extern: Start File|File with custom Gcode for header/start (in nc folder)||
 Extern: Stop File|File with custom Gcode for footer/end (in nc folder)||
-Extern: Tool File|File with custom Gcode for tool change (in nc folder)||
+Extern: Tool File1|File with custom Gcode to start tool change (in nc folder)||
+Extern: Tool File2|File with custom Gcode to end tool change (in nc folder)||
 Extern: Probe File|File with custom Gcode for tool probe (in nc folder)||
 
 ## Group 8: Coolant Control Pin Properties

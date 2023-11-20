@@ -94,11 +94,13 @@ properties = {
   mapF_SafeZ: "Retract:15",            // G01 mapped to G00 if Z is >= jobSafeZRapid
   mapG_AllowRapidZ: false,             // Allow G01 --> G00 for vertical retracts and Z descents above safe
 
-  toolChange0_Enabled: false,          // Enable tool change code (bultin tool change requires LCD display)
-  toolChange1_X: 0,                    // X position for builtin tool change
-  toolChange2_Y: 0,                    // Y position for builtin tool change
-  toolChange3_Z: 40,                   // Z position for builtin tool change
-  toolChange4_DisableZStepper: false,  // disable Z stepper when change a tool
+  toolChange0_Enabled: false,          // Enable tool change code
+  toolChange1_InsertCode: false,        // Insert code to relocate the tool during tool change
+  toolChange2_X: 0,                    // X position for builtin tool change
+  toolChange3_Y: 0,                    // Y position for builtin tool change
+  toolChange4_Z: 40,                   // Z position for builtin tool change
+  toolChange5_DisableZStepper: false,  // disable Z stepper when changing a tool
+  toolChange6_DoFirstChange: false,    // First tool is not already loaded
 
   probe1_OnStart: false,               // Execute probe gcode to align tool
   probe2_OnToolChange: false,          // Z probe after tool change
@@ -109,7 +111,8 @@ properties = {
 
   gcodeStartFile: "",                  // File with custom Gcode for header/start (in nc folder)
   gcodeStopFile: "",                   // File with custom Gcode for footer/end (in nc folder)
-  gcodeToolFile: "",                   // File with custom Gcode for tool change (in nc folder)
+  gcodeToolFile1: "",                  // File with custom Gcode to start tool change (in nc folder)
+  gcodeToolFile2: "",                  // File with custom Gcode to end tool change (in nc folder)
   gcodeProbeFile: "",                  // File with custom Gcode for tool probe (in nc folder)
 
   cutter1_OnVaporize: 100,             // Percentage of power to turn on the laser/plasma cutter in vaporize mode
@@ -238,25 +241,34 @@ propertyDefinitions = {
   },
 
   toolChange0_Enabled: {
-    title: "Tool Change: Enable", description: "Include tool change code when tool changes (bultin tool change requires LCD display)", group: 4,
+    title: "Tool Change: Enable", description: "Include tool changes is NC file", group: 4,
     type: "boolean", default_mm: false, default_in: false
   },
-  toolChange1_X: {
+  toolChange1_InsertCode: {
+    title: "Tool Change: Relocation Code", description: "Insert code to relocate the tool for manual change", group: 4,
+    type: "boolean", default_mm: false, default_in: false
+  },
+  toolChange2_X: {
     title: "Tool Change: X", description: "X location for tool change", group: 4,
     type: "spatial", default_mm: 0, default_in: 0
   },
-  toolChange2_Y: {
+  toolChange3_Y: {
     title: "Tool Change: Y", description: "Y location for tool change", group: 4,
     type: "spatial", default_mm: 0, default_in: 0
   },
-  toolChange3_Z: {
+  toolChange4_Z: {
     title: "Tool Change: Z ", description: "Z location for tool change", group: 4,
     type: "spatial", default_mm: 40, default_in: 1.6
   },
-  toolChange4_DisableZStepper: {
+  toolChange5_DisableZStepper: {
     title: "Tool Change: Disable Z stepper", description: "Disable Z stepper after reaching tool change location", group: 4,
     type: "boolean", default_mm: false, default_in: false
   },
+  toolChange6_DoFirstChange: {
+    title: "Tool Change: Do First Change", description: "First tool is not already loaded", group: 4,
+    type: "boolean", default_mm: false, default_in: false
+  },
+
   
   probe1_OnStart: {
     title: "Probe: On job start", description: "Execute probe gcode on job start", group: 5,
@@ -340,8 +352,12 @@ propertyDefinitions = {
     title: "Extern: Stop File", description: "File with custom Gcode for footer/end (in nc folder)", group: 7,
     type: "file", default_mm: "", default_in: ""
   },
-  gcodeToolFile: {
-    title: "Extern: Tool File", description: "File with custom Gcode for tool change (in nc folder)", group: 7,
+  gcodeToolFile1: {
+    title: "Extern: Tool File1", description: "File with custom Gcode to start tool change (in nc folder)", group: 7,
+    type: "file", default_mm: "", default_in: ""
+  },
+  gcodeToolFile2: {
+    title: "Extern: Tool File2", description: "File with custom Gcode to end tool change (in nc folder)", group: 7,
     type: "file", default_mm: "", default_in: ""
   },
   gcodeProbeFile: {
@@ -941,21 +957,15 @@ function onSection() {
   // Determine the Safe Z Height to map G1s to G0s
   safeZforSection(currentSection);
 
-  // Do a tool change if tool changes are enabled and its not the first section and this section uses
-  // a different tool then the previous section
-  if (properties.toolChange0_Enabled && !isFirstSection() && tool.number != getPreviousSection().getTool().number) {
-    if (properties.gcodeToolFile == "") {
-      // Post Processor does the tool change
-
-      writeComment(eComment.Important, " --- Tool Change Start")
+  // Do a tool change if its the first section and we are doing the first tool change
+  // If its not the first section and the tool changed then do a tool change
+  if (isFirstSection()) {
+    if (properties.toolChange6_DoFirstChange)
       toolChange();
-      writeComment(eComment.Important, " --- Tool Change End")
-    } else {
-      // Users custom tool change gcode is used
-      loadFile(properties.gcodeToolFile);
-    }
-  }
-
+  } 
+  else if (tool.number != getPreviousSection().getTool().number)
+      toolChange();
+  
   // Machining type
   if (currentSection.type == TYPE_MILLING) {
     // Specific milling code
@@ -1771,44 +1781,61 @@ function askUser(text, title, allowJog) {
 }
 
 function toolChange() {
-  // Grbl tool change?
-  if (fw == eFirmware.GRBL) {
-    
-    writeBlock(mFormat.format(6), tFormat.format(tool.number));
-    writeBlock(gFormat.format(54));
+  writeComment(eComment.Important, " --- Tool Change Start")
+
+  // If tool changes are not to be include in the NC file then exit
+  if (!properties.toolChange0_Enabled)
+    return;
+  
+  // If there is a custom GCode file for tool changes then include it
+  if (properties.gcodeToolFile1 != "") {
+    loadFile(properties.gcodeToolFile1);
   }
 
-  // Default tool change
-  else
-  {
-    flushMotions();
+  // Are we inserting code to assist with the tool change?
+  // If not, then just insert tool change GCODE G6 <tool number> and a G54
+  if (properties.toolChange1_InsertCode) {
 
     // Go to tool change position
-    onRapid(propertyMmToUnit(properties.toolChange1_X), propertyMmToUnit(properties.toolChange2_Y), propertyMmToUnit(properties.toolChange3_Z));
-    
+    flushMotions();
+    onRapid(propertyMmToUnit(properties.toolChange2_X), propertyMmToUnit(properties.toolChange3_Y), propertyMmToUnit(properties.toolChange4_Z));
     flushMotions();
   
     // turn off spindle and coolant
     onCommand(COMMAND_COOLANT_OFF);
     onCommand(COMMAND_STOP_SPINDLE);
-    if (!properties.job2_ManualSpindlePowerControl) {
-      // Beep
+
+    // If Marlin then BEEP
+    if ((fw == eFirmware.MARLIN) && !properties.job2_ManualSpindlePowerControl) {
       writeBlock(mFormat.format(300), sFormat.format(400), pFormat.format(2000));
     }
   
     // Disable Z stepper
-    if (properties.toolChange4_DisableZStepper) {
+    if (properties.toolChange5_DisableZStepper) {
       askUser("Z Stepper will disabled. Wait for STOP!!", "Tool change", false);
       writeBlock(mFormat.format(17), 'Z'); // Disable steppers timeout
     }
+
     // Ask tool change and wait user to touch lcd button
     askUser("Tool " + tool.number + " " + tool.comment, "Tool change", true);
+  }
+  else
+  {
+      writeBlock(mFormat.format(6), tFormat.format(tool.number));
+      writeBlock(gFormat.format(54));
+  }
+
+  // If there is a custom GCode file for tool changes then include it
+  if (properties.gcodeToolFile2 != "") {
+    loadFile(properties.gcodeToolFile2);
+  }
   
     // Run Z probe gcode
-    if (properties.probe2_OnToolChange && tool.number != 0) {
-      onCommand(COMMAND_TOOL_MEASURE);
-    }
+  if (properties.probe2_OnToolChange && tool.number != 0) {
+    onCommand(COMMAND_TOOL_MEASURE);
   }
+
+  writeComment(eComment.Important, " --- Tool Change End")
 }
 
 function probeTool() {
@@ -1817,8 +1844,8 @@ function probeTool() {
   writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
   writeComment(eComment.Info, "   Do Probing");
   writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(properties.probe3_Thickness)))
-  if (properties.toolChange3_Z != "") {
-    writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(properties.toolChange3_Z));
+  if (properties.toolChange4_Z != "") {
+    writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(properties.toolChange4_Z));
   }
   writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
   
@@ -1845,8 +1872,8 @@ function probeTool() {
   writeBlock(gFormat.format(92), z); // Set origin to initial position
   
   resetAll();
-  if (properties.toolChange3_Z != "") { // move up tool to safe height again after probing
-    rapidMovementsZ(propertyMmToUnit(properties.toolChange3_Z), false);
+  if (properties.toolChange4_Z != "") { // move up tool to safe height again after probing
+    rapidMovementsZ(propertyMmToUnit(properties.toolChange4_Z), false);
   }
   
   flushMotions();
