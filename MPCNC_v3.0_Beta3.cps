@@ -2045,7 +2045,7 @@ function probeTool() {
   
   resetAll();
   if (getProperty(properties.probe7_SafeZ) != "") { // move up tool to safe height again after probing
-    rapidMovementsZ(propertyMmToUnit(getProperty(properties.probe7_SafeZ)), false);
+    rapidMovementsZ(propertyMmToUnit(getProperty(properties.probe7_SafeZ)));
   }
   
   flushMotions();
