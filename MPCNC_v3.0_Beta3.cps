@@ -1399,15 +1399,17 @@ function onMovement(movement) {
 }
 
 var currentSpindleSpeed = 0;
+var currentSpindleClockwise = true;
 
 function setSpindeSpeed(_spindleSpeed, _clockwise) {
-  if (currentSpindleSpeed != _spindleSpeed) {
+  if ((currentSpindleSpeed != _spindleSpeed) || (_spindleSpeed > 0 && currentSpindleClockwise != _clockwise)) {
     if (_spindleSpeed > 0) {
       spindleOn(_spindleSpeed, _clockwise);
     } else {
       spindleOff();
     }
     currentSpindleSpeed = _spindleSpeed;
+    currentSpindleClockwise = _clockwise;
   }
 }
 
