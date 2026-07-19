@@ -1070,6 +1070,8 @@ function onClose() {
     }
     onCommand(COMMAND_STOP_SPINDLE);
 
+    flushMotions();
+
     // Is Grbl?
     if (fw == eFirmware.GRBL) {
       writeBlock(mFormat.format(30));
@@ -1083,6 +1085,7 @@ function onClose() {
     writeComment(eComment.Important, " *** STOP end ***");
   } else {
     loadFile(getProperty(properties.gcodeStopFile));
+    flushMotions();
   }
 
   if (fw == eFirmware.GRBL) {
