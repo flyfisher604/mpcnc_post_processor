@@ -1596,9 +1596,9 @@ function writeComment(level, text) {
   }
 }
 
-// Rapid movements with G1 and differentiated travel speeds for XY
-// Changes F360 current XY.
-// No longer called for general Rapid only for probing, homing, etc.
+// Rapid movement in X/Y, emitted as G0 at the configured XY travel feedrate.
+// Changes F360's current XY position. Called from rapidMovements() for every
+// onRapid, and directly for moves like the final return-to-origin.
 function rapidMovementsXY(_x, _y) {
   let x = xOutput.format(_x);
   let y = yOutput.format(_y);
@@ -1614,9 +1614,9 @@ function rapidMovementsXY(_x, _y) {
   }
 }
 
-// Rapid movements with G1 and differentiated travel speeds for Z
-// Changes F360 current Z
-// No longer called for general Rapid only for probing, homing, etc.
+// Rapid movement in Z, emitted as G0 at the configured Z travel feedrate.
+// Changes F360's current Z position. Called from rapidMovements() for every
+// onRapid, and directly for retracts like the post-probe safe-Z move.
 function rapidMovementsZ(_z) {
   let z = zOutput.format(_z);
 
@@ -1631,7 +1631,7 @@ function rapidMovementsZ(_z) {
   }
 }
 
-// Rapid movements with G1 uses the max travel rate (xy or z) and then relies on feedrate scaling
+// Combined X/Y/Z rapid: moves Z first, then XY, each as its own G0 at its own configured travel feedrate.
 function rapidMovements(_x, _y, _z) {
 
   rapidMovementsZ(_z);
