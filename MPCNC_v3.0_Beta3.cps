@@ -799,7 +799,7 @@ function safeZforSection(_section)
 
       case eSafeZ.CLEARANCE:
         if (hasParameter("operation:clearanceHeight_value") && hasParameter("operation:clearanceHeight_absolute")) {
-          var clearance = _section.getParameter("operation:clearanceHeight_value");
+          let clearance = _section.getParameter("operation:clearanceHeight_value");
           let abs = _section.getParameter("operation:clearanceHeight_absolute");
 
           if (abs == 1) {
