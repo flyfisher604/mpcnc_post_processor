@@ -1948,12 +1948,12 @@ function askUser(text, title, allowJog) {
 }
 
 function toolChange() {
-  writeComment(eComment.Important, " Tool Change Start");
-
   // If tool changes are not to be include in the NC file then exit
   if (!getProperty(properties.toolChange0_Enabled))
     return;
-  
+
+  writeComment(eComment.Important, " Tool Change Start");
+
   // If there is a custom GCode file for tool changes then include it
   if (getProperty(properties.gcodeToolFile1) != "") {
     loadFile(getProperty(properties.gcodeToolFile1));
