@@ -429,14 +429,6 @@ properties = {
     value      : 40,
     scope      : "post"
   },
-  cutter3_OnEtch: {
-    title      : "Laser: On - Etch",
-    description: "Percentage of power to on the laser/plasma cutter in etch mode.",
-    group      : "7 - Laser",
-    type       : "integer",
-    value      : 40,
-    scope      : "post"
-  },
   cutter4_MarlinMode: {
     title      : "Laser: Marlin/Reprap Mode",
     description: "Marlin/Reprap mode of the laser/plasma cutter.",
@@ -1094,6 +1086,7 @@ function onClose() {
 }
 
 var forceSectionToStartWithRapid = false;
+var sectionComment;
 
 function onSection() {
   // Every section needs to start with a Rapid to get to the initial location.
@@ -1114,8 +1107,8 @@ function onSection() {
   writeComment(eComment.Important, " *** SECTION begin ***");
 
   // Print min/max boundaries for each section
-  vectorX = new Vector(1, 0, 0);
-  vectorY = new Vector(0, 1, 0);
+  var vectorX = new Vector(1, 0, 0);
+  var vectorY = new Vector(0, 1, 0);
   writeComment(eComment.Info, "   X Min: " + xyzFormat.format(currentSection.getGlobalRange(vectorX).getMinimum()) + " - X Max: " + xyzFormat.format(currentSection.getGlobalRange(vectorX).getMaximum()));
   writeComment(eComment.Info, "   Y Min: " + xyzFormat.format(currentSection.getGlobalRange(vectorY).getMinimum()) + " - Y Max: " + xyzFormat.format(currentSection.getGlobalRange(vectorY).getMaximum()));
   writeComment(eComment.Info, "   Z Min: " + xyzFormat.format(currentSection.getGlobalZRange().getMinimum()) + " - Z Max: " + xyzFormat.format(currentSection.getGlobalZRange().getMaximum()));
@@ -1454,7 +1447,7 @@ function onCommand(command) {
       }
       else {
         //Convert numeric coolant code to string
-        strCoolant = (tool.coolant < coolantLevels.length ? (coolantLevels[tool.coolant]) : eCoolant.Off);
+        var strCoolant = (tool.coolant < coolantLevels.length ? (coolantLevels[tool.coolant]) : eCoolant.Off);
         writeComment(eComment.Debug, "   tool.coolant = " + tool.coolant + " strCoolant = " + strCoolant);
   
         setCoolant(strCoolant);
