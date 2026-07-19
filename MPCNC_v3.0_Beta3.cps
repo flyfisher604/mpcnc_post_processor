@@ -2011,9 +2011,7 @@ function probeTool() {
   writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
   writeComment(eComment.Info, "   Do Probing");
   writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(getProperty(properties.probe3_Thickness))))
-  if (getProperty(properties.probe7_SafeZ) != "") {
-    writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(getProperty(properties.probe7_SafeZ)));
-  }
+  writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(getProperty(properties.probe7_SafeZ)));
   writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
   
   askUser("Attach ZProbe", "Probe", false);
@@ -2039,9 +2037,8 @@ function probeTool() {
   writeBlock(gFormat.format(92), z); // Set origin to initial position
   
   resetAll();
-  if (getProperty(properties.probe7_SafeZ) != "") { // move up tool to safe height again after probing
-    rapidMovementsZ(propertyMmToUnit(getProperty(properties.probe7_SafeZ)));
-  }
+  // move up tool to safe height again after probing
+  rapidMovementsZ(propertyMmToUnit(getProperty(properties.probe7_SafeZ)));
   
   flushMotions();
 
