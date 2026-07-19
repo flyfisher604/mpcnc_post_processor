@@ -1500,7 +1500,7 @@ function writeInformation() {
     if (pair.min == undefined || pair.min > rmin) {
       pair.min = rmin;
     }
-    if (pair.max == undefined || pair.max < rmin) {  // was pair.min - changed by DG 1/4/2021
+    if (pair.max == undefined || pair.max < rmax) {
       pair.max = rmax;
     }
   }
