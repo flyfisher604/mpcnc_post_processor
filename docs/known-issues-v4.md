@@ -20,7 +20,7 @@ Legend: `[x]` fixed, `[ ]` open.
 - [x] **#7 — Severity: Correctness** — [Lines 1061-1093](../MPCNC_v3.0_Beta3.cps#L1061-L1093) — `onClose` only called `flushMotions()` once, before the final `rapidMovementsXY(0, 0)`/coolant-off/spindle-off/"Job end" message, so those could fire before the machine finished moving to origin (Marlin/RepRap; GRBL's `flushMotions()` is a no-op and its command queue is already sequential). Also affected the `gcodeStopFile` branch, where a custom footer file loaded via `loadFile()` could contain its own motion with no wait afterward. **Fixed** by adding `flushMotions()` after `COMMAND_STOP_SPINDLE` in the default branch, and after `loadFile()` in the custom-stop-file branch.
 - [x] **#8 — Severity: Correctness** — [Line 2048](../MPCNC_v3.0_Beta3.cps#L2048) — `rapidMovementsZ(...)` was called with a stray second argument (`false`); the function only takes one parameter (`_z`), so it was silently dropped — likely a remnant of an incomplete refactor. **Fixed** by removing the unused argument.
 - [x] **#9 — Severity: Correctness** — [Line 719](../MPCNC_v3.0_Beta3.cps#L719) — Typo `alue: 2` instead of `value: 2` in `eSafeZ.prop[2]`. Was unused elsewhere, but a landmine if ever referenced. **Fixed** by correcting the key name.
-- [ ] **#10 — Severity: Correctness** — [Lines 326-333](../MPCNC_v3.0_Beta3.cps#L326-L333) — `probe3_Thickness` declared `type: "integer"` but defaults to `0.8` (fractional) — type/value mismatch.
+- [x] **#10 — Severity: Correctness** — [Lines 326-333](../MPCNC_v3.0_Beta3.cps#L326-L333) — `probe3_Thickness` declared `type: "integer"` but defaulted to `0.8` (fractional) — type/value mismatch. **Fixed** by changing the type to `"number"`.
 
 ## Dead code / style / maintainability
 

@@ -327,7 +327,7 @@ properties = {
     title      : "Plate thickness",
     description: "Thickness of the probe touchplate.",
     group      : "5 - Probe",
-    type       : "integer",
+    type       : "number",
     value      : 0.8,
     scope      : "post"
   },
