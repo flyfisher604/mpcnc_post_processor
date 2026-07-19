@@ -1980,7 +1980,7 @@ function toolChange() {
     // Disable Z stepper
     if (getProperty(properties.toolChange5_DisableZStepper)) {
       askUser("Z Stepper will disabled. Wait for STOP!!", "Tool change", false);
-      writeBlock(mFormat.format(17), 'Z'); // Disable steppers timeout
+      writeBlock(mFormat.format(84), 'Z'); // Disable steppers timeout
     }
 
     // Ask tool change and wait user to touch lcd button
