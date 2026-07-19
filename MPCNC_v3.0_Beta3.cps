@@ -1807,10 +1807,12 @@ function Start() {
   }
 }
 
+var spindleEnabled = false;
+
 function spindleOn(_spindleSpeed, _clockwise) {
   if (getProperty(properties.job2_ManualSpindlePowerControl)) {
     // For manual any positive input speed assumed as enabled. so it's just a flag
-    if (!this.spindleEnabled) {
+    if (!spindleEnabled) {
       writeComment(eComment.Important, " >>> Spindle Speed: Manual");
       askUser("Turn ON " + speedFormat.format(_spindleSpeed) + "RPM", "Spindle", false);
     }
@@ -1818,8 +1820,8 @@ function spindleOn(_spindleSpeed, _clockwise) {
     writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed));
     writeBlock(mFormat.format(_clockwise ? 3 : 4), sOutput.format(_spindleSpeed));
   }
- 
-  this.spindleEnabled = true;
+
+  spindleEnabled = true;
 }
 
 function spindleOff() {
@@ -1838,7 +1840,7 @@ function spindleOff() {
     }
   }
 
-  this.spindleEnabled = false;
+  spindleEnabled = false;
 }
 
 function display_text(txt) {
