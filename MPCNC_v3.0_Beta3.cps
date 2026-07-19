@@ -827,7 +827,7 @@ function safeZforSection(_section)
         
       case eSafeZ.ERROR:
         safeZHeight = safeZHeightDefault;
-        writeComment(eComment.Important, " >>> WARNING: " + propertyDefinitions.mapF_SafeZ.title + "format error: " + safeZHeight);
+        writeComment(eComment.Important, " >>> WARNING: " + properties.mapF_SafeZ.title + " format error: " + safeZHeight);
         break;
     }
   }
