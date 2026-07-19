@@ -1256,7 +1256,7 @@ function onCircular(clockwise, cx, cy, cz, x, y, z, feed) {
     error(localize("Radius compensation cannot be activated/deactivated for a circular move."));
     return;
   }
-  circular(clockwise, cx, cy, cz, x, y, z, feed)
+  circular(clockwise, cx, cy, cz, x, y, z, feed);
 }
 
 // Called on waterjet/plasma/laser cuts
@@ -1587,11 +1587,14 @@ function writeFirstSection() {
 // Output a comment
 function writeComment(level, text) { 
   if (commentLevels.indexOf(level) <= commentLevels.indexOf(getProperty(properties.job3_CommentLevel))) {
+    // Collapse parentheses (comment markers) and newlines to a space so a multi-line
+    // value can't split the comment into a second, uncommented (active G-code) line.
+    var safeText = sanitizeMessageText(text, "()");
     if (fw == eFirmware.GRBL) {
-      writeln("(" + String(text).replace(/[\(\)]/g, "") + ")");
+      writeln("(" + safeText + ")");
     }
     else {
-      writeln(";" + String(text).replace(/[\(\)]/g, ""));
+      writeln(";" + safeText);
     }
   }
 }
@@ -1844,10 +1847,11 @@ function spindleOff() {
 }
 
 // Collapse newlines and any of `unsafeChars` into a single space, so user-supplied text
-// (tool comments, operation names) embedded in a G-code message can't break line syntax,
-// comment syntax, or quoted parameters.
+// (tool comments, operation names) embedded in a G-code message or comment can't break
+// line syntax, comment syntax, or quoted parameters. Runs of collapsed characters become a
+// single space; leading/trailing whitespace is preserved so callers keep their own indentation.
 function sanitizeMessageText(text, unsafeChars) {
-  return String(text).replace(new RegExp("[\\r\\n" + unsafeChars + "]+", "g"), " ").trim();
+  return String(text).replace(new RegExp("[\\r\\n" + unsafeChars + "]+", "g"), " ");
 }
 
 function display_text(txt) {
