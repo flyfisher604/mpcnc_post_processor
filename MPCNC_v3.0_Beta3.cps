@@ -730,17 +730,17 @@ function parseSafeZProperty() {
 
   // If it was not an error then get the number
   if (safeZMode != eSafeZ.ERROR) {
-    safeZHeightDefault = str.match(eSafeZ.prop[safeZMode].numRegEx);
+    var match = str.match(eSafeZ.prop[safeZMode].numRegEx);
 
-    if ((safeZHeightDefault == null) || (safeZHeightDefault.length !=2)) {
-      writeComment(eComment.Debug, " parseSafeZProperty: " + safeZHeightDefault);
-      writeComment(eComment.Debug, " parseSafeZProperty.length: " + (safeZHeightDefault != null? safeZHeightDefault.length : "na"));
+    if ((match == null) || (match.length != 2)) {
+      writeComment(eComment.Debug, " parseSafeZProperty: " + match);
+      writeComment(eComment.Debug, " parseSafeZProperty.length: " + (match != null ? match.length : "na"));
       writeComment(eComment.Debug, " parseSafeZProperty: Couldn't find number");
       safeZMode = eSafeZ.ERROR;
       safeZHeightDefault = 15;
     }
     else {
-      safeZHeightDefault = safeZHeightDefault[1];
+      safeZHeightDefault = Number(match[1]);
     }
   }
 
