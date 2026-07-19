@@ -10,7 +10,7 @@ Legend: `[x]` fixed, `[ ]` open.
 
 - [x] **#1 — Severity: Breaking** — [Line 1983](../MPCNC_v3.0_Beta3.cps#L1983) — `toolChange()` sent `M17` (Enable Steppers) instead of `M18`/`M84` (Disable Steppers) when "Disable Z stepper" was enabled, keeping the Z axis energized during a manual tool change despite the operator prompt saying it would be disabled. **Fixed** in commit `648aec9` (changed to `M84`).
 - [x] **#2 — Severity: Breaking** — [Line 830](../MPCNC_v3.0_Beta3.cps#L830) — `propertyDefinitions.mapF_SafeZ.title` referenced an undefined variable (properties are just `properties` in this file), throwing a `ReferenceError` and aborting post-processing if `mapF_SafeZ` couldn't be parsed, instead of printing the intended warning. **Fixed** by using `properties.mapF_SafeZ.title` (also added the missing space before "format error").
-- [ ] **#3 — Severity: Breaking** — [Line 1744](../MPCNC_v3.0_Beta3.cps#L1744) — `writeComment(...)` called with a single argument (missing the `level` param), so it always bypasses the comment-level filter and writes a literal `;undefined` line after every loaded custom G-code file.
+- [x] **#3 — Severity: Breaking** — [Line 1744](../MPCNC_v3.0_Beta3.cps#L1744) — `writeComment(...)` was called with a single argument (missing the `level` param), so it always bypassed the comment-level filter and wrote a literal `;undefined` line after every loaded custom G-code file. **Fixed** by passing `eComment.Info` as the level and the correct text as the second argument.
 
 ## Correctness risks
 

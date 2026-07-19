@@ -1741,7 +1741,7 @@ function loadFile(_file) {
     if (txt.length > 0) {
       writeComment(eComment.Info, " --- Start custom gcode " + folder + _file);
       write(txt);
-      writeComment("eComment.Info,  --- End custom gcode " + folder + _file);
+      writeComment(eComment.Info, " --- End custom gcode " + folder + _file);
     }
   } else {
     writeComment(eComment.Important, " Can't open file " + folder + _file);
