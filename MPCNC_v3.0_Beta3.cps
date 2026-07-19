@@ -1139,18 +1139,18 @@ function onSection() {
     switch (currentSection.jetMode) {
       case JET_MODE_THROUGH:
         cutterOnCurrentPower = getProperty(properties.cutter2_OnThrough);
-        jetModeStr = "Through"
+        jetModeStr = "Through";
         break;
       case JET_MODE_ETCHING:
         cutterOnCurrentPower = getProperty(properties.cutter3_OnEtch);
-        jetModeStr = "Etching"
+        jetModeStr = "Etching";
         break;
       case JET_MODE_VAPORIZE:
-        jetModeStr = "Vaporize"
+        jetModeStr = "Vaporize";
         cutterOnCurrentPower = getProperty(properties.cutter1_OnVaporize);
         break;
       default:
-        jetModeStr = "*** Unknown ***"
+        jetModeStr = "*** Unknown ***";
         warn = true;
     }
 
@@ -1948,7 +1948,7 @@ function askUser(text, title, allowJog) {
 }
 
 function toolChange() {
-  writeComment(eComment.Important, " Tool Change Start")
+  writeComment(eComment.Important, " Tool Change Start");
 
   // If tool changes are not to be include in the NC file then exit
   if (!getProperty(properties.toolChange0_Enabled))
@@ -2002,7 +2002,7 @@ function toolChange() {
     onCommand(COMMAND_TOOL_MEASURE);
   }
 
-  writeComment(eComment.Important, " Tool Change End")
+  writeComment(eComment.Important, " Tool Change End");
 }
 
 function probeTool() {
@@ -2010,7 +2010,7 @@ function probeTool() {
   writeComment(eComment.Important, " Probe to Zero Z");
   writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
   writeComment(eComment.Info, "   Do Probing");
-  writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(getProperty(properties.probe3_Thickness))))
+  writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(getProperty(properties.probe3_Thickness))));
   writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(getProperty(properties.probe7_SafeZ)));
   writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
   
