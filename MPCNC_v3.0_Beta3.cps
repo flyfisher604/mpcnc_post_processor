@@ -826,8 +826,8 @@ function safeZforSection(_section)
 }
 
 
-Number.prototype.round = function(places) {
-  return +(Math.round(this + "e+" + places)  + "e-" + places);
+function roundTo(value, places) {
+  return +(Math.round(value + "e+" + places) + "e-" + places);
 }
 
 // Returns true if the rules to convert G1s to G0s are satisfied
@@ -835,7 +835,7 @@ function isSafeToRapid(x, y, z) {
   if (getProperty(properties.mapE_RestoreRapids)) {
 
     // Calculat a z to 3 decimal places for zSafe comparison, every where else use z to avoid mixing rounded with unrounded
-    var z_round = z.round(3);
+    var z_round = roundTo(z, 3);
     writeComment(eComment.Debug, "isSafeToRapid z: " + z + " z_round: " + z_round);
 
     let zSafe = (z_round >= safeZHeight);
