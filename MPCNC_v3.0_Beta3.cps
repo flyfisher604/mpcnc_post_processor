@@ -1843,6 +1843,13 @@ function spindleOff() {
   spindleEnabled = false;
 }
 
+// Collapse newlines and any of `unsafeChars` into a single space, so user-supplied text
+// (tool comments, operation names) embedded in a G-code message can't break line syntax,
+// comment syntax, or quoted parameters.
+function sanitizeMessageText(text, unsafeChars) {
+  return String(text).replace(new RegExp("[\\r\\n" + unsafeChars + "]+", "g"), " ").trim();
+}
+
 function display_text(txt) {
   // Firmware is Grbl
   if (fw == eFirmware.GRBL) {
@@ -1851,7 +1858,7 @@ function display_text(txt) {
 
   // Default
   else {
-    writeBlock(mFormat.format(117), (getProperty(properties.job8_SeparateWordsWithSpace) ? "" : " ") + txt);
+    writeBlock(mFormat.format(117), (getProperty(properties.job8_SeparateWordsWithSpace) ? "" : " ") + sanitizeMessageText(txt, "();"));
   }
 }
 
@@ -1930,20 +1937,20 @@ function circular(clockwise, cx, cy, cz, x, y, z, feed) {
 function askUser(text, title, allowJog) {
   // Firmware is RepRap?
   if (fw == eFirmware.REPRAP) {
-    var v1 = " P\"" + text + "\" R\"" + title + "\" S3";
+    var v1 = " P\"" + sanitizeMessageText(text, "\"") + "\" R\"" + sanitizeMessageText(title, "\"") + "\" S3";
     var v2 = allowJog ? " X1 Y1 Z1" : "";
     writeBlock(mFormat.format(291), (getProperty(properties.job8_SeparateWordsWithSpace) ? "" : " ") + v1 + v2);
   }
 
   // GRBL, include the message in a comment prefixed with MSG
   else if (fw == eFirmware.GRBL) {
-      writeBlock(mFormat.format(0), (getProperty(properties.job8_SeparateWordsWithSpace) ? "" : " ") + "(MSG " + text + ")");
+      writeBlock(mFormat.format(0), (getProperty(properties.job8_SeparateWordsWithSpace) ? "" : " ") + "(MSG " + sanitizeMessageText(text, "();") + ")");
   }
-  
+
   // Default
   else
   {
-    writeBlock(mFormat.format(0), (getProperty(properties.job8_SeparateWordsWithSpace) ? "" : " ") + text);
+    writeBlock(mFormat.format(0), (getProperty(properties.job8_SeparateWordsWithSpace) ? "" : " ") + sanitizeMessageText(text, "();"));
   }
 }
 
