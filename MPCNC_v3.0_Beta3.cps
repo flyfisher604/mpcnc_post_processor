@@ -1818,7 +1818,7 @@ function spindleOn(_spindleSpeed, _clockwise) {
     }
   } else {
     writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed));
-    writeBlock(mFormat.format(_clockwise ? 3 : 4), sOutput.format(spindleSpeed));
+    writeBlock(mFormat.format(_clockwise ? 3 : 4), sOutput.format(_spindleSpeed));
   }
  
   this.spindleEnabled = true;

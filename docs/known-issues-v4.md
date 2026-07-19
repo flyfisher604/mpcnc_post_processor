@@ -14,7 +14,7 @@ Legend: `[x]` fixed, `[ ]` open.
 
 ## Correctness risks
 
-- [ ] **#4 — Severity: Correctness** — [Line 1821](../MPCNC_v3.0_Beta3.cps#L1821) — `spindleOn` writes `sOutput.format(spindleSpeed)` (the global) instead of the function's own `_spindleSpeed` parameter. Currently masked because all call sites pass matching values.
+- [x] **#4 — Severity: Correctness** — [Line 1821](../MPCNC_v3.0_Beta3.cps#L1821) — `spindleOn` wrote `sOutput.format(spindleSpeed)` (the framework-injected global, like `tool`/`currentSection`/`unit`) instead of the function's own `_spindleSpeed` parameter. Was masked because all call sites happened to pass matching values. **Fixed** by using `_spindleSpeed`.
 - [ ] **#5 — Severity: Correctness** — [Lines 1403-1412](../MPCNC_v3.0_Beta3.cps#L1403-L1412) — `setSpindeSpeed` only compares speed value, ignoring `_clockwise`; a direction reversal at unchanged RPM silently emits no G-code.
 - [ ] **#6 — Severity: Correctness** — [Line 1501](../MPCNC_v3.0_Beta3.cps#L1501) — `handleMinMax` compares `pair.max < rmin` instead of `rmax`, under-reporting the true max range in the informational Ranges Table header comment.
 - [ ] **#7 — Severity: Correctness** — [Lines 1061-1091](../MPCNC_v3.0_Beta3.cps#L1061-L1091) — `onClose` only calls `flushMotions()` once, before the final `rapidMovementsXY(0, 0)`/coolant-off/spindle-off/"Job end" message, so those can fire before the machine finishes moving to origin.
