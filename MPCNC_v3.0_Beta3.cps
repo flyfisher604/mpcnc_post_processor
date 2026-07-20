@@ -834,22 +834,32 @@ function roundTo(value, places) {
 function isSafeToRapid(x, y, z) {
   if (getProperty(properties.mapE_RestoreRapids)) {
 
-    // Calculat a z to 3 decimal places for zSafe comparison, every where else use z to avoid mixing rounded with unrounded
-    var z_round = roundTo(z, 3);
-    writeComment(eComment.Debug, "isSafeToRapid z: " + z + " z_round: " + z_round);
+    // Compare positions at the output precision (unit-dependent: 3 dp mm / 4 dp inch, the
+    // same precision the coordinates are written with). Two positions that format to the
+    // same G-code are the same point, so rounding here keeps floating-point representation
+    // noise from spuriously failing the "constant axis" tests and defeating the G1 -> G0 mapping.
+    var places = (unit == MM ? 3 : 4);
+    var zr = roundTo(z, places);
+    writeComment(eComment.Debug, "isSafeToRapid z: " + z + " zr: " + zr);
 
-    let zSafe = (z_round >= safeZHeight);
+    let zSafe = (zr >= safeZHeight);
 
-    writeComment(eComment.Debug, "isSafeToRapid zSafe: " + zSafe + " z_round: " + z_round + " safeZHeight: " + safeZHeight);
+    writeComment(eComment.Debug, "isSafeToRapid zSafe: " + zSafe + " zr: " + zr + " safeZHeight: " + safeZHeight);
 
     // Destination z must be in safe zone.
     if (zSafe) {
       let cur = getCurrentPosition();
-      let zConstant = (z == cur.z);
-      let zUp = (z > cur.z);
-      let xyConstant = ((x == cur.x) && (y == cur.y));
-      let curZSafe = (cur.z >= safeZHeight);
-      writeComment(eComment.Debug, "isSafeToRapid curZSafe: " + curZSafe + " cur.z: " + cur.z);
+      let xr = roundTo(x, places);
+      let yr = roundTo(y, places);
+      let curXr = roundTo(cur.x, places);
+      let curYr = roundTo(cur.y, places);
+      let curZr = roundTo(cur.z, places);
+
+      let zConstant = (zr == curZr);
+      let zUp = (zr > curZr);
+      let xyConstant = ((xr == curXr) && (yr == curYr));
+      let curZSafe = (curZr >= safeZHeight);
+      writeComment(eComment.Debug, "isSafeToRapid curZSafe: " + curZSafe + " curZr: " + curZr);
 
       // Restore Rapids only when the target Z is safe and
       //   Case 1: Z is not changing, but XY are
