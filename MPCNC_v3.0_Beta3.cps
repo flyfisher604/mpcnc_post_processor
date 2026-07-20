@@ -1129,6 +1129,14 @@ function writeWCS(section) {
 }
 
 function onSection() {
+  // Multi-axis toolpaths aren't supported (only 3-axis / 2D-jet). Fail at the start of
+  // the offending operation with a clear message, rather than partway through its motion
+  // (onLinear5D/onRapid5D also guard, as a backstop).
+  if (currentSection.isMultiAxis()) {
+    error(localize("Multi-axis toolpath is not supported. Use a 3-axis milling or 2D/jet strategy."));
+    return;
+  }
+
   // Every section needs to start with a Rapid to get to the initial location.
   // In the hobby version Rapids have been elliminated and the first command is
   // a onLinear not a onRapid command. This results in not current position being
