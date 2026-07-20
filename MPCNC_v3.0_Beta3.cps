@@ -1259,6 +1259,24 @@ function onCircular(clockwise, cx, cy, cz, x, y, z, feed) {
   circular(clockwise, cx, cy, cz, x, y, z, feed);
 }
 
+// Drilling / canned cycles.
+// None of the supported firmwares handle G81/G82/G83 canned cycles as drilling:
+// GRBL has no canned cycles, Marlin only supports them in an opt-in custom build
+// (CNC_DRILLING_CYCLE, non-standard params), and RepRap/Duet reuse those codes for
+// mesh/probe/babystep functions. So every cycle point is expanded into ordinary
+// G0/G1 plunge-and-retract moves (via the existing onRapid/onLinear/onDwell paths),
+// which run identically on all three firmwares.
+function onCyclePoint(x, y, z) {
+  // WCS/inspection probing can't be faked by expansion (it would emit plain G0/G1
+  // moves with no actual G38 probe), so reject it clearly instead of silently
+  // producing non-probing motion. (This post's own Z touch-off is separate; see probeTool.)
+  if (isProbeOperation()) {
+    cycleNotSupported();
+    return;
+  }
+  expandCyclePoint(x, y, z);
+}
+
 // Called on waterjet/plasma/laser cuts
 var powerState = false;
 

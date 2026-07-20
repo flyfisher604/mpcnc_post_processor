@@ -33,7 +33,14 @@ Where a "missing" feature is actually appropriate for the target firmware, it is
 
   *Residual uncertainty (honest):* the exact behavior of `linearize(undefined)` — segment explosion vs. thrown error vs. silent pass-through — is **not** doc-confirmed; the Autodesk forum/KB pages that discuss the "built-in tolerance" 403-block automated fetching. What is confirmed is that assigning `tolerance` is required and universal in Autodesk's own posts.
 
-- [ ] **F2 — No canned-cycle handlers (`onCycle`/`onCyclePoint`/`onCycleEnd`) → drilling operations do not post.** — (absent from file). Autodesk docs: `onCyclePoint(x, y, z)` is *"the controlling function for drilling, probing, and inspection cycles,"* and there is **no automatic linearization if `onCyclePoint` is entirely absent** — a drilling/tapping/boring/probing operation will produce no drilling motion or error out. A compliant post must at minimum implement `onCyclePoint` whose `default` branch calls the built-in `expandCyclePoint(x, y, z)` (which decomposes the cycle into `onRapid`/`onLinear` moves), plus `onCycleEnd`. Today, any Drilling operation in Fusion will fail against this post. **Fix (minimal):** add `onCyclePoint`/`onCycle`/`onCycleEnd` that expand cycles via `expandCyclePoint()`; (optional richer version emits native `G81/G82/G83` etc.). Note: expanded tapping/boring also need `onCommand` support for `COMMAND_SPINDLE_CLOCKWISE/COUNTERCLOCKWISE`/`COMMAND_STOP_SPINDLE` (the post already handles these).
+- [x] **F2 — No canned-cycle handlers (`onCycle`/`onCyclePoint`/`onCycleEnd`) → drilling operations do not post.** — **Fixed** by adding an `onCyclePoint(x, y, z)` that calls `expandCyclePoint(x, y, z)`, decomposing every drilling/tapping/boring cycle into ordinary `G0/G1` moves through the existing `onRapid`/`onLinear`/`onDwell` paths (portable across Marlin/GRBL/RepRap; no native canned cycles emitted, per the firmware analysis below). Probe operations are guarded with `isProbeOperation()` → `cycleNotSupported()` so Fusion WCS-probing errors clearly instead of silently expanding into fake (non-G38) motion. Original finding: (absent from file). Autodesk docs: `onCyclePoint(x, y, z)` is *"the controlling function for drilling, probing, and inspection cycles,"* and there is **no automatic linearization if `onCyclePoint` is entirely absent** — a drilling/tapping/boring/probing operation will produce no drilling motion or error out. Today, any Drilling operation in Fusion will fail against this post.
+
+  **Fix must be expansion-only — do NOT emit native G81/G82/G83 for these firmwares** (verified against firmware docs):
+  - **GRBL v1.1** does not support canned cycles at all — only `G80` (cancel) exists in its modal group; `G81/G82/G83` are unimplemented.
+  - **Marlin** supports `G81/G82/G83` *only* in a non-default custom build compiled with `CNC_DRILLING_CYCLE`, and with non-Fanuc parameter semantics (`L` repeat, `Q` peck). A post can't assume a user's build has it.
+  - **RepRap/Duet (RRF)** reuses `G81/G82/G83` for entirely different 3D-printer functions (mesh bed compensation / Z-probe / babystepping) — emitting a drilling `G81` to a Duet would be **misinterpreted as an unrelated command (a hazard)**, not merely ignored.
+
+  So the correct, portable fix is: implement `onCyclePoint`/`onCycle`/`onCycleEnd` where `onCyclePoint` calls the built-in **`expandCyclePoint(x, y, z)`** to decompose every cycle into ordinary `G0/G1` plunge-and-retract moves (identical behavior on all three firmwares). Native canned-cycle output should **not** be added. Note: expanded tapping/boring also rely on `onCommand` support for `COMMAND_SPINDLE_CLOCKWISE/COUNTERCLOCKWISE`/`COMMAND_STOP_SPINDLE` (already handled by this post).
 
 ---
 
@@ -81,3 +88,9 @@ Where a "missing" feature is actually appropriate for the target firmware, it is
 - [PostProcessor Class Reference](https://cam.autodesk.com/posts/reference/classPostProcessor.html) — `tolerance`, `unit`, `highFeedrate`, `allowedCircularPlanes`, `expandCyclePoint`, `getProperty`/`setProperty`, `getPower`
 - [Section Class Reference](https://cam.autodesk.com/posts/reference/classSection.html) — `getWorkOffset`, `getJetMode` (JET_MODE_THROUGH/ETCHING/VAPORIZE), `getQuality`, `isMultiAxis`, `getMaximumFeedrate`
 - [Cycles reference](https://cam.autodesk.com/posts/reference/cycles.html) — cycle callback flow, `cycleType`, expansion behavior
+
+### Firmware capability sources (for F2 — canned-cycle support)
+
+- [GRBL v1.1 Commands (gnea/grbl wiki)](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Commands) — motion modal group is `G0 G1 G2 G3 G38.x G80`; no `G81/G82/G83`.
+- [Marlin `CNC_DRILLING_CYCLE` — G81/G82/G83 PRs/issue](https://github.com/MarlinFirmware/Marlin/issues/14448) (also PR [#14225](https://github.com/MarlinFirmware/Marlin/pull/14225), PR [#16103](https://github.com/MarlinFirmware/Marlin/pull/16103)) — drilling cycles are an opt-in build flag, not stock.
+- [RepRap G-code dictionary](https://reprap.org/wiki/G-code) — `G81/G82/G83` are mesh bed compensation / Z-probe / babystep in RepRapFirmware, conflicting with CNC drilling meaning.
