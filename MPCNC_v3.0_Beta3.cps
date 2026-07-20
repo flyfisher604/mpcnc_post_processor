@@ -1652,11 +1652,18 @@ function rapidMovementsZ(_z) {
   }
 }
 
-// Combined X/Y/Z rapid: moves Z first, then XY, each as its own G0 at its own configured travel feedrate.
+// Combined X/Y/Z rapid, emitted as separate G0s (each at its own configured travel feedrate).
+// Order the split moves so we never plunge into the part: when Z is descending, position XY
+// first and then bring Z down; when Z is rising or unchanged, retract Z first and then move XY.
+// (Matches Autodesk's safe initial-positioning pattern: rapid XY above the part, then Z down.)
 function rapidMovements(_x, _y, _z) {
-
-  rapidMovementsZ(_z);
-  rapidMovementsXY(_x, _y);
+  if (_z < getCurrentPosition().z) {
+    rapidMovementsXY(_x, _y);
+    rapidMovementsZ(_z);
+  } else {
+    rapidMovementsZ(_z);
+    rapidMovementsXY(_x, _y);
+  }
 }
 
 // Calculate the feedX, feedY and feedZ components
