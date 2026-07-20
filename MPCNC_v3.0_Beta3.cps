@@ -1040,6 +1040,9 @@ function onOpen() {
   // Set the starting sequence number for line numbering
   sequenceNumber = getProperty(properties.job6_SequenceNumberStart);
 
+  // No work offset emitted yet
+  currentWorkOffset = undefined;
+
   // Set the seperator used between text
   if (!getProperty(properties.job8_SeparateWordsWithSpace)) {
     setWordSeparator("");
@@ -1087,6 +1090,43 @@ function onClose() {
 
 var forceSectionToStartWithRapid = false;
 var sectionComment;
+var currentWorkOffset;   // last work offset (WCS) emitted, to suppress redundant output
+
+// Emit the work coordinate system (WCS) for a section.
+// GRBL and RepRap/Duet support G54-G59 (RepRap also G59.1-G59.3), so honor the offset
+// the user assigned in Fusion. Stock Marlin has no G54-G59 -- this post sets the origin
+// with G92 there instead -- so on Marlin we only warn when a non-default WCS was selected
+// that we can't honor. currentWorkOffset suppresses re-emitting the same WCS each section.
+function writeWCS(section) {
+  var workOffset = section.getWorkOffset();
+  if (workOffset == 0) {
+    workOffset = 1; // default to the first WCS (G54)
+  }
+
+  if (fw == eFirmware.MARLIN) {
+    if (workOffset > 1 && workOffset != currentWorkOffset) {
+      writeComment(eComment.Important, " >>> WARNING: Marlin uses a G92 origin; work offset " + workOffset + " (G" + (53 + workOffset) + ") is not supported and is ignored");
+    }
+    currentWorkOffset = workOffset;
+    return;
+  }
+
+  // GRBL / RepRap: select the work coordinate system (only when it changes).
+  if (workOffset == currentWorkOffset) {
+    return;
+  }
+  if (workOffset <= 6) {
+    writeBlock(gFormat.format(53 + workOffset));            // G54 - G59
+  }
+  else if (fw == eFirmware.REPRAP && workOffset <= 9) {
+    writeBlock(gFormat.format(59 + (workOffset - 6) / 10)); // G59.1 - G59.3
+  }
+  else {
+    error("Work offset " + workOffset + " is out of range for " + fw + " (GRBL supports G54-G59, RepRap G54-G59.3).");
+    return;
+  }
+  currentWorkOffset = workOffset;
+}
 
 function onSection() {
   // Every section needs to start with a Rapid to get to the initial location.
@@ -1124,7 +1164,10 @@ function onSection() {
   } 
   else if (tool.number != getPreviousSection().getTool().number)
       toolChange();
-  
+
+  // Select the work coordinate system (WCS on GRBL/RepRap; warn-only on Marlin)
+  writeWCS(currentSection);
+
   // Machining type
   if (currentSection.type == TYPE_MILLING) {
     // Specific milling code
@@ -2009,7 +2052,6 @@ function toolChange() {
   else
   {
       writeBlock(mFormat.format(6), tFormat.format(tool.number));
-      writeBlock(gFormat.format(54));
   }
 
   // If there is a custom GCode file for tool changes then include it
