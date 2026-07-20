@@ -31,7 +31,7 @@ minimumChordLength = spatial(0.01, MM);
 minimumCircularRadius = spatial(0.01, MM);
 maximumCircularRadius = spatial(1000, MM);
 minimumCircularSweep = toRad(0.01);
-maximumCircularSweep = toRad(180);
+maximumCircularSweep = toRad(180); // split arcs >180 deg (so full circles post as two arcs, avoiding start==end full-circle quirks on some firmware)
 allowHelicalMoves = false;
 allowedCircularPlanes = undefined;
 
@@ -1937,66 +1937,36 @@ function circular(clockwise, cx, cy, cz, x, y, z, feed) {
 
   var start = getCurrentPosition();
 
+  // Full circles never arrive here: maximumCircularSweep = 180 splits them into two
+  // arcs upstream, and helical moves are linearized by the kernel (allowHelicalMoves =
+  // false) -- so only planar partial arcs reach this point.
+
   // Firmware is Grbl
   if (fw == eFirmware.GRBL) {
-    if (isFullCircle()) {
-        if (isHelical()) {
+    switch (getCircularPlane()) {
+        case PLANE_XY:
+            writeBlock(gPlaneModal.format(17), gMotionModal.format(clockwise ? 2 : 3), xOutput.format(x), yOutput.format(y), zOutput.format(z), iOutput.format(cx - start.x, 0), jOutput.format(cy - start.y, 0), fOutput.format(feed));
+            break;
+        case PLANE_ZX:
+            writeBlock(gPlaneModal.format(18), gMotionModal.format(clockwise ? 2 : 3), xOutput.format(x), yOutput.format(y), zOutput.format(z), iOutput.format(cx - start.x, 0), kOutput.format(cz - start.z, 0), fOutput.format(feed));
+            break;
+        case PLANE_YZ:
+            writeBlock(gPlaneModal.format(19), gMotionModal.format(clockwise ? 2 : 3), xOutput.format(x), yOutput.format(y), zOutput.format(z), jOutput.format(cy - start.y, 0), kOutput.format(cz - start.z, 0), fOutput.format(feed));
+            break;
+        default:
             linearize(tolerance);
-            return;
-        }
-        switch (getCircularPlane()) {
-            case PLANE_XY:
-                writeBlock(gPlaneModal.format(17), gMotionModal.format(clockwise ? 2 : 3), xOutput.format(x), iOutput.format(cx - start.x, 0), jOutput.format(cy - start.y, 0), fOutput.format(feed));
-                break;
-            case PLANE_ZX:
-                writeBlock(gPlaneModal.format(18), gMotionModal.format(clockwise ? 2 : 3), zOutput.format(z), iOutput.format(cx - start.x, 0), kOutput.format(cz - start.z, 0), fOutput.format(feed));
-                break;
-            case PLANE_YZ:
-                writeBlock(gPlaneModal.format(19), gMotionModal.format(clockwise ? 2 : 3), yOutput.format(y), jOutput.format(cy - start.y, 0), kOutput.format(cz - start.z, 0), fOutput.format(feed));
-                break;
-            default:
-                linearize(tolerance);
-        }
-    } else {
-        switch (getCircularPlane()) {
-            case PLANE_XY:
-                writeBlock(gPlaneModal.format(17), gMotionModal.format(clockwise ? 2 : 3), xOutput.format(x), yOutput.format(y), zOutput.format(z), iOutput.format(cx - start.x, 0), jOutput.format(cy - start.y, 0), fOutput.format(feed));
-                break;
-            case PLANE_ZX:
-                writeBlock(gPlaneModal.format(18), gMotionModal.format(clockwise ? 2 : 3), xOutput.format(x), yOutput.format(y), zOutput.format(z), iOutput.format(cx - start.x, 0), kOutput.format(cz - start.z, 0), fOutput.format(feed));
-                break;
-            case PLANE_YZ:
-                writeBlock(gPlaneModal.format(19), gMotionModal.format(clockwise ? 2 : 3), xOutput.format(x), yOutput.format(y), zOutput.format(z), jOutput.format(cy - start.y, 0), kOutput.format(cz - start.z, 0), fOutput.format(feed));
-                break;
-            default:
-                linearize(tolerance);
-        }
     }
   }
 
   // Default
   else {
     // Marlin supports arcs only on XY plane
-    if (isFullCircle()) {
-      if (isHelical()) {
+    switch (getCircularPlane()) {
+      case PLANE_XY:
+        writeBlock(gMotionModal.format(clockwise ? 2 : 3), xOutput.format(x), yOutput.format(y), zOutput.format(z), iOutput.format(cx - start.x, 0), jOutput.format(cy - start.y, 0), fOutput.format(feed));
+        break;
+      default:
         linearize(tolerance);
-        return;
-      }
-      switch (getCircularPlane()) {
-        case PLANE_XY:
-          writeBlock(gMotionModal.format(clockwise ? 2 : 3), xOutput.format(x), iOutput.format(cx - start.x, 0), jOutput.format(cy - start.y, 0), fOutput.format(feed));
-          break;
-        default:
-          linearize(tolerance);
-      }
-    } else {
-      switch (getCircularPlane()) {
-        case PLANE_XY:
-          writeBlock(gMotionModal.format(clockwise ? 2 : 3), xOutput.format(x), yOutput.format(y), zOutput.format(z), iOutput.format(cx - start.x, 0), jOutput.format(cy - start.y, 0), fOutput.format(feed));
-          break;
-        default:
-          linearize(tolerance);
-      }
     }
   }
 }
