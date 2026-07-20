@@ -1255,6 +1255,13 @@ var pendingRadiusCompensation = RADIUS_COMPENSATION_OFF;
 
 function onRadiusCompensation() {
   pendingRadiusCompensation = radiusCompensation;
+
+  // Marlin/GRBL/RepRap have no G41/G42 cutter compensation, so control-side
+  // compensation can't be honored. Fail early with an actionable message; the
+  // supported mode is "In computer" (Fusion pre-offsets the centerline).
+  if (pendingRadiusCompensation != RADIUS_COMPENSATION_OFF) {
+    error(localize("Cutter radius compensation in the control is not supported (Marlin/GRBL/RepRap have no G41/G42). Set the operation's Compensation Type to 'In computer'."));
+  }
 }
 
 // Rapid movements
@@ -1780,11 +1787,8 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
 
 // Linear movements
 function linearMovements(_x, _y, _z, _feed) {
-  if (pendingRadiusCompensation != RADIUS_COMPENSATION_OFF) {
-    // ensure that we end at desired position when compensation is turned off
-    xOutput.reset();
-    yOutput.reset();
-  }
+  // Note: control-side radius compensation is rejected up front in onRadiusCompensation
+  // (Marlin/GRBL/RepRap have no G41/G42), so pendingRadiusCompensation is always OFF here.
 
   // Force the feedrate to be scaled (if enabled). The feedrate is projected into the
   // x, y, and z axis and each axis is tested to see if it exceeds its defined max. If
@@ -1799,11 +1803,7 @@ function linearMovements(_x, _y, _z, _feed) {
   let f = fOutput.format(feed);
 
   if (x || y || z) {
-    if (pendingRadiusCompensation != RADIUS_COMPENSATION_OFF) {
-      error(localize("Radius compensation mode is not supported."));
-    } else {
-      writeBlock(gMotionModal.format(1), x, y, z, f);
-    }
+    writeBlock(gMotionModal.format(1), x, y, z, f);
   } else if (f) {
     if (getNextRecord().isMotion()) { // try not to output feed without motion
       fOutput.reset(); // force feed on next line
