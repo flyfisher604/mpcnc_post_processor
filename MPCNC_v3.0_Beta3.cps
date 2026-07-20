@@ -24,7 +24,7 @@ extension = "gcode";
 setCodePage("ascii");
 
 capabilities = CAPABILITY_MILLING | CAPABILITY_JET;
-// tolerance = spatial(0.002, MM);
+tolerance = spatial(0.002, MM);
 
 // Arc support variables
 minimumChordLength = spatial(0.01, MM);

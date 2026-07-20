@@ -1,0 +1,83 @@
+# Fusion 360 / Autodesk HSM Post-Processor Compliance Issues — MPCNC_v3.0_Beta3.cps
+
+Findings from a review of the post against **Autodesk / Fusion 360 post-processor
+functionality**, using the official Autodesk documentation (Post Processor Training Guide,
+rev. 4/2/25; the `cam.autodesk.com/posts/reference/` class/entry-function references). This is a
+**separate** pass from the general code-quality review in [known-issues-v4.md](known-issues-v4.md)
+(findings #1–#26); it looks specifically at correctness against the Autodesk API and at
+functionality that a compliant milling + jet post is expected to provide.
+
+Legend: `[x]` fixed, `[ ]` open. All items are currently **open** (review/report only — no edits made).
+
+Numbering uses an `F` prefix (F1, F2, …) to keep these distinct from the code-quality findings.
+
+Context — the target is hobby firmware (Marlin / GRBL / RepRap-Duet), not an industrial
+Fanuc/Haas control. Several industrial conventions (tool-length-offset tables, WCS fixtures) are
+intentionally handled differently here (G92-based zeroing, manual tool changes with Z re-probe).
+Where a "missing" feature is actually appropriate for the target firmware, it is called out as
+**by design** rather than a defect.
+
+---
+
+## Breaking — produces wrong or no output
+
+- [x] **F1 — `tolerance` is unset but is used by every arc-linearization path.** — [Line 27](../MPCNC_v3.0_Beta3.cps#L27), [`circular()`: 1858-1928](../MPCNC_v3.0_Beta3.cps#L1858-L1928). **Fixed** by uncommenting line 27 so `tolerance = spatial(0.002, MM);` is assigned. Original finding: `tolerance = spatial(0.002, MM)` was **commented out**, yet `circular()` calls `linearize(tolerance)` in several places. Per Autodesk docs `tolerance` is a kernel-consumed global the post **must** assign (in MM), with **no documented default** and no documented kernel initialization (the class reference lists it as a bare `Number` attribute — unlike `unit`, which the docs explicitly say the kernel populates). An unassigned global reads as `undefined`, so these calls become `linearize(undefined)`.
+
+  **Verified — not injected by the environment:** Autodesk's own stock **GRBL** post and **Carbide3D (GRBL)** post (the closest official comparables to the MPCNC target) both assign `tolerance = spatial(0.002, MM);` in the header and call `linearize(tolerance)` in `onCircular` — the exact pattern this post uses, except the assignment is commented out here. No Autodesk stock post omits it. So the environment does **not** supply a usable default; the post must set it.
+
+  **Severity is latent-but-real.** In the common 2.5D case with "Use Arcs" enabled, XY arcs are emitted directly as G2/G3 and `linearize()` is never reached — which is likely why this hasn't been widely noticed. It manifests in two concrete paths:
+  1. **`job4_UseArcs = false`** → [lines 1859-1861](../MPCNC_v3.0_Beta3.cps#L1859-L1861) route **every** arc through `linearize(tolerance)` = `linearize(undefined)`. This is a normal user choice (senders/controllers that handle arcs poorly), so it's a live trigger.
+  2. **Non-XY-plane arcs on Marlin** (default firmware) and full-circle/helical fallbacks → the `linearize(tolerance)` calls in [circular()](../MPCNC_v3.0_Beta3.cps#L1858-L1928) (e.g. the Marlin branch linearizes ZX/YZ arcs, [1904-1927](../MPCNC_v3.0_Beta3.cps#L1904-L1927)).
+
+  **Fix:** restore `tolerance = spatial(0.002, MM);` (uncomment line 27). Autodesk: *"Specifies the tolerance used to linearize circular moves… This variable must be set in millimeters (MM)."*
+
+  *Residual uncertainty (honest):* the exact behavior of `linearize(undefined)` — segment explosion vs. thrown error vs. silent pass-through — is **not** doc-confirmed; the Autodesk forum/KB pages that discuss the "built-in tolerance" 403-block automated fetching. What is confirmed is that assigning `tolerance` is required and universal in Autodesk's own posts.
+
+- [ ] **F2 — No canned-cycle handlers (`onCycle`/`onCyclePoint`/`onCycleEnd`) → drilling operations do not post.** — (absent from file). Autodesk docs: `onCyclePoint(x, y, z)` is *"the controlling function for drilling, probing, and inspection cycles,"* and there is **no automatic linearization if `onCyclePoint` is entirely absent** — a drilling/tapping/boring/probing operation will produce no drilling motion or error out. A compliant post must at minimum implement `onCyclePoint` whose `default` branch calls the built-in `expandCyclePoint(x, y, z)` (which decomposes the cycle into `onRapid`/`onLinear` moves), plus `onCycleEnd`. Today, any Drilling operation in Fusion will fail against this post. **Fix (minimal):** add `onCyclePoint`/`onCycle`/`onCycleEnd` that expand cycles via `expandCyclePoint()`; (optional richer version emits native `G81/G82/G83` etc.). Note: expanded tapping/boring also need `onCommand` support for `COMMAND_SPINDLE_CLOCKWISE/COUNTERCLOCKWISE`/`COMMAND_STOP_SPINDLE` (the post already handles these).
+
+---
+
+## Correctness / safety risks
+
+- [ ] **F3 — `rapidMovements()` outputs Z before XY, contrary to the documented safe initial-positioning order.** — [`rapidMovements`: 1634-1639](../MPCNC_v3.0_Beta3.cps#L1634-L1639). The function emits `rapidMovementsZ(_z)` **then** `rapidMovementsXY(_x, _y)`. For any combined rapid where Z descends while XY moves (e.g. a diagonal approach the kernel hands to `onRapid` as a single X/Y/Z move), moving **Z first** plunges the tool at the *current* XY before it travels to position — a collision/plunge-into-fixture risk. Autodesk's canonical safe-start sequence is the opposite: **rapid XY above the part first, then bring Z down** (`G0 X.. Y..` then `G0 G43 Z.. H..`). Retracts (Z rising) are safe Z-first, but the blanket ordering is unsafe for descending moves. **Fix:** for descending Z, do XY before Z (only retracts should do Z-first); i.e. order the two sub-moves by whether Z is increasing or decreasing relative to current position.
+
+- [ ] **F4 — Work Coordinate System / work offsets (`getWorkOffset()`) are ignored.** — (no `getWorkOffset` in file); the only WCS output is a hardcoded `G54` at [line 1998](../MPCNC_v3.0_Beta3.cps#L1998), and only in the `toolChange1_InsertCode == false` branch. With tool changes disabled (the default), the post emits **no** work-offset code at all. Autodesk pattern: read `currentSection.getWorkOffset()` and emit `section.wcs` (G54–G59, G59.x / G54.1 P#). Consequence: a Fusion setup that assigns a non-default WCS (G55, G56, …) is silently posted against the wrong (or machine-current) offset. **Partly by design** — this post uses a G92-relative zeroing workflow ([`job1_SetOriginOnStart` → G92 X0 Y0 Z0](../MPCNC_v3.0_Beta3.cps#L1799-L1802)), which is a legitimate hobby-CNC model where a single origin is set at job start. But the post should at least **warn or error** if a section requests a work offset > 1 (or the default), rather than silently ignoring it. **Fix:** honor `getWorkOffset()` (emit G54–G59), or explicitly `error()`/`warning()` when a non-default WCS is requested so the user isn't misled.
+
+- [ ] **F5 — `onPassThrough` not implemented → Manual NC "Pass through" is silently dropped.** — (absent from file). Autodesk: when `onManualNC` is not defined, each Manual NC entry falls back to an individual handler; "Pass through" routes to `onPassThrough(value)`, which should emit the text unmodified. The post implements `onDwell`, `onComment`, and `onCommand` (so Dwell / Comment / Stop / Optional Stop / etc. work), but has no `onPassThrough`, so any Manual NC → Pass Through block a user adds is discarded from the output. **Fix:** add `function onPassThrough(value) { writeBlock(value); }` (or route through the post's block writer). Implementing `onManualNC` with an `expandManualNC(command, value)` default is optional/best-practice but not required.
+
+---
+
+## Limitations / deviations from standard practice (lower priority; several are by-design)
+
+- [ ] **F6 — Control-side radius (cutter) compensation is not supported; it hard-errors.** — [`onRadiusCompensation`: 1202-1204](../MPCNC_v3.0_Beta3.cps#L1202-L1204), [`linearMovements` error: 1720-1723](../MPCNC_v3.0_Beta3.cps#L1720-L1723). The post latches `pendingRadiusCompensation` and then calls `error("Radius compensation mode is not supported.")` if a move needs it. Erroring is a **sanctioned fallback** for a post that only supports "In computer" compensation (Marlin/GRBL have no G41/G42 cutter-comp), so this is acceptable/by-design. Minor improvement: the standard mechanism is the `supportsRadiusCompensation: false` setting so the kernel produces a cleaner message; and the error should ideally surface at section start rather than mid-motion. **Recommendation, not a bug.**
+
+- [ ] **F7 — Coolant uses a bespoke dual-channel implementation instead of the declarative `coolants` array.** — [`setCoolant`/`CoolantA`/`CoolantB`: 880-958](../MPCNC_v3.0_Beta3.cps#L880-L958). Autodesk's recommended approach is a declarative `coolant.coolants` array plus `setCoolant(tool.coolant)` / `getCoolantCodes()`, which the kernel validates. This post rolls its own two-channel, pin-based (M42 P# S#) coolant with custom-file overrides. That's a deliberate design to express MPCNC's pin-driven coolant, which the stock mechanism can't easily represent — **by design**, but it bypasses kernel validation of coolant modes. Note only.
+
+- [ ] **F8 — No tool-length compensation output (G43 H#); tool-change block is `M6 T#`.** — [`toolChange`: 1990-1998](../MPCNC_v3.0_Beta3.cps#L1990-L1998). Industrial posts emit `G43 H#` with initial positioning. Marlin/GRBL/RepRap have no tool-length-offset tables, and this post instead re-probes Z after a tool change ([`probe2_OnToolChange`](../MPCNC_v3.0_Beta3.cps#L2000-L2003)). So the G43 omission is **appropriate for the target firmware** — flagged here only so it isn't mistaken for a gap. (Minor: `writeBlock(M6, T#)` emits `M6 T#`; the more common order is `T# M6`, but Marlin accepts either.)
+
+- [ ] **F9 — `maximumCircularSweep = toRad(180)` makes the `isFullCircle()` branches in `circular()` dead code.** — [Line 34](../MPCNC_v3.0_Beta3.cps#L34), [`circular()` full-circle branches: 1868-1885, 1906-1917](../MPCNC_v3.0_Beta3.cps#L1868-L1917). With a 180° max sweep, the kernel never delivers a full circle to `onCircular` (it splits it into ≤180° arcs), so the `isFullCircle()` handling can never execute. Autodesk: *"if you wish to have 360-degree circular records you must define `maximumCircularSweep` to be 360 degrees."* Either set `maximumCircularSweep = toRad(360)` if single-block full circles are desired (GRBL/Marlin support them), or remove the dead `isFullCircle()` branches. Minor consistency issue.
+
+- [ ] **F10 — `getProperty(properties.key)` uses the object-reference form.** — throughout the file. Autodesk documents **both** `getProperty("key")` (recommended) and `getProperty(properties.key)` (object reference) as valid; the object form works here because the post uses the *combined inline* `properties` structure. So this is **not a defect**. Recommendation only: the string-key form is form-independent (survives a future move to the split `propertyDefinitions` structure) and is what Autodesk recommends. Informational.
+
+- [ ] **F11 — Multi-axis is only rejected at the first 5-axis move, not at section start.** — [`onLinear5D`/`onRapid5D`: 1240-1250](../MPCNC_v3.0_Beta3.cps#L1240-L1250). Multi-axis toolpaths correctly `error()` out, but only once motion begins. Minor: a `currentSection.isMultiAxis()` check in `onSection` would fail faster with a clearer message. Declared-unsupported, so low priority.
+
+---
+
+## Checked and NOT an issue (ruled out against the docs)
+
+- **Formats built from `unit` at module-load time** ([lines 638-661](../MPCNC_v3.0_Beta3.cps#L638-L661)) — Autodesk confirms `unit` is populated **before** the global section executes, and the stock RS-274D sample computes `createFormat` decimals from `unit` at load time. Sanctioned pattern, not a bug.
+- **`allowedCircularPlanes = undefined`** ([line 36](../MPCNC_v3.0_Beta3.cps#L36)) — documented to mean "allow all three planes" (not "disabled"). Correct.
+- **`certificationLevel = 2`** — current/standard value; correct.
+- **`highFeedrate` not set** — only used when `highFeedMapping` maps rapids to feed moves, which this post doesn't do. Benign.
+- **`onPower` jet handling** ([`onPower`: 1265-1278](../MPCNC_v3.0_Beta3.cps#L1265-L1278)) — `onPower` is the correct/required jet on-off handler and is implemented; `currentSection.jetMode` (THROUGH/ETCHING/VAPORIZE) is read correctly. Compliant.
+- **`onMovement` not filtering non-cutting moves for jet** — acceptable, because the laser/jet is held off during rapids via `onPower(false)`; the `MOVEMENT_PIERCE*` remapping in `onMovement` is comment-only, which is fine.
+
+---
+
+## Sources (Autodesk official documentation)
+
+- [CAM Post Processor Training Guide (rev. 4/2/25), PDF](https://cam.autodesk.com/posts/posts/guides/Post%20Processor%20Training%20Guide.pdf) — kernel settings & `tolerance` (§5.1.1, §5.26.1), `onManualNC`/`expandManualNC` (§6.1), cycles & `writeDrillCycle` (§5.28–5.30), WCS/`wcsDefinitions`/`writeWCS` (§5.3, §5.3.8), retract & initial positioning (§5.3.1, §5.3.11, §5.31.5), radius comp (§5.15), coolant (§4.1, §5.3.10), properties/`getProperty` (§5.1.2–5.1.6)
+- [Entry Functions reference](https://cam.autodesk.com/posts/reference/entry_functions.html) — `onCyclePoint`, `onPower`, `onPassThrough`, `onMovement`, `onManualNC`, `onRadiusCompensation`, etc.
+- [PostProcessor Class Reference](https://cam.autodesk.com/posts/reference/classPostProcessor.html) — `tolerance`, `unit`, `highFeedrate`, `allowedCircularPlanes`, `expandCyclePoint`, `getProperty`/`setProperty`, `getPower`
+- [Section Class Reference](https://cam.autodesk.com/posts/reference/classSection.html) — `getWorkOffset`, `getJetMode` (JET_MODE_THROUGH/ETCHING/VAPORIZE), `getQuality`, `isMultiAxis`, `getMaximumFeedrate`
+- [Cycles reference](https://cam.autodesk.com/posts/reference/cycles.html) — cycle callback flow, `cycleType`, expansion behavior
