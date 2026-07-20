@@ -1240,6 +1240,17 @@ function onComment(message) {
   writeComment(eComment.Important, message);
 }
 
+// Manual NC "Pass through": emit the user-entered text verbatim (one block per line).
+// Not sanitized -- pass-through is meant to reach the controller untouched.
+function onPassThrough(value) {
+  var lines = String(value).split(/\r?\n/);
+  for (var i = 0; i < lines.length; ++i) {
+    if (lines[i] != "") {
+      writeBlock(lines[i]);
+    }
+  }
+}
+
 var pendingRadiusCompensation = RADIUS_COMPENSATION_OFF;
 
 function onRadiusCompensation() {
