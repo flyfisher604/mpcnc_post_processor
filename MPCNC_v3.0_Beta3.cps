@@ -1754,22 +1754,6 @@ function propertyMmToUnit(_v) {
   return (_v / (unit == IN ? 25.4 : 1));
 }
 
-/*
-function mergeProperties(to, from) {
-  for (var attrname in from) {
-    to[attrname] = from[attrname];
-  }
-}
-
-function Firmware3dPrinterLike() {
-  FirmwareBase.apply(this, arguments);
-  this.spindleEnabled = false;
-}
-
-Firmware3dPrinterLike.prototype = Object.create(FirmwareBase.prototype);
-Firmware3dPrinterLike.prototype.constructor = Firmware3dPrinterLike;
-*/
-
 function Start() {
   // Common GCODE
 
