@@ -18,46 +18,6 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   above the safe-Z height (e.g. multiple contours with a linking move at retract height) to
   actually validate the conversion logic, not just its conservative refusal.
 
-- **Tapping's speed-feed synchronization commands are silently dropped, with no warning (unlike coolant).**
-  Source: `Setup1.gcode` T8 tapping section ([Setup1.gcode:18438-18496](c:\Users\don_m\OneDrive\Documents\Hobbies\Coding\GCode\Setup1.gcode#L18438-L18496)),
-  9/16-12 right-hand tap. F360 emits `COMMAND_ACTIVATE_SPEED_FEED_SYNCHRONIZATION` /
-  `COMMAND_DEACTIVATE_SPEED_FEED_SYNCHRONIZATION` around the tap-in (`G1 Z-43.18 F1058`) and
-  synchronized tap-out (`Z-12.7` at the reversed spindle direction) moves. `F1058` is exactly
-  500 RPM × 2.117mm pitch — F360 assumes the controller performs real closed-loop spindle/feed
-  sync for these moves.
-  In `onCommand()` ([MPCNC_v4.0_Beta1.cps:1513-1571](../MPCNC_v4.0_Beta1.cps#L1513-L1571)), there
-  is no `case` for either `COMMAND_ACTIVATE_SPEED_FEED_SYNCHRONIZATION` or
-  `COMMAND_DEACTIVATE_SPEED_FEED_SYNCHRONIZATION` — they fall through with only the generic
-  top-of-function id comment, emitting no G-code. That's the only thing that *can* be done
-  (GRBL/Marlin on an MPCNC have no `G33`/rigid-tapping capability), so tapping only works with a
-  floating/tension tap holder absorbing timing drift.
-  The gap: unlike the coolant-channel mismatch, which explicitly warns
-  (`>>> WARNING: No matching Coolant channel : Flood requested`), and unlike
-  `COMMAND_LOCK_MULTI_AXIS`/`UNLOCK_MULTI_AXIS`/`BREAK_CONTROL`, which are explicit no-op `case`s
-  acknowledging they're intentionally ignored, the speed-feed-sync commands aren't handled at all
-  — silently. An operator could run a tapping op without a floating tap holder and get no
-  indication from the post that real spindle sync isn't happening.
-  **Follow-up needed:** add explicit no-op `case`s for both commands (for clarity/consistency with
-  `LOCK_MULTI_AXIS` etc.), and consider a one-time `>>> WARNING` when a tapping operation is
-  detected, noting that a floating/tension tap holder is required (needs approval before changing).
-
-- **"3 - Map Rapids" properties have no tooltip warning that they shouldn't be enabled for a full F360 license.**
-  Source: property review, prompted by the `2D Contour1.gcode` run in this log's first entry,
-  which deliberately enabled these switches against full-F360 output "to exercise the code" —
-  a scenario the properties' own descriptions don't warn against.
-  `mapD_RestoreFirstRapids` ("First G1 -> G0 Rapid") and `mapE_RestoreRapids` ("Map: G1s -> G0
-  Rapids"), defined at [MPCNC_v4.0_Beta1.cps:220-235](../MPCNC_v4.0_Beta1.cps#L220-L235), exist
-  specifically to undo what F360 Personal/hobbyist edition does — downgrading all `G0` rapids to
-  `G1` — per the comment at [MPCNC_v4.0_Beta1.cps:1294-1301](../MPCNC_v4.0_Beta1.cps#L1294-L1301)
-  ("only required when F360 Personal edition is used"). Their descriptions ("Enable to ensure
-  that the first move of a cut starts with a G0 Rapid." / "Enable to convert G1s to G0s Rapids
-  when safe.") don't say this, so nothing in the Fusion 360 post dialog stops a full-license user
-  from enabling them unnecessarily.
-  **Follow-up needed:** add a note to both tooltips (and probably `mapG_AllowRapidZ`, which only
-  matters when `mapE_RestoreRapids` is on) that they should be left off for a full (non-Personal)
-  F360 license, since real `G0`s are already present and there's nothing for the switches to
-  recover (needs approval before changing).
-
 - **No safe clearance move at a work-offset (WCS) transition between sections.**
   Source: `Setups.gcode` (two Fusion Setups in one job), prompted by F360's own dialog:
   "Multiple setups with different WCS settings have been selected... Your post must be customized
@@ -150,3 +110,26 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   `probeTool()` ([MPCNC_v4.0_Beta1.cps:2087-2095](../MPCNC_v4.0_Beta1.cps#L2087-L2095)) updated to
   match the new semantics. Note the default flip is a real behavior change for Marlin/RepRap users
   upgrading from Beta 1 with default settings (previously defaulted to `G28`, now defaults to `G38.2`).
+
+- **Tapping's speed-feed synchronization commands were silently dropped, with no warning (unlike
+  coolant) — fixed.**
+  Source: `Setup1.gcode` T8 tapping section, 9/16-12 right-hand tap; F360 emits
+  `COMMAND_ACTIVATE_SPEED_FEED_SYNCHRONIZATION` / `COMMAND_DEACTIVATE_SPEED_FEED_SYNCHRONIZATION`
+  around the tap-in and synchronized tap-out moves, assuming the controller performs real
+  closed-loop spindle/feed sync — which Marlin/GRBL/RepRap have no capability to do (no `G33`).
+  `onCommand()` ([MPCNC_v4.0_Beta1.cps:1558-1573](../MPCNC_v4.0_Beta1.cps#L1558-L1573)) now has
+  explicit `case`s for both commands (no longer falling through silently), each emitting
+  `>>> WARNING: Speed-feed synchronization (rigid tapping) is not supported; a floating/tension
+  tap holder is required` — on every occurrence (not just once), so every affected move in the
+  file is individually flagged for diagnosis, matching the coolant-mismatch warning precedent.
+
+- **"3 - Map Rapids" properties had no tooltip warning that they shouldn't be enabled for a full
+  F360 license — fixed.**
+  Source: property review, prompted by the `2D Contour1.gcode` run's deliberate use of these
+  switches against full-F360 output "to exercise the code" — a scenario the properties' own
+  descriptions didn't warn against. `mapD_RestoreFirstRapids`, `mapE_RestoreRapids`, `mapF_SafeZ`,
+  and `mapG_AllowRapidZ` exist specifically to undo what F360 Personal/hobbyist edition does
+  (downgrading all `G0` rapids to `G1`) — not needed on a full license, where real `G0`s already
+  exist. The property group heading ([MPCNC_v4.0_Beta1.cps:220-249](../MPCNC_v4.0_Beta1.cps#L220-L249))
+  was renamed from `"3 - Map Rapids"` to `"3 - Map G1s to Rapids (disable on full license)"`, so
+  the warning is visible directly in the Fusion 360 post dialog for all four properties at once.

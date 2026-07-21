@@ -1512,7 +1512,7 @@ function onSpindleSpeed(spindleSpeed) {
 
 function onCommand(command) {
   writeComment(eComment.Info, " " + getCommandStringId(command));
-  
+
   switch (command) {
     case COMMAND_START_SPINDLE:
       onCommand(tool.clockwise ? COMMAND_SPINDLE_CLOCKWISE : COMMAND_SPINDLE_COUNTERCLOCKWISE);
@@ -1558,6 +1558,16 @@ function onCommand(command) {
     case COMMAND_UNLOCK_MULTI_AXIS:
       return;
     case COMMAND_BREAK_CONTROL:
+      return;
+    case COMMAND_ACTIVATE_SPEED_FEED_SYNCHRONIZATION:
+      // Marlin/GRBL/RepRap have no rigid-tapping/spindle-sync capability (no G33), so this
+      // is a deliberate no-op: the tap feed F360 calculated already assumes a constant
+      // spindle RPM, and a floating/tension tap holder is needed to absorb any timing drift.
+      // Warned every occurrence (not just once) so every affected move in the file is flagged.
+      writeComment(eComment.Important, " >>> WARNING: Speed-feed synchronization (rigid tapping) is not supported; a floating/tension tap holder is required");
+      return;
+    case COMMAND_DEACTIVATE_SPEED_FEED_SYNCHRONIZATION:
+      writeComment(eComment.Important, " >>> WARNING: Speed-feed synchronization (rigid tapping) is not supported; a floating/tension tap holder is required");
       return;
     case COMMAND_TOOL_MEASURE:
       if (!tool.isJetTool()) {
