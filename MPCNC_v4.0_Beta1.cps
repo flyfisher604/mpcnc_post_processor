@@ -332,8 +332,8 @@ properties = {
     scope      : "post"
   },
   probe4_G382orG28: {
-    title      : "Probe with G38.2 (Yes) or G28 (No)",
-    description: "Yes: probe with G38.2. No: probe with G28 (Home Z). Note: Grbl always uses G38.2 regardless of this setting.",
+    title      : "Probe G38.2 (Yes) or G28 (No)",
+    description: "Grbl always uses G38.2.",
     group      : "5 - Probe",
     type       : "boolean",
     value      : true,
