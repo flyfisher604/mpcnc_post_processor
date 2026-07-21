@@ -234,7 +234,7 @@ properties = {
   mapD_RestoreFirstRapids: {
     title      : "First G1 -> G0 Rapid",
     description: "Enable to ensure that the first move of a cut starts with a G0 Rapid.",
-    group      : "3 - Map G1s to Rapids (disable on full license)",
+    group      : "3 - Map G1s to Rapids (disable when using full license)",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -242,7 +242,7 @@ properties = {
   mapE_RestoreRapids: {
     title      : "Map: G1s -> G0 Rapids",
     description: "Enable to convert G1s to G0s Rapids when safe.",
-    group      : "3 - Map G1s to Rapids (disable on full license)",
+    group      : "3 - Map G1s to Rapids (disable when using full license)",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -250,7 +250,7 @@ properties = {
   mapF_SafeZ: {
     title      : "Map: Safe Z to Rapid",
     description: "Z must be above or equal to this value to be mapped G1s --> G0s; Uses Retract level if defined or 15.",
-    group      : "3 - Map G1s to Rapids (disable on full license)",
+    group      : "3 - Map G1s to Rapids (disable when using full license)",
     type       : "string",
     value      : "Retract:15",
     scope      : "post"
@@ -258,7 +258,7 @@ properties = {
   mapG_AllowRapidZ: {
     title      : "Map: Allow Rapid Z",
     description: "Enable to include vertical G1 retracts and safe descents as rapids.",
-    group      : "3 - Map G1s to Rapids (disable on full license)",
+    group      : "3 - Map G1s to Rapids (disable when using full license)",
     type       : "boolean",
     value      : false,
     scope      : "post"
