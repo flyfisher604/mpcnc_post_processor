@@ -1127,7 +1127,7 @@ function writeWCS(section) {
 
   if (workOffset == 0) {
     workOffset = 1; // default to the first WCS (G54)
-    writeComment(eComment.Debug, " writeWCS: workOffset not specified, defaulting to: " + workOffset);
+    writeComment(eComment.Info, " writeWCS: workOffset not specified, defaulting to: " + workOffset);
   }
 
   if (fw == eFirmware.MARLIN) {
