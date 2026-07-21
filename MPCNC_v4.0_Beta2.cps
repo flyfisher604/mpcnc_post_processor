@@ -1140,21 +1140,23 @@ function writeWCS(section) {
 
   // GRBL / RepRap: select the work coordinate system (only when it changes).
   if (workOffset == currentWorkOffset) {
-    writeComment(eComment.Debug, " writeWCS: unchanged, not re-selecting");
+    writeComment(eComment.Info, " WCS unchanged: " + workOffset + ", not re-selecting");
     return;
   }
   var previousWorkOffset = currentWorkOffset;
+  var offsetCode;
   if (workOffset <= 6) {
-    writeBlock(gFormat.format(53 + workOffset));            // G54 - G59
+    offsetCode = 53 + workOffset;                           // G54 - G59
   }
   else if (fw == eFirmware.REPRAP && workOffset <= 9) {
-    writeBlock(gFormat.format(59 + (workOffset - 6) / 10)); // G59.1 - G59.3
+    offsetCode = 59 + (workOffset - 6) / 10;                // G59.1 - G59.3
   }
   else {
     error("Work offset " + workOffset + " is out of range for " + fw + " (GRBL supports G54-G59, RepRap G54-G59.3).");
     return;
   }
   writeComment(eComment.Info, " WCS changed: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset) + " -> " + workOffset);
+  writeBlock(gFormat.format(offsetCode));
   currentWorkOffset = workOffset;
 }
 
