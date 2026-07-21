@@ -1,6 +1,6 @@
 /*
 **
-Version 4.0 (Beta 1)
+Version 4.0 (Beta 2)
 
 Updated to new method of handling properties
 
@@ -10,7 +10,7 @@ Changed Feb 2, 2025
 **
 */
 
-description = "v4.0 (Beta 1) MPCNC Milling/Laser for Marlin, Grbl, RepRap";
+description = "v4.0 (Beta 2) MPCNC Milling/Laser for Marlin, Grbl, RepRap";
 vendor = "flyfisher604";
 vendorUrl = "https://github.com/flyfisher604/mpcnc_post_processor";
 longDescription = "MPCNC F360 Post processor. Supports scaling of speeds to accomidate slow Z axis. Warning: BETA review all GCode.";

@@ -1,4 +1,4 @@
-# Testing Log — MPCNC_v4.0_Beta1.cps
+# Testing Log — MPCNC Post Processor
 
 Observations from manually reviewing real Fusion 360-generated `.gcode` output (as opposed to
 static code review). These are notes worth following up on, not necessarily confirmed bugs —
@@ -9,9 +9,9 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
 - **Full-F360 G1→G0 restore run never exercised the "true" branch of `isSafeToRapid`.**
   Source: `2D Contour1.gcode` (single 2D contour, `Map: G1s -> G0 Rapids = true`, `Map: First G1 -> G0 Rapid = true`, SafeZ = Retract = 5mm).
   The whole toolpath stayed at Z ≤ 1mm, below the 5mm safe height, so every `isSafeToRapid` call
-  at [MPCNC_v4.0_Beta1.cps:834](../MPCNC_v4.0_Beta1.cps#L834) correctly returned `false` (destination unsafe) —
+  at [MPCNC_v4.0_Beta2.cps:834](../MPCNC_v4.0_Beta2.cps#L834) correctly returned `false` (destination unsafe) —
   none of the `zConstant` / `zUp` / `zDown-with-curZSafe` true-branches at
-  [MPCNC_v4.0_Beta1.cps:869-881](../MPCNC_v4.0_Beta1.cps#L869-L881) ever ran. Also confirmed
+  [MPCNC_v4.0_Beta2.cps:869-881](../MPCNC_v4.0_Beta2.cps#L869-L881) ever ran. Also confirmed
   `forceSectionToStartWithRapid` was already `false` by the time of the first `onLinear` (real
   `G0`s from F360 preceded it), so the "First G1 → G0" branch was a correct no-op too.
   **Follow-up needed:** generate a toolpath that has a horizontal link/transition move at or
@@ -25,9 +25,9 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   different work offsets." Confirmed in [Setups.gcode:18385-18403](c:\Users\don_m\OneDrive\Documents\Hobbies\Coding\GCode\Setups.gcode#L18385-L18403):
   Setup1's last op and Setup2's first op both use tool T171, so `toolChange()` (the only place
   that retracts to a configured safe position,
-  [MPCNC_v4.0_Beta1.cps:2028-2030](../MPCNC_v4.0_Beta1.cps#L2028-L2030)) is skipped entirely
-  ([MPCNC_v4.0_Beta1.cps:1183](../MPCNC_v4.0_Beta1.cps#L1183): only triggered on a tool number
-  change). `writeWCS()` itself ([MPCNC_v4.0_Beta1.cps:1110-1139](../MPCNC_v4.0_Beta1.cps#L1110-L1139))
+  [MPCNC_v4.0_Beta2.cps:2028-2030](../MPCNC_v4.0_Beta2.cps#L2028-L2030)) is skipped entirely
+  ([MPCNC_v4.0_Beta2.cps:1183](../MPCNC_v4.0_Beta2.cps#L1183): only triggered on a tool number
+  change). `writeWCS()` itself ([MPCNC_v4.0_Beta2.cps:1110-1139](../MPCNC_v4.0_Beta2.cps#L1110-L1139))
   never moves anything — selecting a different WCS doesn't move the machine, so the tool is left
   wherever the *previous* section's own final retract happened to put it (relative to the *old*
   WCS's Z zero), with no verification that position is clear of the *new* WCS's fixture/part.
@@ -82,7 +82,7 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   between runs to mill repeat copies" workflow.**
   Source: discussion prompted by the `Setups.gcode`/multi-WCS review above.
   `job1_SetOriginOnStart` ("Zero Starting Location (G92)") emits `G92 X0 Y0 Z0` at start
-  ([MPCNC_v4.0_Beta1.cps:1882-1886](../MPCNC_v4.0_Beta1.cps#L1882-L1886)) — an offset relative to
+  ([MPCNC_v4.0_Beta2.cps:1882-1886](../MPCNC_v4.0_Beta2.cps#L1882-L1886)) — an offset relative to
   wherever the tool physically is at that instant, not a lookup into a pre-stored fixture-offset
   table. With it **on** (as in every file reviewed so far), manually selecting a different WCS on
   the console before a re-run has no effect: the program's own `G92` immediately re-anchors the
@@ -101,7 +101,7 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
 
 - **Missing `permittedCommentChars` global — a possible kernel-level backstop for the
   comment-sanitization work already done in `known-issues-v4.md` #19/#24.**
-  Source: comparing our globals ([MPCNC_v4.0_Beta1.cps:13-36](../MPCNC_v4.0_Beta1.cps#L13-L36))
+  Source: comparing our globals ([MPCNC_v4.0_Beta2.cps:13-36](../MPCNC_v4.0_Beta2.cps#L13-L36))
   against a comparable, actively-maintained community GRBL post (OpenBuilds' Fusion 360
   post-processor), which declares `permittedCommentChars` alongside the same
   `capabilities`/`tolerance`/circular-move globals we already have. That global tells the Fusion
@@ -131,8 +131,8 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   `T171 - Face1.gcode` (GRBL-style, emitted `G38.2 F30 Z-10` regardless of the property).
   The property was renamed `probe4_G382orG28` and its semantics were flipped: `true` (default) now
   probes with `G38.2`, `false` probes with `G28`, and the description explicitly notes "Grbl always
-  uses G38.2 regardless of this setting" ([MPCNC_v4.0_Beta1.cps:334-341](../MPCNC_v4.0_Beta1.cps#L334-L341)).
-  `probeTool()` ([MPCNC_v4.0_Beta1.cps:2087-2095](../MPCNC_v4.0_Beta1.cps#L2087-L2095)) updated to
+  uses G38.2 regardless of this setting" ([MPCNC_v4.0_Beta2.cps:334-341](../MPCNC_v4.0_Beta2.cps#L334-L341)).
+  `probeTool()` ([MPCNC_v4.0_Beta2.cps:2087-2095](../MPCNC_v4.0_Beta2.cps#L2087-L2095)) updated to
   match the new semantics. Note the default flip is a real behavior change for Marlin/RepRap users
   upgrading from Beta 1 with default settings (previously defaulted to `G28`, now defaults to `G38.2`).
 
@@ -142,7 +142,7 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   `COMMAND_ACTIVATE_SPEED_FEED_SYNCHRONIZATION` / `COMMAND_DEACTIVATE_SPEED_FEED_SYNCHRONIZATION`
   around the tap-in and synchronized tap-out moves, assuming the controller performs real
   closed-loop spindle/feed sync — which Marlin/GRBL/RepRap have no capability to do (no `G33`).
-  `onCommand()` ([MPCNC_v4.0_Beta1.cps:1558-1573](../MPCNC_v4.0_Beta1.cps#L1558-L1573)) now has
+  `onCommand()` ([MPCNC_v4.0_Beta2.cps:1558-1573](../MPCNC_v4.0_Beta2.cps#L1558-L1573)) now has
   explicit `case`s for both commands (no longer falling through silently), each emitting
   `>>> WARNING: Speed-feed synchronization (rigid tapping) is not supported; a floating/tension
   tap holder is required` — on every occurrence (not just once), so every affected move in the
@@ -155,7 +155,7 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   descriptions didn't warn against. `mapD_RestoreFirstRapids`, `mapE_RestoreRapids`, `mapF_SafeZ`,
   and `mapG_AllowRapidZ` exist specifically to undo what F360 Personal/hobbyist edition does
   (downgrading all `G0` rapids to `G1`) — not needed on a full license, where real `G0`s already
-  exist. The property group heading ([MPCNC_v4.0_Beta1.cps:220-249](../MPCNC_v4.0_Beta1.cps#L220-L249))
+  exist. The property group heading ([MPCNC_v4.0_Beta2.cps:220-249](../MPCNC_v4.0_Beta2.cps#L220-L249))
   was renamed from `"3 - Map Rapids"` to `"3 - Map G1s to Rapids (disable on full license)"`, so
   the warning is visible directly in the Fusion 360 post dialog for all four properties at once.
 
@@ -164,11 +164,11 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   Source: `Setups.gcode` — F360's Operations panel screenshot showed Setup1's ops at Work Offset
   `#1` and Setup2's ops at Work Offset `#0`, confirmed as genuinely different in each Setup's
   dialog. That's exactly why no `G55` (or any second WCS-select line) ever appeared in the
-  generated file: [MPCNC_v4.0_Beta1.cps:1112-1114 (pre-fix)](../MPCNC_v4.0_Beta1.cps) treated
+  generated file: [MPCNC_v4.0_Beta2.cps:1112-1114 (pre-fix)](../MPCNC_v4.0_Beta2.cps) treated
   `workOffset == 0` as "unset" and defaulted it to `1`, the same value Setup1 already had — so two
   sections F360 reported as different collapsed to an identical `G54` selection, with no way to
   see that happening from the gcode alone.
-  `writeWCS()` ([MPCNC_v4.0_Beta1.cps:1110-1141](../MPCNC_v4.0_Beta1.cps#L1110-L1141)) now logs: a
+  `writeWCS()` ([MPCNC_v4.0_Beta2.cps:1110-1141](../MPCNC_v4.0_Beta2.cps#L1110-L1141)) now logs: a
   `Debug` entry line (raw `workOffset` + prior `currentWorkOffset`, showing `"none"` instead of a
   literal `undefined` before the first section), a `Debug` note *only* when the `0→1` fallback
   actually fires, a `Debug` line when a section's offset is unchanged (skipped, not re-selected),
@@ -189,7 +189,7 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   Source: user confirmed live in the Fusion 360 NC Program editor — with Haas selected as the post,
   the Operations tab's Work Offset column showed `G54`/`G54`/`G55` for a Setup edited to `0`/`1`/`2`
   respectively; with our post selected (same unchanged Setup), the same column just showed the raw
-  index (`0`). Added at [MPCNC_v4.0_Beta1.cps:37-49](../MPCNC_v4.0_Beta1.cps#L37-L49), alongside the
+  index (`0`). Added at [MPCNC_v4.0_Beta2.cps:37-49](../MPCNC_v4.0_Beta2.cps#L37-L49), alongside the
   other capability globals we already declare (`capabilities`, `tolerance`, `maximumCircularSweep`,
   `allowHelicalMoves`, `allowedCircularPlanes`):
   ```javascript

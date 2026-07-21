@@ -6,7 +6,7 @@ This is modified fork of https://github.com/guffy1234/mpcnc_posts_processor that
 
 CAM posts processor for use with Fusion 360 and [MPCNC](https://www.v1engineering.com).
 
-This is the v4.0 (Beta) post processor, distributed as the single file `MPCNC_v4.0_Beta1.cps`.
+This is the v4.0 (Beta) post processor, distributed as the single file `MPCNC_v4.0_Beta2.cps`.
 
 Supported firmware:
 - Marlin 2.x
@@ -15,8 +15,8 @@ Supported firmware:
 - RepRap firmware (Duet3d) 
 
 Installation:
-- The post processor consists of a single file, `MPCNC_v4.0_Beta1.cps`.
-- It can be simply installed by selecting Manage->Post Library from the Fusion 360 menubar; alternatively `MPCNC_v4.0_Beta1.cps` can be copied into a directory and selected each time prior to a post operation. If there is an existing copy installed, select it prior to installing and use the trash can icon to delete it.
+- The post processor consists of a single file, `MPCNC_v4.0_Beta2.cps`.
+- It can be simply installed by selecting Manage->Post Library from the Fusion 360 menubar; alternatively `MPCNC_v4.0_Beta2.cps` can be copied into a directory and selected each time prior to a post operation. If there is an existing copy installed, select it prior to installing and use the trash can icon to delete it.
 - The desired post processor can be selected during a post using the Setup button and selecting Use Personal Post Library.
 - Use the Job: CNC Firmware property to select between Marlin 2.x, Grbl 1.1 and RepRap firmware.
 
