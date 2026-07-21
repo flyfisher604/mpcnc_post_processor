@@ -41,40 +41,26 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   every section/WCS boundary — not just on tool change. Worth using as the template when this is
   implemented.
 
-- **`writeWCS()` silently collapses a raw work offset of `0` into `1` (G54), masking a real
-  difference F360 reported, with no debug/info visibility into the decision.**
-  Source: `Setups.gcode` — F360's Operations panel screenshot showed Setup1's ops at Work Offset
-  `#1` and Setup2's ops at Work Offset `#0`, confirmed as genuinely different in each Setup's
-  dialog. That's exactly why no `G55` (or any second WCS-select line) ever appeared in the
-  generated file: [MPCNC_v4.0_Beta1.cps:1112-1114](../MPCNC_v4.0_Beta1.cps#L1112-L1114) treats
-  `workOffset == 0` as "unset" and defaults it to `1`, the same value Setup1 already had — so two
-  sections F360 reported as different collapse to an identical `G54` selection, and there was no
-  way to see that happening from the gcode alone (no comment logs the raw vs. resolved value).
-  **Follow-up needed:** add `eComment.Debug`/`Info` logging in `writeWCS()` for the raw
-  `section.getWorkOffset()` value, the resolved value after the `0→1` fallback, and whether the
-  WCS-select line was actually written or skipped (matches the existing debug-comment style used
-  in `isSafeToRapid`/`parseSafeZProperty`). Drafted but **not applied** — needs approval:
-  ```diff
-   function writeWCS(section) {
-     var workOffset = section.getWorkOffset();
-  +  writeComment(eComment.Debug, " writeWCS: raw workOffset: " + workOffset);
-  +
-     if (workOffset == 0) {
-       workOffset = 1; // default to the first WCS (G54)
-     }
-  +  writeComment(eComment.Debug, " writeWCS: resolved workOffset: " + workOffset + " currentWorkOffset: " + currentWorkOffset);
-
-     if (fw == eFirmware.MARLIN) {
-       ...
-     }
-
-     // GRBL / RepRap: select the work coordinate system (only when it changes).
-     if (workOffset == currentWorkOffset) {
-  +    writeComment(eComment.Info, "   WCS unchanged, not re-selecting");
-       return;
-     }
-     ...
-  ```
+- **Using WCS `0` and `1` together in the same design is a latent human-factors risk, even though
+  the code now handles it correctly and visibly.**
+  Source: follow-on consideration while resolving the `writeWCS()` logging entry below, using the
+  same `Setups.gcode` case (Setup1=`1`, Setup2=`0`) that started this whole WCS investigation.
+  Both `0` and `1` alias to `G54` (confirmed via Autodesk's official offset table and the user's
+  own live Fusion test: `0`→`G54`, `1`→`G54`, `2`→`G55`). Using **either one alone**, consistently,
+  throughout a design is fine — every section resolves to the same `G54`, no ambiguity. The risk is
+  specifically when a design *mixes* them across Setups/operations, exactly like `Setups.gcode` did:
+  to a human reading Fusion's Operations panel or Post Process tab, `0` and `1` look like two
+  different deliberate choices — reinforced by F360's own "multiple setups with different WCS
+  settings" dialog, which fires on exactly this case — when operationally they are identical. An
+  operator could reasonably but wrongly conclude the two Setups are meant to reference two separate
+  physical fixture offsets and prep hardware accordingly, when the generated gcode will actually
+  select `G54` for both. The new debug/info logging (below) makes this visible *inside the
+  generated file* after the fact, but nothing currently surfaces it at the point where a human is
+  making the physical setup decision, before gcode is even generated.
+  **Follow-up needed:** no code fix intended right now — flagged for future review only. Possible
+  directions if revisited: a `>>> WARNING` when a job mixes both `0` and `1` across sections despite
+  them resolving identically, or documentation guidance recommending users standardize on an
+  explicit `1` rather than leaving some Setups at the default `0`.
 
 - **The program's `G92`-based start-of-job origin, plus `writeWCS()` always emitting an explicit
   WCS-select, would defeat a "run the same gcode multiple times, switching WCS on the console
@@ -219,3 +205,28 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   exist. The property group heading ([MPCNC_v4.0_Beta1.cps:220-249](../MPCNC_v4.0_Beta1.cps#L220-L249))
   was renamed from `"3 - Map Rapids"` to `"3 - Map G1s to Rapids (disable on full license)"`, so
   the warning is visible directly in the Fusion 360 post dialog for all four properties at once.
+
+- **`writeWCS()` silently collapsed a raw work offset of `0` into `1` (G54), masking a real
+  difference F360 reported, with no debug/info visibility into the decision — fixed.**
+  Source: `Setups.gcode` — F360's Operations panel screenshot showed Setup1's ops at Work Offset
+  `#1` and Setup2's ops at Work Offset `#0`, confirmed as genuinely different in each Setup's
+  dialog. That's exactly why no `G55` (or any second WCS-select line) ever appeared in the
+  generated file: [MPCNC_v4.0_Beta1.cps:1112-1114 (pre-fix)](../MPCNC_v4.0_Beta1.cps) treated
+  `workOffset == 0` as "unset" and defaulted it to `1`, the same value Setup1 already had — so two
+  sections F360 reported as different collapsed to an identical `G54` selection, with no way to
+  see that happening from the gcode alone.
+  `writeWCS()` ([MPCNC_v4.0_Beta1.cps:1110-1141](../MPCNC_v4.0_Beta1.cps#L1110-L1141)) now logs: a
+  `Debug` entry line (raw `workOffset` + prior `currentWorkOffset`, showing `"none"` instead of a
+  literal `undefined` before the first section), a `Debug` note *only* when the `0→1` fallback
+  actually fires, a `Debug` line when a section's offset is unchanged (skipped, not re-selected),
+  and an `Info` line (`WCS changed: A -> B`) whenever a real `G54`-`G59` selection is actually
+  written — placed after the write succeeds so the out-of-range `error()` path never falsely
+  announces a change that didn't happen. Streamlined to avoid duplicating information: since
+  `Debug` level already includes everything `Info` shows (`commentLevels.indexOf(level) <= ...` in
+  `writeComment()`), lines that would have just repeated an `Info` line's own value (e.g. a
+  standalone "resolved workOffset" line matching the entry line in the common non-zero case, or an
+  "exit changed" line repeating the `Info` message's own target value) were dropped rather than
+  kept as redundant `Debug` output.
+  See the "Using WCS `0` and `1` together" entry above — this fix makes the `0`/`1` aliasing
+  visible in the generated file, but doesn't address the underlying human-factors risk of a design
+  mixing them in the first place.

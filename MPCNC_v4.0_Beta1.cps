@@ -1109,8 +1109,11 @@ var currentWorkOffset;   // last work offset (WCS) emitted, to suppress redundan
 // that we can't honor. currentWorkOffset suppresses re-emitting the same WCS each section.
 function writeWCS(section) {
   var workOffset = section.getWorkOffset();
+  writeComment(eComment.Debug, " writeWCS: entry workOffset: " + workOffset + " currentWorkOffset: " + (currentWorkOffset == undefined ? "none" : currentWorkOffset));
+
   if (workOffset == 0) {
     workOffset = 1; // default to the first WCS (G54)
+    writeComment(eComment.Debug, " writeWCS: workOffset not specified, defaulting to: " + workOffset);
   }
 
   if (fw == eFirmware.MARLIN) {
@@ -1123,8 +1126,10 @@ function writeWCS(section) {
 
   // GRBL / RepRap: select the work coordinate system (only when it changes).
   if (workOffset == currentWorkOffset) {
+    writeComment(eComment.Debug, " writeWCS: unchanged, not re-selecting");
     return;
   }
+  var previousWorkOffset = currentWorkOffset;
   if (workOffset <= 6) {
     writeBlock(gFormat.format(53 + workOffset));            // G54 - G59
   }
@@ -1135,6 +1140,7 @@ function writeWCS(section) {
     error("Work offset " + workOffset + " is out of range for " + fw + " (GRBL supports G54-G59, RepRap G54-G59.3).");
     return;
   }
+  writeComment(eComment.Info, " WCS changed: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset) + " -> " + workOffset);
   currentWorkOffset = workOffset;
 }
 
