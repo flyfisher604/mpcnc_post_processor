@@ -331,9 +331,9 @@ properties = {
     value      : 0.8,
     scope      : "post"
   },
-  probe4_UseHomeZ: {
-    title      : "Use Home Z (G28)",
-    description: "Probe with G28 (Yes) or G38 (No).",
+  probe4_G382orG28: {
+    title      : "Probe with G38.2 (Yes) or G28 (No)",
+    description: "Yes: probe with G38.2. No: probe with G28 (Home Z). Note: Grbl always uses G38.2 regardless of this setting.",
     group      : "5 - Probe",
     type       : "boolean",
     value      : true,
@@ -2087,10 +2087,10 @@ function probeTool() {
   // Not GRBL
   else {
     // refer http://marlinfw.org/docs/gcode/G038.html
-    if (getProperty(properties.probe4_UseHomeZ)) {
-      writeBlock(gFormat.format(28), 'Z');
-    } else {
+    if (getProperty(properties.probe4_G382orG28)) {
       writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probe6_G38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.probe5_G38Target))));
+    } else {
+      writeBlock(gFormat.format(28), 'Z');
     }
   }
 
