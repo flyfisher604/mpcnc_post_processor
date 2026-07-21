@@ -101,6 +101,76 @@ would otherwise silently lose the probe-on-start behavior.
 - Hands-on test: a multi-WCS job with `wcsB_OnChange = Probe Z`, confirming each
   WCS's own offset register is written independently and none of the others shift.
 
+## Open design question: tool-change position should likely be G53, not WCS-relative
+
+Found while cleaning up `toolChange()`'s wording (property renames are already
+in; the underlying behavior is deliberately left unchanged for now).
+`toolChange2_X`/`toolChange3_Y`/`toolChange4_Z` are currently emitted as plain
+`G0` words (no `G53`), so the tool-change rapid lands wherever those numbers
+resolve in whichever WCS is *currently* active, not machine coordinates.
+
+A dedicated manual tool-change spot (or a real ATC installation) only works as
+a fixed *machine* location — the whole point is that the operator can always
+reach it. WCS-relative positioning breaks that: the physical spot would
+silently drift to wherever each job's WCS happens to be zeroed, which differs
+per workpiece. So this is likely a real bug, not just a documented quirk — it
+should probably be a `G53` move instead. `G53` doesn't require true
+limit-switch homing to be internally consistent (GRBL/RepRap track machine
+position by step-counting from the controller's last reset/power-up), so it
+just needs the operator to reset from a consistent physical position, which is
+a normal habit on switch-less hobby builds.
+
+Separately, `toolChange7_ProbeAfterChange`'s probe *does* need a specific WCS
+to write into (it's not a fixed-location question) — for that part, the
+existing ordering caveat still applies: in `onSection()`, `toolChange()` (and
+therefore this probe) runs *before* `writeWCS(currentSection)` selects the new
+section's WCS, so it currently targets the *previous* section's WCS if a tool
+change coincides with a WCS change.
+
+Not implemented yet — needs a decision on the `G53` change before altering
+behavior.
+
+**Production-machine precedent** (confirms this isn't just a hunch): real CNCs
+never tie tool-change position to a WCS. Fanuc uses `G30` (a second
+reference-return position, defined as a fixed distance from machine zero via
+parameters, set once at machine installation) specifically so tool-change
+clearance is independent of whatever work offset is active. Haas uses `G53`
+the same way, explicitly to establish "a consistent, safe location for tool
+changes regardless of the active work offset." Both are machine-coordinate
+mechanisms, never WCS-relative.
+
+## Open design idea: switch to ignore Fusion's per-section WCS assignment
+
+For users who don't need multi-fixture jobs, a boolean could make `writeWCS()`
+skip reacting to `section.getWorkOffset()` for every section after the first —
+staying on whatever WCS `wcsA_OnStart` established, regardless of what
+Fusion's Setups say. `wcsA_OnStart` wouldn't need to change, since it only ever
+deals with the first section.
+
+Risk: if a job genuinely spans two different physical fixtures (two real
+WCS's), silently pinning everything to the first one would cut the second
+setup's toolpaths using the wrong offset — a real footgun, not just a
+simplification. If built, it needs a loud warning (same tier as the existing
+Marlin WCS-ignored warning) whenever a later section's WCS actually differs
+and gets overridden, so it's never silent.
+
+## Open design idea: multi-fixture reposition-and-probe on WCS change
+
+`wcsB_OnChange` currently offers only `Skip` / `Probe Z`. A genuine
+multi-fixture workflow — pause for the operator to physically move the
+stock/vise to a different location, then probe to establish *that* WCS's own
+origin — would mean growing a third option that mirrors `wcsA_OnStart`'s
+richer choice, e.g. `Skip` / `Probe Z` / `Reposition & Probe XY+Z`, with an
+`askUser()` pause for the reposition step before probing.
+
+Note: this establishes a *work* origin (via `G10 L20 P<n>`, scoped to that
+WCS), not the machine's true 0,0,0 — there's no such thing as "probing to
+machine coordinates"; machine position is fixed by step-counting from the
+controller's last reset/power-up (or true homing), not something a probe cycle
+can set. This is exactly the scenario the G10-per-WCS rework was built for — it
+wouldn't have worked cleanly under the old global-`G92` approach, since every
+WCS's origin needs to be independently addressable for this to be safe.
+
 ## Implementation checklist
 
 - [ ] Remove `job1_SetOriginOnStart`, `probe1_OnStart` properties.

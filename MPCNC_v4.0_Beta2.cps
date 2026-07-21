@@ -92,16 +92,8 @@ properties = {
       { title: eFirmware.GRBL, id: eFirmware.GRBL },
       { title: eFirmware.REPRAP, id: eFirmware.REPRAP }
     ],
-    value: eFirmware.MARLIN,
+    value: eFirmware.GRBL,
     scope: "post"
-  },
-  job1_SetOriginOnStart: {
-    title      : "Zero Starting Location (G92)",
-    description: "On start, set the current location as 0,0,0 (G92).",
-    group      : "1 - Job",
-    type       : "boolean",
-    value      : true,
-    scope      : "post"
   },
   job2_ManualSpindlePowerControl: {
     title      : "Manual Spindle On/Off",
@@ -166,7 +158,7 @@ properties = {
     scope      : "post"
   },
   job9_GoOriginOnFinish: {
-    title      : "At end go to 0,0",
+    title      : "At End Go to 0,0",
     description: "Return to X0 Y0 at gcode end, Z remains unchanged.",
     group      : "1 - Job",
     type       : "boolean",
@@ -175,7 +167,7 @@ properties = {
   },
 
   fr0_TravelSpeedXY: {
-    title      : "Travel speed X/Y",
+    title      : "Travel Speed X/Y",
     description: "High speed for Rapid movements X & Y (mm/min).",
     group      : "2 - Feeds and Speeds",
     type       : "integer",
@@ -281,31 +273,31 @@ properties = {
     scope      : "post"
   },
   toolChange2_X: {
-    title      : "Tool Change: X",
-    description: "X location for tool change.",
+    title      : "Tool Change X",
+    description: "X location for tool change, in whichever WCS is currently active (plain G0, not machine coordinates).",
     group      : "4 - Tool Changes",
     type       : "integer",
     value      : 0,
     scope      : "post"
   },
   toolChange3_Y: {
-    title      : "Tool Change: Y",
-    description: "Y location for tool change.",
+    title      : "Tool Change Y",
+    description: "Y location for tool change, in whichever WCS is currently active (plain G0, not machine coordinates).",
     group      : "4 - Tool Changes",
     type       : "integer",
     value      : 0,
     scope      : "post"
   },
   toolChange4_Z: {
-    title      : "Tool Change: Z",
-    description: "Z location for tool change.",
+    title      : "Tool Change Z",
+    description: "Z location for tool change, in whichever WCS is currently active (plain G0, not machine coordinates).",
     group      : "4 - Tool Changes",
     type       : "integer",
     value      : 40,
     scope      : "post"
   },
   toolChange5_DisableZStepper: {
-    title      : "Disable Z stepper",
+    title      : "Disable Z Stepper",
     description: "Disable Z stepper after reaching tool change location.",
     group      : "4 - Tool Changes",
     type       : "boolean",
@@ -320,65 +312,82 @@ properties = {
     value      : false,
     scope      : "post"
   },
+  toolChange7_ProbeAfterChange: {
+    title      : "Probe After Tool Change",
+    description: "Probe Z at the current location after each tool change.",
+    group      : "4 - Tool Changes",
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
+  },
 
-  probe1_OnStart: {
-    title      : "On job start",
-    description: "Include GCode to probe on job start.",
-    group      : "5 - Probe",
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
+  probeA_OnStart: {
+    title      : "Probe at Job Start",
+    description: "Establishes the origin for whichever WCS the first section resolves to -- WCS 1 / G54 if that section's Setup doesn't specify one (the default), otherwise whatever WCS that Setup specifies; it is not forced to G54. Skip: does nothing. Zero XYZ: sets the current position as X0 Y0 Z0. Zero XY & Probe Z: sets X0 Y0, then probes Z. On GRBL/RepRap this writes into that resolved WCS's own offset, e.g. G10 L20 P1 X0 Y0 Z0 if it resolved to G54; Marlin has no per-WCS offsets, so it uses G92 X0 Y0 Z0 instead.",
+    group      : "5 - WCS / Probe",
+    type       : "enum",
+    values: [
+      { title: "Skip", id: "Skip" },
+      { title: "Zero XYZ", id: "Zero XYZ" },
+      { title: "Zero XY & Probe Z", id: "Zero XY & Probe Z" }
+    ],
+    value: "Zero XY & Probe Z",
+    scope: "post"
   },
-  probe2_OnToolChange: {
-    title      : "After Tool Change",
-    description: "After tool change, probe Z at the current location.",
-    group      : "5 - Probe",
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
+  probeB_OnChange: {
+    title      : "Probe on WCS Change",
+    description: "When a later section selects a different WCS than the one before it. Skip: does nothing. Probe Z: probes Z and writes it into the newly-selected WCS's own offset (G10 L20 P<n>) on GRBL/RepRap. Has no effect on Marlin -- Marlin has no per-WCS offsets to change into, only a single G92 origin.",
+    group      : "5 - WCS / Probe",
+    type       : "enum",
+    values: [
+      { title: "Skip", id: "Skip" },
+      { title: "Probe Z", id: "Probe Z" }
+    ],
+    value: "Skip",
+    scope: "post"
   },
-  probe3_Thickness: {
-    title      : "Plate thickness",
-    description: "Thickness of the probe touchplate.",
-    group      : "5 - Probe",
-    type       : "number",
-    value      : 0.8,
-    scope      : "post"
-  },
-  probe4_G382orG28: {
-    title      : "Probe G38.2 (Yes) or G28 (No)",
-    description: "Grbl always uses G38.2.",
-    group      : "5 - Probe",
+  probeC_G382orG28: {
+    title      : "G38.2 (On) or G28 (Off)",
+    description: "Probe using G38.2 (On) or G28 (Off). Grbl always uses G38.2 regardless of this setting; RepRap fully supports G38.2 too, so this should be left On there as well. Off (G28) is intended for Marlin builds with no dedicated probe, using the Z homing switch as a substitute reference.",
+    group      : "5 - WCS / Probe",
     type       : "boolean",
     value      : true,
     scope      : "post"
   },
-  probe5_G38Target: {
-    title      : "G38 target",
+  probeD_G38Target: {
+    title      : "G38 Target",
     description: "G38 probing's furthest Z position.",
-    group      : "5 - Probe",
+    group      : "5 - WCS / Probe",
     type       : "integer",
     value      : -10,
     scope      : "post"
   },
-  probe6_G38Speed: {
-    title      : "G38 speed",
+  probeE_G38Speed: {
+    title      : "G38 Speed",
     description: "G38 probing's speed (mm/min).",
-    group      : "5 - Probe",
+    group      : "5 - WCS / Probe",
     type       : "integer",
     value      : 30,
     scope      : "post"
   },
-  probe7_SafeZ: {
+  probeF_SafeZ: {
     title      : "Safe Z",
     description: "Safe Z to return to after probing.",
-    group      : "5 - Probe",
+    group      : "5 - WCS / Probe",
     type       : "integer",
     value      : 40,
     scope      : "post"
   },
+  probeH_Thickness: {
+    title      : "Plate Thickness",
+    description: "Thickness of the probe touchplate.",
+    group      : "5 - WCS / Probe",
+    type       : "number",
+    value      : 0.8,
+    scope      : "post"
+  },
 
-  gcodeStartFile: {
+  gcode0_StartFile: {
     title      : "Start GCode File",
     description: "File with custom Gcode for header/start (in nc folder).",
     group      : "6 - External Include Files",
@@ -386,7 +395,7 @@ properties = {
     value      : "",
     scope      : "post"
   },
-  gcodeStopFile: {
+  gcode1_StopFile: {
     title      : "Stop GCode File",
     description: "File with custom Gcode for footer/end (in nc folder).",
     group      : "6 - External Include Files",
@@ -394,7 +403,7 @@ properties = {
     value      : "",
     scope      : "post"
   },
-  gcodeToolFile1: {
+  gcode2_ToolFile1: {
     title      : "Tool Change Start",
     description: "File with custom Gcode to start tool change (in nc folder).",
     group      : "6 - External Include Files",
@@ -402,7 +411,7 @@ properties = {
     value      : "",
     scope      : "post"
   },
-  gcodeToolFile2: {
+  gcode3_ToolFile2: {
     title      : "Tool Change End",
     description: "File with custom Gcode to end tool change (in nc folder).",
     group      : "6 - External Include Files",
@@ -410,7 +419,7 @@ properties = {
     value      : "",
     scope      : "post"
   },
-  gcodeProbeFile: {
+  gcode4_ProbeFile: {
     title      : "Probe",
     description: "File with custom Gcode for tool probe (in nc folder).",
     group      : "6 - External Include Files",
@@ -625,16 +634,16 @@ properties = {
     scope      : "post"
   },
 
-  DuetMillingMode: {
-    title      : "Milling mode",
+  duet0_MillingMode: {
+    title      : "Milling Mode",
     description: "GCode  to setup Duet3d into milling mode.",
     group      : "9 - Duet",
     type       : "string",
     value      : "M453 P2 I0 R30000 F200",
     scope      : "post"
   },
-  DuetLaserMode: {
-    title      : "Laser mode",
+  duet1_LaserMode: {
+    title      : "Laser Mode",
     description: "GCode  to setup Duet3d into laser mode.",
     group      : "9 - Duet",
     type       : "string",
@@ -1082,7 +1091,7 @@ function onClose() {
 
   flushMotions();
 
-  if (getProperty(properties.gcodeStopFile) == "") {
+  if (getProperty(properties.gcode1_StopFile) == "") {
     onCommand(COMMAND_COOLANT_OFF);
     if (getProperty(properties.job9_GoOriginOnFinish)) {
       rapidMovementsXY(0, 0);
@@ -1103,7 +1112,7 @@ function onClose() {
     
     writeComment(eComment.Important, " *** STOP end ***");
   } else {
-    loadFile(getProperty(properties.gcodeStopFile));
+    loadFile(getProperty(properties.gcode1_StopFile));
     flushMotions();
   }
 
@@ -1125,14 +1134,20 @@ function writeWCS(section) {
   var workOffset = section.getWorkOffset();
   writeComment(eComment.Debug, " writeWCS: entry workOffset: " + workOffset + " currentWorkOffset: " + (currentWorkOffset == undefined ? "none" : currentWorkOffset));
 
+  // Fusion reports workOffset 0 both when the user left the Setup's Work Offset
+  // field at its default and when they explicitly chose the default -- the API
+  // can't tell those two cases apart, so 0 always means "use WCS 1".
   if (workOffset == 0) {
     workOffset = 1; // default to the first WCS (G54)
-    writeComment(eComment.Info, " writeWCS: workOffset not specified, defaulting to: " + workOffset);
+    writeComment(eComment.Info, " writeWCS: workOffset defaulted to: " + workOffset);
   }
 
   if (fw == eFirmware.MARLIN) {
     if (workOffset > 1 && workOffset != currentWorkOffset) {
       writeComment(eComment.Important, " >>> WARNING: Marlin uses a G92 origin; work offset " + workOffset + " (G" + (53 + workOffset) + ") is not supported and is ignored");
+    }
+    if (getProperty(properties.probeB_OnChange) != "Skip" && workOffset != currentWorkOffset) {
+      writeComment(eComment.Important, " >>> WARNING: probeB_OnChange (\"Probe Z\" on WCS change) has no effect on Marlin; Marlin has no WCS changes to react to, only its single G92 origin");
     }
     currentWorkOffset = workOffset;
     return;
@@ -1158,6 +1173,42 @@ function writeWCS(section) {
   writeComment(eComment.Info, " WCS changed: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset) + " -> " + workOffset);
   writeBlock(gFormat.format(offsetCode));
   currentWorkOffset = workOffset;
+
+  // Re-probe Z on WCS changes after the first one (the first is handled by
+  // probeA_OnStart in writeFirstSection()) -- each WCS has its own G10-scoped
+  // offset, so switching to one for the first time in this file may need its
+  // own Z reference rather than whatever stale value is stored for it.
+  var onChangeMode = getProperty(properties.probeB_OnChange);
+  writeComment(eComment.Debug, " writeWCS: probeB_OnChange: " + onChangeMode + " previousWorkOffset: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset));
+  if (previousWorkOffset != undefined && onChangeMode == "Probe Z") {
+    if (tool.number != 0 && !tool.isJetTool()) {
+      onCommand(COMMAND_TOOL_MEASURE);
+    } else {
+      writeComment(eComment.Debug, " writeWCS: probeB_OnChange probe skipped (tool 0 or jet tool)");
+    }
+  }
+}
+
+// Persists the current position as WCS wcsNumber's own origin. Any of x/y/z may
+// be undefined to leave that axis alone. On GRBL/RepRap this writes directly
+// into that WCS's own offset register (G10 L20 P<n>), so it can't leak into any
+// other WCS. Marlin has no addressable per-WCS register (no
+// CNC_COORDINATE_SYSTEMS assumed here), so it falls back to G92 -- a single
+// global origin, the only mechanism stock Marlin has.
+function writeWcsOrigin(wcsNumber, x, y, z) {
+  writeComment(eComment.Debug, " writeWcsOrigin: wcs: " + wcsNumber
+    + " x: " + (x == undefined ? "-" : x) + " y: " + (y == undefined ? "-" : y) + " z: " + (z == undefined ? "-" : z)
+    + " method: " + (fw == eFirmware.MARLIN ? "G92 (global -- Marlin has no per-WCS register)" : ("G10 L20 (scoped to WCS " + wcsNumber + ")")));
+
+  var xWord = x == undefined ? undefined : xFormat.format(x);
+  var yWord = y == undefined ? undefined : yFormat.format(y);
+  var zWord = z == undefined ? undefined : zFormat.format(z);
+
+  if (fw == eFirmware.MARLIN) {
+    writeBlock(gFormat.format(92), xWord, yWord, zWord);
+  } else {
+    writeBlock(gFormat.format(10), "L20", "P" + wcsNumber, xWord, yWord, zWord);
+  }
 }
 
 function onSection() {
@@ -1205,8 +1256,12 @@ function onSection() {
   else if (tool.number != getPreviousSection().getTool().number)
       toolChange();
 
-  // Select the work coordinate system (WCS on GRBL/RepRap; warn-only on Marlin)
-  writeWCS(currentSection);
+  // Select the work coordinate system (WCS on GRBL/RepRap; warn-only on Marlin).
+  // The first section already did this in writeFirstSection(), before its
+  // probeA_OnStart origin/probe sequence, so skip the redundant re-selection here.
+  if (!isFirstSection()) {
+    writeWCS(currentSection);
+  }
 
   // Machining type
   if (currentSection.type == TYPE_MILLING) {
@@ -1251,10 +1306,10 @@ function onSection() {
     if (machineMode != currentSection.type) {
       switch (currentSection.type) {
           case TYPE_MILLING:
-              writeBlock(getProperty(properties.DuetMillingMode));
+              writeBlock(getProperty(properties.duet0_MillingMode));
               break;
           case TYPE_JET:
-              writeBlock(getProperty(properties.DuetLaserMode));
+              writeBlock(getProperty(properties.duet1_LaserMode));
               break;
       }
     }
@@ -1701,16 +1756,52 @@ function writeFirstSection() {
   // Write out the information block at the beginning of the file
   writeInformation();
 
+  // Select the WCS before Start()/gcode0_StartFile and writeWcsOnStart() below --
+  // both may set an origin on top of the active WCS, so the WCS must be
+  // selected first or the origin would land on the wrong one (either a stale
+  // WCS left active by a prior job, or the controller's default).
+  writeWCS(currentSection);
+
   writeComment(eComment.Important, " *** START begin ***");
 
-  if (getProperty(properties.gcodeStartFile) == "") {
+  if (getProperty(properties.gcode0_StartFile) == "") {
        Start();
   } else {
-    loadFile(getProperty(properties.gcodeStartFile));
+    loadFile(getProperty(properties.gcode0_StartFile));
   }
+
+  writeWcsOnStart();
 
   writeComment(eComment.Important, " *** START end ***");
   writeComment(eComment.Important, " ");
+}
+
+// Implements the probeA_OnStart property: establishes the origin for the WCS
+// writeWCS() just selected for the first section, scoped to that WCS via
+// writeWcsOrigin() (G10 on GRBL/RepRap, G92 on Marlin).
+function writeWcsOnStart() {
+  var mode = getProperty(properties.probeA_OnStart);
+  writeComment(eComment.Debug, " writeWcsOnStart: probeA_OnStart: " + mode + " wcs: " + currentWorkOffset);
+
+  if (mode == "Skip") {
+    writeComment(eComment.Debug, " writeWcsOnStart: Skip selected, nothing emitted");
+    return;
+  }
+
+  if (mode == "Zero XYZ") {
+    writeComment(eComment.Info, "   Set current position to 0,0,0");
+    writeWcsOrigin(currentWorkOffset, 0, 0, 0);
+    return;
+  }
+
+  // "Zero XY & Probe Z"
+  writeComment(eComment.Info, "   Set current X,Y position to 0,0");
+  writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
+  if (tool.number != 0 && !tool.isJetTool()) {
+    onCommand(COMMAND_TOOL_MEASURE);
+  } else {
+    writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool)");
+  }
 }
 
 // Output a comment
@@ -1910,17 +2001,6 @@ function Start() {
     writeComment(eComment.Info, "   Disable stepper timeout");
     writeBlock(mFormat.format(84), sFormat.format(0)); // Disable steppers timeout
   }
-
-  // Are we setting the orgin on start?
-  if (getProperty(properties.job1_SetOriginOnStart)) {
-    writeComment(eComment.Info, "   Set current position to 0,0,0");
-    writeBlock(gFormat.format(92), xFormat.format(0), yFormat.format(0), zFormat.format(0)); // Set origin to initial position
-  }
-
-  // Do a Probe on start?
-  if (getProperty(properties.probe1_OnStart) && tool.number != 0 && !tool.isJetTool()) {
-    onCommand(COMMAND_TOOL_MEASURE);
-  }
 }
 
 var spindleEnabled = false;
@@ -2049,15 +2129,27 @@ function toolChange() {
   writeComment(eComment.Important, " Tool Change Start");
 
   // If there is a custom GCode file for tool changes then include it
-  if (getProperty(properties.gcodeToolFile1) != "") {
-    loadFile(getProperty(properties.gcodeToolFile1));
+  if (getProperty(properties.gcode2_ToolFile1) != "") {
+    loadFile(getProperty(properties.gcode2_ToolFile1));
   }
 
   // Are we inserting code to assist with the tool change?
-  // If not, then just insert tool change GCODE G6 <tool number> and a G54
+  // If not, then just insert the tool change GCode (M6 <tool number>).
   if (getProperty(properties.toolChange1_InsertCode)) {
 
-    // Go to tool change position
+    // Go to tool change position. A manual/dedicated tool-change spot only
+    // makes sense as a fixed MACHINE location -- the whole point is that the
+    // operator (or a real ATC) can always reach it. But toolChange2_X/3_Y/4_Z
+    // are currently emitted as plain G0 words (no G53), i.e. WCS-relative:
+    // the actual physical spot would silently drift to wherever THIS job's
+    // WCS happens to be zeroed, which differs per workpiece. That's likely a
+    // bug, not intended behavior -- this should probably be a G53 move
+    // instead, so it lands at the same physical spot regardless of which WCS
+    // is active. (G53 doesn't need true limit-switch homing to be internally
+    // consistent -- GRBL/RepRap track machine position by step-counting from
+    // the controller's last reset/power-up, so it just needs the operator to
+    // reset from a consistent physical position.) Not changed yet -- flagging
+    // for a decision before altering behavior.
     flushMotions();
     onRapid(propertyMmToUnit(getProperty(properties.toolChange2_X)), propertyMmToUnit(getProperty(properties.toolChange3_Y)), propertyMmToUnit(getProperty(properties.toolChange4_Z)));
     flushMotions();
@@ -2086,12 +2178,15 @@ function toolChange() {
   }
 
   // If there is a custom GCode file for tool changes then include it
-  if (getProperty(properties.gcodeToolFile2) != "") {
-    loadFile(getProperty(properties.gcodeToolFile2));
+  if (getProperty(properties.gcode3_ToolFile2) != "") {
+    loadFile(getProperty(properties.gcode3_ToolFile2));
   }
-  
-    // Run Z probe gcode
-  if (getProperty(properties.probe2_OnToolChange) && tool.number != 0) {
+
+    // Run Z probe gcode. Same WCS caveat as the rapid above: this still runs
+    // before the new section's WCS is selected, so probeTool() writes into
+    // the PREVIOUS section's WCS (via currentWorkOffset), not the one the
+    // upcoming section will use.
+  if (getProperty(properties.toolChange7_ProbeAfterChange) && tool.number != 0) {
     onCommand(COMMAND_TOOL_MEASURE);
   }
 
@@ -2103,8 +2198,8 @@ function probeTool() {
   writeComment(eComment.Important, " Probe to Zero Z");
   writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
   writeComment(eComment.Info, "   Do Probing");
-  writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(getProperty(properties.probe3_Thickness))));
-  writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(getProperty(properties.probe7_SafeZ)));
+  writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(getProperty(properties.probeH_Thickness))));
+  writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(getProperty(properties.probeF_SafeZ)));
   writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
   
   askUser("Attach ZProbe", "Probe", false);
@@ -2113,25 +2208,24 @@ function probeTool() {
   if (fw == eFirmware.GRBL) {
     // refer to http://linuxcnc.org/docs/stable/html/gcode/g-code.html#gcode:g38
     // Note this is not using the optional P parameter available on FluidNC (http://wiki.fluidnc.com/en/config/probe)
-    writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probe6_G38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.probe5_G38Target))));
+    writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probeE_G38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.probeD_G38Target))));
   }
 
   // Not GRBL
   else {
     // refer http://marlinfw.org/docs/gcode/G038.html
-    if (getProperty(properties.probe4_G382orG28)) {
-      writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probe6_G38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.probe5_G38Target))));
+    if (getProperty(properties.probeC_G382orG28)) {
+      writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probeE_G38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.probeD_G38Target))));
     } else {
       writeBlock(gFormat.format(28), 'Z');
     }
   }
 
-  let z = zFormat.format(propertyMmToUnit(getProperty(properties.probe3_Thickness)));
-  writeBlock(gFormat.format(92), z); // Set origin to initial position
-  
+  writeWcsOrigin(currentWorkOffset, undefined, undefined, propertyMmToUnit(getProperty(properties.probeH_Thickness)));
+
   resetAll();
   // move up tool to safe height again after probing
-  rapidMovementsZ(propertyMmToUnit(getProperty(properties.probe7_SafeZ)));
+  rapidMovementsZ(propertyMmToUnit(getProperty(properties.probeF_SafeZ)));
   
   flushMotions();
 
