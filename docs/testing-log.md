@@ -84,68 +84,6 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   file for that feature; revisit this entry once that's reviewed.
   **Follow-up needed:** no action yet — pending the dedicated auto-iterate-WCS test file.
 
-- **Post is missing a `wcsDefinitions` declaration, so Fusion's own UI can't resolve/display raw
-  work-offset indices as G-code before posting.**
-  Source: user confirmed live in the Fusion 360 NC Program editor — with Haas selected as the
-  post, the Operations tab's Work Offset column showed `G54`/`G54`/`G55` for a Setup edited to
-  `0`/`1`/`2` respectively; with our post selected (same unchanged Setup), the same column just
-  showed the raw index (`0`). `wcsDefinitions` is a real, documented top-level global (confirmed
-  in Autodesk's official Haas post source) that a post declares — alongside globals we *do*
-  already have like `capabilities`, `tolerance`, `maximumCircularSweep`, `allowHelicalMoves`,
-  `allowedCircularPlanes` ([MPCNC_v4.0_Beta1.cps:26-36](../MPCNC_v4.0_Beta1.cps#L26-L36)) — purely
-  so Fusion's *own UI* can resolve/validate/display work-offset indices, independent of and prior
-  to actually posting. We don't declare it at all, so Fusion has nothing to resolve the index
-  against and falls back to showing the bare number. This is a UI/pre-post-visibility gap only —
-  `writeWCS()` already resolves the same values correctly at actual posting time.
-  Haas's declaration, for reference:
-  ```javascript
-  wcsDefinitions = {
-    useZeroOffset: false,
-    wcs          : [
-      {name:"Standard", format:"G", range:[54, 59]},
-      {name:"Extended", format:"G154 P", range:[1, 99]}
-    ]
-  };
-  ```
-  **Follow-up needed:** draft a `wcsDefinitions` matching what `writeWCS()` actually supports —
-  not applied, needs approval and (ideally) live verification in Fusion since neither of us can
-  confirm rendering without posting:
-  ```javascript
-  wcsDefinitions = {
-    useZeroOffset: true,  // matches writeWCS(): raw offset 0 silently aliases to WCS 1 (G54)
-    wcs          : [
-      {name:"Standard", format:"G", range:[54, 59]},        // GRBL/RepRap: G54-G59 (raw 1-6)
-      {name:"Extended", format:"G59.", range:[1, 3]}         // RepRap only: G59.1-G59.3 (raw 7-9)
-    ]
-  };
-  ```
-  Open question: this is a single static declaration, but the post supports 3 firmwares behind one
-  property (Marlin has no G54-G59 at all — `writeWCS()` only warns there). Unclear whether/how a
-  static `wcsDefinitions` can or should vary by the firmware property, or whether declaring the
-  GRBL/RepRap scheme unconditionally (and continuing to rely on Marlin's existing runtime warning
-  comment for that case) is an acceptable simplification.
-  **Correction/update after further research:** `wcsDefinitions` does **not** appear in Autodesk's
-  official, complete `PostProcessor` class attribute list (confirmed by fetching the full ~300-entry
-  list directly — every other global we already declare, like `capabilities`/`tolerance`/
-  `certificationLevel`, is on it; `wcsDefinitions` is not). Initially read that as "maybe not a real
-  kernel feature." But the companion `Section` class reference settles it the other way: `Section`
-  has `getWCS()`, `getWCSIndex()`, `getWCSOrigin()`, `getWCSPlane()`, `getWCSPosition()`,
-  `getDynamicWCSOrigin/Plane()`, plus attributes `wcs`, `wcsOrigin`, `wcsPlane`, `wcsIndex` — and
-  `getWCS()`'s own documented text is *"Returns the WCS code string. If there is no WCS definition
-  defined or the work offset is out of range, it will return an empty string"* (`getWCSIndex()`
-  says the same, returning `-1` instead). So "a WCS definition" is a real, load-bearing, documented
-  prerequisite that `Section` methods depend on — Autodesk's docs just never document the mechanism
-  that defines it (presumably `wcsDefinitions` itself). That's a genuine gap in Autodesk's own
-  documentation, not evidence the feature isn't real.
-  **Practical implication we hadn't considered:** if `wcsDefinitions` were declared correctly, our
-  own `writeWCS()` could potentially call `currentSection.getWCS()` (or `getWCSIndex()`) directly to
-  get the properly formatted code string, instead of hand-computing `gFormat.format(53 + workOffset)`
-  itself ([MPCNC_v4.0_Beta1.cps:1128-1132](../MPCNC_v4.0_Beta1.cps#L1128-L1132)) — potentially a real
-  simplification, not just a cosmetic UI fix, and it would generalize the RepRap `G59.1`-`G59.3`
-  case for free instead of our own hand-rolled arithmetic. Still unverified without live testing in
-  Fusion — the drafted `wcsDefinitions` block above remains a starting point, not something to trust
-  blindly.
-
 - **Missing `permittedCommentChars` global — a possible kernel-level backstop for the
   comment-sanitization work already done in `known-issues-v4.md` #19/#24.**
   Source: comparing our globals ([MPCNC_v4.0_Beta1.cps:13-36](../MPCNC_v4.0_Beta1.cps#L13-L36))
@@ -230,3 +168,54 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   See the "Using WCS `0` and `1` together" entry above — this fix makes the `0`/`1` aliasing
   visible in the generated file, but doesn't address the underlying human-factors risk of a design
   mixing them in the first place.
+
+- **Missing `wcsDefinitions` declaration — added, so Fusion's own UI can now resolve/display raw
+  work-offset indices as G-code before posting.**
+  Source: user confirmed live in the Fusion 360 NC Program editor — with Haas selected as the post,
+  the Operations tab's Work Offset column showed `G54`/`G54`/`G55` for a Setup edited to `0`/`1`/`2`
+  respectively; with our post selected (same unchanged Setup), the same column just showed the raw
+  index (`0`). Added at [MPCNC_v4.0_Beta1.cps:37-49](../MPCNC_v4.0_Beta1.cps#L37-L49), alongside the
+  other capability globals we already declare (`capabilities`, `tolerance`, `maximumCircularSweep`,
+  `allowHelicalMoves`, `allowedCircularPlanes`):
+  ```javascript
+  wcsDefinitions = {
+    useZeroOffset: false,
+    wcs          : [
+      {name:"Standard", format:"G", range:[54, 59]},   // GRBL/RepRap: G54-G59 (raw offset 1-6)
+      {name:"Extended", format:"G59.", range:[1, 3]}    // RepRap only: G59.1-G59.3 (raw offset 7-9)
+    ]
+  };
+  ```
+  Confirmed real (not invented/legacy) via the `Section` class reference — `getWCS()`/`getWCSIndex()`
+  explicitly depend on "a WCS definition" existing (see the earlier correction note in this log),
+  even though `wcsDefinitions` itself is absent from Autodesk's own `PostProcessor` class attribute
+  list — a genuine gap in Autodesk's documentation, not evidence it isn't real.
+  **`useZeroOffset` — determined, per your request, before finalizing the value:** Fetched Fanuc's
+  actual official post source, which contains this real validation code (in `validateCommonParameters()`,
+  evidently a shared-library convention used by official multi-offset posts like Fanuc/Haas):
+  ```javascript
+  if (getSection(0).workOffset == 0 && section.workOffset > 0) {
+    if (!(typeof wcsDefinitions != "undefined" && wcsDefinitions.useZeroOffset)) {
+      error(localize("Using multiple work offsets is not possible if the initial work offset is 0."));
+    }
+  }
+  ```
+  So `useZeroOffset` specifically gates one scenario: *the first section's offset is `0` AND some
+  later section has an explicit non-zero offset*. When `false` (Fanuc's and Haas's actual value —
+  correcting the earlier assumption that Haas accepting `0`→`G54` implied `true`), that combination
+  is a hard `error()`, refusing to post at all. When `true`, it's silently permitted. This is
+  exactly the "Using WCS `0` and `1` together" ambiguity flagged above — professional posts treat it
+  as an error worth blocking, not something to silently alias through.
+  **Why we declared `false` (not the originally-drafted `true`):** `true` would have been the wrong
+  choice — it exists specifically to *waive* the safety check, and we have no reason to waive a
+  check aimed at exactly the risk we already flagged as worth future review. `false` matches the
+  ecosystem convention and doesn't misrepresent anything about our own validation.
+  **Important caveat — this is likely inert for us right now:** `validateCommonParameters()` reads
+  like post-script code from a shared include (`commonFunctions.cpi`-style), not a check Fusion's
+  kernel runs automatically just because `wcsDefinitions` exists. We don't import that shared
+  library, and `writeWCS()` has no equivalent check of its own — it still silently aliases `0`→`1`
+  regardless of `useZeroOffset`'s value. So today, `useZeroOffset: false` is the *documented,
+  correct* value to declare, but likely does **not** yet give us Fanuc/Haas's actual error-blocking
+  behavior. Implementing that check ourselves (mirroring the snippet above inside `writeWCS()` or
+  `onSection()`) is the natural next step if the "`0`/`1` mixed design" risk gets revisited — not
+  done now, per your instruction to hold off on that fix.

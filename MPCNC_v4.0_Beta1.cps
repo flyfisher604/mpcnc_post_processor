@@ -35,6 +35,20 @@ maximumCircularSweep = toRad(180); // split arcs >180 deg (so full circles post 
 allowHelicalMoves = false;
 allowedCircularPlanes = undefined;
 
+// Lets Fusion's own UI (Operations panel, Post Process dialog) resolve/display a section's
+// raw work offset as its actual G-code before posting, instead of showing the bare index.
+// useZeroOffset: false matches other official posts (Fanuc, Haas) -- it does NOT change how
+// writeWCS() itself resolves offset 0 (still silently aliased to WCS 1 / G54 there); it only
+// mirrors their documented meaning (reject an initial offset of 0 mixed with an explicit
+// non-zero offset later) in case Fusion's kernel enforces it independently of our own code.
+wcsDefinitions = {
+  useZeroOffset: false,
+  wcs          : [
+    {name:"Standard", format:"G", range:[54, 59]},   // GRBL/RepRap: G54-G59 (raw offset 1-6)
+    {name:"Extended", format:"G59.", range:[1, 3]}    // RepRap only: G59.1-G59.3 (raw offset 7-9)
+  ]
+};
+
 machineMode = undefined; //TYPE_MILLING, TYPE_JET
 
 var eFirmware = {
