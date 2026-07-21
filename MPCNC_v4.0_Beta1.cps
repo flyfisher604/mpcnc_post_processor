@@ -44,8 +44,8 @@ allowedCircularPlanes = undefined;
 wcsDefinitions = {
   useZeroOffset: false,
   wcs          : [
-    {name:"Standard", format:"G", range:[54, 59]},   // GRBL/RepRap: G54-G59 (raw offset 1-6)
-    {name:"Extended", format:"G59.", range:[1, 3]}    // RepRap only: G59.1-G59.3 (raw offset 7-9)
+    {name:"GRBL/RepRap", format:"G", range:[54, 59]},   // G54-G59 (raw offset 1-6)
+    {name:"RepRap only", format:"G59.", range:[1, 3]}    // G59.1-G59.3 (raw offset 7-9)
   ]
 };
 

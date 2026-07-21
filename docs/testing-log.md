@@ -61,6 +61,21 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   directions if revisited: a `>>> WARNING` when a job mixes both `0` and `1` across sections despite
   them resolving identically, or documentation guidance recommending users standardize on an
   explicit `1` rather than leaving some Setups at the default `0`.
+  **Correction to the reference check, if this is ever implemented:** Fanuc's actual validation
+  (quoted in the `wcsDefinitions` entry below) is narrower than it first looks —
+  `getSection(0).workOffset == 0 && section.workOffset > 0` only ever compares each section against
+  the *very first* section in the job. It's order-dependent: it catches "first section left at `0`,
+  a later section explicitly numbered" (a common oversight — numbering later Setups but forgetting
+  to number the first one), but it would **not** catch our own `Setups.gcode` case (Setup1=`1`
+  explicit, Setup2=`0` default) — the reverse order — since `getSection(0).workOffset` there is `1`,
+  not `0`, so the check never fires for any later section regardless of its value. Confirmed by
+  re-reading the exact snippet: it's a fixed comparison against index `0`, not a general
+  any-section-vs-any-other-section comparison.
+  So if we implement our own equivalent someday, the correct rule for the risk we're actually
+  flagging is broader than Fanuc's: **any section with `workOffset == 0` alongside any *other*
+  section with a different explicit non-zero offset** should be flagged, regardless of which one
+  comes first in the job — not just a check against section index `0`. Fanuc's version is a cheap
+  heuristic for their most common real-world mistake, not a complete treatment of the ambiguity.
 
 - **The program's `G92`-based start-of-job origin, plus `writeWCS()` always emitting an explicit
   WCS-select, would defeat a "run the same gcode multiple times, switching WCS on the console
@@ -181,8 +196,8 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   wcsDefinitions = {
     useZeroOffset: false,
     wcs          : [
-      {name:"Standard", format:"G", range:[54, 59]},   // GRBL/RepRap: G54-G59 (raw offset 1-6)
-      {name:"Extended", format:"G59.", range:[1, 3]}    // RepRap only: G59.1-G59.3 (raw offset 7-9)
+      {name:"GRBL/RepRap", format:"G", range:[54, 59]},   // G54-G59 (raw offset 1-6)
+      {name:"RepRap only", format:"G59.", range:[1, 3]}    // G59.1-G59.3 (raw offset 7-9)
     ]
   };
   ```
@@ -205,7 +220,9 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   correcting the earlier assumption that Haas accepting `0`→`G54` implied `true`), that combination
   is a hard `error()`, refusing to post at all. When `true`, it's silently permitted. This is
   exactly the "Using WCS `0` and `1` together" ambiguity flagged above — professional posts treat it
-  as an error worth blocking, not something to silently alias through.
+  as an error worth blocking, not something to silently alias through. Note, though: this exact
+  check is narrower than it looks (order-dependent, only compares against the very first section) —
+  see the correction appended to that entry above before using this snippet as a template.
   **Why we declared `false` (not the originally-drafted `true`):** `true` would have been the wrong
   choice — it exists specifically to *waive* the safety check, and we have no reason to waive a
   check aimed at exactly the risk we already flagged as worth future review. `false` matches the
