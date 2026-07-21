@@ -98,6 +98,92 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   file for that feature; revisit this entry once that's reviewed.
   **Follow-up needed:** no action yet — pending the dedicated auto-iterate-WCS test file.
 
+- **Post is missing a `wcsDefinitions` declaration, so Fusion's own UI can't resolve/display raw
+  work-offset indices as G-code before posting.**
+  Source: user confirmed live in the Fusion 360 NC Program editor — with Haas selected as the
+  post, the Operations tab's Work Offset column showed `G54`/`G54`/`G55` for a Setup edited to
+  `0`/`1`/`2` respectively; with our post selected (same unchanged Setup), the same column just
+  showed the raw index (`0`). `wcsDefinitions` is a real, documented top-level global (confirmed
+  in Autodesk's official Haas post source) that a post declares — alongside globals we *do*
+  already have like `capabilities`, `tolerance`, `maximumCircularSweep`, `allowHelicalMoves`,
+  `allowedCircularPlanes` ([MPCNC_v4.0_Beta1.cps:26-36](../MPCNC_v4.0_Beta1.cps#L26-L36)) — purely
+  so Fusion's *own UI* can resolve/validate/display work-offset indices, independent of and prior
+  to actually posting. We don't declare it at all, so Fusion has nothing to resolve the index
+  against and falls back to showing the bare number. This is a UI/pre-post-visibility gap only —
+  `writeWCS()` already resolves the same values correctly at actual posting time.
+  Haas's declaration, for reference:
+  ```javascript
+  wcsDefinitions = {
+    useZeroOffset: false,
+    wcs          : [
+      {name:"Standard", format:"G", range:[54, 59]},
+      {name:"Extended", format:"G154 P", range:[1, 99]}
+    ]
+  };
+  ```
+  **Follow-up needed:** draft a `wcsDefinitions` matching what `writeWCS()` actually supports —
+  not applied, needs approval and (ideally) live verification in Fusion since neither of us can
+  confirm rendering without posting:
+  ```javascript
+  wcsDefinitions = {
+    useZeroOffset: true,  // matches writeWCS(): raw offset 0 silently aliases to WCS 1 (G54)
+    wcs          : [
+      {name:"Standard", format:"G", range:[54, 59]},        // GRBL/RepRap: G54-G59 (raw 1-6)
+      {name:"Extended", format:"G59.", range:[1, 3]}         // RepRap only: G59.1-G59.3 (raw 7-9)
+    ]
+  };
+  ```
+  Open question: this is a single static declaration, but the post supports 3 firmwares behind one
+  property (Marlin has no G54-G59 at all — `writeWCS()` only warns there). Unclear whether/how a
+  static `wcsDefinitions` can or should vary by the firmware property, or whether declaring the
+  GRBL/RepRap scheme unconditionally (and continuing to rely on Marlin's existing runtime warning
+  comment for that case) is an acceptable simplification.
+  **Correction/update after further research:** `wcsDefinitions` does **not** appear in Autodesk's
+  official, complete `PostProcessor` class attribute list (confirmed by fetching the full ~300-entry
+  list directly — every other global we already declare, like `capabilities`/`tolerance`/
+  `certificationLevel`, is on it; `wcsDefinitions` is not). Initially read that as "maybe not a real
+  kernel feature." But the companion `Section` class reference settles it the other way: `Section`
+  has `getWCS()`, `getWCSIndex()`, `getWCSOrigin()`, `getWCSPlane()`, `getWCSPosition()`,
+  `getDynamicWCSOrigin/Plane()`, plus attributes `wcs`, `wcsOrigin`, `wcsPlane`, `wcsIndex` — and
+  `getWCS()`'s own documented text is *"Returns the WCS code string. If there is no WCS definition
+  defined or the work offset is out of range, it will return an empty string"* (`getWCSIndex()`
+  says the same, returning `-1` instead). So "a WCS definition" is a real, load-bearing, documented
+  prerequisite that `Section` methods depend on — Autodesk's docs just never document the mechanism
+  that defines it (presumably `wcsDefinitions` itself). That's a genuine gap in Autodesk's own
+  documentation, not evidence the feature isn't real.
+  **Practical implication we hadn't considered:** if `wcsDefinitions` were declared correctly, our
+  own `writeWCS()` could potentially call `currentSection.getWCS()` (or `getWCSIndex()`) directly to
+  get the properly formatted code string, instead of hand-computing `gFormat.format(53 + workOffset)`
+  itself ([MPCNC_v4.0_Beta1.cps:1128-1132](../MPCNC_v4.0_Beta1.cps#L1128-L1132)) — potentially a real
+  simplification, not just a cosmetic UI fix, and it would generalize the RepRap `G59.1`-`G59.3`
+  case for free instead of our own hand-rolled arithmetic. Still unverified without live testing in
+  Fusion — the drafted `wcsDefinitions` block above remains a starting point, not something to trust
+  blindly.
+
+- **Missing `permittedCommentChars` global — a possible kernel-level backstop for the
+  comment-sanitization work already done in `known-issues-v4.md` #19/#24.**
+  Source: comparing our globals ([MPCNC_v4.0_Beta1.cps:13-36](../MPCNC_v4.0_Beta1.cps#L13-L36))
+  against a comparable, actively-maintained community GRBL post (OpenBuilds' Fusion 360
+  post-processor), which declares `permittedCommentChars` alongside the same
+  `capabilities`/`tolerance`/circular-move globals we already have. That global tells the Fusion
+  post-processing kernel itself which characters are legal inside a comment; we have no
+  equivalent, and instead rely entirely on our own hand-rolled `sanitizeMessageText()` (added for
+  #19/#24) to strip unsafe characters from `sectionComment`/`tool.comment` before they reach
+  `writeComment()`/`askUser()`/`display_text()`. Not confirmed whether declaring this would add a
+  real second layer of protection or is purely cosmetic/informational on Fusion's side.
+  **Follow-up needed:** research what `permittedCommentChars` actually enforces (kernel-side
+  filtering vs. just documentation) before deciding whether it's worth adding on top of the
+  existing `sanitizeMessageText()` fix.
+
+- **Minor/cosmetic global-metadata gaps, lower priority.**
+  Source: same OpenBuilds GRBL post comparison as above. That post also declares `vendorUrl`,
+  `model`, `debugMode`, and `extension` (`"gcode"`, so Fusion defaults the save-dialog file
+  extension) — none of which we declare. `capabilities` there also includes
+  `CAPABILITY_INSPECTION`/`CAPABILITY_MACHINE_SIMULATION`, which we correctly omit since this post
+  rejects probing/inspection operations (`isProbeOperation()` → `cycleNotSupported()`). No action
+  needed on the capability omission; `extension` might be a small, genuine convenience win (default
+  `.nc`/`.tap` vs. an explicit `.gcode`) worth a look sometime.
+
 ## Resolved
 
 - **`probe4_UseHomeZ` ("Use Home Z (G28)") was silently ignored when firmware = GRBL, with no
