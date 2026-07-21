@@ -74,6 +74,12 @@ confirmed/fixed code defects live in [known-issues-v4.md](known-issues-v4.md).
   **Follow-up needed:** add a guaranteed retract-to-safe-height (and ideally move-away-in-XY)
   whenever `writeWCS()` is about to change the active offset, not just on a tool change (needs
   approval before changing).
+  **Note:** `G53` (machine-coordinate rapid, supported on GRBL/RepRap — see the earlier "Is G53
+  supported" discussion) may be a good mechanism for this. Autodesk's own official posts (e.g.
+  Haas) solve exactly this class of problem with a shared `writeRetract()` function, driven by a
+  "Safe Retracts" property (`G28`/`G53`/clearance-height options), called from `onSection()` at
+  every section/WCS boundary — not just on tool change. Worth using as the template when this is
+  implemented.
 
 - **`writeWCS()` silently collapses a raw work offset of `0` into `1` (G54), masking a real
   difference F360 reported, with no debug/info visibility into the decision.**
