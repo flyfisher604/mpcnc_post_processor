@@ -618,13 +618,25 @@ Goal: safe-Z, tool-change, and inter-section/inter-WCS traverses actually use th
 reserved base as their common work-relative reference. Each item below is separately
 verifiable — land and test one before starting the next.
 
+**Progress (updated):**
+- ✅ **Landed:** job-start call-order confirm; Guard B; the new properties (`Safe Z Retract
+  Across WCS` + `Cross Part Clearance`); the added-part re-probe repositioning; the WCS/Probe
+  relabels + default flip. (The `[x]` items below.)
+- 🔧 **In progress:** the base-relative traverse retract (transit-through-base). Done + verified
+  for the re-probe path — `retractThroughBaseClearance()` consumes `Cross Part Clearance`
+  (verified in `Setup1 Multi.gcode`); still to do: emit it on inter-part traverses that don't
+  re-probe, and reconcile so a boundary doing both isn't retracted twice.
+- ⬜ **Not started:** tool-change position work-relative to base; tool-change re-probe ordering;
+  probe XY offset; retract on *every* inter-part traverse; base-WCS state machine (R1/R2) wiring.
+
 - [x] Confirm/adjust job-start call order: home (Phase 2) → base establish (Phase 3) →
       per-section WCS (Phase 1) — check `onOpen()`/`writeFirstSection()` sequencing.
       *(verified sound; no code change — base establish writes register-scoped `G10 L20
       P<base>`, independent of the active WCS, so the existing order is correct.)*
 - [ ] Add the **inter-op traverse clearance** retract — a job-level safe-Z that is
       distinct from `C_MapRapids_SafeZ` / `safeZHeight` (see "Traverse clearance is not
-      the G1->G0 plane" above). Base-gated, so single-WCS jobs stay byte-identical:
+      the G1->G0 plane" above). Base-gated, so single-WCS jobs stay byte-identical.
+      **(in progress — property + Guard B landed; the retract motion is the current build.)**
   - [x] New user property: a physical clearance height **above the reserved base**
         (spoilboard). Not derived — per-WCS offsets are unknown until probed at runtime
         and fixtures/clamps aren't modeled, so only the operator can supply it. Lives in
@@ -636,7 +648,9 @@ verifiable — land and test one before starting the next.
   - [ ] Multi-WCS job (base reserved): at each section/WCS boundary, retract Z to the
         base-relative clearance **before** selecting the next WCS, then traverse XY, then
         let the next section's forced first-rapid descend. Never switch WCS at an unknown
-        or low Z.
+        or low Z. **(partial — done for boundaries that re-probe, via
+        `retractThroughBaseClearance()`; boundaries that do NOT re-probe are the "retract
+        on every traverse" item below, not yet built.)**
   - [ ] Single-WCS job (incl. hobby single-op): emit no new forced retract; the existing
         per-section behavior already clears within the shared frame. Byte-identical.
   - [x] Wire Guard B off this same feature: feature enabled + more than one distinct
@@ -663,11 +677,13 @@ verifiable — land and test one before starting the next.
       not re-zeroed), then probe Z. The first-/only-part probe (`C_Probe_OnStart`) is
       exempt: the operator has parked at the origin, so the current position already *is*
       X0 Y0. Pre-existing bug, but now the default path (default flipped Skip → Probe Z).
-  - [ ] **Follow-up: retract relative to the spoilboard base, not the last part.** The
-        landed retract clears to `H_Probe_SafeZ` in the OUTGOING part's frame — the last
-        part, not the stable cross-WCS reference. When the base-relative traverse retract
-        lands, clear relative to the reserved base instead, and reconcile so a boundary
-        that both traverses and re-probes isn't retracted twice.
+  - [x] **Follow-up: retract relative to the spoilboard base, not the last part.** *(done for
+        the re-probe path.)* When a base is reserved and `Safe Z Retract Across WCS` is on, the
+        added-part retract now transits through the base and clears to `Cross Part Clearance`
+        (`retractThroughBaseClearance()`). With no base (feature off) it still falls back to
+        `H_Probe_SafeZ` in the outgoing frame. Still to reconcile against the every-boundary
+        traverse retract (below) when that lands, so a boundary that both traverses and
+        re-probes isn't retracted twice.
 - [ ] Add a **probe XY offset** (two new properties, X and Y) applied at *every* part
       probe — first part (`C_Probe_OnStart`) and each added part (`D_Probe_OnChange`)
       alike. The probe touch-point becomes origin + (offsetX, offsetY) instead of the raw

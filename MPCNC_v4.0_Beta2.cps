@@ -1335,14 +1335,8 @@ function writeWCS(section) {
     return;
   }
   var previousWorkOffset = currentWorkOffset;
-  var offsetCode;
-  if (workOffset <= 6) {
-    offsetCode = 53 + workOffset;                           // G54 - G59
-  }
-  else if (fw == eFirmware.REPRAP && workOffset <= 9) {
-    offsetCode = 59 + (workOffset - 6) / 10;                // G59.1 - G59.3
-  }
-  else {
+  var offsetCode = wcsGcode(workOffset);
+  if (offsetCode == undefined) {
     error("Work offset " + workOffset + " is out of range for " + fw + " (GRBL supports G54-G59, RepRap G54-G59.3).");
     return;
   }
@@ -1358,15 +1352,24 @@ function writeWCS(section) {
     + " previousWorkOffset: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset)
     + " probeNewPart: " + probeNewPart);
 
-  // Retract Z to the probe safe height FIRST, before selecting the new WCS. The new WCS's
-  // Z origin is unknown until we probe it, so an absolute Z move there would be unsafe --
-  // retract now, while the outgoing WCS (established) is still active, then switch and
-  // reposition in XY at this height.
-  // TODO(Phase 4 traverse retract): this clears to H_Probe_SafeZ in the OUTGOING part's
-  // frame -- the LAST part, not the stable cross-WCS reference. Once the base-relative
-  // traverse retract lands, clear relative to the reserved spoilboard base instead, and
-  // reconcile so a boundary that both traverses and re-probes isn't retracted twice.
-  if (probeNewPart) {
+  // Retract Z to a safe height FIRST, before selecting the new WCS -- the new WCS's Z origin
+  // is unknown until we probe it, so an absolute Z move there would be unsafe. Two cases:
+  //  - Base reserved + cross-WCS safe-Z enabled: transit through the spoilboard base and
+  //    clear to Cross Part Clearance -- a stable height above the spoilboard that clears
+  //    fixtures across parts of differing thickness (retractThroughBaseClearance()).
+  //  - Otherwise (no base, or the destination IS the base): fall back to Safe Z in the
+  //    OUTGOING part's frame. Not the stable cross-part reference, but the tool is at least
+  //    clear enough to reposition for the re-probe. (Guard B blocks the risky no-base
+  //    multi-WCS case up front, so this fallback only runs when the feature is off.)
+  var base = getReservedBaseWcs();
+  var baseRelative = probeNewPart && getProperty(properties.J_Probe_SafeZAcrossWcs)
+                     && base != 0 && base != workOffset;
+  writeComment(eComment.Debug, " writeWCS: retract decision -- baseRelative: " + baseRelative
+    + " base: " + base + " J_SafeZAcrossWcs: " + getProperty(properties.J_Probe_SafeZAcrossWcs)
+    + " workOffset: " + workOffset);
+  if (baseRelative) {
+    retractThroughBaseClearance();
+  } else if (probeNewPart) {
     writeComment(eComment.Info, "   Retract before WCS change -- re-probe of the new part follows");
     resetAll();
     rapidMovementsZ(propertyMmToUnit(getProperty(properties.H_Probe_SafeZ)));
@@ -1428,6 +1431,33 @@ function getReservedBaseWcs() {
 // Human-readable G-code name for a workOffset number, for comments/errors.
 function wcsName(n) {
   return n <= 6 ? ("G" + (53 + n)) : ("G59." + (n - 6));
+}
+
+// Numeric G-code for a work offset: 1-6 -> 54-59 (G54-G59), 7-9 -> 59.1-59.3 (G59.1-G59.3).
+// Returns undefined if out of range for the firmware (the G59.x slots are RepRap-only);
+// callers report the error. Shared by writeWCS() and the base-clearance transit.
+function wcsGcode(workOffset) {
+  if (workOffset <= 6) return 53 + workOffset;
+  if (fw == eFirmware.REPRAP && workOffset <= 9) return 59 + (workOffset - 6) / 10;
+  return undefined;
+}
+
+// Retract to the "Cross Part Clearance" height measured above the reserved spoilboard base,
+// by transiting THROUGH the base WCS. The base's Z was established at job start
+// (writeBaseEstablish), so it is the one frame where an absolute safe height is meaningful
+// across parts of differing thickness. Selects the base with a plain frame switch -- NOT
+// writeWCS(), so it triggers no D_Probe_OnChange re-probe and writes no origin -- then
+// commands the clearance (a real Z move, so this is never an empty base round-trip). LEAVES
+// the base active; the caller selects the destination WCS next. Caller guarantees a base is
+// reserved. See docs/wcs-rework-plan.md "Base WCS is transited, not parked".
+function retractThroughBaseClearance() {
+  var base = getReservedBaseWcs();
+  writeComment(eComment.Info, "   Retract to spoilboard-base clearance " + wcsName(base) + " before traverse");
+  writeBlock(gFormat.format(wcsGcode(base)));   // transit-select the base frame (no re-probe)
+  currentWorkOffset = base;
+  resetAll();
+  rapidMovementsZ(propertyMmToUnit(getProperty(properties.K_Probe_SafeZClearance)));
+  flushMotions();
 }
 
 function onSection() {

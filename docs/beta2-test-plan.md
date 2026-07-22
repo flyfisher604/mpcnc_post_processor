@@ -160,16 +160,22 @@ Guard B. See the "Not yet implemented" item at the end.
       Across WCS`, `Cross Part Clearance (above spoilboard)`, and group `02 - Establish Machine
       Coordinates` (Test 3). Verified. No enum ids or property keys changed, so existing presets
       keep working — labels/defaults only.
-- [ ] **Single-WCS regression (byte-identical).** Post a single-Setup, single-op job and confirm
-      output is byte-for-byte identical to the pre-Phase-4 baseline — no Guard error, no added
-      retract/probe (Test 4). **Outstanding.**
+- [x] **Base-relative re-probe retract (transit through the spoilboard base).** GRBL, base `G59`
+      reserved, `Safe Z Retract Across WCS` on, two copies on `G54`/`G55`: at the `G54→G55`
+      boundary the post transits through the base and clears to Cross Part Clearance before
+      re-probing. Verified in `Setup1 Multi.gcode` (Debug on): `retract decision -- baseRelative:
+      true base: 6 J_SafeZAcrossWcs: true` → `( Retract to spoilboard-base clearance G59 …)` →
+      `G59` → `Z40` → `G55` → `X0 Y0` → `G38.2` → `G10 L20 P2 Z`. With the toggle off (or no base)
+      it falls back to Safe Z in the outgoing frame.
+- [x] **Single-WCS regression (byte-identical) — OMITTED (not run, per decision).** Rationale:
+      single-WCS paths are unchanged by inspection — the new `writeWCS` branch requires a genuine
+      WCS change, Guard B early-returns on a single offset, and the new properties emit nothing.
 - [ ] **Not yet implemented — do not test yet.** These plan items have no code, so they will
       show no new behavior:
-      - Base-relative traverse-clearance retract (consumes `Cross Part Clearance`; makes `Safe Z
-        Retract Across WCS` emit motion). Note the interim: the added-part re-probe retract uses
-        `Safe Z` (`H_Probe_SafeZ`) in the *outgoing* part's frame, not the base — a tracked
-        follow-up.
+      - Safe-Z retract on inter-part traverses that do NOT re-probe (the re-probe path already
+        transits the base — see the verified item above). This is the "retract on every traverse"
+        case; it must reconcile with the re-probe retract so a boundary that does both isn't
+        retracted twice.
       - Tool-change position work-relative to the base.
       - Tool-change re-probe ordering fix (`toolChange()` still runs before `writeWCS()`).
       - Probe XY offset applied at every part probe (first + added).
-      - Safe-Z retract on every inter-part traverse (not just re-probes).
