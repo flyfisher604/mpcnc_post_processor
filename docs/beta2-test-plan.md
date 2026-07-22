@@ -56,3 +56,32 @@ that needs hands-on verification before release.
       cleanly in Fusion.
 - [ ] **Regression pass.** Re-run the existing sample jobs (`Test/*.gcode`) and confirm no output
       differences beyond the items above.
+
+## Phase 2 — establish MCS (machine homing), from `docs/wcs-rework-plan.md`
+
+- [x] **Default regression.** With `A_Machine_HomeX`/`B_Machine_HomeY`/`C_Machine_HomeZ` all
+      left at `Power-On` (the default), confirm output is byte-for-byte identical to the pre-Phase-2
+      baseline — no new G-code, and no new comments at the default Comment Level (`Info`).
+      Verified: default-settings output is byte-for-byte identical to the pre-Phase-2 baseline.
+- [x] **Marlin, Z homed + prompt.** Set `C_Machine_HomeZ = Home` and `D_Machine_PromptBeforeHome
+      = On` on Marlin: confirm the attach-plate pause (`askUser`) fires immediately before `G28 Z`,
+      and that X/Y (left `Power-On`) emit no motion. Verified: prompt fires immediately before
+      `G28 Z`, X/Y emit no motion.
+- [x] **GRBL/FluidNC, combined `$H`.** Set `A_Machine_HomeX = Home`, `C_Machine_HomeZ = Power-On`
+      on GRBL: confirm exactly **one** `$H` is emitted (not per-axis), and that Comment Level =
+      Debug shows which axes were asserted wired. Verified: exactly one `$H` emitted; Debug
+      comments show the per-axis assertions.
+- [x] **RRF, independent `G28`.** Set `A_Machine_HomeX = Home` only on RepRap: confirm `G28 X`
+      fires alone, Y/Z left untouched, and the Z-home prompt never fires on RRF even if
+      `D_Machine_PromptBeforeHome` is on (Marlin-only pause). Verified: `G28 X` fires alone, Y/Z
+      untouched, no prompt on RRF.
+- [x] **Prompt scoping.** Confirm `D_Machine_PromptBeforeHome` has no effect for X/Y homing, for
+      GRBL/FluidNC `$H`, or for RRF `G28 Z` — only Marlin `G28 Z` triggers the pause. Verified:
+      pause fires only for Marlin `G28 Z`; no effect for X/Y, GRBL `$H`, or RRF.
+- [x] **Property naming / dialog order.** Confirm the new `<ItemLetter>_<Group>_<Name>` keys
+      (e.g. `A_Job_SelectedFirmware`, `A_Machine_HomeX`) list in the intended order within each
+      group, and that the zero-padded group headers (`01 - Job` … `10 - Duet`) list in numeric
+      order — in particular that `10 - Duet` sorts **last**, not next to `01 - Job`. Also confirm
+      every group still appears (renaming keys must not change values — settings from a Beta 2
+      pre-rename post may reset to defaults, verify). Verified: groups and within-group properties
+      list in the intended order in the Fusion post dialog.

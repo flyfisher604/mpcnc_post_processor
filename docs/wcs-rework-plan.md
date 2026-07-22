@@ -186,8 +186,13 @@ no persisted setup. So this post takes a deliberate **work-relative stance**:
 
 - The everyday reference is the **active WCS**, not the machine frame.
 - **Tool length is folded into a Z re-probe after every tool change** (no TLO).
-- Homing (the machine frame) is used only for **gantry squaring + a repeatable XY
-  origin**, and as an *optional* robustness feature — never the everyday Z reference.
+- Homing (the machine frame) establishes MCS for **X/Y only** — gantry squaring and a
+  repeatable XY origin, and as an *optional* robustness feature. **Z homing is a
+  separate concern**: where a real Z endstop exists (LowRider switches, Marlin sharing
+  the Z-min pin with a movable plate), it is homed for its own sake (squaring, or
+  because the plate-homing trick needs it) — it is never in service of MCS
+  establishment and never becomes the everyday Z reference, which is always the
+  work-Z touch-off below.
 
 This is the right stance for the audience: it works on the lowest-common-denominator
 machine (no Z homing) and matches the GRBL ecosystem (Shapeoko / OpenBuilds /
@@ -249,8 +254,8 @@ because a wrong home command is a crash.
 **Decision:** we do not assume a recompiled FluidNC with `allow_single_axis` — stock
 FluidNC and stock GRBL are treated identically, both `$H`-only. This collapses the
 firmware table to three rows and has a property-model consequence: on GRBL/FluidNC the
-per-axis `machine0_HomeX`/`machine1_HomeY`/`machine2_HomeZ` pickers cannot each trigger
-their own command, because `$H` is all-or-nothing. There, the post emits **one** `$H` if
+per-axis `A_Machine_HomeX`/`B_Machine_HomeY`/`C_Machine_HomeZ` pickers cannot each
+trigger their own command, because `$H` is all-or-nothing. There, the post emits **one** `$H` if
 *any* axis is set to `Home`; the per-axis pickers still matter as documentation/bookkeeping
 (which axes the user asserts are actually wired to home) but do not each cause separate
 motion. Marlin and RRF/Duet get true independent subsets via `G28 X`/`G28 Y`/`G28 Z`.
@@ -292,32 +297,62 @@ that axis homed.
 
 ## Properties (the dialog)
 
-**Group "0 - Machine"** (sorts first; homing is the first physical act):
+**Property naming convention (dialog ordering).** In Fusion's post dialog, groups are
+ordered by the `group:` string and, within a group, properties are ordered by a string
+sort of the **property key** (the inline-property form this post uses has no `order`
+field — that only exists in the split `propertyDefinitions` form, deliberately not
+adopted here). Two independent mechanisms, so ordering is controlled in two places:
 
-- `machine0_HomeX` / `machine1_HomeY` / `machine2_HomeZ`: `Power-On` | `Home`
+- **Group order — the `group:` string, zero-padded to two digits:** `01 - Job`,
+  `02 - Machine`, `03 - Feeds and Speeds`, `04 - Map G1s to Rapids...`,
+  `05 - Tool Changes`, `06 - WCS / Probe`, `07 - External Include Files`, `08 - Laser`,
+  `09 - Coolant`, `10 - Duet`. Padding is required: unpadded, `10 - Duet` sorts adjacent
+  to `1 - Job` (the classic `1, 10, 2` lexicographic bug) instead of last. Fixed-width
+  digits sort correctly under every collation Fusion might use (and regardless of whether
+  it ignores the ` - ` punctuation). A single-letter group prefix in the *key* does **not**
+  drive group order — only the `group:` string does.
+- **Within-group order — a single-letter item prefix on the key:**
+  `<ItemLetter>_<GroupName>_<PropertyName>`, the item letter (`A`, `B`, …) restarting at
+  `A` in each group, e.g. `A_Job_SelectedFirmware`, `B_Job_ManualSpindlePowerControl`,
+  `A_Machine_HomeX`, `B_Machine_HomeY`.
+
+Old-prefix → new mapping (historical prose below still uses the old names):
+`job*`→`?_Job_*`, `machine*`→`?_Machine_*`, `fr*`→`?_Feeds_*`, `map*`→`?_MapRapids_*`,
+`toolChange*`→`?_ToolChange_*`, `probe*`→`?_Probe_*`, `gcode*`→`?_Include_*`,
+`cutter*`→`?_Laser_*`, `cl*`→`?_Coolant_*`, `duet*`→`?_Duet_*` (`?` = item letter).
+**New properties added in later phases must follow this convention** (pick the next free
+item letter in their group; if inserting mid-group, re-letter the ones after it).
+
+**Group "02 - Machine"** (sorts right after `"01 - Job"`, so the firmware picker
+`A_Job_SelectedFirmware` is already visible above it — the per-axis pickers' behavior
+depends on which firmware is selected: bookkeeping-only on GRBL/FluidNC vs. real
+independent `G28` on Marlin/RRF):
+
+- `A_Machine_HomeX` / `B_Machine_HomeY` / `C_Machine_HomeZ`: `Power-On` | `Home`
   (default `Power-On`). On Marlin/RRF each fires its own `G28 <axis>`. On GRBL/FluidNC
   (no per-axis `$H`, see homing section) any axis set to `Home` triggers one combined
   `$H`; the three pickers still document which axes are actually expected to home.
-- `machine3_PromptBeforeHome` (bool): pause before the **Z** home so the operator can
+- `D_Machine_PromptBeforeHome` (bool): pause before the **Z** home so the operator can
   place the movable Z plate. Fires only when Z is set to `Home` on a plate-homed setup
   (Marlin sharing the Z-min pin); never for switch homing or X/Y.
 
-**Reserved base** (in the WCS / Probe group):
+**Reserved base** (in the WCS / Probe group — Phase 3, provisional item letters, e.g.
+`H_Probe_BaseReserve` / `I_Probe_BaseEstablish`, finalized when the phase lands):
 
-- `wcsBase_Reserve` (dropdown): `None` | `G54` | `G55` | `G56` | `G57` | `G58` | `G59` |
+- `*_Probe_BaseReserve` (dropdown): `None` | `G54` | `G55` | `G56` | `G57` | `G58` | `G59` |
   `G59.1 (RepRap)` | `G59.2 (RepRap)` | `G59.3 (RepRap)`. Default `G59`. `G54` is
   offered for users who deliberately want the spoilboard base on the Fusion default
   slot; the default stays `G59` so a beginner's parts (which land on `G54`) never
   collide with the reserved base.
-- `wcsBase_Establish` (bool, default **on**): this is the reserved base's version of the
+- `*_Probe_BaseEstablish` (bool, default **on**): this is the reserved base's version of the
   probe-on-start step — at job start, probe the spoilboard and write the result into the
   reserved base WCS (`G10 L20 P<n>`). When **disabled**, the post skips the probe and
   emits an Info comment like `(assuming base G59 was established in a previous job)`, so
   the probe-once / run-many workflow is explicit rather than silent.
 
-**Unchanged:** the Phase-1 `probeA_OnStart` / `probeB_OnChange` / `toolChange7_ProbeAfterChange`
-and the shared probe mechanics (`probeC_G382orG28`, `probeD_G38Target`,
-`probeE_G38Speed`, `probeF_SafeZ`, `probeH_Thickness`).
+**Unchanged:** the Phase-1 `A_Probe_OnStart` / `B_Probe_OnChange` /
+`H_ToolChange_ProbeAfterChange` and the shared probe mechanics (`C_Probe_G382orG28`,
+`D_Probe_G38Target`, `E_Probe_G38Speed`, `F_Probe_SafeZ`, `G_Probe_Thickness`).
 
 Tooltips must state, per axis, that the machine must actually be wired to home that
 axis, and that machine homing is distinct from the work-Z touch-off. The README gets
@@ -377,46 +412,53 @@ Incremental — the machine frame is established and verified before existing be
 rewired. Index only; each phase's concrete checklist is its own section below.
 
 - **Phase 1 — done.** WCS origin/probe rework to `G10 L20`.
-- **Phase 2 — next, not started.** Establish MCS in isolation.
-- **Phase 3 — not started.** Reserved base + validation guards.
+- **Phase 2 — done** (verified in `docs/beta2-test-plan.md`; README write-up still outstanding).
+  Establish MCS in isolation.
+- **Phase 3 — next, not started.** Reserved base + validation guards.
 - **Phase 4 — not started.** Consume the base for safe-Z / tool-change / traverses.
 - **Phase 5 — not started, likely no-op.** Confirm `G0`/`G1` rapid mapping needs no change.
 
 ## Implementation checklist (Phase 2) — establish MCS, in isolation
 
 Goal: the post can home (or explicitly not home) each axis at job start and say so in
-the output. **Change nothing else this phase** — with every axis left at the default
-`Power-On`, output must stay byte-for-byte identical to the current Phase-1 baseline.
+the output. X/Y homing is what actually establishes MCS (repeatable origin, gantry
+squaring); Z homing, where wired, is included for its own reason (a real endstop or the
+plate-homing trick) — it is never in service of MCS and never changes the everyday Z
+reference (still always the work-Z touch-off). **Change nothing else this phase** —
+with every axis left at the default `Power-On`, output must stay byte-for-byte
+identical to the current Phase-1 baseline.
 
-- [ ] Add property group `"0 - Machine"` (sorts before `"1 - Job"`).
-- [ ] Add `machine0_HomeX` / `machine1_HomeY` / `machine2_HomeZ` (enum: `Power-On` |
-      `Home`, default `Power-On` each).
-- [ ] Add `machine3_PromptBeforeHome` (bool, default off) — pause before a *Z* home only,
+- [x] Add property group `"02 - Machine"` and zero-pad all group headers to two digits
+      (`01 - Job` … `10 - Duet`), so Machine sorts right after Job (the firmware picker is
+      visible above the per-axis homing pickers whose behavior depends on it) and the
+      headers sort in numeric order — see the naming convention above for why padding is
+      required.
+- [x] Add `A_Machine_HomeX` / `B_Machine_HomeY` / `C_Machine_HomeZ` (enum: `Power-On` |
+      `Home`, default `Power-On` each) — keys follow the naming convention above.
+- [x] Add `D_Machine_PromptBeforeHome` (bool, default off) — pause before a *Z* home only,
       on the plate-homed setup (Marlin sharing the Z-min pin). Not shown/not fired for
       X/Y or for GRBL/FluidNC/RRF switch homing.
-- [ ] Add a `writeMachineHoming()` (or similarly named) function, called once at job
-      start, **before** `writeWCS(currentSection)`/`writeWcsOnStart()` in
-      `writeFirstSection()`:
-  - [ ] Marlin / RRF: emit `G28 <axis>` independently per axis set to `Home`.
-  - [ ] GRBL / FluidNC: emit **one** `$H` if *any* axis is set to `Home` (no per-axis
+- [x] Add a `writeMachineHoming()` function, called once at job start, **before**
+      `writeWCS(currentSection)`/`writeWcsOnStart()` in `writeFirstSection()`:
+  - [x] Marlin / RRF: emit `G28 <axis>` independently per axis set to `Home`.
+  - [x] GRBL / FluidNC: emit **one** `$H` if *any* axis is set to `Home` (no per-axis
         command — see homing section); Debug-log which axes the user asserted are
         wired, since the pickers don't map to independent motion here.
-  - [ ] Any axis left `Power-On`: emit a Debug (or Info, per the existing
-        Off/Important/Info/Debug convention) comment stating no motion, current
+  - [x] Any axis left `Power-On`: emit a Debug comment stating no motion, current
         position accepted as zero — never silent.
-  - [ ] Wire `machine3_PromptBeforeHome`'s pause using the post's existing
-        pause/message mechanism (whatever `probeC`-family plate-attach pauses already
-        use), immediately before the Z home command.
-- [ ] Tooltips: each axis property must state the machine has to actually be wired to
+  - [x] Wire `D_Machine_PromptBeforeHome`'s pause using the post's existing
+        `askUser()` mechanism (the same plate-attach pause the probe path uses),
+        immediately before the Z home command; Marlin-only.
+- [x] Tooltips: each axis property states the machine has to actually be wired to
       home that axis, and that machine homing is distinct from the work-Z touch-off.
 - [ ] README: add the "Per-machine settings" table and a short explanation of Home vs.
-      Power-On vs. Probe.
-- [ ] Regression check: default settings (`Power-On`/`Power-On`/`Power-On`) produce
+      Power-On vs. Probe. **Still outstanding.**
+- [x] Regression check: default settings (`Power-On`/`Power-On`/`Power-On`) produce
       identical `.nc` output to the current Phase-1 baseline — no new G-code.
-- [ ] Hands-on tests: Marlin with `Home` + prompt on Z fires the pause then `G28 Z`;
+- [x] Hands-on tests: Marlin with `Home` + prompt on Z fires the pause then `G28 Z`;
       GRBL/FluidNC with X=`Home`, Z=`Power-On` fires exactly one `$H` (not per-axis);
       RRF with X=`Home` only fires `G28 X` only, Y/Z left alone.
-- [ ] Update `docs/beta2-test-plan.md` (or successor) with these test items.
+- [x] Update `docs/beta2-test-plan.md` (or successor) with these test items.
 
 ## Implementation checklist (Phase 3) — reserved base + validation guards
 
@@ -424,15 +466,16 @@ Goal: a spoilboard base WCS can be reserved and (optionally) self-established, a
 post catches the misconfigurations identified in "Validation guards" above — all before
 anything downstream (Phase 4) actually depends on the base existing.
 
-- [ ] Add `wcsBase_Reserve` dropdown (`None` | `G54`-`G59` | `G59.1`-`G59.3 (RepRap)`,
-      default `G59`) to the `"5 - WCS / Probe"` group.
-- [ ] Add `wcsBase_Establish` (bool, default on).
-- [ ] Job-start: if a base is reserved and `wcsBase_Establish` is on, probe the
+- [ ] Add `H_Probe_BaseReserve` dropdown (`None` | `G54`-`G59` | `G59.1`-`G59.3 (RepRap)`,
+      default `G59`) to the `"06 - WCS / Probe"` group (next free item letter after
+      `G_Probe_Thickness`).
+- [ ] Add `I_Probe_BaseEstablish` (bool, default on) — next free item letter.
+- [ ] Job-start: if a base is reserved and `*_Probe_BaseEstablish` is on, probe the
       spoilboard and write it via `writeWcsOrigin()` into the reserved WCS. If off,
       emit an Info comment, e.g. `(assuming base G59 was established in a previous
       job)`, and skip the probe.
 - [ ] Guard A (no redefine of the base): post-time check — if a base is reserved, error
-      if any section's `probeA_OnStart` / `probeB_OnChange` / `toolChange7_ProbeAfterChange`
+      if any section's `A_Probe_OnStart` / `B_Probe_OnChange` / `H_ToolChange_ProbeAfterChange`
       would write to that same WCS number.
 - [ ] Guard C (Marlin single-frame): post-time check — error if a Marlin job uses more
       than one distinct work offset.
@@ -488,7 +531,7 @@ new model, or file concrete follow-up items if it does.
 
 ## Decisions (resolved)
 
-- **`machine3_PromptBeforeHome`** fires only before a plate-homed **Z** home, never
+- **`D_Machine_PromptBeforeHome`** fires only before a plate-homed **Z** home, never
   globally or for X/Y.
 - **Homing order** is not post-controlled (see the homing section) — a firmware concern,
   not a plan question.
