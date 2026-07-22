@@ -127,17 +127,22 @@ therefore this probe) runs *before* `writeWCS(currentSection)` selects the new
 section's WCS, so it currently targets the *previous* section's WCS if a tool
 change coincides with a WCS change.
 
-Not implemented yet — needs a decision on the `G53` change before altering
-behavior.
+**Production-machine precedent** (the original reasoning): real CNCs never tie
+tool-change position to a WCS. Fanuc uses `G30` (a second reference-return
+position, defined as a fixed distance from machine zero via parameters, set once
+at machine installation) specifically so tool-change clearance is independent of
+whatever work offset is active. Haas uses `G53` the same way. Both are
+machine-coordinate mechanisms.
 
-**Production-machine precedent** (confirms this isn't just a hunch): real CNCs
-never tie tool-change position to a WCS. Fanuc uses `G30` (a second
-reference-return position, defined as a fixed distance from machine zero via
-parameters, set once at machine installation) specifically so tool-change
-clearance is independent of whatever work offset is active. Haas uses `G53`
-the same way, explicitly to establish "a consistent, safe location for tool
-changes regardless of the active work offset." Both are machine-coordinate
-mechanisms, never WCS-relative.
+**RESOLVED / superseded -- see "The G54-base decision + spoilboard base +
+validation guards" below.** The `G53` conclusion held for production mills but
+was reconsidered for V1E hardware: most target machines can't home Z (no machine
+Z), machine coordinates are negative/confusing on GRBL, and mixing a machine-Z
+reference on one machine with a work-Z reference on another is itself a crash
+class. The adopted default is instead a **work-relative, G54-base** convention
+(a `G54` reserved as the spoilboard base), with machine-referenced (`G53`)
+positioning demoted to an optional robustness feature where homing supports it.
+The `toolChange7_ProbeAfterChange` ordering caveat above still stands regardless.
 
 ## Open design idea: switch to ignore Fusion's per-section WCS assignment
 
@@ -638,16 +643,22 @@ The whole feature is useless if operators can't tell which to pick. Draft copy:
 
 ### Which machine-referenced features each choice later enables
 
-Not a hard gate everywhere -- reliability vs. availability differs by firmware:
-- **Safe-Z retract / tool-change position** become *reliable* when the relevant
-  axes are `Home`. With `Power-On` they still function on GRBL/FluidNC/Marlin
-  (referencing the power-on frame) but must warn about the parking ritual; on
-  **RRF** an un-homed axis will refuse the move, so there they are effectively
-  gated on `Home`.
+Applies to the **optional** machine-referenced variants only -- the everyday
+default is work-relative to the G54 base (see "The G54-base decision"). Where a
+user opts into a machine-referenced move, reliability vs. availability differs by
+firmware:
+- **Optional machine-Z retract / machine-XY tool-change** become *reliable* when
+  the relevant axes are `Home`. With `Power-On` they still function on
+  GRBL/FluidNC/Marlin (referencing the power-on frame) but must warn about the
+  parking ritual; on **RRF** an un-homed axis will refuse the move, so there they
+  are effectively gated on `Home`.
 
 ### Target operator flows (the goal: effectively produce parts on V1E machines)
 
-Grounded in the verified V1E reality above.
+Grounded in the verified V1E reality above. These describe what each machine's
+frame *can* support; the everyday default for safe-Z / tool-change is still
+work-relative to the G54 base (see "The G54-base decision") -- "machine-
+referenced" below means the optional robustness variant.
 
 **LowRider -- X/Y + Z endstop switches (the standard build):** Home X/Y/Z at job
 start (Z homes *up* to its switches) -> full machine frame -> safe-Z retract,
@@ -687,30 +698,46 @@ behavior is rewired.
   state in comments; tooltips + GitHub docs. **Change nothing else.** Verify per
   firmware that the right home commands appear, power-on axes emit only a
   comment, and existing output is otherwise byte-for-byte unchanged.
-- **Phase 3 (consume MCS -- each step separately verifiable):**
-  1. Job-start integration: sequence homing *before* WCS establishment.
-  2. Safe-Z retract to machine top before any traverse (`G53 Z` / homed native /
-     RRF-gated).
-  3. Tool-change position machine-referenced, with a safe-Z retract first.
+  Note: Phase 2's homing establishes the machine **XY** frame (gantry squaring +
+  a repeatable origin for resume). It is *not* the everyday Z reference -- that
+  is the work-relative G54 base (Phase 3). See "The G54-base decision" section.
+- **Phase 3 (spoilboard base + validation guards -- the everyday reference):**
+  add the `wcsBase_Spoilboard` mode (Off / Establish at start / Assume already
+  set); when non-Off, establish `G54` once as the spoilboard reference and treat
+  it read-only. Add Guard A (error if any option would re-write `G54` after the
+  base is set) and Guard B (error if a safe-Z feature is enabled in a multi-WCS
+  job with no base declared). Verify the guards fire on the intended
+  misconfigurations and stay silent on valid single-WCS jobs.
+- **Phase 4 (consume the base -- each step separately verifiable, all
+  work-relative in the active WCS / G54 base):**
+  1. Job-start integration: sequence homing (Phase 2) -> spoilboard base
+     establish (Phase 3) -> per-section WCS.
+  2. Safe-Z retract before any traverse: an **absolute** clearance height in the
+     active WCS / G54 base (clears the stock regardless of pocket depth).
+     Machine-top (`G53 Z` / homed native) stays an *optional* extra-clearance
+     mode for homed machines, not the default.
+  3. Tool-change position: work-relative to the G54 base (fixed spoilboard
+     reference), with a safe-Z retract first. `G53` machine-XY offered only as
+     the optional robust variant where XY is homed.
   4. Tool-change Z re-establishment (tool-length / re-zero). NOTE for design:
      a new tool has a different length, so Z must be re-referenced after the
      swap. Without a tool-length-offset system (see Layer 3 / TLO), this means a
      full guided sequence: safe-Z retract -> travel to the probe point (a fixed
      tool-setter location if one exists, otherwise back over the work / a placed
      plate) -> probe Z (re-zero the work Z for the new tool) -> safe-Z retract ->
-     travel to the next section's start. Every leg is collision-sensitive and
-     frame-aware (machine frame for the travel/retract, work frame for the
-     re-zero). This is the crux of making multi-tool jobs actually safe on V1E
-     machines; treat it as its own sub-step, not a bolt-on to step 3.
-  5. Inter-section moves: retract to safe machine-Z before the XY traverse to
-     the next section's start (collision avoidance).
+     travel to the next section's start. Every leg is collision-sensitive. This
+     is the crux of making multi-tool jobs actually safe on V1E machines; treat
+     it as its own sub-step, not a bolt-on to step 3.
+  5. Inter-section moves: absolute safe-Z clearance (active WCS / base) before
+     the XY traverse to the next section's start (collision avoidance).
   6. Inter-WCS moves: same retract-before-traverse when the WCS changes between
-     sections.
-- **Phase 4 (likely no-op):** review the `G0`/`G1` (rapid-mapping) optimizations.
+     sections -- the retract references the stable G54 base, not the shifting
+     per-part WCS.
+- **Phase 5 (likely no-op):** review the `G0`/`G1` (rapid-mapping) optimizations.
   Expected fine as-is: they operate **within a single section and a single WCS**,
   so there is no coordinate-frame transition and thus no cross-frame collision
   risk. Collisions happen at *transitions* (job start, tool change, between
-  sections, on WCS change) -- which is exactly what Phase 3 covers -- not inside
+  sections, on WCS change) -- which is exactly what Phase 4 covers -- not inside
   one continuous toolpath. Confirm, then leave alone.
 
 ### Open decisions for this design
@@ -723,27 +750,104 @@ behavior is rewired.
   that pre-fill the per-axis defaults -- nicer UX, but added maintenance and
   another thing to keep in sync with firmware behavior.
 
+## The G54-base decision + spoilboard base + validation guards
+
+The pivotal design decision, replacing the earlier "tool-change should be `G53`"
+conclusion. It came from a concrete crash class: if the post uses a *machine*-Z
+reference on one machine (LowRider, Z0 at the top of travel, work envelope
+negative below) but a *work*-Z reference on another (MPCNC, Z0 at the
+spoilboard, positive up), then a single posted concept like "retract to Z30"
+means "30 above the spoilboard" (safe) on one and "30 above the top of travel"
+(out of range / crash) on the other.
+
+### Decision
+
+Standardize on a **work-relative, G54-base convention** as the everyday
+reference, on every machine and firmware:
+
+- `G54` is a **stable base zeroed to the spoilboard** (a *fixed* surface, so it
+  is independent of stock thickness -- not the stock top).
+- All everyday moves (safe-Z retract, tool-change position, inter-section and
+  inter-WCS traverses) are **work-relative** to that base / the active WCS. Z0 =
+  spoilboard, up = positive, identically everywhere -- the frame-mixing crash
+  class disappears.
+- Machine-referenced (`G53` / homed-native) positioning is **demoted to an
+  optional robustness feature** for homed machines (e.g. an extra-clearance
+  machine-top retract), never the default.
+- An **absolute** work-Z clearance clears the stock as reliably as a machine-top
+  retract (from any pocket depth), so nothing safety-critical is lost. A
+  botched work-Z ruins the cut regardless, so machine-top's immunity to that is
+  not a real safety argument for the audience.
+
+Why this is right for V1E (not just a preference): it is the only reference that
+works on the lowest-common-denominator machine (no-Z-home MPCNC/FluidNC), it
+matches the GRBL ecosystem (Shapeoko/OpenBuilds/Onefinity all zero to work +
+probe), it fits Marlin's single-frame/`G92` model with no `G53` needed, and it
+*simplifies* the post (one frame, no machine-Z tiering on the everyday path).
+
+### The property
+
+In the WCS group, a mode (not a bare boolean -- "declare the base" and
+"establish it now" are separable, and "probe once, run many jobs" is a real
+workflow):
+
+- `wcsBase_Spoilboard`: **Off** | **Establish at start (probe G54 to spoilboard)**
+  | **Assume already set (G54 is the spoilboard base)**.
+
+Establishing is mostly a **Z** operation (probe the spoilboard surface, write
+`G54` Z via `writeWcsOrigin(1, …, thickness)` + the plate pauses); its **XY**
+origin is the homed XY or a declared corner -- so a fully stable base (incl. a
+fixed tool-change XY) depends on **homed XY** (ties back to the MCS group). On a
+switch-less machine the base is Z-only and tool-change XY still has no fixed
+reference.
+
+### The two validation guards (post-time -- the post errors in Fusion, it cannot
+check the controller's live state)
+
+- **Guard A -- no redefine.** "Using" `G54` (selecting/cutting in it) is always
+  fine; "redefining" it (the post emitting a *second* write to `G54`'s offset
+  after the base establish) is the error. If `wcsBase_Spoilboard != Off` and any
+  section's origin-establishment (`probeA_OnStart`/`probeB_OnChange` resolving to
+  offset 1) would re-write `G54` -> **post error**: "G54 is reserved as the
+  spoilboard base -- assign this operation's Work Offset to G55 or higher."
+  Note the `0 -> default -> G54` collision: a Setup with an unset Work Offset
+  resolves to `G54`, so the error text must call that out explicitly.
+- **Guard B -- safe-Z needs a base, scoped to multi-WCS.** If a safe-Z-dependent
+  feature (tool-change retract, inter-WCS safe move) is enabled **and** the job
+  uses **more than one WCS** **and** `wcsBase_Spoilboard == Off` -> **post
+  error**: "Safe-Z moves across WCS require a base; set 'Spoilboard base' to
+  Establish or Assume." A **single-WCS** job is exempt -- its one part zero is a
+  stable-enough reference for safe-Z on its own.
+
+### Workflow conventions this encodes (must be documented for users)
+
+- **Single-part job:** zero the active WCS to the part; safe-Z and tool-change
+  are relative to that one zero. No separate base needed. The common case.
+- **Multi-fixture job:** `G54` = fixed spoilboard base (set once, never moved);
+  `G55+` = per-part offsets. If the operator instead re-zeroes `G54` per part,
+  the base drifts -- Guard A catches the post-side symptom, but the convention
+  itself must be taught in the docs.
+
 ## Pragmatic priorities for the V1E / hobby audience
 
 This is a *value* ranking (what's worth doing); the *execution* order is the
-phased roadmap above -- MCS is established and verified in isolation (Phase 2)
-before the machine-referenced features (Phase 3) are wired in. Items 1 and 2
-below are Phase 3 work that depends on Phase 2 existing first.
+phased roadmap above.
 
-1. **Per-axis "Machine" (MCS) group** (Phase 2; see the implementation-options
-   subsection above). The keystone -- nothing machine-referenced is trustworthy
-   without it, and it ships first, in isolation, verified before anything else
-   changes.
-2. **Fix tool-change position to machine-referenced** (`G53` / homed native
-   frame, with unhomed fallback). Real bug, safety-relevant. Phase 3, needs
-   Phase 2.
-3. **Safe-Z retract to machine top before traverse / end-of-job / tool change.**
-   Pure safety. Phase 3, needs Phase 2.
+1. **Per-axis "Machine" (MCS) group** (Phase 2). Establishes the machine **XY**
+   frame (gantry squaring + repeatable origin for resume). Ships first, in
+   isolation, verified before anything else changes. Not the everyday Z
+   reference.
+2. **Spoilboard base (`G54`) + Guards A/B** (Phase 3). The everyday reference and
+   the safety net that makes the work-relative model enforceable at post time.
+3. **Work-relative safe-Z + tool-change position** (Phase 4). Absolute clearance
+   in the active WCS / G54 base; `G53` machine-XY / machine-top only as optional
+   robustness where homed.
 4. **Name the model honestly in UI/docs**: "work-Z probing only, X/Y manual, no
-   tool-length system -> Z re-probed per tool change." Costs nothing, prevents
-   wrong-mental-model crashes. Can land anytime.
+   tool-length system -> Z re-probed per tool change," plus the single-part vs.
+   multi-fixture base convention. Costs nothing, prevents wrong-mental-model
+   crashes. Can land anytime.
 5. **Marlin multi-WCS -> hard error**, not per-section warning. Independent of
-   the MCS work.
+   the above.
 6. *(Optional, later)* Real TLO for RRF/GRBL to break the re-probe-every-change
    requirement -- best paired with the fixed Z-probe / tool-setter convergence.
 7. *(Probably skip)* Consuming Fusion's native `onProbe` framework -- production-
