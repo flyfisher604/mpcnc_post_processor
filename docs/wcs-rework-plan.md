@@ -678,7 +678,7 @@ verifiable — land and test one before starting the next.
       exempt: the operator has parked at the origin, so the current position already *is*
       X0 Y0. Pre-existing bug, but now the default path (default flipped Skip → Probe Z).
   - [x] **Follow-up: retract relative to the spoilboard base, not the last part.** *(done for
-        the re-probe path.)* When a base is reserved and `Safe Z Retract Across WCS` is on, the
+        the re-probe path.)* When a base is reserved and `Safe Z Retract Across Parts` is on, the
         added-part retract now transits through the base and clears to `Cross Part Clearance`
         (`retractThroughBaseClearance()`). With no base (feature off) it still falls back to
         `H_Probe_SafeZ` in the outgoing frame. Still to reconcile against the every-boundary

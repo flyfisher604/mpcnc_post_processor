@@ -134,11 +134,11 @@ that needs hands-on verification before release.
 Partial phase. Landed and testable: Guard B, the added-part re-probe repositioning, and the
 WCS/Probe property relabels + default flip. **Not yet built** (so not testable): the
 base-relative traverse retract that would consume `Cross Part Clearance` — that property and
-the `Safe Z Retract Across WCS` *motion* do nothing yet; the toggle currently only drives
+the `Safe Z Retract Across Parts` *motion* do nothing yet; the toggle currently only drives
 Guard B. See the "Not yet implemented" item at the end.
 
 - [x] **Guard B (safe-Z across WCS needs a base).** On GRBL, a 2-WCS job (`G54`+`G55`):
-      - `WCS for Spoilboard = None`, `Safe Z Retract Across WCS = On` (default) → post errors
+      - `WCS for Spoilboard = None`, `Safe Z Retract Across Parts = On` (default) → post errors
         *"Safe-Z across WCS requires a base: reserve a spoilboard base … or turn off Safe Z
         Retract Across WCS."* (1a). Verified.
       - Same, toggle `Off` → posts, no Guard B error (1b). Verified.
@@ -161,7 +161,7 @@ Guard B. See the "Not yet implemented" item at the end.
       Coordinates` (Test 3). Verified. No enum ids or property keys changed, so existing presets
       keep working — labels/defaults only.
 - [x] **Base-relative re-probe retract (transit through the spoilboard base).** GRBL, base `G59`
-      reserved, `Safe Z Retract Across WCS` on, two copies on `G54`/`G55`: at the `G54→G55`
+      reserved, `Safe Z Retract Across Parts` on, two copies on `G54`/`G55`: at the `G54→G55`
       boundary the post transits through the base and clears to Cross Part Clearance before
       re-probing. Verified in `Setup1 Multi.gcode` (Debug on): `retract decision -- baseRelative:
       true base: 6 J_SafeZAcrossWcs: true` → `( Retract to spoilboard-base clearance G59 …)` →

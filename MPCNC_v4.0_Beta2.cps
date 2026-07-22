@@ -460,7 +460,7 @@ properties = {
     scope      : "post"
   },
   J_Probe_SafeZAcrossWcs: {
-    title      : "Safe Z Retract Across WCS",
+    title      : "Safe Z Retract Across Parts",
     description: "Multi-fixture safety. On (default): before traversing between operations that use different WCS, the tool retracts to the Cross Part Clearance below so it clears fixtures/clamps/other parts, and the job is validated (Guard B) to reject a multi-WCS job that reserves no spoilboard base -- a clearance height is meaningless across WCS whose offsets are only known after probing at runtime. Single-WCS jobs (including a single operation) are unaffected: no extra retract is emitted and the guard does not apply. Off: no cross-WCS retract and no guard. GRBL/RepRap only (Marlin is single-frame; see Guard C).",
     group      : "03 - Work Coordinate System - WCS / Probe",
     type       : "boolean",
@@ -469,7 +469,7 @@ properties = {
   },
   K_Probe_SafeZClearance: {
     title      : "Cross Part Clearance (above spoilboard)",
-    description: "Absolute work-Z height, measured above the reserved spoilboard base, that the tool retracts to before traversing between parts (different WCS). Set it high enough to clear the tallest fixture, clamp, or part in the job. Only used when Safe Z Retract Across WCS is on and a base is reserved.",
+    description: "Absolute work-Z height, measured above the reserved spoilboard base, that the tool retracts to before traversing between parts (different WCS). Set it high enough to clear the tallest fixture, clamp, or part in the job. Only used when Safe Z Retract Across Parts is on and a base is reserved.",
     group      : "03 - Work Coordinate System - WCS / Probe",
     type       : "number",
     value      : 40,
@@ -1203,7 +1203,7 @@ function validateJob() {
     // single-WCS job is exempt -- its one work zero is a stable enough reference. (Marlin
     // multi-WCS already errored above via Guard C, so only GRBL/RepRap reach here.)
     if (getProperty(properties.J_Probe_SafeZAcrossWcs) && collectDistinctOffsets().length > 1) {
-      error("Safe-Z across WCS requires a base: reserve a spoilboard base (\"WCS for Spoilboard\"), or turn off \"Safe Z Retract Across WCS\".");
+      error("Safe-Z across parts requires a base: reserve a spoilboard base (\"WCS for Spoilboard\"), or turn off \"Safe Z Retract Across Parts\".");
     }
     return; // no base reserved -> Guard A and the slot check are moot
   }
