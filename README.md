@@ -1,233 +1,421 @@
-
-Fusion 360 CAM posts processor for MPCNC 
+Fusion 360 CAM Post Processor for MPCNC / LowRider
 ====
 
-This is modified fork of https://github.com/guffy1234/mpcnc_posts_processor that was originally forked https://github.com/martindb/mpcnc_posts_processor.
+CAM post processor for [Fusion 360](https://www.autodesk.com/products/fusion-360)
+and the [V1 Engineering](https://www.v1engineering.com) MPCNC / LowRider family of
+machines. This is a modified fork of
+[guffy1234/mpcnc_posts_processor](https://github.com/guffy1234/mpcnc_posts_processor),
+originally forked from
+[martindb/mpcnc_posts_processor](https://github.com/martindb/mpcnc_posts_processor).
 
-CAM posts processor for use with Fusion 360 and [MPCNC](https://www.v1engineering.com).
+This is the **v4.0 (Beta)** post processor, distributed as the single file
+`MPCNC_v4.0_Beta2.cps`.
 
-This is the v4.0 (Beta) post processor, distributed as the single file `MPCNC_v4.0_Beta2.cps`.
+Supported firmware (set by the **Job → CNC Firmware** property):
 
-Supported firmware:
+- GRBL 1.1 / FluidNC
 - Marlin 2.x
-- Repetier firmware 1.0.3 (not tested. gcode is same as for Marlin)
-- GRBL 1.1
-- RepRap firmware (Duet3d) 
+- RepRap firmware (Duet3D)
+- Repetier 1.0.3 (untested; g-code is the same as Marlin)
 
-Installation:
-- The post processor consists of a single file, `MPCNC_v4.0_Beta2.cps`.
-- It can be simply installed by selecting Manage->Post Library from the Fusion 360 menubar; alternatively `MPCNC_v4.0_Beta2.cps` can be copied into a directory and selected each time prior to a post operation. If there is an existing copy installed, select it prior to installing and use the trash can icon to delete it.
-- The desired post processor can be selected during a post using the Setup button and selecting Use Personal Post Library.
-- Use the Job: CNC Firmware property to select between Marlin 2.x, Grbl 1.1 and RepRap firmware.
+---
 
-Some design points:
-- Setup operation types: Milling, Water/Laser/Plasma.
-- Only 3-axis toolpaths are supported. Multi-axis (4/5-axis) operations are rejected with an error at the start of the offending operation.
-- Support mm and Inches units (**but all properties MUST be set in MM**).
-- Rapid movements use two separate G0 moves — one for Z and one for XY — with independent travel speeds for Z and XY. The two moves are ordered so the tool never plunges into the work or drags across it: on a **descent** (Z moving toward the work) the XY move is output first and then Z; on a **retract** (Z rising, or unchanged) the Z move is output first and then XY.
-- Drilling and other canned-cycle operations (drill, peck, bore, tap, etc.) are supported. Because Marlin/GRBL/RepRap have no G81/G82/G83 canned cycles, each cycle is expanded into ordinary G0/G1 plunge-and-retract moves.
-- Work coordinate systems: on GRBL and RepRap/Duet the WCS selected in Fusion is emitted (G54–G59, and G59.1–G59.3 on RepRap). Marlin has no work-offset table, so the origin is instead set with G92 (see [Job: Zero Starting Location]); a warning is emitted if an operation selects a non-default WCS that cannot be honored.
-- Cutter/radius compensation must be set to **In computer** on the operation. Control-side compensation (G41/G42) is not supported by these firmwares and will produce a posting error.
-- Arcs supported on the XY plane (Marlin/Repetier/RepRap) or all planes (Grbl). Full circles are emitted as two arcs.
-- Manual NC **Pass through** commands are emitted to the output verbatim.
-- Tested with LCD display and SD card (built in tool change requires printing from SD and LCD to restart).
-- Support for 3 different laser power levels using "cutting modes" (through, etch, vaporize).
-- Support 2 coolant channels. You may attach relays to control external devices - as example air jet valve.
-- Customizable level of verbosity of comments.
-- Support line numbers.
-- Support GRBL laser mode (**note: you probably have to enabled laser mode [$32=1](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Laser-Mode)**).
+# What this post does
 
-   ![screenshot](/screenshot.jpg "screenshot")
+At its core the post turns a Fusion CAM program into g-code for a hobby-class CNC
+(MPCNC, LowRider, and similar GRBL/Marlin/RepRap machines). Beyond the usual
+translation it is built around one central idea that shapes every other feature:
 
-# Properties
+**These machines are *work-relative*.** Most of them have no reliable machine-Z
+reference — no tool setter, often no Z endstop, sometimes no endstops at all. So the
+post does not lean on the machine frame. Instead you establish a **work zero** (by
+jogging to it, or by probing a touch plate), and everything the post emits — cutting,
+retracts, traverses between parts — is measured relative to that zero. Where a machine
+*can* home, homing is used for X/Y repeatability, never as the everyday Z reference.
 
-> WARNING: If you are using the Fusion 360 for Personal Use license, formally know as the Fusion 360 Hobbyist license, please respect the [limitations of that license](https://knowledge.autodesk.com/support/fusion-360/learn-explore/caas/sfdcarticles/sfdcarticles/Fusion-360-Free-License-Changes.html). To remain compliant with that license set your [Feed: Travel Speed X/Y] and [Feed: Travel Speed Z] no faster then your machine's maximum cut feedrate (see Group 2 Properties).
->
->Fusion 360 for Personal Use restricts all moves not to exceed the maximum cut speed. This has been implemented not by reducing the speed of G0s but by changing all G0 (moves) to G1 (cut) commands. The side effect of this was to unintentionally introduce situations where tool dragging and/or work piece collisions occur, general at the start of jobs or after tool changes.
->
->You can choose to resolve these issues by enabling the selective mapping of G1s->G0s (see Group 3 Properties). These issues are resolved because the post processor emits each G0 rapid as separate Z and XY moves, ordered so the tool retracts before travelling horizontally and travels horizontally before descending — whereas a G1 cuts through X, Y and Z simultaneously.
+The post is designed to **degrade gracefully**:
 
-## Group 1: Job Properties
-Use these properties to control overall aspects of the job.
+- A **hobby** job — one operation, one part, no probe — needs almost no setup. Jog to
+  your zero, post, run.
+- A **full** job — many operations, multiple tools, or multiple fixtures making several
+  copies — has the extra structure (WCS handling, a reserved spoilboard base, per-part
+  probing, safe cross-part traverses) available and validated, without complicating the
+  simple case.
+
+Other capabilities: 3-axis milling and jet (laser / plasma / waterjet) operations;
+canned drilling cycles expanded into plain moves; arcs; 3 laser power levels; two
+configurable coolant channels; adjustable comment verbosity; optional line numbers;
+external include files for custom g-code. Only 3-axis toolpaths are supported —
+multi-axis operations are rejected with a clear error.
+
+> **Units:** the post outputs in whatever units the Setup uses (mm or inch), **but all
+> post properties must be entered in millimeters.**
+
+---
+
+# Installation
+
+The post is a single file, `MPCNC_v4.0_Beta2.cps`.
+
+1. In Fusion, choose **Manage → Post Library**.
+2. If an older copy is installed, select it and use the trash-can icon to remove it
+   first.
+3. Import `MPCNC_v4.0_Beta2.cps` (or keep it in a folder and select it at post time).
+4. When posting, use **Setup → Use Personal Post Library** and select this post.
+5. Set **Job → CNC Firmware** to match your controller.
+
+![screenshot](/screenshot.jpg "screenshot")
+
+---
+
+# Quick start by user type
+
+## Hobbyist — posting a single operation
+
+**Who this is:** a Fusion **Personal Use** (hobbyist) licensee, cutting one part in one
+Setup, usually with a single tool, and zeroing by hand. No probe or fixturing required.
+
+**The flow:**
+
+1. **Job → CNC Firmware** — pick your controller.
+2. **Feeds and Speeds** — this is the license-compliance step. The Fusion Personal
+   license requires that no move exceed your machine's maximum cut feedrate, so set
+   **Travel Speed X/Y** and **Travel Speed Z** no faster than your cut speeds. (See
+   *G1 → G0 rapid mapping* below for why this matters and how the post keeps travels
+   safe.)
+3. **Map G1s to Rapids** — leave this group **on** for the hobby case. It restores safe,
+   properly-ordered rapid moves that the Personal license would otherwise turn into
+   dragging cuts. (Full-license users turn it off — see that section.)
+4. **First Part: Set Work Origin** (in the WCS / Probe group) — how the single part gets
+   its zero:
+   - **Zero XYZ (no probe)** — jog the tool to the part origin (the XY corner *and* down
+     to touch the stock top), then this records that position as X0 Y0 Z0. The classic
+     manual touch-off; also the choice for a laser/pen where Z is set by hand.
+   - **Zero XY, probe Z** — jog to the XY corner, and the post probes Z off a touch
+     plate for you. (Default.)
+   - **Skip** — do nothing (you have zeroed in your sender).
+5. Post and run.
+
+Everything else (the spoilboard base, "On Each Added Part", cross-part clearance) stays
+at its default and emits nothing. A single-operation job is byte-for-byte what you'd
+expect — none of the multi-part machinery runs.
+
+## Full user — WCS, many operations, and multiple fixtures
+
+### First: what is a WCS?
+
+A **Work Coordinate System (WCS)** is a *stored origin* the controller remembers.
+On GRBL and RepRap there are several — `G54`, `G55`, `G56`, `G57`, `G58`, `G59` (and
+`G59.1`–`G59.3` on RepRap only). Selecting one (e.g. `G54`) tells the controller "from
+now on, X0 Y0 Z0 means *this* stored point." Each WCS holds its own offset, so you can
+define several independent zeros and switch between them mid-program without disturbing
+the others.
+
+Fusion assigns a WCS to each Setup via its **Work Offset** field (1 → `G54`, 2 → `G55`,
+…). This post emits the matching selection and writes each origin into that WCS's *own*
+register with `G10 L20 P<n>`, so setting one zero never corrupts another.
+
+> **Marlin is the exception.** Marlin has no work-offset table — it has a single global
+> origin set with `G92`. So on Marlin only *one* coordinate frame exists; a job that
+> uses more than one distinct work offset is rejected at post time (see *Validation
+> guards*). Everything below about multiple WCS applies to GRBL and RepRap.
+
+The full-license user meets WCS in one of three situations:
+
+### (a) Many operations / tools, one part, one WCS
+
+The common full-license job: several operations (face, pocket, contour), possibly
+several tools, all on one part in one Setup — so one WCS throughout.
+
+- Turn the **Map G1s to Rapids** group **off** — the full license already posts real
+  `G0` rapids, so the hobby workaround isn't needed.
+- Set **First Part: Set Work Origin** as above (probe Z is the usual full-license
+  choice).
+- If the job changes tools, enable the **Tool Changes** group. Because there is no
+  tool-length system, turn on **Probe After Tool Change** so each new tool re-references
+  Z. The tool-change park position (**Tool Change X/Y/Z**) is relative to the current
+  work zero.
+- One WCS means one shared frame, so each operation's own retract already clears the
+  part — no extra cross-part machinery runs.
+
+### (b) Multiple fixtures — several copies of a part (Replicate)
+
+You have jigged up several copies of the same part, one per fixture, each on its own
+WCS (`G54`, `G55`, `G56`, …), and want to cut them all in one program.
+
+- **Reserve a spoilboard base** — set **WCS for Spoilboard** (default choice `G59`). This
+  is a *fixed-surface* zero (the spoilboard, not any stock top) that gives the post a
+  stable reference to retract to when traversing between parts of possibly different
+  thickness. Keep **Probe Z to Set Spoilboard WCS** on so it's established at job start.
+- Put each copy on its own Fusion Work Offset. Their **XY** comes from each fixture's
+  pre-set offset — the post never sets XY for an added part.
+- **On Each Added Part** decides Z for each copy after the first:
+  - **Probe Z** (default) — at each new copy the post rapids to that copy's origin and
+    probes its stock-top Z.
+  - **Skip** — the copy uses whatever Z is already stored in its WCS.
+- **Safe Z Retract Across Parts** (on by default) makes the tool retract to **Cross Part
+  Clearance** — an absolute height above the spoilboard base — *before* it traverses to
+  the next fixture, so it clears every clamp and part regardless of their heights.
+- Don't assign any cutting operation to the reserved base WCS itself (a guard enforces
+  this).
+
+### (c) One part from multiple references, or a flip — *not* a single job
+
+Re-datuming the same part to a second reference, or flipping it, is **out of scope for a
+single post run**. On a machine with no homing the post cannot establish the second
+reference's XY, and re-probing the same surface buys nothing. Run each reference / each
+side as a **separate job**.
+
+---
+
+# Supporting concepts
+
+## The work-relative coordinate model
+
+Production controls keep three references separate: the machine frame (`G53`, from
+homing), the work frame (`G54`–`G59`), and tool-length offsets (`G43`, from a tool
+setter). Most V1E machines have none of the three fully, so this post takes a deliberate
+**work-relative stance**:
+
+- The everyday reference is the **active WCS**, not the machine frame.
+- **Tool length is folded into a Z re-probe after each tool change** — there is no TLO.
+- Homing establishes the machine frame for **X/Y only** (squaring and a repeatable
+  origin), as an optional robustness feature. **Z homing, where it exists, is for its own
+  sake** (a real endstop, or the movable-plate trick) and never becomes the everyday Z
+  reference — that is always the work-Z touch-off.
+
+This matches the GRBL ecosystem (Shapeoko / OpenBuilds / Onefinity all zero to the work
+and probe Z) and works on the lowest-common-denominator machine.
+
+## Establishing the machine frame (homing / MCS)
+
+Group **02 - Establish Machine Coordinates** decides, per axis, how the machine frame is
+set. Each of **Home X / Home Y / Home Z** is either:
+
+- **Power-On** (default) — accept the current position as zero; the post emits no motion.
+  The fallback for an axis with no endstop.
+- **Home** — the post emits the homing command and the axis runs to its endstop.
+
+Homing command by firmware:
+
+| Firmware | Command |
+|---|---|
+| Marlin / RRF (Duet) | `G28 X` / `G28 Y` / `G28 Z` — independent per axis set to Home |
+| GRBL / FluidNC | `$H` only — one command homes all configured axes together |
+
+On GRBL/FluidNC the per-axis pickers can't each trigger their own command (`$H` is
+all-or-nothing): any axis set to **Home** causes one `$H`, and the three pickers document
+which axes you assert are wired. **Prompt Before Z Home** pauses before a Marlin `G28 Z`
+so you can place a movable Z plate — it never fires for X/Y or on GRBL/RRF.
+
+Out of the box every axis is **Power-On**, so the post emits no homing (a wrong home
+command is a crash).
+
+## The reserved spoilboard base
+
+For multi-fixture jobs, one WCS can be reserved as a **spoilboard base** (**WCS for
+Spoilboard**, default off / `None`). Because it is zeroed to a *fixed surface* (the
+spoilboard, independent of stock thickness), it is the one frame in which a safe height
+is meaningful across all of a job's parts. It is:
+
+- **Established at job start** by probing the spoilboard (**Probe Z to Set Spoilboard
+  WCS** on), or assumed pre-set from a prior job (off — probe once, run many).
+- **Transited, not parked**: when the tool must move between parts, the post briefly
+  selects the base to retract to **Cross Part Clearance**, then selects the destination
+  WCS. It never leaves the base active into a cut, and never selects it without a real
+  move.
+- Recommended slot **`G59`** (the highest GRBL supports, keeping `G54` free for parts).
+  `G59.1`–`G59.3` are RepRap-only; a base is ignored on Marlin.
+
+## Probing and tool changes
+
+- **Work-Z probing only.** `G38.2` down to a touch plate (thickness compensated via
+  **Plate Thickness**), with attach/remove pauses. There is no tool-length system, and
+  X/Y is never probed (jog manually).
+- **Re-probe after every tool change** is the tool-length substitute — enable **Probe
+  After Tool Change**.
+- **Manual tool changes** (no ATC): retract, move to the work-relative change position,
+  pause for the swap, re-probe Z, resume. Every leg is collision-sensitive.
+
+## Validation guards
+
+The post checks the job at post time (it can't read the live controller) and errors
+before emitting bad g-code:
+
+- **No base redefine** — using the reserved base is fine; a job that would *re-establish*
+  its origin is an error ("assign this operation to another WCS").
+- **Safe-Z across parts needs a base** — if **Safe Z Retract Across Parts** is on and the
+  job uses more than one WCS on GRBL/RRF with no base reserved, it errors (a clearance
+  height is meaningless across un-probed offsets). Single-WCS jobs are exempt.
+- **Marlin is single-frame** — a Marlin job that uses more than one distinct work offset
+  is a hard error (`G92` can't fake multiple WCS).
+
+## G1 → G0 rapid mapping (hobby-license workaround)
+
+> **Personal Use license note:** to comply with the
+> [Fusion Personal Use limitations](https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/Fusion-360-Free-License-Changes.html),
+> set **Travel Speed X/Y** and **Travel Speed Z** no faster than your machine's maximum
+> cut feedrate.
+
+The Personal license restricts all moves to the max cut speed — and Fusion implements
+this by turning every `G0` rapid into a `G1` cut. The side effect is dragging cuts and
+collisions at the start of jobs and after tool changes. Group **05 - Map G1s to Rapids**
+selectively converts those `G1` moves back into `G0` rapids where it's safe:
+
+- **First G1 → G0 Rapid** — restores the lost initial positioning move at the start of a
+  toolpath (the "tool dragged across the work" problem).
+- **Map: G1s → G0 Rapids** — converts horizontal `G1` moves at or above **Map: Safe Z to
+  Rapid** into rapids (assumes anything at that height is a safe air move).
+- **Map: Safe Z to Rapid** — a constant (e.g. `10`) or a Fusion height with a fallback
+  (`Retract:15`, `Feed:5`, `Clearance:7`).
+- **Map: Allow Rapid Z** — also convert safe vertical moves.
+
+The post emits each `G0` as **two moves** — Z and XY separately, ordered so the tool
+retracts before travelling and travels before descending — which is what makes these
+conversions safe. A cutting move is never converted. **Full-license users disable this
+whole group** — their posted rapids are already real `G0` moves.
+
+## Feeds and feedrate scaling
+
+**Travel Speed X/Y** and **Travel Speed Z** are always used for `G0` rapids. If **Scale
+Feedrate** is on, `G1` cut feedrates are scaled so no axis exceeds its **Max XY / Max Z
+Cut Speed**: the toolpath feed is projected onto each axis, over-limit axes are scaled
+down proportionally, and the result is capped at **Max Toolpath Speed**. Scaling only
+ever *reduces* a feed. (Because scaling is 3-dimensional, a resulting toolpath feed can
+look higher than a single axis limit while each axis is still within its own limit.)
+
+---
+
+# Property reference
+
+Groups appear in the Fusion dialog in the order below.
+
+## 01 - Job
+|Title|Description|Default|
+|---|---|---|
+|CNC Firmware|Dialect of g-code to create (GRBL / Marlin / RepRap).|**GRBL 1.1**|
+|Manual Spindle On/Off|Issue pauses to manually turn the spindle on/off.|**true**|
+|Comment Level|Verbosity: Off, Important, Info, Debug.|**Info**|
+|Use Arcs|Use G2/G3 for circular moves.|**true**|
+|Enable Line #s|Emit sequence numbers.|**false**|
+|First Line #|First sequence number.|**10**|
+|Line # Increment|Sequence-number increment.|**1**|
+|Include Whitespace|Whitespace separation between words.|**true**|
+|At End Go to 0,0|Go to X0 Y0 at program end; Z unchanged.|**true**|
+
+## 02 - Establish Machine Coordinates
+|Title|Description|Default|
+|---|---|---|
+|Home X / Home Y / Home Z|Per axis: **Power-On** (accept current position, no motion) or **Home** (run to endstop). GRBL homes all axes with one `$H` if any is set to Home.|**Power-On**|
+|Prompt Before Z Home|Pause before a Marlin `G28 Z` to place a movable Z plate. Marlin-only.|**false**|
+
+## 03 - Work Coordinate System - WCS / Probe
+|Title|Description|Default|
+|---|---|---|
+|WCS for Spoilboard|Reserve one WCS as a fixed spoilboard base. `None` = off. `G59.1`–`G59.3` are RepRap-only; ignored on Marlin.|**None**|
+|Probe Z to Set Spoilboard WCS|Probe the spoilboard into the base at job start (off = assume pre-set).|**true**|
+|First Part: Set Work Origin|First/only part origin: **Skip** / **Zero XYZ (no probe)** / **Zero XY, probe Z**.|**Zero XY, probe Z**|
+|On Each Added Part|Multi-fixture only: **Skip** or **Probe Z** at each added copy's WCS.|**Probe Z**|
+|G38.2 (On) or G28 (Off)|Probe with `G38.2` (On) or `G28` (Off). GRBL always `G38.2`.|**On**|
+|G38 Target|Furthest Z the probe move travels to.|**-10**|
+|G38 Speed|Probe feedrate (mm/min).|**30**|
+|Safe Z|Retract height after probing; also the no-base added-part re-probe retract.|**40**|
+|Plate Thickness|Touch-plate thickness (compensated into Z).|**0.8**|
+|Safe Z Retract Across Parts|Retract to Cross Part Clearance before traversing between WCS; drives Guard B. GRBL/RepRap only.|**true**|
+|Cross Part Clearance (above spoilboard)|Absolute height above the base to retract to between parts — clear the tallest fixture.|**40**|
+
+## 04 - Feeds and Speeds
+|Title|Description|Default|
+|---|---|---|
+|Travel Speed X/Y|`G0` travel speed X & Y (mm/min).|**2500**|
+|Travel Speed Z|`G0` travel speed Z (mm/min).|**300**|
+|Enforce Feedrate|Always emit `Fxxx` even when unchanged (useful for Marlin).|**true**|
+|Scale Feedrate|Scale `G1` feeds to axis maximums.|**false**|
+|Max XY Cut Speed|Max X or Y cut speed (mm/min).|**900**|
+|Max Z Cut Speed|Max Z cut speed (mm/min).|**180**|
+|Max Toolpath Speed|Cap for the scaled toolpath feed (mm/min).|**1000**|
+
+## 05 - Map G1s to Rapids (disable when using full license)
+|Title|Description|Default|
+|---|---|---|
+|First G1 → G0 Rapid|Convert the first `G1` of a toolpath to a rapid.|**false**|
+|Map: G1s → G0 Rapids|Convert safe horizontal `G1` moves to rapids.|**false**|
+|Map: Safe Z to Rapid|Threshold Z: a number, or a Fusion height with fallback (e.g. `Retract:15`).|**Retract:15**|
+|Map: Allow Rapid Z|Also convert safe vertical moves.|**false**|
+
+## 06 - Tool Changes
+|Title|Description|Default|
+|---|---|---|
+|Tool Changes are Included|Emit tool-change code when the tool changes.|**false**|
+|Include Relocation Code|Move to the change position (X/Y/Z below); off = plain M6/select.|**false**|
+|Tool Change X / Y / Z|Change position, relative to the current WCS (plain `G0`).|**0 / 0 / 40**|
+|Disable Z Stepper|Disable the Z stepper after reaching the change position.|**false**|
+|Do First Change|Do an initial change to load the first tool.|**false**|
+|Probe After Tool Change|Re-probe Z after each change (the tool-length substitute).|**false**|
+
+## 07 - External Include Files
+Each names a file in the nc output folder whose contents are inserted verbatim at that
+point. Leave empty for built-in code.
+
+|Title|Default|
+|---|---|
+|Start GCode File / Stop GCode File|empty|
+|Tool Change Start / Tool Change End|empty|
+|Probe|empty|
+
+## 08 - Laser
+Fusion's four Through levels all map to "On - Through". The **CNC Firmware** selection
+decides whether the GRBL or Marlin/RepRap laser mode is used.
 
 |Title|Description|Default|
 |---|---|---|
-Job: CNC Firmware|Dialect of GCode to create|**Marlin 2.x**|
-Job: Zero Starting Location (G92)|On start set the current location as 0,0,0 (G92).|**true**|
-Job: Manual Spindle On/Off|Enable to manually turn spindle motor on/off. Post processor will issue additional pauses for TURN ON/TURN OFF the motor.|**true**|
-Job: Comment Level|Controls a increasing level of comments to be included: Off, Important, Info, Debug|**Info**|
-Job: Use Arcs|Use G2/G3 g-codes for circular movements.|**true**|
-Job: Enable Line #s|Show sequence numbers.|**false**|
-Job: First Line #|First sequence number.|**10**|
-Job: Line # Increment|Sequence number increment.|**1**|
-Job: Include Whitespace|Includes whitespace seperation between text.|**true**|
-Job: At end go to 0,0|Go to X0 Y0 at gcode end, Z remains unchanged.|**true**|
+|Laser: On - Vaporize / Through / Etch|Power % per cutting mode.|**100 / 80 / 40**|
+|Laser: Marlin/Reprap Mode|Fan (M106/M107), Spindle (M3/M5), or Pin (M42).|**Fan - M106 S{PWM}/M107**|
+|Laser: Marlin M42 Pin|Custom pin for Pin mode.|**4**|
+|Laser: GRBL Mode|Dynamic (M4) or static (M3) power.|**M4 S{PWM}/M5 dynamic**|
+|Laser: Coolant|Force a coolant for laser ops (e.g. air).|**Off**|
 
-## Group 2: Travel Speed and Feedrate Scaling Properties
-Use these properties to set the speed used for G0 Rapids and to scale the feedrate used
-for G1 cuts.
-
-[Feed: Travel Speed X/Y] and [Feed: Travel Speed Z] are always used for G0 Rapids.
-
-Scaling of the G1 cut feedrates will only occur if [Feed:Scaled Feedrate] is true.
-
-Scaling ensures that no G1 cut exceeds the speed capablities of the X, Y, or Z axes.
-The cut's toolpath feedrate is projected onto the X, Y and Z axes. In turn each axis is tested
-to see if its cut speed is within the limits of that axis. If not, then all axes feedrates are
-scaled proportionatly to bring it within limits. This is repeated for all axes. The three axis
-feedrates are then merged to create a new toolpath feedrate which is then limited to ensure it
-doesn't exceed [Feed: Max Toolpath Speed]. Scaling only ever reduces a feedrate, never increases it.
-
-Note: Because scaling considered 3 dimensional movement a resulting toolpath's feedrate may be
-greater then one or all of the X, Y or Z limits. For example, a small movement in Z compared to
-a much larger movement in XY may result in a feedrate that appears to exceed the capability of
-Z but in reality since Z is moving a much smaller distance for the same time period its actual
-feedrate is within the established limits.
+## 09 - Coolant
+Two channels (A, B); each maps a Fusion coolant mode to enable/disable g-code. If a
+tool's coolant matches a channel, that channel is enabled; a warning is emitted if a
+requested coolant matches no channel. Marlin and GRBL command options are both offered —
+pick to match your wiring. Set a channel to **Use custom** to use the custom strings.
 
 |Title|Description|Default|
 |---|---|---|
-Feed: Travel Speed X/Y|High speed for travel movements X & Y (mm/min).|**2500 mm/min**|
-Feed: Travel Speed Z|High speed for travel movements Z (mm/min).|**300 mm/min**|
-Feed: Enforce Feedrate|Forces the Fxxx to be include even if hasn't changed, useful for Marlin.|**true**|
-Feed: Scaled Feedrate|Scale feedrate based on X, Y, Z axis maximums.|**false**|
-Feed: Max Cut Speed X or Y|Maximum X or Y axis cut speed (mm/min).|**900 mm/min**|
-Feed: Max Cut Speed Z|Maximum Z axis cut speed (mm/min).|**180 mm/min**|
-Feed: Max Toolpath Speed|Maximum scaled feedrate for toolpath (mm/min).|**1000 mm/min**|
+|Channel A / B Mode|Coolant mode that enables the channel.|**off**|
+|Turn Channel A / B On/Off|Enable/disable g-code for the channel.|**M42 P6/P11 S255/S0**|
+|Channel A / B On/Off Custom|Custom include files when Mode = Use custom.|empty|
 
-## Group 3: Map G1->G0 Properties
-
-Allows G1 cuts to be converted to G0 Rapid movements in specific cases:
-
-If [Map: First G1 -> G0 Rapid] is true the post processor resolves the lost
-initial positioning movement at the beginning of a cut toolpath. This problem is often
-identified in forums as the tool being initially dragged across the work surface. 
-
-If [Map: G1s -> G0s] is true then G1 XY cut movements (i.e. no change in Z) that occur
-at a height greater or equal to [Map: Safe Z to Rapid] are converted to G0 Rapids.
-Note: this assumes that any Z above [Map: Safe Z to Rapid] is a movement in the air and clear of
-obstacles. Can be defined as a number or one of F360's planes (Feed, Retract or Clearance).
-
-Position comparisons used to decide whether an axis is unchanged are made at the output precision
-(3 decimals in mm, 4 in inches), so floating-point rounding does not defeat the mapping. A cutting
-move is never converted to a rapid: conversion only happens when the destination Z (and, for a
-descent, the current Z) is at or above [Map: Safe Z to Rapid].
-
-Map: Safe Z for Rapids may be defined as:
-* As a constant numeric value - safe Z will then always be this value for all sections, or
-* As a reference to a F360 Height - safe Z will then follow the Height defined within the operation's Height tab. Allowable Heights are: Feed, Retract, or Clearance. The Height must be followed by a ":" and then a numeric value. The value will be used if Height is not defined for a section.
-
-If [Map: Allow Rapid Z] is true then G1 Z cut movements that either move straight up
-and end above [Map: Safe Z to Rapid], or straight down with the start and end positions both
-above [Map: Safe Z to Rapid] are included. Only occurs if [Map: G1s -> G0s] is also true.
-
-|Title|Description|Default|Format|
-|---|---|---|---|
-Map: First G1 -> G0 Rapid|Converts the first G1 of a cut to G0 Rapid|**false**| |
-Map: G1s -> G0s|Allow G1 cuts to be converted to Rapid G0 moves when safe and appropriate.|**false**| |
-Map: Safe Z for Rapids|A G1 cut's Z must be >= to this to be mapped to a Rapid G0. Can be two formats (1) a number which will be used for all sections, or (2) a reference to F360's Height followed by a default if Height is not available.|**Retract:15** (use the Retract height and if not available 15)| \<number\> or \<F360 Height\>:\<number\>; e.g. 10 or Retract:7 or Feed:5|
-Map: Allow Rapid Z|Include the mapping of vertical cuts if they are safe.|**false**|
-
-## Group 4: Tool change Properties
-
+## 10 - Duet
 |Title|Description|Default|
 |---|---|---|
-Tool Change: Enable|Include tool change code when tool changes (bultin tool change requires LCD display)|**false**|
-Tool Change: Include Relocation Code|Relocate the tool for manual tool changes (uses the X/Y/Z below); when off, a plain M6/tool select is emitted|**false**|
-Tool Change: X|X position for built-in tool change|**0**|
-Tool Change: Y|Y position for built-in tool change|**0**|
-Tool Change: Z|Z position for built-in tool change|**40**|
-Tool Change: Disable Z stepper|Disable Z stepper after reaching tool change location|**false**|
-Tool Change: Do First Change|Do an initial tool change to load the first tool|**false**|
+|Milling Mode|Duet3D milling-mode command.|**M453 P2 I0 R30000 F200**|
+|Laser Mode|Duet3D laser-mode command.|**M452 P2 I0 R255 F200**|
 
-## Group 5: Z Probe Properties
+---
 
-|Title|Description|Default|
-|---|---|---|
-Probe: On job start|Execute probe gcode on job start|**false**|
-Probe: After Tool Change|Z probe after tool change|**false**|
-Probe: Plate thickness|Plate thickness|**0.8**|
-Probe: Use Home Z (G28)|Probe with G28 (Yes) or G38 (No)|**true**|
-Probe: G38 target|G38 Probing's furthest Z position|**-10**|
-Probe: G38 speed|G38 Probing's speed|**30**|
-Probe: Safe Z|Safe Z to return to after probing|**40**|
+# Notes and limitations
 
-## Group 6: Override Behaviour by External File Properties
+- Only 3-axis toolpaths — 4/5-axis operations error out.
+- Cutter/radius compensation must be **In computer**; control-side G41/G42 is a posting
+  error.
+- Arcs are on the XY plane (Marlin/RepRap) or all planes (GRBL); full circles are two
+  arcs.
+- Canned cycles (drill/peck/bore/tap) are expanded into plain G0/G1 moves.
+- Manual NC **Pass through** commands are emitted verbatim.
+- GRBL laser jobs likely need laser mode enabled
+  ([`$32=1`](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Laser-Mode)).
+- Built-in tool change with LCD/SD: printing from SD and using the LCD to restart is
+  required.
 
-Each of these names a file (located in the same nc output folder) whose contents are inserted verbatim at the corresponding point in the program. Leave empty to use the post processor's built-in code.
-
-|Title|Description|Default|
-|---|---|---|
-Start GCode File|File with custom Gcode for header/start (in nc folder)||
-Stop GCode File|File with custom Gcode for footer/end (in nc folder)||
-Tool Change Start|File with custom Gcode inserted at the start of a tool change (in nc folder)||
-Tool Change End|File with custom Gcode inserted at the end of a tool change (in nc folder)||
-Probe|File with custom Gcode for tool probe (in nc folder)||
-
-## Group 7: Laser/Plasma Properties
-
-Fusion 360 defines four levels of Through cut, currently these all map to power level "On - Through".
-
-The firmware selected in the parameter [Job: CNC Firmware] determines if the Grbl or Marlin/Reprap laser parameters are used. 
-
-Fusion 360 does not use a coolant when using its jet tools (waterjet/laser/plasma). When using a laser it may be desirable to use air or some other device you have connected to the coolant channels. The [Laser: Coolant] can be used to force a coolant to be used for the laser operations (see coolant parameter on details for configuring the coolant channels).
-
-|Title|Description|Default|Values|
-|---|---|---|---|
-Laser: On - Vaporize|Persent of power to turn on the laser/plasma cutter in vaporize mode|**100**||
-Laser: On - Through|Persent of power to turn on the laser/plasma cutter in through mode|**80**||
-Laser: On - Etch|Persent of power to turn on the laser/plasma cutter in etch mode|**40**||
-Laser: Marlin/Reprap Mode|Marlin/Reprap mode of the laser/plasma cutter|**Fan - M106 S{PWM}/M107**|"Fan - M106 S{PWM}/M107", "Spindle - M3 O{PWM}/M5", "Pin - M42 P{pin} S{PWM}"|
-Laser: Marlin M42 Pin|Marlin custom pin number for the laser/plasma cutter|**4**||
-Laser: GRBL Mode|GRBL mode of the laser/plasma cutter|**M4 S{PWM}/M5 dynamic power**|"M4 S{PWM}/M5 dynamic power", "M3 S{PWM}/M5 static power"|
-Laser: Coolant|Force a coolant to be used|**Off**|off, flood, mist, throughTool, air, airThroughTool, suction, floodMist, floodThroughTool|
-
-## Group 8: Coolant Control Pin Properties
-
-Coolant has two channels, A and B. Each channel can be configured to be off or set to 1 of the 8 coolant modes that Fusion 360 allows on operation. If a tool's collant requirements match a channel's setting then that channel is enabled. A warning is generated if a tool askes for coolant and there is not a channel that matches. 
-
-If a channel matches the coolant requested the Channel becomes enabled. When a channel is enabled the post processor will include the text associated with the corresponding property [Coolant \<A or B\> Enable]. Note, Marlin and Grbl values are included as options, you must select based on your actual configuration. The firmware selected in property [Job: CNC Firmware] will not override your selection.
-
-If a channel needs to be Disabled because it no longer matchs the coolant requested then the channel is physically disabled by the post processor by including the text associated with the corresponding property [Coolant \<A or B\> Disable]. Note, Marlin and Grbl values are included as options, you must select based on your actual configuration. The firmware selected in the propery [Job: CNC Firmware] will not override your selection.
-
-For coolant requests, like "Flood and Mist" or "Flood and Through Tool" you may want to enable one or
-two channels dependent on if your hardware uses one connections to enable both or a seperate connection for each. Two channels may be enabled by placing the same coolant code in both. For example, setting both channels to "Flood and Mist" will result in enabling both channel A and channel B when the tool requests "Flood and Mist". Correspondingly channels A's enable value will be output (to enable flooding) and channel B's enable value will be output (to enable Mist).
-
-Four custom coolant text strings can be defined for both Channel A and B's on and off values. Use these if the predefine values do not match your hardware. To enable, set the corresponding coolant channel to 'Use custom'.
-
-|Title|Description|Default|Values|
-|---|---|---|---|
-Coolant: A Mode|Enable channel A when tool is set this coolant|**off**|off, flood, mist, throughTool, air, airThroughTool, suction, floodMist, floodThroughTool|
-Coolant: B Mode|Enable channel B when tool is set this coolant|**off**|off, flood, mist, throughTool, air, airThroughTool, suction, floodMist, floodThroughTool|
-Coolant: A Enable|GCode to turn On coolant channel A|**Mrln: M42 P6 S255**|"Mrln: M42 P6 S255", "Mrln: M42 P11 S255", "Grbl: M7 (mist)", "Grbl: M8 (flood)", "Use custom"|
-Coolant: A Disable|GCode to turn Off coolant channel A|**Mrln: M42 P6 S0**|"Mrln: M42 P6 S0", "Mrln: M42 P11 S0", "Grbl: M9 (off)", "Use custom"|
-Coolant: B Enable|GCode to turn On coolant channel B|**Mrln: M42 P11 S255**|"Mrln: M42 P11 S255", "Mrln: M42 P6 S255", "Grbl: M7 (mist)", "Grbl: M8 (flood)", "Use custom"|
-Coolant: B Disable|GCode to turn Off coolant channel B|**Mrln: M42 P11 S0**|"Mrln: M42 P11 S0", "Mrln: M42 P6 S0", "Grbl: M9 (off)", "Use custom"|
-Coolant: Custom A Enable|File with custom GCode to turn On coolant channel A (in nc folder)|empty| |
-Coolant: Custom A Disable|File with custom GCode to turn Off coolant channel A (in nc folder)|empty| |
-Coolant: Custom B Enable|File with custom GCode to turn On coolant channel B (in nc folder)|empty| |
-Coolant: Custom B Disable|File with custom GCode to turn Off coolant channel B (in nc folder)|empty| |
-
-## Group 9: Duet Properties
-
-|Title|Description|Default|
-|---|---|---|
-Duet: Milling mode|GCode command to setup Duet3d milling mode|**M453 P2 I0 R30000 F200**|
-Duet: Laser mode|GCode command to setup Duet3d laser mode|**M452 P2 I0 R255 F200**|
+---
 
 # Resources
 
-[Marlin G-codes](http://marlinfw.org/meta/gcode/)
-
-[PostProcessor Class Reference](https://cam.autodesk.com/posts/reference/classPostProcessor.html)
-
-[Post Processor Training Guide (PDF document)](https://cam.autodesk.com/posts/posts/guides/Post%20Processor%20Training%20Guide.pdf)
-
-[Dumper PostProcessor](https://cam.autodesk.com/hsmposts?p=dump)
-
-[Library of exist post processors](https://cam.autodesk.com/hsmposts)
-
-[Post processors forum](https://forums.autodesk.com/t5/hsm-post-processor-forum/bd-p/218)
-
-[How to set up a 4/5 axis machine configuration](https://forums.autodesk.com/t5/hsm-post-processor-forum/how-to-set-up-a-4-5-axis-machine-configuration/td-p/6488176)
-
-[Beginners Guide to Editing Post Processors in Fusion 360! FF121 (Youtube video)](https://www.youtube.com/watch?v=5EodQIY25tU)
+- [Marlin G-codes](https://marlinfw.org/meta/gcode/)
+- [PostProcessor Class Reference](https://cam.autodesk.com/posts/reference/classPostProcessor.html)
+- [Post Processor Training Guide (PDF)](https://cam.autodesk.com/posts/posts/guides/Post%20Processor%20Training%20Guide.pdf)
+- [Dumper PostProcessor](https://cam.autodesk.com/hsmposts?p=dump)
+- [Library of existing post processors](https://cam.autodesk.com/hsmposts)
+- [Post processors forum](https://forums.autodesk.com/t5/hsm-post-processor-forum/bd-p/218)
