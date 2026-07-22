@@ -336,19 +336,25 @@ independent `G28` on Marlin/RRF):
   place the movable Z plate. Fires only when Z is set to `Home` on a plate-homed setup
   (Marlin sharing the Z-min pin); never for switch homing or X/Y.
 
-**Reserved base** (in the WCS / Probe group — Phase 3, provisional item letters, e.g.
-`H_Probe_BaseReserve` / `I_Probe_BaseEstablish`, finalized when the phase lands):
+**Reserved base** (`H_Probe_BaseReserve` / `I_Probe_BaseEstablish`, in the WCS / Probe
+group):
 
-- `*_Probe_BaseReserve` (dropdown): `None` | `G54` | `G55` | `G56` | `G57` | `G58` | `G59` |
-  `G59.1 (RepRap)` | `G59.2 (RepRap)` | `G59.3 (RepRap)`. Default `G59`. `G54` is
-  offered for users who deliberately want the spoilboard base on the Fusion default
-  slot; the default stays `G59` so a beginner's parts (which land on `G54`) never
-  collide with the reserved base.
-- `*_Probe_BaseEstablish` (bool, default **on**): this is the reserved base's version of the
+- `H_Probe_BaseReserve` (dropdown): `None` | `G54` | `G55` | `G56` | `G57` | `G58` | `G59` |
+  `G59.1 (RepRap)` | `G59.2 (RepRap)` | `G59.3 (RepRap)`. **Default `None`** (feature
+  opt-in). *Deviation from the earlier draft, which proposed default `G59`:* defaulting the
+  base on would make every default job — including the hobby single-part common case —
+  emit a spoilboard probe at start, breaking the Phase-2 "byte-identical by default"
+  stance. So the base is off unless the user picks a slot. When a user does reserve one,
+  `G59` remains the natural choice (highest GRBL slot, keeps `G54` free for beginners'
+  parts); `G54` is still offered for those who deliberately want the base on the Fusion
+  default slot. `G59.1`-`G59.3` require RepRap; a base is ignored on Marlin (no per-WCS
+  registers) with a warning.
+- `I_Probe_BaseEstablish` (bool, default **on**): the reserved base's version of the
   probe-on-start step — at job start, probe the spoilboard and write the result into the
   reserved base WCS (`G10 L20 P<n>`). When **disabled**, the post skips the probe and
   emits an Info comment like `(assuming base G59 was established in a previous job)`, so
-  the probe-once / run-many workflow is explicit rather than silent.
+  the probe-once / run-many workflow is explicit rather than silent. No effect when
+  `H_Probe_BaseReserve` is `None`.
 
 **Unchanged:** the Phase-1 `A_Probe_OnStart` / `B_Probe_OnChange` /
 `H_ToolChange_ProbeAfterChange` and the shared probe mechanics (`C_Probe_G382orG28`,
@@ -376,6 +382,33 @@ Post-time only — the post errors in Fusion; it cannot read the controller's li
   silently wrong on it. On Marlin, a job using more than one WCS is a **hard post error**:
   *"Marlin has a single coordinate frame — this multi-WCS job cannot be posted; use one
   work offset."*
+
+## Proposal under discussion: consolidate the two probe properties (NOT yet decided)
+
+Raised during Phase 3 testing. The two probe-timing dropdowns (`A_Probe_OnStart`
+"Probe at Job Start" and `B_Probe_OnChange` "Probe on WCS Change") are easy to confuse —
+in testing, the job-start probe was mistaken for the on-change probe. **Proposal:**
+collapse them into a single property.
+
+- **Remove** `A_Probe_OnStart` ("Probe at Job Start").
+- **Rename** `B_Probe_OnChange`'s label `"Probe on WCS Change"` → `"Probe on WCS"`.
+- **New option set:** `Skip` | `Probe Z on First WCS` | `Probe Z on WCS Change`.
+
+Open questions to resolve before implementing (do not action yet):
+
+- **Where do the non-probe behaviors go?** `A_Probe_OnStart` today also offers `Zero XYZ`
+  (set current position to 0,0,0, no probe) and the `Zero XY` half of `Zero XY & Probe Z`
+  (set current X/Y to 0,0). A probe-only dropdown drops both. Does XY-zero become
+  automatic/unconditional, a separate property, or is it dropped?
+- **Does `Probe Z on WCS Change` include the first WCS or only subsequent changes?**
+  i.e. are "First WCS" and "WCS Change" mutually exclusive options, or should there be a
+  "both" behavior (probe the first WCS *and* every later change)?
+- **Interaction with the reserved base** (`I_Probe_BaseEstablish`): the base already
+  probes at job start independently; make sure the consolidated option doesn't double-probe
+  or conflict.
+- **Migration:** existing presets referencing `A_Probe_OnStart` / `B_Probe_OnChange` by id
+  would need a mapping (and would silently reset otherwise, as happened with the Beta1→Beta2
+  property renames).
 
 ## Workflow conventions (for the README)
 
@@ -414,8 +447,9 @@ rewired. Index only; each phase's concrete checklist is its own section below.
 - **Phase 1 — done.** WCS origin/probe rework to `G10 L20`.
 - **Phase 2 — done** (verified in `docs/beta2-test-plan.md`; README write-up still outstanding).
   Establish MCS in isolation.
-- **Phase 3 — next, not started.** Reserved base + validation guards.
-- **Phase 4 — not started.** Consume the base for safe-Z / tool-change / traverses.
+- **Phase 3 — done** (guards + reserved base, verified in `docs/beta2-test-plan.md`;
+  README write-up still outstanding). Reserved base + validation guards.
+- **Phase 4 — next, not started.** Consume the base for safe-Z / tool-change / traverses.
 - **Phase 5 — not started, likely no-op.** Confirm `G0`/`G1` rapid mapping needs no change.
 
 ## Implementation checklist (Phase 2) — establish MCS, in isolation
@@ -466,30 +500,34 @@ Goal: a spoilboard base WCS can be reserved and (optionally) self-established, a
 post catches the misconfigurations identified in "Validation guards" above — all before
 anything downstream (Phase 4) actually depends on the base existing.
 
-- [ ] Add `H_Probe_BaseReserve` dropdown (`None` | `G54`-`G59` | `G59.1`-`G59.3 (RepRap)`,
-      default `G59`) to the `"06 - WCS / Probe"` group (next free item letter after
-      `G_Probe_Thickness`).
-- [ ] Add `I_Probe_BaseEstablish` (bool, default on) — next free item letter.
-- [ ] Job-start: if a base is reserved and `*_Probe_BaseEstablish` is on, probe the
-      spoilboard and write it via `writeWcsOrigin()` into the reserved WCS. If off,
-      emit an Info comment, e.g. `(assuming base G59 was established in a previous
-      job)`, and skip the probe.
-- [ ] Guard A (no redefine of the base): post-time check — if a base is reserved, error
-      if any section's `A_Probe_OnStart` / `B_Probe_OnChange` / `H_ToolChange_ProbeAfterChange`
-      would write to that same WCS number.
-- [ ] Guard C (Marlin single-frame): post-time check — error if a Marlin job uses more
-      than one distinct work offset.
-- [ ] Guard B (safe-Z across WCS needs a base): the *property* and its check can be
-      added now, but it has nothing to key off until Phase 4 adds the safe-Z feature —
-      note this dependency in code rather than half-wiring it; full enforcement lands
-      in Phase 4.
-- [ ] Tooltips + README: explain the reserved base and both guard error messages.
-- [ ] Regression check: `wcsBase_Reserve = None` produces identical output to the
-      Phase-2 baseline.
-- [ ] Hands-on tests: Guard A fires when a section's WCS collides with the reserved
+- [x] Add `H_Probe_BaseReserve` dropdown (`None` | `G54`-`G59` | `G59.1`-`G59.3 (RepRap)`)
+      to the `"06 - WCS / Probe"` group (item letter `H`, after `G_Probe_Thickness`).
+      **Default `None`, not `G59`** — see the deviation note in the Reserved base section
+      above (keeps default output byte-identical, per the Phase-2 stance).
+- [x] Add `I_Probe_BaseEstablish` (bool, default on) — item letter `I`.
+- [x] Job-start (`writeBaseEstablish()`, called from `writeFirstSection()` after `Start()`,
+      before `writeWcsOnStart()`): if a base is reserved and `I_Probe_BaseEstablish` is on,
+      probe the spoilboard and write it via `probeTool(base)` → `writeWcsOrigin()` into the
+      reserved WCS. If off, emit the `(assuming base G<n> was established ...)` Info comment
+      and skip. `probeTool()` gained an optional `targetWcs` param (defaults to the active
+      offset) so the base reuses the existing probe mechanics.
+- [x] Guard A (no redefine of the base): `baseOriginWriteReason()` walks the sections and
+      errors if `A_Probe_OnStart` / `B_Probe_OnChange` / `H_ToolChange_ProbeAfterChange`
+      would write to the base WCS.
+- [x] Guard C (Marlin single-frame): `validateJob()` errors if a Marlin job uses more than
+      one distinct work offset. Also added: `G59.1`-`G59.3` base rejected on GRBL.
+- [x] Guard B (safe-Z across WCS needs a base): left as a documented code note in
+      `validateJob()` — nothing to key off until Phase 4 adds the safe-Z-across-WCS feature.
+- [x] Tooltips: property descriptions explain the reserved base and establish behavior.
+      **README still outstanding** (shared with the Phase-2 README write-up).
+- [x] Regression check: `H_Probe_BaseReserve = None` (the default) takes the early-return
+      path in `validateJob()`/`writeBaseEstablish()` — no base output; Info-level output
+      identical to the Phase-2 baseline. *(code-verified; hands-on below)*
+- [x] Hands-on tests: Guard A fires when a section's WCS collides with the reserved
       base; Guard C fires on a Marlin job using 2+ WCS; both guards stay silent on a
-      valid single-WCS job with no base reserved.
-- [ ] Update `docs/beta2-test-plan.md` (or successor) with these test items.
+      valid single-WCS job with no base reserved. *(All 8 items in `docs/beta2-test-plan.md`
+      verified in Fusion.)*
+- [x] Update `docs/beta2-test-plan.md` (or successor) with these test items.
 
 ## Implementation checklist (Phase 4) — consume the base
 

@@ -431,6 +431,34 @@ properties = {
     value      : 0.8,
     scope      : "post"
   },
+  H_Probe_BaseReserve: {
+    title      : "Reserved Spoilboard Base",
+    description: "Reserve one WCS as a fixed spoilboard base (a stable Z reference for multi-fixture jobs). None (default): feature off, nothing emitted. Otherwise the selected WCS is reserved as the base and no operation may re-establish its origin (see Reserved Base Establish). G59.1-G59.3 require RepRap. GRBL/RepRap only -- Marlin has no per-WCS registers, so a base is ignored there.",
+    group      : "06 - WCS / Probe",
+    type       : "enum",
+    values: [
+      { title: "None", id: "None" },
+      { title: "G54", id: "1" },
+      { title: "G55", id: "2" },
+      { title: "G56", id: "3" },
+      { title: "G57", id: "4" },
+      { title: "G58", id: "5" },
+      { title: "G59", id: "6" },
+      { title: "G59.1 (RepRap)", id: "7" },
+      { title: "G59.2 (RepRap)", id: "8" },
+      { title: "G59.3 (RepRap)", id: "9" }
+    ],
+    value: "None",
+    scope: "post"
+  },
+  I_Probe_BaseEstablish: {
+    title      : "Reserved Base Establish",
+    description: "When a base is reserved: On (default) probes the spoilboard at job start and writes the result into the base WCS (G10 L20 P<n>). Off skips the probe and emits an Info comment assuming the base was established in a previous job (probe-once / run-many). No effect when Reserved Spoilboard Base is None.",
+    group      : "06 - WCS / Probe",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
+  },
 
   A_Include_StartFile: {
     title      : "Start GCode File",
@@ -1094,8 +1122,88 @@ function laserOff() {
 //---------------- on Entry Points ----------------
 
 // Called in every new gcode file
+// Distinct work offsets used across all sections, with Fusion's ambiguous 0 aliased
+// to 1 (WCS 1 / G54), matching writeWCS().
+function collectDistinctOffsets() {
+  var seen = {};
+  var list = [];
+  var n = getNumberOfSections();
+  for (var i = 0; i < n; ++i) {
+    var wo = getSection(i).getWorkOffset();
+    if (wo == 0) wo = 1;
+    if (!seen[wo]) { seen[wo] = true; list.push(wo); }
+  }
+  return list;
+}
+
+// Guard A support: does any section (re)write an origin into WCS `base`? Returns the
+// triggering feature's name, or null. Cutting *in* the base is fine; only a write is the
+// error. Mirrors the three origin-writing triggers and their firing conditions.
+function baseOriginWriteReason(base) {
+  var onStart = getProperty(properties.A_Probe_OnStart) != "Skip";
+  var onChange = getProperty(properties.B_Probe_OnChange) != "Skip";
+  var reprobe = getProperty(properties.A_ToolChange_Enabled) && getProperty(properties.H_ToolChange_ProbeAfterChange);
+  var doFirstChange = getProperty(properties.G_ToolChange_DoFirstChange);
+  var n = getNumberOfSections();
+  var prevWo, prevTool;
+  for (var i = 0; i < n; ++i) {
+    var sec = getSection(i);
+    var wo = sec.getWorkOffset();
+    if (wo == 0) wo = 1;
+    var toolNum = sec.getTool().number;
+    if (i == 0) {
+      if (onStart && wo == base) return "Probe at Job Start";
+    } else {
+      if (onChange && wo != prevWo && wo == base) return "Probe on WCS Change";
+    }
+    var toolChanged = (i == 0) ? doFirstChange : (toolNum != prevTool);
+    if (reprobe && toolChanged && wo == base) return "Probe After Tool Change";
+    prevWo = wo;
+    prevTool = toolNum;
+  }
+  return null;
+}
+
+// Post-time validation guards (see docs/wcs-rework-plan.md "Validation guards").
+// Runs once from onOpen(), before any output, so a misconfiguration fails fast.
+function validateJob() {
+  // Guard C -- Marlin is single-frame: a job using more than one distinct work offset
+  // is silently wrong on it. The reserved base is a per-WCS-register concept that does
+  // not apply to Marlin (warned at establish time), so its guards are skipped here.
+  if (fw == eFirmware.MARLIN) {
+    if (collectDistinctOffsets().length > 1) {
+      error("Marlin has a single coordinate frame -- this multi-WCS job cannot be posted; use one work offset.");
+    }
+    return;
+  }
+
+  var base = getReservedBaseWcs();
+  if (base == 0) {
+    return; // no base reserved -> Guard A and the slot check are moot
+  }
+
+  // RepRap-only slots: G59.1-G59.3 (7-9) don't exist on GRBL.
+  if (base > 6 && fw != eFirmware.REPRAP) {
+    error("Reserved base " + wcsName(base) + " requires RepRap (GRBL supports G54-G59 only).");
+    return;
+  }
+
+  // Guard A -- no redefine of the base.
+  var reason = baseOriginWriteReason(base);
+  if (reason) {
+    error(wcsName(base) + " is reserved as the spoilboard base -- assign this operation to another WCS (would be re-established by: " + reason + ").");
+    return;
+  }
+
+  // Guard B -- safe-Z across WCS needs a base: deferred to Phase 4, which adds the
+  // safe-Z-across-WCS feature this check would key off. Nothing to wire until then.
+}
+
 function onOpen() {
   fw = getProperty(properties.A_Job_SelectedFirmware);
+
+  // Validate the job configuration before emitting anything (may error() out).
+  validateJob();
 
   // Output anything special to start the GCode
   if (fw == eFirmware.GRBL) {
@@ -1189,10 +1297,10 @@ function writeWCS(section) {
 
   if (fw == eFirmware.MARLIN) {
     if (workOffset > 1 && workOffset != currentWorkOffset) {
-      writeComment(eComment.Important, " >>> WARNING: Marlin uses a G92 origin; work offset " + workOffset + " (G" + (53 + workOffset) + ") is not supported and is ignored");
+      writeComment(eComment.Important, " >>> WARNING: Marlin uses a G92 origin; work offset " + workOffset + "/G" + (53 + workOffset) + " is not supported and is ignored");
     }
     if (getProperty(properties.B_Probe_OnChange) != "Skip" && workOffset != currentWorkOffset) {
-      writeComment(eComment.Important, " >>> WARNING: B_Probe_OnChange (\"Probe Z\" on WCS change) has no effect on Marlin; Marlin has no WCS changes to react to, only its single G92 origin");
+      writeComment(eComment.Important, " >>> WARNING: B_Probe_OnChange \"Probe Z\" on WCS change has no effect on Marlin; Marlin has no WCS changes to react to, only its single G92 origin");
     }
     currentWorkOffset = workOffset;
     return;
@@ -1254,6 +1362,20 @@ function writeWcsOrigin(wcsNumber, x, y, z) {
   } else {
     writeBlock(gFormat.format(10), "L20", "P" + wcsNumber, xWord, yWord, zWord);
   }
+}
+
+// The reserved spoilboard base as a workOffset number (1-6 = G54-G59,
+// 7-9 = G59.1-G59.3), or 0 when the feature is off ("None"). The H_Probe_BaseReserve
+// enum ids are the numbers directly, so this also validates the raw value.
+function getReservedBaseWcs() {
+  var v = getProperty(properties.H_Probe_BaseReserve);
+  if (v == "None") return 0;
+  return parseInt(v, 10);
+}
+
+// Human-readable G-code name for a workOffset number, for comments/errors.
+function wcsName(n) {
+  return n <= 6 ? ("G" + (53 + n)) : ("G59." + (n - 6));
 }
 
 function onSection() {
@@ -1873,10 +1995,46 @@ function writeFirstSection() {
     loadFile(getProperty(properties.A_Include_StartFile));
   }
 
+  // Establish the reserved spoilboard base (if any) before the first section's own
+  // origin -- both after Start() so absolute positioning/units are set for the probe.
+  writeBaseEstablish();
+
   writeWcsOnStart();
 
   writeComment(eComment.Important, " *** START end ***");
   writeComment(eComment.Important, " ");
+}
+
+// Implements H_Probe_BaseReserve / I_Probe_BaseEstablish: at job start, establish the
+// reserved spoilboard base WCS's Z by probing (writing G10 L20 P<base>), or -- when
+// establish is off -- just note that a prior job set it. No-op when no base is reserved,
+// so a default (None) job emits nothing here. The base is a per-WCS register concept, so
+// it is skipped with a warning on Marlin (single global frame, no P<n> registers).
+function writeBaseEstablish() {
+  var base = getReservedBaseWcs();
+  if (base == 0) {
+    writeComment(eComment.Debug, " writeBaseEstablish: no base reserved (None), nothing emitted");
+    return;
+  }
+
+  var gname = wcsName(base);
+
+  if (fw == eFirmware.MARLIN) {
+    writeComment(eComment.Important, " >>> WARNING: reserved base " + gname + " ignored on Marlin (no per-WCS registers; single global frame)");
+    return;
+  }
+
+  if (!getProperty(properties.I_Probe_BaseEstablish)) {
+    writeComment(eComment.Info, "   assuming base " + gname + " is already established -- from a prior job or set manually");
+    return;
+  }
+
+  if (tool.number != 0 && !tool.isJetTool()) {
+    writeComment(eComment.Important, " Establish spoilboard base " + gname);
+    probeTool(base);
+  } else {
+    writeComment(eComment.Debug, " writeBaseEstablish: probe skipped (tool 0 or jet tool)");
+  }
 }
 
 // Implements the A_Probe_OnStart property: establishes the origin for the WCS
@@ -2296,7 +2454,13 @@ function toolChange() {
   writeComment(eComment.Important, " Tool Change End");
 }
 
-function probeTool() {
+// Probe Z and write it as the origin of a WCS. targetWcs defaults to the active
+// work offset (the normal tool/section probe); the reserved-base establishment passes
+// the base WCS number so the spoilboard Z lands in the base register instead.
+function probeTool(targetWcs) {
+  if (targetWcs == undefined) {
+    targetWcs = currentWorkOffset;
+  }
   // Command comment block
   writeComment(eComment.Important, " Probe to Zero Z");
   writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
@@ -2324,7 +2488,7 @@ function probeTool() {
     }
   }
 
-  writeWcsOrigin(currentWorkOffset, undefined, undefined, propertyMmToUnit(getProperty(properties.G_Probe_Thickness)));
+  writeWcsOrigin(targetWcs, undefined, undefined, propertyMmToUnit(getProperty(properties.G_Probe_Thickness)));
 
   resetAll();
   // move up tool to safe height again after probing
