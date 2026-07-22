@@ -358,6 +358,25 @@ group):
   the probe-once / run-many workflow is explicit rather than silent. No effect when
   `A_Probe_BaseReserve` is `None`.
 
+  > **⚠ MARKED FOR REVIEW — make `B_Probe_BaseEstablish` an enum, not a toggle.** Proposal:
+  > relabel to **"Spoilboard WCS is"** with two options: **"Zero XY, Probe Z"** and **"Use
+  > Existing WCS Machine Value"**. Rationale: a boolean can't express setting the base's XY as
+  > well as probing its Z. Likely mapping: *Zero XY, Probe Z* = establish the base now (today's
+  > `on`) and additionally set its XY origin; *Use Existing WCS Machine Value* = trust whatever
+  > offset the base WCS already holds on the controller (from a prior job or set manually),
+  > emitting the "assuming established previously" comment (today's `off`). Open questions the
+  > review must settle before coding:
+  > 1. **"Zero XY" gives the base an XY origin it doesn't have today** (currently the base is a
+  >    Z-only spoilboard reference). Note this is *zero-at-current-position* — parallel to
+  >    `C_Probe_OnStart`'s "Zero XY, probe Z", **not** machine homing (group `02 - Establish
+  >    Machine Coordinates` still owns X/Y homing). Decide what the base's XY is actually used
+  >    for — the cross-part retract only needs the base's Z; if XY isn't consumed, confirm
+  >    whether zeroing it is meaningful or just harmless bookkeeping.
+  > 2. **Default** — today's default is establish-on; map that to *Zero XY, Probe Z*.
+  > 3. **Preset migration** — changing the property *type* boolean→enum drops existing preset
+  >    values (a stored `true`/`false` can't map to an enum id), so presets reset to the enum
+  >    default. Call this out in release notes, as with prior type/key changes.
+
 **Unchanged:** the Phase-1 `C_Probe_OnStart` / `D_Probe_OnChange` /
 `H_ToolChange_ProbeAfterChange` and the shared probe mechanics (`E_Probe_G382orG28`,
 `F_Probe_G38Target`, `G_Probe_G38Speed`, `H_Probe_SafeZ`, `I_Probe_Thickness`).
@@ -665,9 +684,16 @@ verifiable — land and test one before starting the next.
         value, so a retract using it would be both wrong-height and unset.
         *(satisfied — the retract uses `Cross Part Clearance` (base) or `H_Probe_SafeZ`
         (fallback); `safeZHeight` is untouched.)*
-- [ ] Make the tool-change position (`toolChange2_X`/`3_Y`/`4_Z`) explicitly
-      work-relative to the reserved base rather than "whichever WCS happens to be
-      active" (see "Open design question" note earlier in this doc).
+- [ ] **Tool-change position: base-relative when a base is reserved, else current-WCS**
+      (decision, 2026). Two branches for `C_ToolChange_X`/`D_ToolChange_Y`/`E_ToolChange_Z`:
+      - **Base reserved** → park relative to the reserved base — a fixed physical spot for the
+        whole job (the base is one stable zero, so the park doesn't drift per fixture). Reuse
+        the transit-select machinery (`retractThroughBaseClearance()`-style low-level WCS emit)
+        to enter the base frame for the park move.
+      - **No base** → park relative to the current WCS, as today (plain `G0`, no change).
+      Never `G53`. Current code does *only* the no-base behavior for all jobs; the base branch
+      is the work to add. Pairs with the re-probe **ordering** fix (next item), since both
+      hinge on when the base/WCS is selected around `toolChange()`.
 - [ ] Fix the tool-change re-probe ordering caveat: `toolChange()` currently runs
       before `writeWCS(currentSection)` selects the new section's WCS in `onSection()`,
       so a tool change coinciding with a WCS change re-probes into the *previous*
@@ -759,6 +785,11 @@ new model, or file concrete follow-up items if it does.
 - **No machine-profile presets** — the per-axis properties stand on their own.
 - **Marlin multi-WCS is a hard post error** (Guard C), not a warning.
 - **No real TLO** — per-tool re-probe remains the tool-length substitute.
+- **Tool-change position: base-relative if a base is reserved, else current-WCS** —
+  `C_ToolChange_X`/`D_ToolChange_Y`/`E_ToolChange_Z` park relative to the reserved base when
+  one exists (a fixed physical spot across all fixtures), falling back to the active WCS when
+  no base is reserved. Never `G53`. Current code does only the no-base (current-WCS) behavior;
+  the base branch and the tool-change re-probe *ordering* fix are the remaining work.
 - **Multi-WCS is Replicate-only** — the per-copy Z re-probe (`D_Probe_OnChange`, labelled
   "On Each Added Part") and the reserved base target milling multiple *copies* of
   a part, one WCS per copy. Milling one part from multiple datums/references, or a flip, is
