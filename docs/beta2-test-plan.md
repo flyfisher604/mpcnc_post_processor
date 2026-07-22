@@ -88,23 +88,23 @@ that needs hands-on verification before release.
 
 ## Phase 3 — reserved spoilboard base + validation guards, from `docs/wcs-rework-plan.md`
 
-- [x] **Default regression (base None).** With `H_Probe_BaseReserve = None` (the default),
+- [x] **Default regression (base None).** With `A_Probe_BaseReserve = None` (the default),
       confirm output is byte-for-byte identical to the Phase-2 baseline — no base probe, no
       base comments at the default Comment Level (`Info`). (`validateJob()` and
       `writeBaseEstablish()` early-return; only a suppressed Debug comment is emitted.)
       Verified: default (base None) output is byte-for-byte identical to the Phase-2 baseline.
-- [x] **Base establish (GRBL/RepRap).** Set `H_Probe_BaseReserve = G59`,
-      `I_Probe_BaseEstablish = On`, parts on `G54`: confirm a spoilboard probe fires at job
+- [x] **Base establish (GRBL/RepRap).** Set `A_Probe_BaseReserve = G59`,
+      `B_Probe_BaseEstablish = On`, parts on `G54`: confirm a spoilboard probe fires at job
       start (attach ZProbe / `G38.2` / `G10 L20 P6 Z<thickness>` / detach) **before** the first
       section's own origin/probe, and that `G54` work still probes separately. Verified on GRBL:
       base probe writes `G10 L20 P6 Z0.8` before the `G54` (`P1`) XY-zero + Z-probe.
-- [x] **Base establish OFF (assume prior).** Same but `I_Probe_BaseEstablish = Off`: confirm
+- [x] **Base establish OFF (assume prior).** Same but `B_Probe_BaseEstablish = Off`: confirm
       no base probe, and an Info comment (assuming the base is already established) is emitted
       instead. Verified: no probe; comment shown. Wording broadened to cover the manual-set case
       and de-parenthesized so `writeComment()` no longer mangles it: now
       `assuming base G59 is already established -- from a prior job or set manually`.
 - [x] **Guard A (no base redefine).** Reserve `G59` and assign a milling operation's Setup to
-      `G59` with `A_Probe_OnStart` (or `B_Probe_OnChange` / `H_ToolChange_ProbeAfterChange`)
+      `G59` with `C_Probe_OnStart` (or `D_Probe_OnChange` / `H_ToolChange_ProbeAfterChange`)
       active: confirm the post errors with *"G59 is reserved as the spoilboard base — assign this
       operation to another WCS …"* and names the triggering feature. Verified: post aborts in
       `onOpen()` with *"G59 is reserved as the spoilboard base -- assign this operation to another
@@ -114,7 +114,7 @@ that needs hands-on verification before release.
       Marlin job posts unchanged. Verified: post aborts in `onOpen()` with *"Marlin has a single
       coordinate frame -- this multi-WCS job cannot be posted; use one work offset."* (the
       accompanying *"Multiple work offsets used in program"* is Fusion's own warning, not ours).
-- [x] **RepRap-only base on GRBL.** Set `H_Probe_BaseReserve = G59.1` on GRBL: confirm the error
+- [x] **RepRap-only base on GRBL.** Set `A_Probe_BaseReserve = G59.1` on GRBL: confirm the error
       *"Reserved base G59.1 requires RepRap …"*. On RepRap it is accepted. Verified on GRBL: post
       aborts with *"Reserved base G59.1 requires RepRap (GRBL supports G54-G59 only)."*
 - [x] **Base ignored on Marlin.** Reserve a base on Marlin (single-WCS job): confirm the base
