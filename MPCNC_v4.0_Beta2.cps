@@ -396,32 +396,32 @@ properties = {
   },
   C_Probe_OnStart: {
     title      : "First Part: Set Work Origin",
-    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Skip: does nothing. Set current position as origin: writes X0 Y0 Z0 at the current position with no probe (for a jet/laser or a manual touch-off). Zero XY, probe Z: sets X0 Y0 here, then probes Z. On GRBL/RepRap this writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional copies of the part, see \"Each Added Part: Re-probe Z\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
+    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Both non-Skip options record the tool's current position as the origin, so jog the tool to the part origin before running the job (when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point -- i.e. the origin is machine home). Skip: does nothing. Zero XYZ (no probe): records the current position as X0 Y0 Z0 with no probe and no motion -- a manual touch-off, or a jet/laser where Z is set by hand. Zero XY, probe Z: records X0 Y0 here, then probes the stock-top Z. On GRBL/RepRap either writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional copies of the part, see \"On Each Added Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
     group      : "03 - Work Coordinate System - WCS / Probe",
     type       : "enum",
     values: [
       { title: "Skip", id: "Skip" },
-      { title: "Set current position as origin (no probe)", id: "Zero XYZ" },
+      { title: "Zero XYZ (no probe)", id: "Zero XYZ" },
       { title: "Zero XY, probe Z", id: "Zero XY & Probe Z" }
     ],
     value: "Zero XY & Probe Z",
     scope: "post"
   },
   D_Probe_OnChange: {
-    title      : "Each Added Part: Re-probe Z",
-    description: "Multi-fixture jobs only -- milling several copies of a part, one WCS per copy. When the job advances to the next copy's WCS (G55, G56, ...), re-probe that copy's stock-top Z and write it into that WCS's own offset (G10 L20 P<n>) on GRBL/RepRap. The copy's XY comes from its fixture's pre-set offset -- the post never sets XY for added parts. Skip: all copies share one Z (same thickness, or offsets already persisted). No effect on Marlin (single G92 origin). Does NOT support milling one part from multiple datums/references or a flip -- run those as separate jobs.",
+    title      : "On Each Added Part",
+    description: "Multi-fixture jobs only -- milling several copies of a part, one WCS per copy. What to do when the job advances to the next copy's WCS (G55, G56, ...). Skip: do nothing -- the copy uses the Z already stored in its own WCS (set by a prior job or manually); the post does not re-probe or copy any Z. Probe Z: rapid to the copy's origin (X0 Y0) and probe its stock-top Z, writing it into that WCS's own offset (G10 L20 P<n>) on GRBL/RepRap. The copy's XY always comes from its fixture's pre-set offset -- the post never sets XY for added parts. The safe-Z retract on the traverse is separate (see Safe Z Retract Across Parts). No effect on Marlin (single G92 origin). Does NOT support milling one part from multiple datums/references or a flip -- run those as separate jobs.",
     group      : "03 - Work Coordinate System - WCS / Probe",
     type       : "enum",
     values: [
-      { title: "Skip (copies share Z)", id: "Skip" },
-      { title: "Probe Z per added part", id: "Probe Z" }
+      { title: "Skip", id: "Skip" },
+      { title: "Probe Z", id: "Probe Z" }
     ],
     value: "Probe Z",
     scope: "post"
   },
   E_Probe_G382orG28: {
     title      : "G38.2 (On) or G28 (Off)",
-    description: "Probe using G38.2 (On) or G28 (Off). Grbl always uses G38.2 regardless of this setting; RepRap fully supports G38.2 too, so this should be left On there as well. Off (G28) is intended for Marlin builds with no dedicated probe, using the Z homing switch as a substitute reference.",
+    description: "Probe using G38.2 (On) or G28 (Off). GRBL always uses G38.2 regardless of this setting; RepRap fully supports G38.2 too, so this should be left On there as well. Off (G28) is intended for Marlin builds with no dedicated probe, using the Z homing switch as a substitute reference.",
     group      : "03 - Work Coordinate System - WCS / Probe",
     type       : "boolean",
     value      : true,
@@ -445,7 +445,7 @@ properties = {
   },
   H_Probe_SafeZ: {
     title      : "Safe Z",
-    description: "Safe Z to return to after probing.",
+    description: "Safe Z the tool retracts to after probing. Also the retract height used before an added-part re-probe when no spoilboard base is reserved (with a base reserved, Cross Part Clearance is used instead).",
     group      : "03 - Work Coordinate System - WCS / Probe",
     type       : "integer",
     value      : 40,
@@ -1341,7 +1341,7 @@ function writeWCS(section) {
     return;
   }
   // Decide up front whether this WCS change re-probes the new part (D_Probe_OnChange =
-  // "Each Added Part: Re-probe Z"). Each WCS has its own G10-scoped Z; the first is set by
+  // "On Each Added Part"). Each WCS has its own G10-scoped Z; the first is set by
   // C_Probe_OnStart in writeFirstSection(), so this is only for the added copies. Compute
   // it before the switch so the pre-switch retract below runs while the OUTGOING WCS --
   // whose Z is established -- is still active.
@@ -1353,20 +1353,24 @@ function writeWCS(section) {
     + " probeNewPart: " + probeNewPart);
 
   // Retract Z to a safe height FIRST, before selecting the new WCS -- the new WCS's Z origin
-  // is unknown until we probe it, so an absolute Z move there would be unsafe. Two cases:
-  //  - Base reserved + cross-WCS safe-Z enabled: transit through the spoilboard base and
-  //    clear to Cross Part Clearance -- a stable height above the spoilboard that clears
-  //    fixtures across parts of differing thickness (retractThroughBaseClearance()).
-  //  - Otherwise (no base, or the destination IS the base): fall back to Safe Z in the
-  //    OUTGOING part's frame. Not the stable cross-part reference, but the tool is at least
-  //    clear enough to reposition for the re-probe. (Guard B blocks the risky no-base
-  //    multi-WCS case up front, so this fallback only runs when the feature is off.)
+  // is unknown until we probe it, so an absolute Z move there would be unsafe. This fires on
+  // EVERY inter-part traverse (any genuine WCS change), not only when we re-probe:
+  //  - Base reserved + "Safe Z Retract Across Parts" on: transit through the spoilboard base
+  //    and clear to Cross Part Clearance -- a stable height above the spoilboard that clears
+  //    fixtures across parts of differing thickness (retractThroughBaseClearance()). This is
+  //    the single retract for the boundary; a re-probe, if any, repositions after it (below),
+  //    so a boundary that both traverses and re-probes is NOT retracted twice.
+  //  - Otherwise, only when a re-probe follows (probeNewPart): fall back to Safe Z in the
+  //    OUTGOING part's frame, just enough to reposition safely for the probe. A non-re-probe
+  //    traverse with no base emits no forced retract (unchanged; Guard B blocks the risky
+  //    no-base multi-WCS case up front when the feature is on).
   var base = getReservedBaseWcs();
-  var baseRelative = probeNewPart && getProperty(properties.J_Probe_SafeZAcrossWcs)
+  var isTraverse = (previousWorkOffset != undefined);   // a genuine inter-part WCS change
+  var baseRelative = isTraverse && getProperty(properties.J_Probe_SafeZAcrossWcs)
                      && base != 0 && base != workOffset;
   writeComment(eComment.Debug, " writeWCS: retract decision -- baseRelative: " + baseRelative
     + " base: " + base + " J_SafeZAcrossWcs: " + getProperty(properties.J_Probe_SafeZAcrossWcs)
-    + " workOffset: " + workOffset);
+    + " isTraverse: " + isTraverse + " probeNewPart: " + probeNewPart + " workOffset: " + workOffset);
   if (baseRelative) {
     retractThroughBaseClearance();
   } else if (probeNewPart) {
@@ -1453,8 +1457,12 @@ function wcsGcode(workOffset) {
 function retractThroughBaseClearance() {
   var base = getReservedBaseWcs();
   writeComment(eComment.Info, "   Retract to spoilboard-base clearance " + wcsName(base) + " before traverse");
-  writeBlock(gFormat.format(wcsGcode(base)));   // transit-select the base frame (no re-probe)
-  currentWorkOffset = base;
+  // Select the base only if it isn't already active (it can be, when the previous section
+  // cut on the base) -- re-selecting the active WCS would be a redundant line.
+  if (currentWorkOffset != base) {
+    writeBlock(gFormat.format(wcsGcode(base)));   // transit-select the base frame (no re-probe)
+    currentWorkOffset = base;
+  }
   resetAll();
   rapidMovementsZ(propertyMmToUnit(getProperty(properties.K_Probe_SafeZClearance)));
   flushMotions();
