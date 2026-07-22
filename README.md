@@ -157,8 +157,9 @@ WCS (`G54`, `G55`, `G56`, …), and want to cut them all in one program.
 - **Safe Z Retract Across Parts** (on by default) makes the tool retract to **Cross Part
   Clearance** — an absolute height above the spoilboard base — *before* it traverses to
   the next fixture, so it clears every clamp and part regardless of their heights.
-- Don't assign any cutting operation to the reserved base WCS itself (a guard enforces
-  this).
+- Keep the reserved base as the fixed spoilboard reference — don't zero a part to it. A
+  guard trips only if an operation would *re-establish* the base's origin (re-zero or
+  re-probe it); it doesn't otherwise stop you from selecting that WCS.
 
 ### (c) One part from multiple references, or a flip — *not* a single job
 
@@ -174,7 +175,7 @@ side as a **separate job**.
 ## The work-relative coordinate model
 
 Production controls keep three references separate: the machine frame (`G53`, from
-homing), the work frame (`G54`–`G59`), and tool-length offsets (`G43`, from a tool
+homing), the work frame (`G54`–`G59`), and tool-length offsets (TLO, `G43`, from a tool
 setter). Most V1E machines have none of the three fully, so this post takes a deliberate
 **work-relative stance**:
 
@@ -191,10 +192,11 @@ and probe Z) and works on the lowest-common-denominator machine.
 ## Establishing the machine frame (homing / MCS)
 
 Group **02 - Establish Machine Coordinates** decides, per axis, how the machine frame is
-set. Each of **Home X / Home Y / Home Z** is either:
+set. Each axis (**X**, **Y**, **Z**) is either:
 
 - **Power-On** (default) — accept the current position as zero; the post emits no motion.
-  The fallback for an axis with no endstop.
+  The fallback for an axis with no endstop; this also covers an axis you have already
+  homed yourself at the controller/console.
 - **Home** — the post emits the homing command and the axis runs to its endstop.
 
 Homing command by firmware:
@@ -204,10 +206,11 @@ Homing command by firmware:
 | Marlin / RRF (Duet) | `G28 X` / `G28 Y` / `G28 Z` — independent per axis set to Home |
 | GRBL / FluidNC | `$H` only — one command homes all configured axes together |
 
-On GRBL/FluidNC the per-axis pickers can't each trigger their own command (`$H` is
-all-or-nothing): any axis set to **Home** causes one `$H`, and the three pickers document
-which axes you assert are wired. **Prompt Before Z Home** pauses before a Marlin `G28 Z`
-so you can place a movable Z plate — it never fires for X/Y or on GRBL/RRF.
+On GRBL/FluidNC the per-axis dropdowns can't each trigger their own command (`$H` is
+all-or-nothing): any axis set to **Home** causes one `$H`, and the three dropdowns
+document which axes you assert are wired to sense a homing operation (not to be confused
+with a probe operation). **Prompt Before Z Home** pauses before a Marlin `G28 Z` so you
+can place a movable Z plate — it never fires for X/Y or on GRBL/RRF.
 
 Out of the box every axis is **Power-On**, so the post emits no homing (a wrong home
 command is a crash).
@@ -252,11 +255,6 @@ before emitting bad g-code:
   is a hard error (`G92` can't fake multiple WCS).
 
 ## G1 → G0 rapid mapping (hobby-license workaround)
-
-> **Personal Use license note:** to comply with the
-> [Fusion Personal Use limitations](https://www.autodesk.com/support/technical/article/caas/sfdcarticles/sfdcarticles/Fusion-360-Free-License-Changes.html),
-> set **Travel Speed X/Y** and **Travel Speed Z** no faster than your machine's maximum
-> cut feedrate.
 
 The Personal license restricts all moves to the max cut speed — and Fusion implements
 this by turning every `G0` rapid into a `G1` cut. The side effect is dragging cuts and
@@ -307,7 +305,7 @@ Groups appear in the Fusion dialog in the order below.
 ## 02 - Establish Machine Coordinates
 |Title|Description|Default|
 |---|---|---|
-|Home X / Home Y / Home Z|Per axis: **Power-On** (accept current position, no motion) or **Home** (run to endstop). GRBL homes all axes with one `$H` if any is set to Home.|**Power-On**|
+|X / Y / Z|Per axis: **Power-On** (accept current position, no motion) or **Home** (run to endstop). GRBL homes all axes with one `$H` if any is set to Home.|**Power-On**|
 |Prompt Before Z Home|Pause before a Marlin `G28 Z` to place a movable Z plate. Marlin-only.|**false**|
 
 ## 03 - Work Coordinate System - WCS / Probe

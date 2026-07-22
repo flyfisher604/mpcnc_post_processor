@@ -167,8 +167,8 @@ properties = {
   },
 
   A_Machine_HomeX: {
-    title      : "Home X",
-    description: "Power-On: accept the current X position as zero, no motion emitted. Home: home X to its endstop at job start (the machine must actually be wired to home this axis). This establishes the machine frame (MCS) only -- it is distinct from the work-Z touch-off used for the everyday cutting reference.",
+    title      : "X",
+    description: "Power-On: accept the current X position as zero (this includes the position after you have already homed X yourself at the controller/console), no motion emitted. Home: home X to its endstop at job start (the machine must actually be wired to home this axis). This establishes the machine frame (MCS) only -- it is distinct from the work-Z touch-off used for the everyday cutting reference.",
     group      : "02 - Establish Machine Coordinates",
     type       : "enum",
     values: [
@@ -179,8 +179,8 @@ properties = {
     scope: "post"
   },
   B_Machine_HomeY: {
-    title      : "Home Y",
-    description: "Power-On: accept the current Y position as zero, no motion emitted. Home: home Y to its endstop at job start (the machine must actually be wired to home this axis). This establishes the machine frame (MCS) only -- it is distinct from the work-Z touch-off used for the everyday cutting reference.",
+    title      : "Y",
+    description: "Power-On: accept the current Y position as zero (this includes the position after you have already homed Y yourself at the controller/console), no motion emitted. Home: home Y to its endstop at job start (the machine must actually be wired to home this axis). This establishes the machine frame (MCS) only -- it is distinct from the work-Z touch-off used for the everyday cutting reference.",
     group      : "02 - Establish Machine Coordinates",
     type       : "enum",
     values: [
@@ -191,8 +191,8 @@ properties = {
     scope: "post"
   },
   C_Machine_HomeZ: {
-    title      : "Home Z",
-    description: "Power-On: accept the current Z position as zero, no motion emitted. Home: home Z to its endstop at job start (the machine must actually be wired to home this axis, e.g. LowRider switches, or Marlin sharing the Z-min pin with a movable plate). Most V1E machines have no usable machine Z -- the everyday Z reference is always the work-Z touch-off (probe), never this setting.",
+    title      : "Z",
+    description: "Power-On: accept the current Z position as zero (this includes the position after you have already homed Z yourself at the controller/console), no motion emitted. Home: home Z to its endstop at job start (the machine must actually be wired to home this axis, e.g. LowRider switches, or Marlin sharing the Z-min pin with a movable plate). Most V1E machines have no usable machine Z -- the everyday Z reference is always the work-Z touch-off (probe), never this setting.",
     group      : "02 - Establish Machine Coordinates",
     type       : "enum",
     values: [
@@ -204,7 +204,7 @@ properties = {
   },
   D_Machine_PromptBeforeHome: {
     title      : "Prompt Before Z Home",
-    description: "Pause before homing Z so the operator can place the movable Z-homing plate (Marlin sharing the Z-min pin). Only fires when Home Z = Home and firmware is Marlin; never for X/Y, and never for GRBL/FluidNC/RRF switch-based Z homing.",
+    description: "Pause before homing Z so the operator can place the movable Z-homing plate (Marlin sharing the Z-min pin). Only fires when Z = Home and firmware is Marlin; never for X/Y, and never for GRBL/FluidNC/RRF switch-based Z homing.",
     group      : "02 - Establish Machine Coordinates",
     type       : "boolean",
     value      : false,

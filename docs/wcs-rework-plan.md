@@ -431,6 +431,9 @@ ids changed, so existing presets keep working — display labels only:
 
 - `C_Probe_OnStart`: "Probe at Job Start" → **"First Part: Set Work Origin"** (the first / only
   part). Keeps `Skip` / set-current-position-as-origin / zero-XY-probe-Z.
+  > **⚠ TODO — shorten the middle option label.** `Zero XYZ (no probe)` still truncates in
+  > the Fusion dropdown; find a shorter label (the enum id `Zero XYZ` must stay unchanged for
+  > preset compatibility). Cosmetic — clean up later.
 - `D_Probe_OnChange`: "Probe on WCS Change" → **"On Each Added Part"**, and its
   default flipped `Skip` → **`Probe Z`** so the Replicate workflow re-probes each copy's Z
   out of the box. An added copy's XY always comes from its fixture's pre-set offset; the
