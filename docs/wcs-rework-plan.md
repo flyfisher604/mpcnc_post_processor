@@ -308,7 +308,18 @@ adopted here). Two independent mechanisms, so ordering is controlled in two plac
   `05 - Map G1s to Rapids...`, `06 - Tool Changes`, `07 - External Include Files`,
   `08 - Laser`, `09 - Coolant`, `10 - Duet` (WCS/Probe sits right after Machine so the
   dialog follows the post-setup flow: firmware/job → machine homing → work coordinate &
-  probe → feeds → …). Padding is required: unpadded, `10 - Duet` sorts adjacent
+  probe → feeds → …).
+  > **⚠ TODO — reorder groups so WCS/Probe follows Map G1s.** Move
+  > `Work Coordinate System - WCS / Probe` to *after* `Map G1s to Rapids` and *before*
+  > `Tool Changes`, giving: `01 - Job`, `02 - Establish Machine Coordinates`,
+  > `03 - Feeds and Speeds`, `04 - Map G1s to Rapids...`, `05 - Work Coordinate System -
+  > WCS / Probe`, `06 - Tool Changes`, `07 …`. This matches the setup flow the README
+  > hobbyist section already follows (firmware → feeds → rapid mapping → set work origin →
+  > tool changes). Renumber only the `group:` strings on the affected properties; the
+  > within-group item-letter keys (`A_Feeds_*`, `A_Probe_*`, …) are unchanged. Update the
+  > group-order list above and the README property-reference order when it lands.
+
+  Padding is required: unpadded, `10 - Duet` sorts adjacent
   to `1 - Job` (the classic `1, 10, 2` lexicographic bug) instead of last. Fixed-width
   digits sort correctly under every collation Fusion might use (and regardless of whether
   it ignores the ` - ` punctuation). A single-letter group prefix in the *key* does **not**

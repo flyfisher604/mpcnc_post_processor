@@ -72,28 +72,29 @@ The post is a single file, `MPCNC_v4.0_Beta2.cps`.
 
 ## Hobbyist — posting a single operation
 
-**Who this is:** a Fusion **Personal Use** (hobbyist) licensee, cutting one part in one
-Setup, usually with a single tool, and zeroing by hand. No probe or fixturing required.
+**Who this is:** you're cutting one part in one Setup, usually with a single tool, and
+zeroing by hand. No probe or fixturing required.
 
 **The flow:**
 
 1. **Job → CNC Firmware** — pick your controller.
-2. **Feeds and Speeds** — this is the license-compliance step. The Fusion Personal
-   license requires that no move exceed your machine's maximum cut feedrate, so set
-   **Travel Speed X/Y** and **Travel Speed Z** no faster than your cut speeds. (See
-   *G1 → G0 rapid mapping* below for why this matters and how the post keeps travels
-   safe.)
-3. **Map G1s to Rapids** — leave this group **on** for the hobby case. It restores safe,
-   properly-ordered rapid moves that the Personal license would otherwise turn into
-   dragging cuts. (Full-license users turn it off — see that section.)
-4. **First Part: Set Work Origin** (in the WCS / Probe group) — how the single part gets
-   its zero:
-   - **Zero XYZ (no probe)** — jog the tool to the part origin (the XY corner *and* down
-     to touch the stock top), then this records that position as X0 Y0 Z0. The classic
-     manual touch-off; also the choice for a laser/pen where Z is set by hand.
-   - **Zero XY, probe Z** — jog to the XY corner, and the post probes Z off a touch
-     plate for you. (Default.)
-   - **Skip** — do nothing (you have zeroed in your sender).
+2. **Feeds and Speeds** — set the speeds to what your machine is actually capable of:
+   **Travel Speed X/Y**, **Travel Speed Z**, and the **Max XY Cut Speed** / **Max Z Cut
+   Speed** limits. Enable **Scale Feedrate** so cut moves are scaled to stay within those
+   axis limits, and **Enforce Feedrate** so a feedrate is always emitted — together they
+   keep the job within your CNC's capabilities.
+3. **Map G1s to Rapids** — a hobbyist job may benefit from these optimizations: they
+   restore safe, properly-ordered travel moves (retract before travelling, travel before
+   descending) and avoid dragging the tool across the work. Leave this group **on** to
+   enable them. (See *G1 → G0 rapid mapping* below.)
+4. **Work Coordinate System – WCS / Probe** — set how the single part gets its zero:
+   - **First Part: Set Work Origin**:
+     - **Zero XYZ (no probe)** — jog the tool to the part origin (the XY corner *and*
+       down to touch the stock top); this records that position as X0 Y0 Z0. The classic
+       manual touch-off; also the choice for a laser/pen where Z is set by hand.
+     - **Zero XY, probe Z** — jog to the XY corner and the post probes Z off a touch
+       plate for you. (Default.)
+     - **Skip** — do nothing (you've already zeroed in your sender).
 5. Post and run.
 
 Everything else (the spoilboard base, "On Each Added Part", cross-part clearance) stays
