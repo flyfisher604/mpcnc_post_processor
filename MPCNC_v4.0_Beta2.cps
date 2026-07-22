@@ -169,7 +169,7 @@ properties = {
   A_Machine_HomeX: {
     title      : "Home X",
     description: "Power-On: accept the current X position as zero, no motion emitted. Home: home X to its endstop at job start (the machine must actually be wired to home this axis). This establishes the machine frame (MCS) only -- it is distinct from the work-Z touch-off used for the everyday cutting reference.",
-    group      : "02 - Machine",
+    group      : "02 - Establish Machine Coordinates",
     type       : "enum",
     values: [
       { title: "Power-On", id: "Power-On" },
@@ -181,7 +181,7 @@ properties = {
   B_Machine_HomeY: {
     title      : "Home Y",
     description: "Power-On: accept the current Y position as zero, no motion emitted. Home: home Y to its endstop at job start (the machine must actually be wired to home this axis). This establishes the machine frame (MCS) only -- it is distinct from the work-Z touch-off used for the everyday cutting reference.",
-    group      : "02 - Machine",
+    group      : "02 - Establish Machine Coordinates",
     type       : "enum",
     values: [
       { title: "Power-On", id: "Power-On" },
@@ -193,7 +193,7 @@ properties = {
   C_Machine_HomeZ: {
     title      : "Home Z",
     description: "Power-On: accept the current Z position as zero, no motion emitted. Home: home Z to its endstop at job start (the machine must actually be wired to home this axis, e.g. LowRider switches, or Marlin sharing the Z-min pin with a movable plate). Most V1E machines have no usable machine Z -- the everyday Z reference is always the work-Z touch-off (probe), never this setting.",
-    group      : "02 - Machine",
+    group      : "02 - Establish Machine Coordinates",
     type       : "enum",
     values: [
       { title: "Power-On", id: "Power-On" },
@@ -205,7 +205,7 @@ properties = {
   D_Machine_PromptBeforeHome: {
     title      : "Prompt Before Z Home",
     description: "Pause before homing Z so the operator can place the movable Z-homing plate (Marlin sharing the Z-min pin). Only fires when Home Z = Home and firmware is Marlin; never for X/Y, and never for GRBL/FluidNC/RRF switch-based Z homing.",
-    group      : "02 - Machine",
+    group      : "02 - Establish Machine Coordinates",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -395,28 +395,28 @@ properties = {
     scope      : "post"
   },
   C_Probe_OnStart: {
-    title      : "Probe at Job Start",
-    description: "Establishes the origin for whichever WCS the first section resolves to -- WCS 1 / G54 if that section's Setup doesn't specify one (the default), otherwise whatever WCS that Setup specifies; it is not forced to G54. Skip: does nothing. Zero XYZ: sets the current position as X0 Y0 Z0. Zero XY & Probe Z: sets X0 Y0, then probes Z. On GRBL/RepRap this writes into that resolved WCS's own offset, e.g. G10 L20 P1 X0 Y0 Z0 if it resolved to G54; Marlin has no per-WCS offsets, so it uses G92 X0 Y0 Z0 instead.",
+    title      : "First Part: Set Work Origin",
+    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Skip: does nothing. Set current position as origin: writes X0 Y0 Z0 at the current position with no probe (for a jet/laser or a manual touch-off). Zero XY, probe Z: sets X0 Y0 here, then probes Z. On GRBL/RepRap this writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional copies of the part, see \"Each Added Part: Re-probe Z\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
     group      : "03 - Work Coordinate System - WCS / Probe",
     type       : "enum",
     values: [
       { title: "Skip", id: "Skip" },
-      { title: "Zero XYZ", id: "Zero XYZ" },
-      { title: "Zero XY & Probe Z", id: "Zero XY & Probe Z" }
+      { title: "Set current position as origin (no probe)", id: "Zero XYZ" },
+      { title: "Zero XY, probe Z", id: "Zero XY & Probe Z" }
     ],
     value: "Zero XY & Probe Z",
     scope: "post"
   },
   D_Probe_OnChange: {
-    title      : "Probe on WCS Change",
-    description: "When a later section selects a different WCS than the one before it. Skip: does nothing. Probe Z: probes Z and writes it into the newly-selected WCS's own offset (G10 L20 P<n>) on GRBL/RepRap. Has no effect on Marlin -- Marlin has no per-WCS offsets to change into, only a single G92 origin.",
+    title      : "Each Added Part: Re-probe Z",
+    description: "Multi-fixture jobs only -- milling several copies of a part, one WCS per copy. When the job advances to the next copy's WCS (G55, G56, ...), re-probe that copy's stock-top Z and write it into that WCS's own offset (G10 L20 P<n>) on GRBL/RepRap. The copy's XY comes from its fixture's pre-set offset -- the post never sets XY for added parts. Skip: all copies share one Z (same thickness, or offsets already persisted). No effect on Marlin (single G92 origin). Does NOT support milling one part from multiple datums/references or a flip -- run those as separate jobs.",
     group      : "03 - Work Coordinate System - WCS / Probe",
     type       : "enum",
     values: [
-      { title: "Skip", id: "Skip" },
-      { title: "Probe Z", id: "Probe Z" }
+      { title: "Skip (copies share Z)", id: "Skip" },
+      { title: "Probe Z per added part", id: "Probe Z" }
     ],
-    value: "Skip",
+    value: "Probe Z",
     scope: "post"
   },
   E_Probe_G382orG28: {
@@ -457,6 +457,22 @@ properties = {
     group      : "03 - Work Coordinate System - WCS / Probe",
     type       : "number",
     value      : 0.8,
+    scope      : "post"
+  },
+  J_Probe_SafeZAcrossWcs: {
+    title      : "Safe Z Retract Across WCS",
+    description: "Multi-fixture safety. On (default): before traversing between operations that use different WCS, the tool retracts to the Cross Part Clearance below so it clears fixtures/clamps/other parts, and the job is validated (Guard B) to reject a multi-WCS job that reserves no spoilboard base -- a clearance height is meaningless across WCS whose offsets are only known after probing at runtime. Single-WCS jobs (including a single operation) are unaffected: no extra retract is emitted and the guard does not apply. Off: no cross-WCS retract and no guard. GRBL/RepRap only (Marlin is single-frame; see Guard C).",
+    group      : "03 - Work Coordinate System - WCS / Probe",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
+  },
+  K_Probe_SafeZClearance: {
+    title      : "Cross Part Clearance (above spoilboard)",
+    description: "Absolute work-Z height, measured above the reserved spoilboard base, that the tool retracts to before traversing between parts (different WCS). Set it high enough to clear the tallest fixture, clamp, or part in the job. Only used when Safe Z Retract Across WCS is on and a base is reserved.",
+    group      : "03 - Work Coordinate System - WCS / Probe",
+    type       : "number",
+    value      : 40,
     scope      : "post"
   },
 
@@ -1179,6 +1195,16 @@ function validateJob() {
 
   var base = getReservedBaseWcs();
   if (base == 0) {
+    // Guard B -- safe-Z across WCS needs a base. When the cross-WCS safe-Z retract is
+    // enabled and the job spans more than one work offset, there is no frame in which a
+    // single clearance height is meaningful across those WCS: their offsets are only
+    // established by probing at runtime, so the post can't relate one WCS's Z to
+    // another's. The reserved spoilboard base is that common frame, so require it. A
+    // single-WCS job is exempt -- its one work zero is a stable enough reference. (Marlin
+    // multi-WCS already errored above via Guard C, so only GRBL/RepRap reach here.)
+    if (getProperty(properties.J_Probe_SafeZAcrossWcs) && collectDistinctOffsets().length > 1) {
+      error("Safe-Z across WCS requires a base: reserve a spoilboard base (\"WCS for Spoilboard\"), or turn off \"Safe Z Retract Across WCS\".");
+    }
     return; // no base reserved -> Guard A and the slot check are moot
   }
 
@@ -1194,9 +1220,6 @@ function validateJob() {
     error(wcsName(base) + " is reserved as the spoilboard base -- assign this operation to another WCS (would be re-established by: " + reason + ").");
     return;
   }
-
-  // Guard B -- safe-Z across WCS needs a base: deferred to Phase 4, which adds the
-  // safe-Z-across-WCS feature this check would key off. Nothing to wire until then.
 }
 
 function onOpen() {
@@ -1323,22 +1346,51 @@ function writeWCS(section) {
     error("Work offset " + workOffset + " is out of range for " + fw + " (GRBL supports G54-G59, RepRap G54-G59.3).");
     return;
   }
+  // Decide up front whether this WCS change re-probes the new part (D_Probe_OnChange =
+  // "Each Added Part: Re-probe Z"). Each WCS has its own G10-scoped Z; the first is set by
+  // C_Probe_OnStart in writeFirstSection(), so this is only for the added copies. Compute
+  // it before the switch so the pre-switch retract below runs while the OUTGOING WCS --
+  // whose Z is established -- is still active.
+  var onChangeMode = getProperty(properties.D_Probe_OnChange);
+  var probeNewPart = (previousWorkOffset != undefined && onChangeMode == "Probe Z"
+                      && tool.number != 0 && !tool.isJetTool());
+  writeComment(eComment.Debug, " writeWCS: D_Probe_OnChange: " + onChangeMode
+    + " previousWorkOffset: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset)
+    + " probeNewPart: " + probeNewPart);
+
+  // Retract Z to the probe safe height FIRST, before selecting the new WCS. The new WCS's
+  // Z origin is unknown until we probe it, so an absolute Z move there would be unsafe --
+  // retract now, while the outgoing WCS (established) is still active, then switch and
+  // reposition in XY at this height.
+  // TODO(Phase 4 traverse retract): this clears to H_Probe_SafeZ in the OUTGOING part's
+  // frame -- the LAST part, not the stable cross-WCS reference. Once the base-relative
+  // traverse retract lands, clear relative to the reserved spoilboard base instead, and
+  // reconcile so a boundary that both traverses and re-probes isn't retracted twice.
+  if (probeNewPart) {
+    writeComment(eComment.Info, "   Retract before WCS change -- re-probe of the new part follows");
+    resetAll();
+    rapidMovementsZ(propertyMmToUnit(getProperty(properties.H_Probe_SafeZ)));
+    flushMotions();
+  }
+
   writeComment(eComment.Info, " WCS changed: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset) + " -> " + workOffset);
   writeBlock(gFormat.format(offsetCode));
   currentWorkOffset = workOffset;
 
-  // Re-probe Z on WCS changes after the first one (the first is handled by
-  // C_Probe_OnStart in writeFirstSection()) -- each WCS has its own G10-scoped
-  // offset, so switching to one for the first time in this file may need its
-  // own Z reference rather than whatever stale value is stored for it.
-  var onChangeMode = getProperty(properties.D_Probe_OnChange);
-  writeComment(eComment.Debug, " writeWCS: D_Probe_OnChange: " + onChangeMode + " previousWorkOffset: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset));
-  if (previousWorkOffset != undefined && onChangeMode == "Probe Z") {
-    if (tool.number != 0 && !tool.isJetTool()) {
-      onCommand(COMMAND_TOOL_MEASURE);
-    } else {
-      writeComment(eComment.Debug, " writeWCS: D_Probe_OnChange probe skipped (tool 0 or jet tool)");
-    }
+  if (probeNewPart) {
+    // After the switch the tool is still over the PREVIOUS part's XY -- probing here would
+    // measure the previous part / fixture and write a bogus Z into the new WCS. Rapid to
+    // the new part's reference (X0 Y0) first; this emits X/Y only, so Z stays at the safe
+    // height set above. XY comes from the new WCS's pre-set offset -- we do not re-zero it.
+    // (A configurable probe XY offset, applied here and at first-part probing, is a tracked
+    // follow-up; for now the probe point is the origin.)
+    resetAll();
+    writeComment(eComment.Info, "   Move to new part origin X0 Y0, then probe Z");
+    rapidMovementsXY(0, 0);
+    flushMotions();
+    onCommand(COMMAND_TOOL_MEASURE);
+  } else if (previousWorkOffset != undefined && onChangeMode == "Probe Z") {
+    writeComment(eComment.Debug, " writeWCS: D_Probe_OnChange probe skipped (tool 0 or jet tool)");
   }
 }
 
@@ -1424,8 +1476,10 @@ function onSection() {
       toolChange();
 
   // Select the work coordinate system (WCS on GRBL/RepRap; warn-only on Marlin).
-  // The first section already did this in writeFirstSection(), before its
-  // C_Probe_OnStart origin/probe sequence, so skip the redundant re-selection here.
+  // This is the later-section half of the deliberate WCS-selection split: section 1
+  // already selected here inside writeFirstSection() (it had to run before that section's
+  // origin write -- see the phase-order note on writeFirstSection()), so re-selecting for
+  // the first section would be redundant. Every later section selects its WCS here.
   if (!isFirstSection()) {
     writeWCS(currentSection);
   }
@@ -1973,6 +2027,21 @@ function writeMachineHoming() {
   }
 }
 
+// Job preamble: everything emitted once, before any section's cutting body. Called
+// once from onSection() when isFirstSection() is true. Fixed phase order, each step
+// depending on the one before:
+//   1. writeInformation()   -- file header block (top of file)
+//   2. writeMachineHoming()  -- establish MCS (home / accept power-on), before anything
+//                               work-relative
+//   3. writeWCS()            -- select the first section's WCS
+//   4. Start() / start file  -- units, absolute mode, spindle init
+//   5. writeBaseEstablish()  -- probe the reserved spoilboard base (needs 4's units)
+//   6. writeWcsOnStart()     -- C_Probe_OnStart: the initial origin for the WCS from 3
+// Only step 3 (writeWCS) is not intrinsically first-section work -- every section selects
+// its WCS. It lives here because steps 4-6 may write an origin on top of the active WCS,
+// so the WCS must be selected first. That is the deliberate reason WCS selection is split:
+// section 1 selects here (mid-preamble, before its origin write); every later section
+// selects in onSection()'s body. See the matching note at the writeWCS() call there.
 function writeFirstSection() {
   // Write out the information block at the beginning of the file
   writeInformation();

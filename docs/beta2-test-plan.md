@@ -128,3 +128,48 @@ that needs hands-on verification before release.
       silent (using a WCS other than the base is fine), Guard C N/A. The no-base-reserved silent
       case is covered by the Default regression (base None) item above. (The lone coolant Flood
       warning is unrelated pre-existing behavior.)
+
+## Phase 4 — consume the base (re-probe / safe-Z / traverses), from `docs/wcs-rework-plan.md`
+
+Partial phase. Landed and testable: Guard B, the added-part re-probe repositioning, and the
+WCS/Probe property relabels + default flip. **Not yet built** (so not testable): the
+base-relative traverse retract that would consume `Cross Part Clearance` — that property and
+the `Safe Z Retract Across WCS` *motion* do nothing yet; the toggle currently only drives
+Guard B. See the "Not yet implemented" item at the end.
+
+- [x] **Guard B (safe-Z across WCS needs a base).** On GRBL, a 2-WCS job (`G54`+`G55`):
+      - `WCS for Spoilboard = None`, `Safe Z Retract Across WCS = On` (default) → post errors
+        *"Safe-Z across WCS requires a base: reserve a spoilboard base … or turn off Safe Z
+        Retract Across WCS."* (1a). Verified.
+      - Same, toggle `Off` → posts, no Guard B error (1b). Verified.
+      - Same, base reserved `G59` → posts (1c). Verified.
+      - Single-WCS job, `None`, `On` → posts (single-WCS exempt) (1d). Verified.
+      - Marlin, 2 WCS → Guard C fires first, not Guard B (1e). Verified.
+- [x] **Added-part re-probe repositions before probing.** GRBL Replicate job, two copies on
+      `G54`/`G55`, same tool, `Each Added Part: Re-probe Z = Probe Z per added part` (the new
+      default). At the `G54→G55` boundary the post must retract, select `G55`, rapid to the new
+      part origin (`X0 Y0`), then probe. Verified in `Test2.gcode` (2a): the emitted order is
+      `Z<SafeZ>` retract → `G55` → `X0 Y0` → `G38.2` → `G10 L20 P2 Z`. Previously it probed at
+      the *previous* part's end position (bogus Z into the new offset).
+- [x] **First-part probe unchanged.** In the same job the first section (`G54`,
+      `First Part: Set Work Origin = Zero XY, probe Z`) sets XY in place (`G10 L20 P1 X0 Y0`, a
+      register write) and probes at the parked position — no `X0 Y0` rapid before the probe (2b).
+      Verified.
+- [x] **WCS/Probe relabels + default flip + group rename.** Dialog shows `First Part: Set Work
+      Origin`, `Each Added Part: Re-probe Z` (default `Probe Z per added part`), `Safe Z Retract
+      Across WCS`, `Cross Part Clearance (above spoilboard)`, and group `02 - Establish Machine
+      Coordinates` (Test 3). Verified. No enum ids or property keys changed, so existing presets
+      keep working — labels/defaults only.
+- [ ] **Single-WCS regression (byte-identical).** Post a single-Setup, single-op job and confirm
+      output is byte-for-byte identical to the pre-Phase-4 baseline — no Guard error, no added
+      retract/probe (Test 4). **Outstanding.**
+- [ ] **Not yet implemented — do not test yet.** These plan items have no code, so they will
+      show no new behavior:
+      - Base-relative traverse-clearance retract (consumes `Cross Part Clearance`; makes `Safe Z
+        Retract Across WCS` emit motion). Note the interim: the added-part re-probe retract uses
+        `Safe Z` (`H_Probe_SafeZ`) in the *outgoing* part's frame, not the base — a tracked
+        follow-up.
+      - Tool-change position work-relative to the base.
+      - Tool-change re-probe ordering fix (`toolChange()` still runs before `writeWCS()`).
+      - Probe XY offset applied at every part probe (first + added).
+      - Safe-Z retract on every inter-part traverse (not just re-probes).

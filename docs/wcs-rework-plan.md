@@ -304,7 +304,7 @@ field — that only exists in the split `propertyDefinitions` form, deliberately
 adopted here). Two independent mechanisms, so ordering is controlled in two places:
 
 - **Group order — the `group:` string, zero-padded to two digits:** `01 - Job`,
-  `02 - Machine`, `03 - Work Coordinate System - WCS / Probe`, `04 - Feeds and Speeds`,
+  `02 - Establish Machine Coordinates`, `03 - Work Coordinate System - WCS / Probe`, `04 - Feeds and Speeds`,
   `05 - Map G1s to Rapids...`, `06 - Tool Changes`, `07 - External Include Files`,
   `08 - Laser`, `09 - Coolant`, `10 - Duet` (WCS/Probe sits right after Machine so the
   dialog follows the post-setup flow: firmware/job → machine homing → work coordinate &
@@ -325,7 +325,7 @@ Old-prefix → new mapping (historical prose below still uses the old names):
 **New properties added in later phases must follow this convention** (pick the next free
 item letter in their group; if inserting mid-group, re-letter the ones after it).
 
-**Group "02 - Machine"** (sorts right after `"01 - Job"`, so the firmware picker
+**Group "02 - Establish Machine Coordinates"** (sorts right after `"01 - Job"`, so the firmware picker
 `A_Job_SelectedFirmware` is already visible above it — the per-axis pickers' behavior
 depends on which firmware is selected: bookkeeping-only on GRBL/FluidNC vs. real
 independent `G28` on Marlin/RRF):
@@ -385,40 +385,44 @@ Post-time only — the post errors in Fusion; it cannot read the controller's li
   *"Marlin has a single coordinate frame — this multi-WCS job cannot be posted; use one
   work offset."*
 
-## Proposal under discussion: consolidate the two probe properties (NOT yet decided)
+## Resolved: keep the two probe properties, relabel them for the Replicate workflow
 
-Raised during Phase 3 testing. The two probe-timing dropdowns (`C_Probe_OnStart`
-"Probe at Job Start" and `D_Probe_OnChange` "Probe on WCS Change") are easy to confuse —
-in testing, the job-start probe was mistaken for the on-change probe. **Proposal:**
-collapse them into a single property.
+Raised during Phase 3 testing: the two probe-timing dropdowns were easy to confuse — the
+job-start probe was mistaken for the on-change probe. A proposal to *consolidate* them into
+a single property was considered and **rejected**: consolidation either drops the
+job-start-only behaviors (`Zero XYZ` / `Zero XY`) or applies job-start XY-zeroing to a
+mid-job WCS change, which is a positioning bug — a change lands on the *previous* op's end
+point, so zeroing XY there corrupts the added copy's origin.
 
-- **Remove** `C_Probe_OnStart` ("Probe at Job Start").
-- **Rename** `D_Probe_OnChange`'s label `"Probe on WCS Change"` → `"Probe on WCS"`.
-- **New option set:** `Skip` | `Probe Z on First WCS` | `Probe Z on WCS Change`.
+**Decision instead:** keep `C_Probe_OnStart` and `D_Probe_OnChange` as separate properties
+and remove the confusion by (a) scoping multi-WCS to the **Replicate** case only (see the
+Decisions entry below) and (b) relabelling both for that workflow. No property keys or enum
+ids changed, so existing presets keep working — display labels only:
 
-Open questions to resolve before implementing (do not action yet):
+- `C_Probe_OnStart`: "Probe at Job Start" → **"First Part: Set Work Origin"** (the first / only
+  part). Keeps `Skip` / set-current-position-as-origin / zero-XY-probe-Z.
+- `D_Probe_OnChange`: "Probe on WCS Change" → **"Each Added Part: Re-probe Z"**, and its
+  default flipped `Skip` → **`Probe Z`** so the Replicate workflow re-probes each copy's Z
+  out of the box. An added copy's XY always comes from its fixture's pre-set offset; the
+  post never sets it. Only fires on multi-WCS jobs, so single-part output is unchanged.
 
-- **Where do the non-probe behaviors go?** `C_Probe_OnStart` today also offers `Zero XYZ`
-  (set current position to 0,0,0, no probe) and the `Zero XY` half of `Zero XY & Probe Z`
-  (set current X/Y to 0,0). A probe-only dropdown drops both. Does XY-zero become
-  automatic/unconditional, a separate property, or is it dropped?
-- **Does `Probe Z on WCS Change` include the first WCS or only subsequent changes?**
-  i.e. are "First WCS" and "WCS Change" mutually exclusive options, or should there be a
-  "both" behavior (probe the first WCS *and* every later change)?
-- **Interaction with the reserved base** (`B_Probe_BaseEstablish`): the base already
-  probes at job start independently; make sure the consolidated option doesn't double-probe
-  or conflict.
-- **Migration:** existing presets referencing `C_Probe_OnStart` / `D_Probe_OnChange` by id
-  would need a mapping (and would silently reset otherwise, as happened with the Beta1→Beta2
-  property renames).
+The earlier open questions are moot under this decision: the non-probe behaviors stay on
+`C_Probe_OnStart`; "first / only part" and "added copy" stay as two distinct controls; and
+the reserved base still probes independently, with Guard A preventing any double-establish
+of the base.
 
 ## Workflow conventions (for the README)
 
 - **Single operation / single part (the hobby common case):** zero the active WCS to
   the part; safe-Z and tool-change are relative to that one zero; no base needed.
-- **Multi-fixture / multi-setup:** reserve the base (default `G59`) zeroed to the
-  spoilboard, set once, and put each part on `G54`-`G58`. Don't re-zero the base per
-  part.
+- **Replicate — multiple copies of a part (multi-fixture):** reserve the base (default
+  `G59`) zeroed to the spoilboard, set once, and put each copy on `G54`-`G58`. Optionally
+  re-probe each copy's Z ("Each Added Part: Re-probe Z"); its XY comes from the fixture's
+  pre-set offset. Don't re-zero the base per part.
+- **One part from multiple references (re-datum) or a flip:** out of scope for a single
+  post run — on a machine with no homing / no known reference the post can't establish a
+  second WCS's XY, and re-probing the same surface buys nothing. Run each reference / side
+  as a **separate job**.
 
 ## Per-machine settings (README-ready)
 
@@ -464,7 +468,7 @@ reference (still always the work-Z touch-off). **Change nothing else this phase*
 with every axis left at the default `Power-On`, output must stay byte-for-byte
 identical to the current Phase-1 baseline.
 
-- [x] Add property group `"02 - Machine"` and zero-pad all group headers to two digits
+- [x] Add property group `"02 - Establish Machine Coordinates"` and zero-pad all group headers to two digits
       (`01 - Job` … `10 - Duet`), so Machine sorts right after Job (the firmware picker is
       visible above the per-axis homing pickers whose behavior depends on it) and the
       headers sort in numeric order — see the naming convention above for why padding is
@@ -533,16 +537,116 @@ anything downstream (Phase 4) actually depends on the base existing.
       verified in Fusion.)*
 - [x] Update `docs/beta2-test-plan.md` (or successor) with these test items.
 
+## Traverse clearance is not the G1->G0 plane (Phase 4 design note)
+
+`C_MapRapids_SafeZ` (parsed into `safeZHeight`) answers a different, narrower question:
+"within *this one* milling operation, is Z high enough that a cut G1 can be re-emitted
+as a rapid G0?" It is operation-scoped (it tracks the current op's Retract / Clearance /
+Feed plane) and it is only populated when the hobby "05 - Map G1s to Rapids" group is
+enabled — the group is explicitly labelled "disable when using full license." So it is
+the wrong source for an inter-operation / inter-WCS retract on two counts: the height is
+per-operation (a pocket's 5 mm clearance won't clear a neighbouring fixture, a taller
+part, or a clamp), and for a full-license job it is not set at all.
+
+Phase 4 therefore introduces a **separate, job-level traverse clearance**, never reusing
+`safeZHeight`. Because the post cannot know at post time how one WCS's zero relates to
+another's (offsets are established by probing on the machine) or how tall the fixturing
+is, a cross-WCS clearance can only be expressed **physically — relative to the spoilboard
+base, at a height the operator sets**. This is the concrete reason Guard B requires a
+base whenever a job crosses WCS boundaries: the base is the one frame in which a safe
+height is meaningful across all of the job's parts. It also matches every supported
+controller: GRBL/RRF have no reliable machine-Z on a typical MPCNC (so `G53` is out), and
+Marlin is single-frame (Guard C hard-errors multi-WCS before it can reach a traverse).
+
+Single-WCS jobs need none of this. Their one shared frame already makes each operation's
+own clearance a safe reference — Fusion's per-operation retract still fires at each
+section end — so they get **no new forced retract** and stay byte-identical. The hobby
+single-operation job has no section boundary at all, so the feature never executes.
+
+Degradation ladder:
+
+| Job | Inter-op retract behavior |
+| --- | --- |
+| Hobby, single operation, no base | No section boundary → feature never runs → byte-identical |
+| Multi-op, single part / one WCS, no base | No new forced retract; existing per-section clearance stands → byte-identical |
+| Multi-fixture, base reserved (GRBL/RRF) | Retract to base-relative clearance *before* the WCS switch, traverse XY, then next section's forced-rapid descends |
+| Multi-WCS, GRBL/RRF, no base | Guard B errors ("reserve a spoilboard base") rather than emit an undefined-height traverse |
+
+## Base WCS is transited, not parked (Phase 4 design note)
+
+The base-relative retract has to *select* the base WCS to command a move in its frame
+(the post can't express a base-relative Z from inside another WCS — the numeric
+relationship between the two is only known after runtime probing). That temporary
+selection creates two failure modes the mechanism must avoid:
+
+- **R1 — always restore the operating WCS.** After transiting the base for a retract,
+  the active WCS must be advanced to the one the *next* operations require before any
+  cutting runs. No section's cutting may ever execute with the base WCS left active
+  unintentionally. This also covers a section legitimately *assigned* to the base for
+  cutting (e.g. spoilboard surfacing): once it ends, the following sections' WCS must be
+  restored, not left on the base.
+- **R2 — never round-trip the base empty.** The post must not emit a base-WCS selection
+  that is immediately followed by returning to another WCS with *no motion in between*.
+  Enter the base frame only when a real move (the safe-Z retract) is actually emitted
+  there. If the outgoing and incoming sections share a WCS, or no traverse is needed, the
+  base is not touched at all — no `G59 … G54` bracketing nothing.
+
+Intended mechanism (transit-through-base) at a genuine inter-WCS boundary in a based job:
+
+1. Outgoing WCS active, tool at the end of the previous op.
+2. Select the base WCS and emit the `G0 Z` retract to the cross-WCS clearance — real
+   motion in the base frame, so R2 is satisfied.
+3. Select the incoming section's WCS; that section's forced first rapid positions XY and
+   descends.
+
+Net: `currentWorkOffset` moves outgoing → base → incoming, always ending on the incoming
+WCS (R1), and the base is entered only when a retract is emitted (R2).
+
+Caveats for the implementation:
+
+- The transit's base selection must **not** run through `writeWCS()` unchanged: that
+  function fires `D_Probe_OnChange`'s re-probe and would re-reference the base, colliding
+  with Guard A (the base is never re-established mid-job). Use a low-level WCS emit for a
+  transit — a pure coordinate-frame switch with no probe and no origin write.
+- Keep "base as a transit waypoint" distinct from "base as a real cutting section." The
+  latter is a normal `writeWCS()` selection; only the former is the bracketed retract.
+- No base transit at job end (`onClose`) — nothing follows to justify the frame change.
+
 ## Implementation checklist (Phase 4) — consume the base
 
 Goal: safe-Z, tool-change, and inter-section/inter-WCS traverses actually use the
 reserved base as their common work-relative reference. Each item below is separately
 verifiable — land and test one before starting the next.
 
-- [ ] Confirm/adjust job-start call order: home (Phase 2) → base establish (Phase 3) →
+- [x] Confirm/adjust job-start call order: home (Phase 2) → base establish (Phase 3) →
       per-section WCS (Phase 1) — check `onOpen()`/`writeFirstSection()` sequencing.
-- [ ] Add the absolute work-Z safe-Z retract (relative to the reserved base if one
-      exists, else the active WCS) and wire Guard B to it.
+      *(verified sound; no code change — base establish writes register-scoped `G10 L20
+      P<base>`, independent of the active WCS, so the existing order is correct.)*
+- [ ] Add the **inter-op traverse clearance** retract — a job-level safe-Z that is
+      distinct from `C_MapRapids_SafeZ` / `safeZHeight` (see "Traverse clearance is not
+      the G1->G0 plane" above). Base-gated, so single-WCS jobs stay byte-identical:
+  - [x] New user property: a physical clearance height **above the reserved base**
+        (spoilboard). Not derived — per-WCS offsets are unknown until probed at runtime
+        and fixtures/clamps aren't modeled, so only the operator can supply it. Lives in
+        an always-active group (not the "Map G1s to Rapids" group), so full-license jobs
+        have it too. Sensible default, tooltip explains it must clear the tallest fixture.
+        *(added: `K_Probe_SafeZClearance` = "Cross Part Clearance (above spoilboard)",
+        default 40 mm, in the WCS/Probe group, plus the `J_Probe_SafeZAcrossWcs` toggle.
+        NOT yet read by any motion — the retract below is what will consume it.)*
+  - [ ] Multi-WCS job (base reserved): at each section/WCS boundary, retract Z to the
+        base-relative clearance **before** selecting the next WCS, then traverse XY, then
+        let the next section's forced first-rapid descend. Never switch WCS at an unknown
+        or low Z.
+  - [ ] Single-WCS job (incl. hobby single-op): emit no new forced retract; the existing
+        per-section behavior already clears within the shared frame. Byte-identical.
+  - [x] Wire Guard B off this same feature: feature enabled + more than one distinct
+        offset on GRBL/RRF + no base reserved → error "Safe-Z across WCS requires a
+        base." (Marlin multi-WCS already hard-errors via Guard C, so it never reaches
+        here.) Replaces the deferred placeholder note in `validateJob()`.
+        *(live in `validateJob()`, keyed off `J_Probe_SafeZAcrossWcs`; verified 1a–1e.)*
+  - [ ] Never key off `safeZHeight`: it is operation-scoped and only populated when the
+        hobby "Map G1s to Rapids" group is enabled — a full-license user has no such
+        value, so a retract using it would be both wrong-height and unset.
 - [ ] Make the tool-change position (`toolChange2_X`/`3_Y`/`4_Z`) explicitly
       work-relative to the reserved base rather than "whichever WCS happens to be
       active" (see "Open design question" note earlier in this doc).
@@ -550,8 +654,43 @@ verifiable — land and test one before starting the next.
       before `writeWCS(currentSection)` selects the new section's WCS in `onSection()`,
       so a tool change coinciding with a WCS change re-probes into the *previous*
       section's WCS. Reorder so the probe targets the correct (new) WCS.
-- [ ] Emit the safe-Z retract on every inter-section / inter-WCS traverse, not just
-      tool changes.
+- [x] Added-part re-probe must position before probing (`D_Probe_OnChange` = "Each Added
+      Part: Re-probe Z"). *(code landed in `writeWCS()`; hands-on pending)* It previously
+      fired `COMMAND_TOOL_MEASURE` at the current position, but after a WCS switch the tool
+      is still at the *previous* part's end point — so it probed the wrong spot (previous
+      part / fixture) and wrote a bogus Z into the new copy's offset. Fix: retract to safe
+      Z, switch WCS, rapid to the new WCS's X0 Y0 (X/Y only; XY from the pre-set offset,
+      not re-zeroed), then probe Z. The first-/only-part probe (`C_Probe_OnStart`) is
+      exempt: the operator has parked at the origin, so the current position already *is*
+      X0 Y0. Pre-existing bug, but now the default path (default flipped Skip → Probe Z).
+  - [ ] **Follow-up: retract relative to the spoilboard base, not the last part.** The
+        landed retract clears to `H_Probe_SafeZ` in the OUTGOING part's frame — the last
+        part, not the stable cross-WCS reference. When the base-relative traverse retract
+        lands, clear relative to the reserved base instead, and reconcile so a boundary
+        that both traverses and re-probes isn't retracted twice.
+- [ ] Add a **probe XY offset** (two new properties, X and Y) applied at *every* part
+      probe — first part (`C_Probe_OnStart`) and each added part (`D_Probe_OnChange`)
+      alike. The probe touch-point becomes origin + (offsetX, offsetY) instead of the raw
+      origin, so the origin can sit at a corner / off the material while Z is still probed
+      on the stock top. Same offset for all parts (a job-wide property, not per-fixture).
+      Default 0,0 → current behavior. This supersedes the "off-material origin" caveat
+      noted on the item above — it's the general fix for it.
+- [ ] Emit the base-relative traverse-clearance retract (from the item above) on every
+      inter-section / inter-WCS traverse in a based job, not just tool changes — the
+      section boundary itself triggers it. Still base-gated: single-WCS jobs emit nothing
+      new here.
+- [ ] Honor the base-WCS state machine (see "Base WCS is transited, not parked" above):
+  - [ ] R1 — after any base transit, restore/advance to the next operations' WCS before
+        cutting; never leave the base active into a cutting move. Also restore after a
+        section that legitimately cut on the base.
+  - [ ] R2 — never emit a base selection with no motion before switching away; skip the
+        base entirely when outgoing and incoming WCS match or no traverse is needed.
+  - [ ] Transit uses a low-level WCS emit, not `writeWCS()` — no `D_Probe_OnChange`
+        re-probe and no origin write when passing through the base.
+  - [ ] No base transit at `onClose`.
+  - [ ] Hands-on: multi-WCS job with a spoilboard-surfacing section on the base confirms
+        the following sections' WCS is restored; a two-section same-WCS job emits no base
+        round-trip.
 - [ ] Regression check: single-WCS, no-base jobs are byte-for-byte unaffected.
 - [ ] Hands-on tests: multi-WCS job on GRBL/RepRap correctly retracts/travels via the
       base; Guard B fires when safe-Z is enabled, multi-WCS, and no base reserved.
@@ -582,3 +721,10 @@ new model, or file concrete follow-up items if it does.
 - **No machine-profile presets** — the per-axis properties stand on their own.
 - **Marlin multi-WCS is a hard post error** (Guard C), not a warning.
 - **No real TLO** — per-tool re-probe remains the tool-length substitute.
+- **Multi-WCS is Replicate-only** — the per-copy Z re-probe (`D_Probe_OnChange`, labelled
+  "Each Added Part: Re-probe Z") and the reserved base target milling multiple *copies* of
+  a part, one WCS per copy. Milling one part from multiple datums/references, or a flip, is
+  not supported in a single run — documented as separate jobs. This keeps "a WCS change
+  means the next copy" unambiguous and stops the options from implying general multi-WCS
+  setup the post can't deliver (no automatic XY for added WCS without homing). Re-frame /
+  rename only; no capability was removed.
