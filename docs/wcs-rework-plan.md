@@ -13,11 +13,24 @@ this document is the developer/design record.
 ## Context and stance
 
 The post targets the V1 Engineering **MPCNC / LowRider** family and similar
-GRBL / Marlin / RepRap hobby-class machines. It is developed from the perspective of a V1E
-LowRider / MPCNC practitioner: the aim is **production-quality CNC workflows**
+GRBL / Marlin / RepRap hobby-class machines. The aim is **production-quality CNC workflows**
 (multi-fixture, multi-tool, probing, safe cross-part traverses) that **also degrade simply**
 for a hobby user on the Fusion Personal license cutting a single operation. Both the full
 license and the hobbyist are first-class.
+
+**Development role.** This code is developed by an agent acting in two expert capacities at
+once, and decisions should be made from both lenses together:
+
+- an **expert software developer** — Fusion 360 post-processor engineering in JavaScript:
+  clean, maintainable code, faithful to this post's existing idioms (e.g. the combined-inline
+  `properties` form), with careful regression discipline (default output stays byte-identical);
+- an **expert in best-practice CNC operations** — understanding how these machines actually
+  behave and designing appropriate, *safe* workflows for both the **V1E hobbyist** (Fusion
+  Personal, single operation, manual zeroing) and the **professional** (multi-fixture,
+  multi-tool, probing, multiple WCS).
+
+The habit is: settle the CNC-correct workflow first (what a seasoned operator would want to
+happen at the machine), then design the software that delivers it.
 
 Two principles drive every decision:
 
@@ -29,6 +42,30 @@ Two principles drive every decision:
 - **Graceful degradation.** Defaults keep the simple single-operation job **byte-for-byte
   unchanged**; every advanced feature (reserved base, cross-part safe-Z, per-part probing)
   is opt-in and emits nothing until enabled.
+
+---
+
+## References — Fusion 360 post-processor documentation
+
+Captured so they don't have to be rediscovered:
+
+- **PostProcessor API class reference** — authoritative list of hooks and helpers
+  (`onSection`, `onLinear`/`onRapid`, `writeBlock`, `getProperty`, formatting/motion helpers,
+  etc.): <https://cam.autodesk.com/posts/reference/classPostProcessor.html>
+- **Post Processor Training Guide (PDF)** — Autodesk's narrative guide to writing posts:
+  <https://cam.autodesk.com/posts/posts/guides/Post%20Processor%20Training%20Guide.pdf>
+- **Dumper post** — emits every property / parameter / section value Fusion exposes for a CAM
+  job; run it to discover what's actually available before relying on it:
+  <https://cam.autodesk.com/hsmposts?p=dump>
+- **Library of existing posts** — reference implementations to compare against:
+  <https://cam.autodesk.com/hsmposts>
+- **HSM post-processor forum** — Autodesk's Q&A for post authors:
+  <https://forums.autodesk.com/t5/hsm-post-processor-forum/bd-p/218>
+
+Firmware g-code references (target controllers):
+
+- Marlin: <https://marlinfw.org/meta/gcode/>
+- GRBL 1.1 wiki: <https://github.com/gnea/grbl/wiki>
 
 ---
 
