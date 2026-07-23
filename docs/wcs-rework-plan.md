@@ -96,29 +96,33 @@ safe-Z feature requires it (Guard B).
 - **`A_Spoilboard_BaseReserve`** (`None` default | `G54`–`G59` | `G59.1`–`G59.3 (RepRap)`).
   Default `None` keeps the default job byte-identical. When reserved, `G59` is the natural
   choice (highest GRBL slot, keeps `G54` free for parts). Ignored on Marlin (warned).
-- **`B_Spoilboard_BaseEstablish`** (bool, default on): probe the spoilboard into the base at job
-  start; off = assume pre-set (probe-once/run-many), emitting an Info comment.
-  *(See the review note under [Property / dialog conventions](#property--dialog-conventions)
-  to convert this to an enum.)*
+- **`B_Spoilboard_BaseEstablish`** ("Probe to Set Base") enum, default **Pause & Probe Z**:
+  `None` = assume pre-set (probe-once/run-many, Info comment); `Probe Z` = probe with no
+  operator prompt (fixed/known point); `Pause & Probe Z` = prompt to attach the probe, probe,
+  prompt to detach (the manual touch-off; the byte-identical default). Always probed at the
+  origin (0,0); the probe XY offset never applies.
 
 **Base is transited, not parked** — see the design note below; it governs the retract and
 tool-change work.
 
 ## Machine frame (homing / MCS)
 
-Group `02 - Establish Machine Coordinates`, per axis (`X`/`Y`/`Z`): **Power-On** (default —
-accept current position, incl. an axis already homed at the controller; no motion) or
-**Home** (run to endstop). Homing commands:
+Group `02 - Establish Machine Coordinates`, one enum `A_Machine_HomeBeforeStart`:
+**None** (default — accept the current position, incl. an axis already homed at the controller
+or a power-on 0,0,0; no motion), **XY** (home X and Y — the usual case), or **XYZ** (also home
+Z, only where the machine is wired for it). The per-axis granularity was dropped: the only
+combinations any target machine wants are None / XY / XYZ. Homing commands:
 
 | Firmware | Command |
 |---|---|
-| Marlin / RRF (Duet) | `G28 X` / `G28 Y` / `G28 Z` — independent per axis |
+| Marlin / RRF (Duet) | `G28 X` / `G28 Y` (XY) then `G28 Z` (XYZ) — independent per axis |
 | GRBL / FluidNC | `$H` only — one command homes all configured axes |
 
-On GRBL/FluidNC `$H` is all-or-nothing: any axis set to Home emits one `$H`; the per-axis
-dropdowns are then documentation of which axes are wired to home. `D_Machine_PromptBeforeHome`
-pauses before a **Marlin `G28 Z`** only (movable-plate homing) — never X/Y, never GRBL/RRF.
-The post does not control homing order. Default all `Power-On` → no homing emitted.
+On GRBL/FluidNC `$H` is all-or-nothing: XY and XYZ both emit one `$H` (the mode only documents
+intent). `B_Machine_PromptBeforeHome` (default off) pauses **once before any homing motion**,
+independent of firmware and of which axes home — so it never needs revisiting when the machine
+changes (place a movable Z plate, clear the bed, etc.). The post does not control homing order.
+Default `None` → no homing emitted.
 
 ## Probing & tool changes
 
@@ -160,7 +164,7 @@ Needed when adding new properties:
   > `Spoilboard`; because the key is the stored identifier, the eight renamed keys reset any
   > saved preset to default — a release-notes item.
 - **Within-group order** = a single-letter item prefix on the key,
-  `<Letter>_<Group>_<Name>` (`A`, `B`, … restarting per group), e.g. `A_Machine_HomeX`.
+  `<Letter>_<Group>_<Name>` (`A`, `B`, … restarting per group), e.g. `A_Machine_HomeBeforeStart`.
   New properties take the next free letter (re-letter following ones if inserting mid-group).
 - This post uses the **combined-inline** `properties = {}` form (title/description/type/value
   inline). The split `properties` + `propertyDefinitions` form is the *old broken* approach —
@@ -170,26 +174,26 @@ Needed when adding new properties:
 (consolidating them was rejected — it would apply job-start XY-zeroing to a mid-job WCS
 change, a positioning bug):
 
-- `A_Probe_OnStart` = **"First Part: Set Work Origin"** — `Skip` / `Zero XYZ (no probe)` /
+- `A_Probe_OnStart` = **"Set First Part's Work Origin"** — `Skip` / `Zero XYZ (no probe)` /
   `Zero XY, probe Z` (default). First/only part origin, set at the current position.
   > **⚠ TODO — shorten the middle option label.** `Zero XYZ (no probe)` still truncates in
   > the Fusion dropdown; find a shorter label (enum id `Zero XYZ` must stay). Cosmetic.
 - `B_Probe_OnChange` = **"On Each Added Part"** — `Skip` / `Probe Z` (default). Fires on a
   genuine WCS change after the first section; re-probes each added copy's Z. XY always comes
   from the fixture's pre-set offset (the post never sets XY for added parts).
+- `C_Probe_Pause` = **"Pause"** — `No` / `Before` / `Before & After` (default). Gates the
+  operator attach(before)/detach(after) prompts for the **part** probes (first + added). It
+  does not add new stops — it turns the existing `Attach ZProbe` / `Detach ZProbe` prompts on
+  or off (`Before & After` = the historical always-prompt behavior). Threaded to `probeTool()`
+  via the module-level `probePauseBefore`/`probePauseAfter`, which the base establish sets too
+  and `probeTool()` resets to true after each probe (so the tool-change re-probe still prompts).
 
-> **⚠ MARKED FOR REVIEW — make `B_Spoilboard_BaseEstablish` an enum, not a toggle.** Relabel to
-> **"Spoilboard WCS is"** with two options: **"Zero XY, Probe Z"** (establish the base now,
-> and also set its XY — today's `on`) and **"Use Existing WCS Machine Value"** (trust the
-> offset already stored on the controller — today's `off`). Open questions before coding:
-> 1. **"Zero XY" gives the base an XY origin it doesn't have today** (the base is currently a
->    Z-only spoilboard reference; the cross-part retract only uses its Z). This is
->    *zero-at-current-position*, parallel to `A_Probe_OnStart`, **not** machine homing (group
->    02 still owns X/Y homing). Decide whether the base's XY is actually consumed or is just
->    harmless bookkeeping.
-> 2. **Default** maps today's establish-on to *Zero XY, Probe Z*.
-> 3. **Preset migration** — boolean→enum drops stored preset values (reset to the enum
->    default); release-notes item.
+> **Resolved — `B_Spoilboard_BaseEstablish` is now an enum** ("Probe to Set Base": `None` /
+> `Probe Z` / `Pause & Probe Z`, default `Pause & Probe Z`). The earlier "Spoilboard WCS is /
+> Zero XY, Probe Z" idea (giving the base an XY origin) was dropped: the base stays a Z-only
+> reference. Instead the enum mirrors the part-probe `Pause` control — `Probe Z` = probe with
+> no prompt, `Pause & Probe Z` = attach + detach prompts. Boolean→enum reset the stored preset
+> to the default (release-notes item).
 
 ---
 
@@ -202,7 +206,7 @@ is Z high enough to re-emit a cut G1 as a G0?" It is operation-scoped and only p
 the hobby "Map G1s to Rapids" group is on, so it is the wrong source for an inter-op/inter-WCS
 retract (wrong height, and unset for full-license jobs). The cross-part retract instead uses
 a **job-level clearance measured above the spoilboard base** (`D_Spoilboard_SafeZClearance` =
-"Cross Part Clearance"), the one frame meaningful across all the job's parts. Single-WCS jobs
+"Safe Z" in the Spoilboard Base group), the one frame meaningful across all the job's parts. Single-WCS jobs
 need none of this — their shared frame makes each operation's own clearance a safe reference,
 so they stay byte-identical.
 
@@ -229,16 +233,17 @@ at `onClose`.
 - **Phase 1 — done & shipped.** WCS origin/probe rework to `G10 L20` (replaces the old `G92`
   single-global-origin hazard); the two probe-timing properties; `writeWcsOrigin()`;
   tool-change re-probe now G10-scoped.
-- **Phase 2 — done & verified.** Establish MCS (per-axis homing), in isolation; default
-  `Power-On` output byte-identical to the Phase-1 baseline.
+- **Phase 2 — done & verified.** Establish MCS (homing), in isolation; default
+  `None` (was per-axis `Power-On`, since collapsed to one `Home Before Start` enum)
+  output byte-identical to the Phase-1 baseline.
 - **Phase 3 — done & verified.** Reserved base + establish + Guards A/C (and B's placeholder);
   default `None` byte-identical.
 - **Phase 4 — in progress.** Consume the base for safe-Z / traverses / tool-change. Landed &
-  verified: Guard B; `Cross Part Clearance` + `Safe Z Retract Across Parts`; the
+  verified: Guard B; `Safe Z` (inter-part retract height) + `Retract Across Parts`; the
   base-relative traverse retract on **every** inter-part WCS change (transit-through-base),
   verified on both the re-probe and non-re-probe (Skip) boundaries; added-part re-probe
   repositions to the new part's `X0 Y0` before probing; the WCS/Probe relabels + default flip.
-  Landed, verification pending: **probe XY offset** (`C_Probe_OffsetX` / `D_Probe_OffsetY`).
+  Landed, verification pending: **probe XY offset** (`D_Probe_OffsetX` / `E_Probe_OffsetY`).
   Remaining items below.
 - **Phase 5 — not started** (likely no-op).
 
@@ -273,7 +278,7 @@ each with and without a base.
 
 ### Phase 4 — probe XY offset *(implemented — verification pending)*
 
-`C_Probe_OffsetX` / `D_Probe_OffsetY` (`06 - Probe / Work Origin` group). The probe touch-point becomes
+`D_Probe_OffsetX` / `E_Probe_OffsetY` (`06 - Probe / Work Origin` group). The probe touch-point becomes
 origin + (offsetX, offsetY), so the origin can sit at a corner / off the material while Z
 probes the stock top. Job-wide, not per-fixture; default `0,0` reproduces prior output.
 Applied at **every part probe** — first part (`writeWcsOnStart`, "Zero XY & Probe Z") and
@@ -281,7 +286,7 @@ each added part (`writeWCS` `probeNewPart` branch) — and **never** the spoilbo
 (`writeBaseEstablish`, always at the origin) nor the tool-change re-probe (that reposition is
 part of the ordering item above). Default byte-identical: first-part emits the reposition
 rapid only when the offset is nonzero; added-part keeps the exact `X0 Y0` comment/output at
-offset 0. Tooltips (`C`/`D` offsets + `B_Spoilboard_BaseEstablish`) and README state the base
+offset 0. Tooltips (`D`/`E` offsets + `B_Spoilboard_BaseEstablish`) and README state the base
 probes at 0,0.
 
 *Verification pending:* regression (single-WCS no-offset byte-identical); hands-on (nonzero
@@ -313,12 +318,13 @@ anticipate).
 
 ## Decisions (resolved)
 
-- **`D_Machine_PromptBeforeHome`** fires only before a plate-homed **Z** home (Marlin), never
-  for X/Y or globally.
+- **`B_Machine_PromptBeforeHome`** pauses once before any homing motion, on any firmware and
+  for any axes (deliberately not Z/Marlin-specific, so it survives a machine change).
+- **Homing is one `Home Before Start` enum (None / XY / XYZ)** — the earlier per-axis
+  X/Y/Z pickers were collapsed; no target machine needs a combination outside those three.
 - **Homing order** is not post-controlled (firmware concern).
-- **`B_Spoilboard_BaseEstablish`** defaults **on** (probe the spoilboard into the base); off emits
-  an "assumed pre-set" Info comment. *(Under review to become an enum — see above.)*
-- **No machine-profile presets** — the per-axis properties stand alone.
+- **`B_Spoilboard_BaseEstablish`** is an enum defaulting **Pause & Probe Z** (attach/probe/detach);
+  `Probe Z` probes with no prompt; `None` emits an "assumed pre-set" Info comment.
 - **Marlin multi-WCS is a hard post error** (Guard C).
 - **No real TLO** — per-tool re-probe is the substitute.
 - **Multi-WCS is Replicate-only** — the per-copy Z re-probe (`B_Probe_OnChange`) and the
@@ -332,13 +338,14 @@ anticipate).
 
 ## Reference — per-machine settings
 
-Each row says how each axis gets its reference so the operator knows what to do at job start.
+Each row maps a machine to its `Home Before Start` (None / XY / XYZ) and `Prompt Before Home`
+settings so the operator knows what to do at job start.
 (Candidate for migration into `README.md` if a per-machine section is added there.)
 
-| Machine / firmware | X | Y | Z | Reserved base | Operator does |
-|---|---|---|---|---|---|
-| LowRider (Marlin or FluidNC) | Home | Home | Home if fitted, else Probe | `G59` if multi-fixture, else `None` | homes X/Y; Z endstops optional (beam squaring); work-Z touched off with the plate either way |
-| MPCNC + FluidNC, X/Y switches | Home | Home | Probe | `G59` if multi-fixture | homes X/Y; machine Z n/a (probe pin can't home), Z set by the work plate |
-| MPCNC + Marlin, plate as Z-endstop | Home | Home | Home + prompt | `G59` if multi-fixture | homes X/Y; places movable plate at the pause, Z homes to it |
-| MPCNC, no switches | Power-On | Power-On | Probe | `G59` if multi-fixture | parks X/Y by hand as zero; Z set by the work plate |
-| Single-part job (any machine) | per row above | per row above | per row above | `None` | one WCS zeroed to the part; no base |
+| Machine / firmware | Home Before Start | Prompt Before Home | Reserved base | Operator does |
+|---|---|---|---|---|
+| LowRider (Marlin or FluidNC) | `XYZ` if Z endstops fitted, else `XY` | Off | `G59` if multi-fixture, else `None` | homes X/Y; Z endstops optional (beam squaring); work-Z touched off with the plate either way |
+| MPCNC + FluidNC, X/Y switches | `XY` | Off | `G59` if multi-fixture | homes X/Y; machine Z n/a (probe pin can't home), Z set by the work plate |
+| MPCNC + Marlin, plate as Z-endstop | `XYZ` | On | `G59` if multi-fixture | homes X/Y; at the pause places the movable plate, then Z homes to it |
+| MPCNC, no switches | `None` | Off | `G59` if multi-fixture | parks X/Y by hand as zero; Z set by the work plate |
+| Single-part job (any machine) | per row above | per row above | `None` | one WCS zeroed to the part; no base |

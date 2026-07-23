@@ -30,12 +30,37 @@ Design/behavior detail lives in `docs/wcs-rework-plan.md`.
   and a combined boundary — each with and without a reserved base. Confirm the re-probe lands
   in the *new* WCS, repositions to the new part's `X0 Y0` first, a combined boundary retracts
   and probes **once**, and the park is base-relative when a base is reserved (else current-WCS).
-- **Probe XY offset.** With a non-zero X/Y offset, confirm the probe touch-point is
-  origin + (offsetX, offsetY) at both the first and each added part; `0,0` reproduces current
-  behavior.
 - **Spoilboard-surfacing on the base (R1).** A multi-WCS job with a section cutting on the base
   confirms following sections' WCS is restored; a same-WCS two-section job emits no base
   round-trip (already spot-checked in Test C).
+
+## Beta-2 dialog & behavior rework — re-verify
+
+This session reworked the dialog and several probe/homing behaviors; defaults are intended
+byte-identical. Re-verify:
+
+- **Group split & renumber.** `03 - Spoilboard Base` (4 items) right after machine homing;
+  `06 - Probe / Work Origin` (10 items) after Map G1s; downstream groups renumber through
+  `11 - Duet`. Items order by letter prefix within each group. Renamed / re-lettered keys reset
+  saved presets to default (release-notes item).
+- **Label renames** display correctly: Reserved WCS, Probe to Set Base, Retract Across Parts,
+  Safe Z (Spoilboard group), Set First Part's Work Origin.
+- **Group 02 — Home Before Start** (None / XY / XYZ). `None` (default) → no homing,
+  byte-identical. `XY` → one `$H` (GRBL/FluidNC) or `G28 X` / `G28 Y` (Marlin/RRF). `XYZ` → also
+  `G28 Z` (Marlin/RRF; GRBL `$H` already homes all configured axes). `Prompt Before Home`
+  (default off) pauses once before any homing, on every firmware and axis set.
+- **Probe to Set Base** enum: `None` → Info "assumed pre-set", no probe; `Probe Z` → probe with
+  no attach/detach prompt; `Pause & Probe Z` (default) → attach → probe → detach (byte-identical
+  to the old On). Still writes `G10 L20 P<base> Z<thk>` at the origin.
+- **Part-probe Pause** (No / Before / Before & After). Gates the `Attach ZProbe` (before) /
+  `Detach ZProbe` (after) prompts on the first + added part probes: `No` = neither, `Before` =
+  attach only, `Before & After` (default) = both (byte-identical). The tool-change re-probe
+  still prompts (out of scope).
+- **Probe XY offset** (`D_Probe_OffsetX` / `E_Probe_OffsetY`). Non-zero offset → probe
+  touch-point is origin + (offsetX, offsetY) at the first and each added part; `0,0` reproduces
+  current behavior. Never applied to the base probe.
+- **Regression:** a single-WCS, no-base, default-settings job is byte-for-byte unchanged after
+  all the above.
 
 ---
 
@@ -50,22 +75,18 @@ Design/behavior detail lives in `docs/wcs-rework-plan.md`.
 - `MPCNC_v4.0_Beta2.cps` installs/selects cleanly, replacing the Beta 1 entry.
 
 ### Phase 2 — establish MCS (homing)
-- Default (all `Power-On`) output byte-for-byte identical to the pre-Phase-2 baseline.
-- Marlin `Z = Home` + prompt: pause fires immediately before `G28 Z`; X/Y emit no motion.
-- GRBL: any axis `Home` → exactly one `$H`; Debug shows the per-axis assertions.
-- RRF: `X = Home` only → `G28 X` alone, Y/Z untouched.
-- Prompt scoping: pause only for Marlin `G28 Z`; never X/Y, GRBL `$H`, or RRF.
-- Property keys / zero-padded group headers list in the intended dialog order (`11 - Duet`
-  last). Confirm the WCS/Probe split shows as `03 - Spoilboard Base` (4 items) right after
-  machine homing and `06 - Probe / Work Origin` (9 items) after Map G1s, each item ordered by
-  its letter prefix. Renamed keys reset their saved preset to default (release-notes item).
+- Verified against the original **per-axis** design, now **superseded** by the Group-02 rework
+  (per-axis X/Y/Z → one `Home Before Start` enum; the prompt is now firmware/axis-independent).
+  Only the default carries over unchanged: default → no homing, byte-identical. The new
+  behavior is in *Beta-2 dialog & behavior rework — re-verify* above.
 
 ### Phase 3 — reserved base + guards
 - Base `None` (default): byte-for-byte identical to the Phase-2 baseline.
-- Base establish On: spoilboard probe → `G10 L20 P6 Z<thk>` **before** the first section's own
-  origin/probe; `G54` work still probes separately.
-- Base establish Off: no probe; Info comment
+- Base establish (now `Pause & Probe Z`, was On): spoilboard probe → `G10 L20 P6 Z<thk>`
+  **before** the first section's own origin/probe; `G54` work still probes separately.
+- Base establish `None` (was Off): no probe; Info comment
   `assuming base G59 is already established -- from a prior job or set manually`.
+  *(The new `Probe Z` variant — probe with no attach/detach prompt — is in the re-verify list.)*
 - **Guard A:** assigning an origin-establishing op to the reserved base aborts in `onOpen()`
   (`G59 is reserved as the spoilboard base -- assign this operation to another WCS ...`), naming
   the triggering feature; no g-code emitted.
@@ -82,8 +103,9 @@ Design/behavior detail lives in `docs/wcs-rework-plan.md`.
   `G10 L20 P2 Z` (was probing the previous part's end point).
 - **First-part probe unchanged:** `G10 L20 P1 X0 Y0` + probe at the parked position, no `X0 Y0`
   rapid.
-- **WCS/Probe relabels + default flip + group rename** verified in the dialog (Test 3); no enum
-  ids / keys changed. First-part middle option shows `Zero XYZ (no probe)` (Test A).
+- **WCS/Probe relabels + default flip** verified in the dialog (Test 3) at the time; the group
+  has since been split and keys renamed/re-lettered (see re-verify above), so the dialog needs
+  another pass. First-part middle option shows `Zero XYZ (no probe)` (Test A).
 - **Base-relative retract, re-probe path** (`Setup1 Multi.gcode`): `baseRelative: true base: 6`
   → `G59` → `Z40` → `G55` → `X0 Y0` → `G38.2` → `G10 L20 P2 Z`.
 - **Base-relative retract, non-re-probe (Skip) path** (Test B): `baseRelative: true …
