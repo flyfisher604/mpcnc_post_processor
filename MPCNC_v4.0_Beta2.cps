@@ -440,10 +440,10 @@ properties = {
   },
   I_Probe_SafeZ: {
     title      : "Safe Z",
-    description: "Safe Z the tool retracts to after probing. Also the retract height used before an added-part re-probe when no spoilboard base is reserved (with a base reserved, the Spoilboard Base group's Safe Z is used instead).",
+    description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when no spoilboard base is reserved; with a base reserved, the Spoilboard Base group's Safe Z is used instead). Same syntax as \"Map: Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
     group      : "06 - Probe / Work Origin",
-    type       : "integer",
-    value      : 40,
+    type       : "string",
+    value      : "Retract:15",
     scope      : "post"
   },
   J_Probe_Thickness: {
@@ -841,31 +841,40 @@ var safeZMode = eSafeZ.CONST;
 var safeZHeightDefault = 15;
 var safeZHeight;
 
-function parseSafeZProperty() {
-  var str = getProperty(properties.C_MapRapids_SafeZ);
+// Parse a Safe-Z expression string -- a bare number, or Feed:/Retract:/Clearance:<fallback> --
+// into { mode, dflt }. Shared by the Map-G1s Safe Z (C_MapRapids_SafeZ) and the probe Safe Z
+// (I_Probe_SafeZ) so both accept identical syntax. Pure: touches no globals, emits no output.
+function parseSafeZExpr(str) {
+  var mode;
+  var dflt = 15;
 
   // Look for either a number by itself or 'Feed:', 'Retract:' or 'Clearance:'
-  for (safeZMode = eSafeZ.CONST; safeZMode < eSafeZ.ERROR; safeZMode++) {
-    if (str.search(eSafeZ.prop[safeZMode].regex) == 0) {
+  for (mode = eSafeZ.CONST; mode < eSafeZ.ERROR; mode++) {
+    if (str.search(eSafeZ.prop[mode].regex) == 0) {
       break;
     }
   }
 
   // If it was not an error then get the number
-  if (safeZMode != eSafeZ.ERROR) {
-    var match = str.match(eSafeZ.prop[safeZMode].numRegEx);
+  if (mode != eSafeZ.ERROR) {
+    var match = str.match(eSafeZ.prop[mode].numRegEx);
 
     if ((match == null) || (match.length != 2)) {
-      writeComment(eComment.Debug, " parseSafeZProperty: " + match);
-      writeComment(eComment.Debug, " parseSafeZProperty.length: " + (match != null ? match.length : "na"));
-      writeComment(eComment.Debug, " parseSafeZProperty: Couldn't find number");
-      safeZMode = eSafeZ.ERROR;
-      safeZHeightDefault = 15;
+      mode = eSafeZ.ERROR;
+      dflt = 15;
     }
     else {
-      safeZHeightDefault = Number(match[1]);
+      dflt = Number(match[1]);
     }
   }
+
+  return {mode: mode, dflt: dflt};
+}
+
+function parseSafeZProperty() {
+  var parsed = parseSafeZExpr(getProperty(properties.C_MapRapids_SafeZ));
+  safeZMode = parsed.mode;
+  safeZHeightDefault = parsed.dflt;
 
   writeComment(eComment.Debug, " parseSafeZProperty: safeZMode = '" + eSafeZ.prop[safeZMode].name + "'");
   writeComment(eComment.Debug, " parseSafeZProperty: safeZHeightDefault = " + safeZHeightDefault);
@@ -946,6 +955,60 @@ function safeZforSection(_section)
         break;
     }
   }
+}
+
+// Resolve a parsed Safe-Z expression against one section's F360 levels, returning a concrete
+// height in the OUTPUT unit -- the same convention safeZforSection() uses: F360 level values
+// and the literal fallback are used as-is, never mm-converted. Feed/Retract/Clearance pull the
+// matching operation level when it is defined and absolute; otherwise the literal fallback is
+// used. Pure: emits no output.
+function resolveSafeZHeight(mode, dflt, _section) {
+  var valueParam;
+  var absParam;
+  switch (mode) {
+    case eSafeZ.FEED:
+      valueParam = "operation:feedHeight_value";
+      absParam   = "operation:feedHeight_absolute";
+      break;
+    case eSafeZ.RETRACT:
+      valueParam = "operation:retractHeight_value";
+      absParam   = "operation:retractHeight_absolute";
+      break;
+    case eSafeZ.CLEARANCE:
+      valueParam = "operation:clearanceHeight_value";
+      absParam   = "operation:clearanceHeight_absolute";
+      break;
+    default:  // CONST or ERROR -- use the literal fallback
+      return dflt;
+  }
+
+  if (hasParameter(valueParam) && hasParameter(absParam) && _section.getParameter(absParam) == 1) {
+    return _section.getParameter(valueParam);
+  }
+  return dflt;
+}
+
+// ---- Probe Safe Z ----------------------------------------------------------
+// I_Probe_SafeZ ("06 - Probe / Work Origin" > "Safe Z") uses the SAME expression syntax and
+// F360-level resolution as the Map-G1s Safe Z (C_MapRapids_SafeZ), but is a fully independent
+// property so the two can be tuned separately. "Retract:15" pulls each operation's F360 retract
+// level when defined and absolute, else falls back to 15.
+var probeSafeZMode = eSafeZ.CONST;
+var probeSafeZHeightDefault = 15;
+
+function parseProbeSafeZProperty() {
+  var parsed = parseSafeZExpr(getProperty(properties.I_Probe_SafeZ));
+  probeSafeZMode = parsed.mode;
+  probeSafeZHeightDefault = parsed.dflt;
+
+  writeComment(eComment.Debug, " parseProbeSafeZProperty: probeSafeZMode = '" + eSafeZ.prop[probeSafeZMode].name + "'");
+  writeComment(eComment.Debug, " parseProbeSafeZProperty: probeSafeZHeightDefault = " + probeSafeZHeightDefault);
+}
+
+// Resolve I_Probe_SafeZ for the current operation. Returns a height in the output unit --
+// already unit-correct, so callers must NOT wrap it in propertyMmToUnit().
+function probeSafeZ() {
+  return resolveSafeZHeight(probeSafeZMode, probeSafeZHeightDefault, currentSection);
 }
 
 
@@ -1270,6 +1333,9 @@ function onOpen() {
 
   // Determine the safeZHeight to do rapids
   parseSafeZProperty();
+
+  // Determine the probe retract Safe Z (independent property, same syntax)
+  parseProbeSafeZProperty();
 }
 
 // Called at end of gcode file
@@ -1387,7 +1453,7 @@ function writeWCS(section) {
   } else if (probeNewPart) {
     writeComment(eComment.Info, "   Retract before WCS change -- re-probe of the new part follows");
     resetAll();
-    rapidMovementsZ(propertyMmToUnit(getProperty(properties.I_Probe_SafeZ)));
+    rapidMovementsZ(probeSafeZ());
     flushMotions();
   }
 
@@ -2626,7 +2692,7 @@ function probeTool(targetWcs) {
   if (probePauseBefore) writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
   writeComment(eComment.Info, "   Do Probing");
   writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(getProperty(properties.J_Probe_Thickness))));
-  writeComment(eComment.Info, "   Retract the tool to " + propertyMmToUnit(getProperty(properties.I_Probe_SafeZ)));
+  writeComment(eComment.Info, "   Retract the tool to " + probeSafeZ());
   if (probePauseAfter) writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
 
   if (probePauseBefore) askUser("Attach ZProbe", "Probe", false);
@@ -2652,8 +2718,8 @@ function probeTool(targetWcs) {
 
   resetAll();
   // move up tool to safe height again after probing
-  rapidMovementsZ(propertyMmToUnit(getProperty(properties.I_Probe_SafeZ)));
-  
+  rapidMovementsZ(probeSafeZ());
+
   flushMotions();
 
   if (probePauseAfter) askUser("Detach ZProbe", "Probe", false);
