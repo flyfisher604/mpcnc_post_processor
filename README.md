@@ -1,3 +1,8 @@
+<!-- doc-sync: MPCNC_v4.0_Beta2.cps @ d0b96de
+     This README documents the post as of the commit above. It is NOT kept in sync
+     automatically. To refresh it, review only what changed in the post since that ref:
+       git diff d0b96de..HEAD -- MPCNC_v4.0_Beta2.cps
+     Then bump the ref to the new HEAD. -->
 Fusion 360 CAM Post Processor for MPCNC / LowRider
 ====
 
@@ -87,7 +92,7 @@ zeroing by hand. No probe or fixturing required.
    restore safe, properly-ordered travel moves (retract before travelling, travel before
    descending) and avoid dragging the tool across the work. Leave this group **on** to
    enable them. (See *G1 → G0 rapid mapping* below.)
-4. **Work Coordinate System – WCS / Probe** — set how the single part gets its zero:
+4. **Probe / Work Origin** — set how the single part gets its zero:
    - **First Part: Set Work Origin**:
      - **Zero XYZ (no probe)** — jog the tool to the part origin (the XY corner *and*
        down to touch the stock top); this records that position as X0 Y0 Z0. The classic
@@ -223,7 +228,9 @@ spoilboard, independent of stock thickness), it is the one frame in which a safe
 is meaningful across all of a job's parts. It is:
 
 - **Established at job start** by probing the spoilboard (**Probe Z to Set Spoilboard
-  WCS** on), or assumed pre-set from a prior job (off — probe once, run many).
+  WCS** on), or assumed pre-set from a prior job (off — probe once, run many). This base
+  probe is always taken at the origin (0,0 — the tool's position at job start); the **Probe
+  X/Y Offset** below shifts only *part* probes, never the spoilboard probe.
 - **Transited, not parked**: when the tool must move between parts, the post briefly
   selects the base to retract to **Cross Part Clearance**, then selects the destination
   WCS. It never leaves the base active into a cut, and never selects it without a real
@@ -236,6 +243,11 @@ is meaningful across all of a job's parts. It is:
 - **Work-Z probing only.** `G38.2` down to a touch plate (thickness compensated via
   **Plate Thickness**), with attach/remove pauses. There is no tool-length system, and
   X/Y is never probed (jog manually).
+- **Probe X/Y Offset** (default `0,0`) moves the Z-probe touch-point away from the work
+  origin by a fixed XY distance, so the origin can sit at a part corner or off the material
+  while Z is still read on the stock top. It applies at **every part probe** — the first
+  part and each added copy — and is job-wide, not per-fixture. It never applies to the
+  spoilboard base probe, which always touches off at the origin (0,0).
 - **Re-probe after every tool change** is the tool-length substitute — enable **Probe
   After Tool Change**.
 - **Manual tool changes** (no ATC): retract, move to the work-relative change position,
@@ -308,18 +320,11 @@ Groups appear in the Fusion dialog in the order below.
 |X / Y / Z|Per axis: **Power-On** (accept current position, no motion) or **Home** (run to endstop). GRBL homes all axes with one `$H` if any is set to Home.|**Power-On**|
 |Prompt Before Z Home|Pause before a Marlin `G28 Z` to place a movable Z plate. Marlin-only.|**false**|
 
-## 03 - Work Coordinate System - WCS / Probe
+## 03 - Spoilboard Base
 |Title|Description|Default|
 |---|---|---|
 |WCS for Spoilboard|Reserve one WCS as a fixed spoilboard base. `None` = off. `G59.1`–`G59.3` are RepRap-only; ignored on Marlin.|**None**|
-|Probe Z to Set Spoilboard WCS|Probe the spoilboard into the base at job start (off = assume pre-set).|**true**|
-|First Part: Set Work Origin|First/only part origin: **Skip** / **Zero XYZ (no probe)** / **Zero XY, probe Z**.|**Zero XY, probe Z**|
-|On Each Added Part|Multi-fixture only: **Skip** or **Probe Z** at each added copy's WCS.|**Probe Z**|
-|G38.2 (On) or G28 (Off)|Probe with `G38.2` (On) or `G28` (Off). GRBL always `G38.2`.|**On**|
-|G38 Target|Furthest Z the probe move travels to.|**-10**|
-|G38 Speed|Probe feedrate (mm/min).|**30**|
-|Safe Z|Retract height after probing; also the no-base added-part re-probe retract.|**40**|
-|Plate Thickness|Touch-plate thickness (compensated into Z).|**0.8**|
+|Probe Z to Set Spoilboard WCS|Probe the spoilboard into the base at job start (off = assume pre-set). The base probe is always at the origin (0,0) — the Probe X/Y Offset never applies to it.|**true**|
 |Safe Z Retract Across Parts|Retract to Cross Part Clearance before traversing between WCS; drives Guard B. GRBL/RepRap only.|**true**|
 |Cross Part Clearance (above spoilboard)|Absolute height above the base to retract to between parts — clear the tallest fixture.|**40**|
 
@@ -342,7 +347,20 @@ Groups appear in the Fusion dialog in the order below.
 |Map: Safe Z to Rapid|Threshold Z: a number, or a Fusion height with fallback (e.g. `Retract:15`).|**Retract:15**|
 |Map: Allow Rapid Z|Also convert safe vertical moves.|**false**|
 
-## 06 - Tool Changes
+## 06 - Probe / Work Origin
+|Title|Description|Default|
+|---|---|---|
+|First Part: Set Work Origin|First/only part origin: **Skip** / **Zero XYZ (no probe)** / **Zero XY, probe Z**.|**Zero XY, probe Z**|
+|On Each Added Part|Multi-fixture only: **Skip** or **Probe Z** at each added copy's WCS.|**Probe Z**|
+|Probe X Offset|X from a part's origin to its Z-probe touch-point. Applied at every part probe (first + added), never to the spoilboard base probe. `0` = probe at the origin.|**0**|
+|Probe Y Offset|Y from a part's origin to its Z-probe touch-point. Applied at every part probe (first + added), never to the spoilboard base probe. `0` = probe at the origin.|**0**|
+|G38.2 (On) or G28 (Off)|Probe with `G38.2` (On) or `G28` (Off). GRBL always `G38.2`.|**On**|
+|G38 Target|Furthest Z the probe move travels to.|**-10**|
+|G38 Speed|Probe feedrate (mm/min).|**30**|
+|Safe Z|Retract height after probing; also the no-base added-part re-probe retract.|**40**|
+|Plate Thickness|Touch-plate thickness (compensated into Z).|**0.8**|
+
+## 07 - Tool Changes
 |Title|Description|Default|
 |---|---|---|
 |Tool Changes are Included|Emit tool-change code when the tool changes.|**false**|
@@ -352,7 +370,7 @@ Groups appear in the Fusion dialog in the order below.
 |Do First Change|Do an initial change to load the first tool.|**false**|
 |Probe After Tool Change|Re-probe Z after each change (the tool-length substitute).|**false**|
 
-## 07 - External Include Files
+## 08 - External Include Files
 Each names a file in the nc output folder whose contents are inserted verbatim at that
 point. Leave empty for built-in code.
 
@@ -362,7 +380,7 @@ point. Leave empty for built-in code.
 |Tool Change Start / Tool Change End|empty|
 |Probe|empty|
 
-## 08 - Laser
+## 09 - Laser
 Fusion's four Through levels all map to "On - Through". The **CNC Firmware** selection
 decides whether the GRBL or Marlin/RepRap laser mode is used.
 
@@ -374,7 +392,7 @@ decides whether the GRBL or Marlin/RepRap laser mode is used.
 |Laser: GRBL Mode|Dynamic (M4) or static (M3) power.|**M4 S{PWM}/M5 dynamic**|
 |Laser: Coolant|Force a coolant for laser ops (e.g. air).|**Off**|
 
-## 09 - Coolant
+## 10 - Coolant
 Two channels (A, B); each maps a Fusion coolant mode to enable/disable g-code. If a
 tool's coolant matches a channel, that channel is enabled; a warning is emitted if a
 requested coolant matches no channel. Marlin and GRBL command options are both offered —
@@ -386,7 +404,7 @@ pick to match your wiring. Set a channel to **Use custom** to use the custom str
 |Turn Channel A / B On/Off|Enable/disable g-code for the channel.|**M42 P6/P11 S255/S0**|
 |Channel A / B On/Off Custom|Custom include files when Mode = Use custom.|empty|
 
-## 10 - Duet
+## 11 - Duet
 |Title|Description|Default|
 |---|---|---|
 |Milling Mode|Duet3D milling-mode command.|**M453 P2 I0 R30000 F200**|

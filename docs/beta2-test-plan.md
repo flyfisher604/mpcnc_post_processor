@@ -55,8 +55,10 @@ Design/behavior detail lives in `docs/wcs-rework-plan.md`.
 - GRBL: any axis `Home` → exactly one `$H`; Debug shows the per-axis assertions.
 - RRF: `X = Home` only → `G28 X` alone, Y/Z untouched.
 - Prompt scoping: pause only for Marlin `G28 Z`; never X/Y, GRBL `$H`, or RRF.
-- Property keys / zero-padded group headers list in the intended dialog order (`10 - Duet`
-  last).
+- Property keys / zero-padded group headers list in the intended dialog order (`11 - Duet`
+  last). Confirm the WCS/Probe split shows as `03 - Spoilboard Base` (4 items) right after
+  machine homing and `06 - Probe / Work Origin` (9 items) after Map G1s, each item ordered by
+  its letter prefix. Renamed keys reset their saved preset to default (release-notes item).
 
 ### Phase 3 — reserved base + guards
 - Base `None` (default): byte-for-byte identical to the Phase-2 baseline.
