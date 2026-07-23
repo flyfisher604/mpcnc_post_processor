@@ -1,7 +1,7 @@
-<!-- doc-sync: MPCNC_v4.0_Beta2.cps @ d0b96de
+<!-- doc-sync: MPCNC_v4.0_Beta2.cps @ 1c3ec33
      This README documents the post as of the commit above. It is NOT kept in sync
      automatically. To refresh it, review only what changed in the post since that ref:
-       git diff d0b96de..HEAD -- MPCNC_v4.0_Beta2.cps
+       git diff 1c3ec33..HEAD -- MPCNC_v4.0_Beta2.cps
      Then bump the ref to the new HEAD. -->
 Fusion 360 CAM Post Processor for MPCNC / LowRider
 ====
