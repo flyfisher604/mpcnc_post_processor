@@ -6,6 +6,184 @@ Design/behavior detail lives in `docs/plan.md`.
 
 ---
 
+## Execution runbook — hobbyist & professional flows
+
+End-to-end, persona-driven scenarios covering the current changes (four-mode **Subsequent
+Origin**, safe-Z arrival on every WCS change, the first-part **Skip** behavior change, the
+group-06 rename, the **First Origin / Subsequent Origin / Probe Pause / Probe with G38.2**
+relabels, and the whole-mm integer offsets / Safe Z). **You run these; record the outcome in
+each `Result:` line** (`PASS` / `FAIL` + a note, and paste the relevant g-code snippet). The
+granular token-level checks (M1–M6, P1–P3) below still apply; each scenario tags which ones it
+also satisfies so nothing is double-run.
+
+**Conventions.** Comments are `( ... )` on GRBL and `; ...` on Marlin/RRF — otherwise the tokens
+are identical. `G10 L20 P<n>` is GRBL/RepRap; Marlin uses `G92` and rejects >1 WCS (Guard C).
+Feed placeholders (`F<travelXY>`) are whatever the job's travel feed resolves to. Default probe
+target/speed/thickness = `Z-10` / `F30` / `Z0.8` unless you changed them. Do every scenario on
+**GRBL** first (the default firmware); the firmware-variant rows note what changes elsewhere.
+
+### Results summary (fill as you go)
+
+| ID | Scenario | Result |
+|----|----------|--------|
+| H1 | Hobbyist — single op, default, touch plate | |
+| H2 | Hobbyist — single op, no probe (manual Z) | |
+| H3 | Hobbyist — firmware variant (Marlin/RRF) | |
+| H-REG | Hobbyist — default job byte-for-byte regression | |
+| PB1 | Pro B — 2 copies, base, default re-probe | |
+| PB2 | Pro B — 2 copies, base, Skip (trust stored) | |
+| PBV1 | Pro B-variant — setup run (record fixtures) | |
+| PBV2 | Pro B-variant — production run (re-probe Z) | |
+| PBV3 | Pro B-variant — production run (trust stored Z) | |
+| PA1 | Pro A — multi-datum/flip is refused/steered out | |
+| D1 | Dialog & defaults audit (renames, integer fields) | |
+
+---
+
+### Hobbyist — Fusion Personal, a single milling operation
+
+The design goal: **the default dialog posts a correct job with the fewest possible changes.**
+
+- [ ] **H1 — Single op, defaults, with a Z touch plate (the zero-/one-change path).**
+      *Setup:* one 3-axis milling op, real tool (tool ≠ 0, not a jet tool), GRBL. Leave **every**
+      property at its default (First Origin = `Set Manual X0 Y0, Probe Z0`, Probe Pause =
+      `Before & After`). Jog the tool to the part origin before posting.
+      *Expected, in order:*
+      ```
+      G54
+      (   Set current X,Y position to 0,0)
+      G10 L20 P1 X0 Y0
+      ... M0 attach-probe prompt ...
+      G38.2 F30 Z-10
+      G10 L20 P1 Z0.8
+      ... M0 detach-probe prompt ...
+      ... retract to probe Safe Z, then the cut ...
+      ```
+      **Pass:** the only setting a GRBL hobbyist with a plate must touch to post a correct job is
+      *none*. XY zeroes at the jogged position, Z probes the stock top, both land in `P1`.
+      *Result:* ____
+
+- [ ] **H2 — Single op, no touch plate (manual Z).** Same as H1 but the operator has no probe:
+      set **First Origin = `Set Manual X0 Y0 Z0`**. Jog to the part origin (all three axes) first.
+      *Expected:*
+      ```
+      G54
+      (   Set current position to 0,0,0)
+      G10 L20 P1 X0 Y0 Z0
+      ... straight into the cut, no G38.2, no probe prompts ...
+      ```
+      **Pass:** exactly **one** dialog change (First Origin) converts the flow to a no-probe
+      manual touch-off; no `G38.2` is emitted. *Result:* ____
+
+- [ ] **H3 — Firmware variant (Marlin or RRF).** Repeat H1 with Firmware = Marlin (and again RRF
+      if you use it). **Pass:** comments switch to `; ...`; Marlin emits `G92` instead of
+      `G10 L20`; the single-op flow is otherwise identical. Confirm no spurious multi-WCS warning
+      on a single-op Marlin job. *Result:* ____
+
+- [ ] **H-REG — Default-job regression (the key guarantee).** Post the current default single-op
+      job and diff it against the pre-rework output for the same job (prior tagged `.cps` or a
+      saved reference `.gcode`). **Pass:** **byte-for-byte identical** — the rework must not alter
+      the default hobbyist output. *Result:* ____
+
+---
+
+### Professional B — one WCS per copy, milling multiple copies (Replicate)
+
+Use a **2-copy job**: Setup 1 → WCS `1` (G54), Setup 2 → WCS `2` (G55), reserved base **`G59`**,
+**Retract Across Parts = On**, real tool. Satisfies P2 and M-series checks as tagged.
+
+- [ ] **PB1 — Default re-probe per copy** (Subsequent Origin = `Use Existing X0 Y0, Probe Z0`,
+      the default). *Expected at job start:* base establish `( Establish spoilboard base G59)` →
+      `G38.2` → `G10 L20 P6 Z0.8`; then first copy as H1 into `P1`. *Expected at the `P1→P2`
+      boundary:*
+      ```
+      ... transit through base: G59 → G0 Z40 ...
+      G55
+      (   Move to part origin X0 Y0, then probe Z)
+      G0 X0 Y0 F<travelXY>
+      G38.2 F30 Z-10
+      G10 L20 P2 Z0.8
+      ```
+      **Pass:** base probes once at start (no XY reposition); each copy re-probes Z at its stored
+      XY; the traverse retracts base-relative to `Z40` before switching WCS. *(Satisfies M2, P2.)*
+      *Result:* ____
+
+- [ ] **PB2 — Trust the stored Z** (Subsequent Origin = `Skip/Use Existing X0 Y0 Z0`). Same job.
+      *Expected at `P1→P2`:*
+      ```
+      ... G59 → G0 Z40 ...
+      G55
+      (   Move to this part's stored origin X0 Y0)
+      G0 X0 Y0
+      ... straight into the cut, no probe ...
+      ```
+      **Pass:** no `G38.2` on the added copy; the tool still arrives safely at `X0 Y0` after the
+      retract (this is the behavior change — `Skip` no longer emits nothing). *(Satisfies M1.)*
+      *Result:* ____
+
+---
+
+### Professional B-variant — set the fixtures on run 1, reuse them on later runs
+
+Two distinct jobs against the **same 2-fixture bed**. Reserved base `G59`, Retract Across Parts
+On, real tool. This is the workflow the four new manual modes exist for.
+
+- [ ] **PBV1 — Setup run: record each fixture origin.** First Origin = `Set Manual X0 Y0 Z0`,
+      Subsequent Origin = `Set Manual X0 Y0, Probe Z0`. Jog to fixture 1 before posting.
+      *Expected:* first part records `G10 L20 P1 X0 Y0 Z0` (no probe); at `P1→P2`: retract →
+      `G55` → **jog prompt** (`M0 (MSG Jog to this part's X0 Y0 ...)`) → `G10 L20 P2 X0 Y0` →
+      `G38.2` → `G10 L20 P2 Z0.8`. **Pass:** every fixture's origin is written to its own register
+      (`P1`, `P2`) from an operator jog; the writes persist to the controller (GRBL stores
+      `G10 L20` to EEPROM). After the run, confirm on the controller that `G54`/`G55` report the
+      set origins. *(Satisfies M3, M4.)* *Result:* ____
+
+- [ ] **PBV2 — Production run: reuse fixtures, re-probe Z.** First Origin =
+      `Skip/Use Existing X0 Y0 Z0`, Subsequent Origin = `Use Existing X0 Y0, Probe Z0`. **Do not
+      re-jog** — the origins from PBV1 are already stored. *Expected:* first part —
+      `(   Use stored work origin; move to X0 Y0 at Safe Z)` → `G0 Z<probeSafeZ>` → `G0 X0 Y0`
+      (no origin write, no jog prompt); at `P1→P2` — retract → `G55` → `G0 X0 Y0` → `G38.2` →
+      `G10 L20 P2 Z0.8`. **Pass:** no manual/jog prompts anywhere; XY comes from the stored
+      fixtures; Z is re-probed per copy for the new stock. *(Satisfies M6, M2.)* *Result:* ____
+
+- [ ] **PBV3 — Production run: trust stored Z too.** Same as PBV2 but Subsequent Origin =
+      `Skip/Use Existing X0 Y0 Z0`. **Pass:** no probe anywhere on the added copies; each copy
+      just retracts and arrives at its stored `X0 Y0`. Use only when every copy's stock is the
+      same thickness as the setup run. *Result:* ____
+
+---
+
+### Professional A — multiple WCS to mill ONE part (multi-datum / flip)
+
+This is **not a supported workflow yet** (see plan.md / memory: it needs the safe-Z model
+extended to a re-clamp of the same stock). The test confirms the post *steers the user away*
+rather than silently mis-machining.
+
+- [ ] **PA1 — Confirm the out-of-scope guidance and current behavior.** (a) In the dialog,
+      confirm both **First Origin** and **Subsequent Origin** tooltips end with *"to mill one part
+      from multiple datums/references or a flip, run separate jobs."* (b) Build a deliberate
+      flip-style job (one part, Setup 1 top face WCS `1`, Setup 2 bottom face WCS `2`) and post it.
+      Record what actually happens — the post currently treats the WCS change like a Replicate
+      copy (retract + Subsequent Origin dispatch), which is **not** correct for a re-clamp. **Pass
+      (for now):** the tooltip guidance is present and correct; capture the emitted g-code as the
+      baseline for the future feature. Do **not** treat a plausible-looking post as "supported."
+      *Result:* ____
+
+---
+
+### Dialog & defaults audit
+
+- [ ] **D1 — Labels, groups, and field types.** Open the dialog and confirm: group **`06 - On
+      WCS/Part/Fixture Change`** exists (no lingering `Probe / Work Origin`); titles read **First
+      Origin**, **Subsequent Origin**, **Probe Pause**, **Probe with G38.2**; the base-establish
+      option reads **Pause, Probe Z, Pause**; the Subsequent Origin dropdown lists all four modes
+      (`Skip/Use Existing X0 Y0 Z0`, `Use Existing X0 Y0, Probe Z0`, `Set Manual X0 Y0 Z0`,
+      `Set Manual X0 Y0, Probe Z0`); **Probe X/Y Offset** and both **Safe Z** fields accept only
+      whole numbers (reject a decimal like `2.5`) and are labeled/understood as **whole mm**.
+      Cross-check against the fuller **Beta-2 dialog & behavior rework — re-verify** list below.
+      *Result:* ____
+
+---
+
 ## Outstanding — to run before release
 
 - [ ] **Tapping warning.** Run a tapping operation and confirm the
