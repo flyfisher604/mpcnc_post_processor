@@ -378,29 +378,31 @@ properties = {
   },
   A_Probe_OnStart: {
     title      : "First WCS / Part",
-    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Skip/Use Existing X0 Y0 Z0: use the origin already stored in that WCS (from a prior job or set manually) -- no re-zero; the tool retracts and rapids to the stored X0 Y0. Set Manual X0 Y0 Z0: record the tool's current position as X0 Y0 Z0 with no probe -- a manual touch-off, or a jet/laser where Z is set by hand (jog the tool to the part origin before running; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Set Manual X0 Y0, Probe Z0: record X0 Y0 at the current position, then probe the stock-top Z. On GRBL/RepRap this writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent WCS / Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
+    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Skip/Use Existing X0 Y0 Z0: use the origin already stored in that WCS (from a prior job or set manually) -- no re-zero; the tool retracts and rapids to the stored X0 Y0. Set X0 Y0 Z0 to Current Pos: record the tool's CURRENT position as X0 Y0 Z0 with no probe and no prompt -- pre-jog to the part origin before starting (a manual touch-off, or a jet/laser where Z is set by hand; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Set X0 Y0 to Current Pos, Probe Z0: record X0 Y0 at the current position, then probe the stock-top Z. Jog to X0 Y0 Z0: pause (M0) so you jog the tool to the origin during the run, then record X0 Y0 Z0 there, no probe. Jog to X0 Y0, Probe Z0 (default): pause to jog to the origin, record X0 Y0, then probe Z. On GRBL/RepRap the origin writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent WCS / Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
     group      : "06 - On WCS / Part / Fixture Changes",
     type       : "enum",
     values: [
       { title: "Skip/Use Existing X0 Y0 Z0", id: "Skip" },
-      { title: "Set Manual X0 Y0 Z0", id: "Zero XYZ" },
-      { title: "Set Manual X0 Y0, Probe Z0", id: "Zero XY & Probe Z" }
+      { title: "Set X0 Y0 Z0 to Current Pos", id: "Current XYZ" },
+      { title: "Set X0 Y0 to Current Pos, Probe Z0", id: "Current XY & Probe Z" },
+      { title: "Jog to X0 Y0 Z0", id: "Jog XYZ" },
+      { title: "Jog to X0 Y0, Probe Z0", id: "Jog XY & Probe Z" }
     ],
-    value: "Zero XY & Probe Z",
+    value: "Jog XY & Probe Z",
     scope: "post"
   },
   B_Probe_OnChange: {
     title      : "Subsequent WCS / Part",
-    description: "Multi-part jobs -- milling several parts/copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). Two workflows coexist. USE EXISTING (pre-set fixture offsets / Replicate) -- Skip/Use Existing X0 Y0 Z0: do nothing to the origin; after a safe-Z retract the tool rapids to the part's stored X0 Y0 (X and Z already in its own WCS, from a prior job or set manually). Use Existing X0 Y0, Probe Z0: rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS (G10 L20 P<n>); XY stays the fixture's pre-set offset. SET MANUAL (operator jogs to each part) -- Set Manual X0 Y0 Z0: pause so you jog the tool to this part's origin, then record that position as X0 Y0 Z0 (no probe). Set Manual X0 Y0, Probe Z0: pause to jog to this part's origin, record X0 Y0 there, then probe Z. The attach/detach prompts around any probe follow Probe Pause. The safe-Z retract on the traverse is separate (see Retract Across Parts). Not supported on Marlin (single G92 origin -- use separate jobs). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
+    description: "Multi-part jobs -- milling several parts/copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). Every mode first retracts to a safe Z, then acts. USE EXISTING (pre-set fixture offsets / Replicate) -- Skip/Use Existing X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X and Z already in its own WCS, from a prior job or set manually). Use Existing X0 Y0, Probe Z0: rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS (G10 L20 P<n>); XY stays the fixture's pre-set offset. JOG (operator jogs to each part) -- Jog to X0 Y0 Z0: pause (M0) so you jog the tool to this part's origin, then record that position as X0 Y0 Z0 (no probe). Jog to X0 Y0, Probe Z0 (default): pause to jog to this part's origin, record X0 Y0 there, then probe Z. The attach/detach prompts around any probe follow Probe Pause. The safe-Z retract on the traverse is separate (see Retract Across Parts). Not supported on Marlin (single G92 origin -- use separate jobs). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
     group      : "06 - On WCS / Part / Fixture Changes",
     type       : "enum",
     values: [
       { title: "Skip/Use Existing X0 Y0 Z0", id: "Skip" },
       { title: "Use Existing X0 Y0, Probe Z0", id: "Probe Z" },
-      { title: "Set Manual X0 Y0 Z0", id: "Zero XYZ" },
-      { title: "Set Manual X0 Y0, Probe Z0", id: "Zero XY & Probe Z" }
+      { title: "Jog to X0 Y0 Z0", id: "Jog XYZ" },
+      { title: "Jog to X0 Y0, Probe Z0", id: "Jog XY & Probe Z" }
     ],
-    value: "Probe Z",
+    value: "Jog XY & Probe Z",
     scope: "post"
   },
   C_Probe_Pause: {
@@ -1425,7 +1427,7 @@ function writeWCS(section) {
   // Two workflows coexist:
   //   - Pre-set fixture offset (Replicate): "Skip" (use stored X/Z) and "Probe Z" (stored XY,
   //     re-probe Z) -- the post positions to the stored X0 Y0 automatically.
-  //   - Manual per-part: "Zero XYZ" / "Zero XY & Probe Z" -- the operator jogs to this part
+  //   - Jog per-part: "Jog XYZ" / "Jog XY & Probe Z" -- the operator jogs to this part
   //     and the post records the origin there.
   var onChangeMode = getProperty(properties.B_Probe_OnChange);
   var canProbe = (tool.number != 0 && !tool.isJetTool());
@@ -1489,13 +1491,13 @@ function writeWCS(section) {
       rapidMovementsXY(0, 0);
       flushMotions();
     }
-  } else if (onChangeMode == "Zero XYZ") {
-    // Manual: the operator jogs to this part's origin; record that position as X0 Y0 Z0, no probe.
+  } else if (onChangeMode == "Jog XYZ") {
+    // Jog: the operator jogs to this part's origin; record that position as X0 Y0 Z0, no probe.
     askUser("Jog to this part's X0 Y0 and touch off Z, then continue", "Set part origin", true);
     writeComment(eComment.Info, "   Set current position to 0,0,0");
     writeWcsOrigin(currentWorkOffset, 0, 0, 0);
-  } else if (onChangeMode == "Zero XY & Probe Z") {
-    // Manual: the operator jogs to this part's X0 Y0 (staying clear in Z); record X0 Y0 here,
+  } else if (onChangeMode == "Jog XY & Probe Z") {
+    // Jog: the operator jogs to this part's X0 Y0 (staying clear in Z); record X0 Y0 here,
     // then probe Z. partProbe(true) -- the tool is at the origin after the jog.
     askUser("Jog to this part's X0 Y0 (stay clear in Z), then continue to probe", "Set part origin", true);
     writeComment(eComment.Info, "   Set current X,Y position to 0,0");
@@ -2301,6 +2303,7 @@ function partProbe(atOrigin) {
 // writeWcsOrigin() (G10 on GRBL/RepRap, G92 on Marlin).
 function writeWcsOnStart() {
   var mode = getProperty(properties.A_Probe_OnStart);
+  var canProbe = (tool.number != 0 && !tool.isJetTool());
   writeComment(eComment.Debug, " writeWcsOnStart: A_Probe_OnStart: " + mode + " wcs: " + currentWorkOffset);
 
   if (mode == "Skip") {
@@ -2310,7 +2313,7 @@ function writeWcsOnStart() {
     // retracted before the XY traverse.
     writeComment(eComment.Info, "   Use stored work origin; move to X0 Y0 at Safe Z");
     resetAll();
-    if (tool.number != 0 && !tool.isJetTool()) {
+    if (canProbe) {
       rapidMovementsZ(probeSafeZ());
     }
     rapidMovementsXY(0, 0);
@@ -2318,16 +2321,27 @@ function writeWcsOnStart() {
     return;
   }
 
-  if (mode == "Zero XYZ") {
+  // "Jog ..." modes pause (M0) so the operator jogs the tool to the part origin during the run;
+  // the "... Current Pos" modes assume a pre-jog before start and record wherever the tool now
+  // sits. Both then write the origin identically (the "Current Pos" path stays byte-identical to
+  // the pre-rework default output; only the new "Jog" modes emit the prompt).
+  if (mode == "Jog XYZ" || mode == "Jog XY & Probe Z") {
+    var jogMsg = (mode == "Jog XYZ")
+      ? "Jog to the part's X0 Y0 and touch off Z, then continue"
+      : "Jog to the part's X0 Y0 (stay clear in Z), then continue to probe";
+    askUser(jogMsg, "Set part origin", true);
+  }
+
+  if (mode == "Current XYZ" || mode == "Jog XYZ") {
     writeComment(eComment.Info, "   Set current position to 0,0,0");
     writeWcsOrigin(currentWorkOffset, 0, 0, 0);
     return;
   }
 
-  // "Zero XY & Probe Z"
+  // "Current XY & Probe Z" or "Jog XY & Probe Z"
   writeComment(eComment.Info, "   Set current X,Y position to 0,0");
   writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
-  if (tool.number != 0 && !tool.isJetTool()) {
+  if (canProbe) {
     // The origin is the current position; partProbe() steps to the probe point (origin + XY
     // offset) only when an offset is set, so a zero-offset job stays byte-identical.
     partProbe(true);
