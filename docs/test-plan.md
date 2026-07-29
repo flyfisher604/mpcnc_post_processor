@@ -35,7 +35,8 @@ target/speed/thickness = `Z-10` / `F30` / `Z0.8` unless you changed them. Do eve
 | PBV1 | Pro B-variant — setup run (record fixtures) | |
 | PBV2 | Pro B-variant — production run (re-probe Z) | |
 | PBV3 | Pro B-variant — production run (trust stored Z) | |
-| PA1 | Pro A — multi-datum/flip is refused/steered out | |
+| PA1 | Pro A — 2nd WCS on same part/fixture, re-probe (jog datum) | |
+| PA1b | Pro A — 2nd WCS on same part, Z-only re-probe (stored XY) | |
 | D1 | Dialog & defaults audit (renames, integer fields) | |
 
 ---
@@ -152,21 +153,55 @@ On, real tool. This is the workflow the four new manual modes exist for.
 
 ---
 
-### Professional A — multiple WCS to mill ONE part (multi-datum / flip)
+### Professional A — a second WCS on the same part, same fixture (re-reference off a machined face)
 
-This is **not a supported workflow yet** (see plan.md / memory: it needs the safe-Z model
-extended to a re-clamp of the same stock). The test confirms the post *steers the user away*
-rather than silently mis-machining.
+**In scope.** The part stays clamped in **one fixture** (no flip, no re-clamp). After the face
+and outside are machined in WCS `1` (G54), a second setup uses a new WCS `2` (G55) whose origin
+is **referenced from a machined face**, so its Z must be **re-probed** on that fresh surface.
+Mechanically this is an ordinary inter-WCS traverse plus a re-probe — the post handles it today.
+The tool never leaves the part, so the outgoing-frame Safe Z is a valid clearance and no
+spoilboard base is required. *(The flip / re-clamp variant — where the same stock is turned over
+or re-fixtured — remains future work; see plan.md / memory.)*
 
-- [ ] **PA1 — Confirm the out-of-scope guidance and current behavior.** (a) In the dialog,
-      confirm both **First WCS / Part** and **Subsequent WCS / Part** tooltips end with *"to mill one part
-      from multiple datums/references or a flip, run separate jobs."* (b) Build a deliberate
-      flip-style job (one part, Setup 1 top face WCS `1`, Setup 2 bottom face WCS `2`) and post it.
-      Record what actually happens — the post currently treats the WCS change like a Replicate
-      copy (retract + Subsequent WCS / Part dispatch), which is **not** correct for a re-clamp. **Pass
-      (for now):** the tooltip guidance is present and correct; capture the emitted g-code as the
-      baseline for the future feature. Do **not** treat a plausible-looking post as "supported."
+**Settings note (Guard B).** For a single-part, two-WCS job the simplest safe setup is **Retract
+Across Parts = Off** with **no base**: an inter-WCS traverse still retracts to the probe Safe Z in
+the *outgoing* (G54) frame before the switch, which clears the part. Leaving Retract Across Parts
+**On** without a reserved base trips Guard B (it can't tell one part's two WCS from two different
+fixtures) — so either turn it off or reserve a base for this workflow.
+
+- [ ] **PA1 — New WCS from a machined face, re-probe Z (operator jogs the new datum).** One part,
+      one fixture. Setup 1 → WCS `1` (face + outside). Setup 2 → WCS `2`, origin on a machined face.
+      **Subsequent WCS / Part = `Set Manual X0 Y0, Probe Z0`**; Retract Across Parts = Off, no base;
+      real tool. *Expected at the `G54→G55` boundary:*
+      ```
+      (   Retract to Safe Z before WCS change)
+      G0 Z<probeSafeZ>            ; in the outgoing G54 frame
+      G55
+      ... M0 jog prompt: "Jog to this part's X0 Y0 (stay clear in Z), then continue to probe" ...
+      (   Set current X,Y position to 0,0)
+      G10 L20 P2 X0 Y0
+      (   Move to part origin X0 Y0, then probe Z)   ; probe XY offset 0
+      ... attach-probe prompt per Probe Pause ...
+      G38.2 F30 Z-10
+      G10 L20 P2 Z0.8
+      ... into the WCS-2 cut ...
+      ```
+      **Pass:** the traverse retracts to a clear Z in the outgoing frame *before* selecting G55;
+      the operator jogs to the new datum on the **same** part; the re-probe reads the **machined
+      face** and writes Z into `P2` (not P1); no flip/re-clamp is implied. *(Satisfies M4.)*
       *Result:* ____
+
+- [ ] **PA1b — Variant: new WCS XY already known, only Z re-references.** Same job, but WCS `2`'s
+      X0 Y0 was already established (or equals G54's) so no jog is needed:
+      **Subsequent WCS / Part = `Use Existing X0 Y0, Probe Z0`**. *Expected at `G54→G55`:* retract →
+      `G55` → `(   Move to part origin X0 Y0, then probe Z)` → `G0 X0 Y0` → `G38.2 F30 Z-10` →
+      `G10 L20 P2 Z0.8` — **no jog prompt**. **Pass:** rapids to the stored X0 Y0 and re-probes Z on
+      the machined face into `P2`. *(Satisfies M2.)* *Result:* ____
+
+> **Tooltip follow-up (not a test):** the First/Subsequent WCS / Part tooltips currently say *"to
+> mill one part from multiple datums/references or a flip, run separate jobs"* — now too broad,
+> since this same-fixture re-reference case **is** supported. Only the flip / re-clamp needs the
+> "separate jobs" caveat. Flagged for a wording tweak.
 
 ---
 
