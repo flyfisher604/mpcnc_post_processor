@@ -2,7 +2,7 @@
 
 Verification tracking for `MPCNC_v4.0_Beta1.cps` → `MPCNC_v4.0_Beta2.cps`. **Outstanding**
 tests are listed first; **verified** items are summarized below so they aren't re-run.
-Design/behavior detail lives in `docs/wcs-rework-plan.md`.
+Design/behavior detail lives in `docs/plan.md`.
 
 ---
 
@@ -23,6 +23,13 @@ Design/behavior detail lives in `docs/wcs-rework-plan.md`.
 - [ ] **Full regression pass.** Re-run the sample jobs (`Test/*.gcode`) and confirm no output
       differences beyond the intended Beta-2 changes. In particular confirm single-WCS,
       no-base jobs are byte-for-byte unaffected.
+- [ ] **`isSafeToRapid` true-branch (Map G1s → Rapids).** The prior full-F360 run
+      (`2D Contour1.gcode`) stayed at Z ≤ 1mm, below the 5mm safe height, so every
+      `isSafeToRapid` call returned `false` and the `zConstant` / `zUp` /
+      `zDown-with-curZSafe` conversion branches were **never exercised** — only the conservative
+      refusal was. Generate a toolpath with a horizontal link/transition move at or above safe-Z
+      (e.g. multiple contours with a linking move at retract height) to actually validate the
+      G1→G0 conversion. Ties to the Phase 5 rapid-mapping review in the plan.
 
 ## To test when built — Phase 4 remaining (see plan)
 

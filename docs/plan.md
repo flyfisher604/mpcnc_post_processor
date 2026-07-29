@@ -249,6 +249,20 @@ at `onClose`.
 
 ---
 
+## Completed reviews (archived)
+
+Three standalone review passes are finished; every finding is fixed in `MPCNC_v4.0_Beta2.cps`
+and preserved in git. Their tracking docs were removed at closeout to keep the working set to
+the two driving files (this plan + the test plan). Recover the fix rationale from git if needed:
+
+- **Code-quality review** — 26 findings (#1–#26), all fixed. `git log --follow -- docs/known-issues-v4.md`
+- **Autodesk / F360 compliance review** — F1–F11, all resolved (fixed or accepted as-designed).
+  `git log --follow -- docs/f360-compliance-issues.md`
+- **Floating-point comparison review** — FP1 fixed, remainder cleared.
+  `git log --follow -- docs/float-comparison-review.md`
+
+---
+
 ## Remaining work (pick up here)
 
 ### Phase 4 — tool-change ordering + base-relative park *(one unit; design settled)*
@@ -305,7 +319,7 @@ accommodates it. *Deferred until the retract/tool-change work is done.*
 - Regression: single-WCS, no-base jobs byte-for-byte unaffected.
 - Hands-on: multi-WCS via base retract/travel; Guard B fires when safe-Z + multi-WCS + no
   base; a spoilboard-surfacing section on the base restores the following sections' WCS (R1).
-- Update `docs/beta2-test-plan.md`.
+- Update `docs/test-plan.md`.
 
 ### Phase 5 — G0/G1 rapid-mapping review
 Confirm the "Map G1s to Rapids" optimization needs no change under the new model: does it ever
@@ -313,6 +327,34 @@ run across a section/WCS boundary (where Phase 4 injects safe-Z/base logic), or 
 one section/WCS? If strictly single-section: document "no change needed" and close as a no-op.
 If a cross-boundary case exists: file it as a new item (a collision-risk case Phase 4 didn't
 anticipate).
+
+### Backlog / future review *(lower priority; folded from the old testing-log)*
+
+Observations from reviewing real F360 g-code output that need no immediate action:
+
+- **WCS `0`/`1` mixed-design warning (human-factors).** A job that uses work offset `0` in one
+  section and `1` in another resolves both to `G54` (both alias to WCS 1), but to an operator
+  reading Fusion's Operations panel they look like two deliberate, different fixtures — F360's
+  own "multiple setups with different WCS" dialog reinforces the illusion. No code fix intended
+  yet. If revisited: emit a `>>> WARNING` when a job mixes `0` with a *different* explicit
+  offset, and/or add README guidance to standardize on an explicit `1`. The correct rule is
+  any-section-vs-any-other-section — broader than Fanuc's `getSection(0).workOffset == 0`
+  check, which is order-dependent and would miss the `Setups.gcode` case (Setup1=`1`, Setup2=`0`).
+- **`useZeroOffset` enforcement.** `wcsDefinitions.useZeroOffset: false` is declared but is
+  likely inert — the enforcing `validateCommonParameters()` lives in a shared post library this
+  post doesn't import, so `writeWCS()` still silently aliases `0`→`1`. Mirroring that check in
+  `writeWCS()`/`onSection()` is the natural companion to the item above if the mixed-design risk
+  is pursued.
+- **`job1_SetOriginOnStart` (G92) vs. the G10 L20 model.** The original motivation for revisiting
+  origins — a `G92 X0 Y0 Z0` start origin defeating a "switch WCS on the console between runs to
+  mill repeat copies" workflow — is now addressed by the Replicate multi-WCS path (per-copy Z
+  re-probe + reserved base). Confirm the remaining G92 start origin doesn't undercut a
+  console-selected WCS on re-runs. Pending the dedicated auto-iterate-WCS test file.
+- **`permittedCommentChars` global.** A comparable community GRBL post declares it; research
+  whether declaring it adds real kernel-side comment filtering on top of the existing
+  `sanitizeMessageText()` (code-quality #19/#24) before adding — it may be purely informational.
+- **Global-metadata gaps.** Consider declaring `extension: "gcode"` (so Fusion defaults the save
+  dialog to `.gcode` instead of `.nc`/`.tap`); optionally `vendorUrl` / `model`. Cosmetic.
 
 ---
 

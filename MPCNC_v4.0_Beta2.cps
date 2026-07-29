@@ -1254,7 +1254,7 @@ function baseOriginWriteReason(base) {
   return null;
 }
 
-// Post-time validation guards (see docs/wcs-rework-plan.md "Validation guards").
+// Post-time validation guards (see docs/plan.md "Validation guards").
 // Runs once from onOpen(), before any output, so a misconfiguration fails fast.
 function validateJob() {
   // Guard C -- Marlin is single-frame: a job using more than one distinct work offset
@@ -1525,7 +1525,7 @@ function wcsGcode(workOffset) {
 // writeWCS(), so it triggers no B_Probe_OnChange re-probe and writes no origin -- then
 // commands the clearance (a real Z move, so this is never an empty base round-trip). LEAVES
 // the base active; the caller selects the destination WCS next. Caller guarantees a base is
-// reserved. See docs/wcs-rework-plan.md "Base WCS is transited, not parked".
+// reserved. See docs/plan.md "Base WCS is transited, not parked".
 function retractThroughBaseClearance() {
   var base = getReservedBaseWcs();
   writeComment(eComment.Info, "   Retract to spoilboard-base clearance " + wcsName(base) + " before traverse");
