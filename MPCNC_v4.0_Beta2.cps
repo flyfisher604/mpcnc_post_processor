@@ -168,7 +168,7 @@ properties = {
 
   A_Machine_HomeBeforeStart: {
     title      : "Home Before Start",
-    description: "Home the machine at job start to establish a repeatable machine frame (MCS). None (default): emit no homing -- accept the current position (already homed at the controller, or a power-on 0,0,0). XY: home X and Y (the usual case -- gives XY repeatability and gantry squaring; Z stays on the work-Z probe touch-off). XYZ: also home Z, only if the machine is actually wired to home Z (LowRider switches, or the Marlin movable-plate trick). Per firmware: on GRBL/FluidNC one $H homes every configured axis, so XY and XYZ emit the same $H (the choice just documents intent); on Marlin/RepRap each axis is homed independently (G28 X / G28 Y / G28 Z). Homing gives X/Y repeatability only -- the everyday Z cutting reference is always the work-Z touch-off (see First Origin), never this.",
+    description: "Home the machine at job start to establish a repeatable machine frame (MCS). None (default): emit no homing -- accept the current position (already homed at the controller, or a power-on 0,0,0). XY: home X and Y (the usual case -- gives XY repeatability and gantry squaring; Z stays on the work-Z probe touch-off). XYZ: also home Z, only if the machine is actually wired to home Z (LowRider switches, or the Marlin movable-plate trick). Per firmware: on GRBL/FluidNC one $H homes every configured axis, so XY and XYZ emit the same $H (the choice just documents intent); on Marlin/RepRap each axis is homed independently (G28 X / G28 Y / G28 Z). Homing gives X/Y repeatability only -- the everyday Z cutting reference is always the work-Z touch-off (see First WCS / Part), never this.",
     group      : "02 - Establish Machine Coordinates",
     type       : "enum",
     values: [
@@ -377,9 +377,9 @@ properties = {
     scope: "post"
   },
   A_Probe_OnStart: {
-    title      : "First Origin",
-    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Skip/Use Existing X0 Y0 Z0: use the origin already stored in that WCS (from a prior job or set manually) -- no re-zero; the tool retracts and rapids to the stored X0 Y0. Set Manual X0 Y0 Z0: record the tool's current position as X0 Y0 Z0 with no probe -- a manual touch-off, or a jet/laser where Z is set by hand (jog the tool to the part origin before running; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Set Manual X0 Y0, Probe Z0: record X0 Y0 at the current position, then probe the stock-top Z. On GRBL/RepRap this writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent Origin\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
-    group      : "06 - On WCS/Part/Fixture Change",
+    title      : "First WCS / Part",
+    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Skip/Use Existing X0 Y0 Z0: use the origin already stored in that WCS (from a prior job or set manually) -- no re-zero; the tool retracts and rapids to the stored X0 Y0. Set Manual X0 Y0 Z0: record the tool's current position as X0 Y0 Z0 with no probe -- a manual touch-off, or a jet/laser where Z is set by hand (jog the tool to the part origin before running; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Set Manual X0 Y0, Probe Z0: record X0 Y0 at the current position, then probe the stock-top Z. On GRBL/RepRap this writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent WCS / Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
+    group      : "06 - On WCS / Part / Fixture Changes",
     type       : "enum",
     values: [
       { title: "Skip/Use Existing X0 Y0 Z0", id: "Skip" },
@@ -390,9 +390,9 @@ properties = {
     scope: "post"
   },
   B_Probe_OnChange: {
-    title      : "Subsequent Origin",
+    title      : "Subsequent WCS / Part",
     description: "Multi-part jobs -- milling several parts/copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). Two workflows coexist. USE EXISTING (pre-set fixture offsets / Replicate) -- Skip/Use Existing X0 Y0 Z0: do nothing to the origin; after a safe-Z retract the tool rapids to the part's stored X0 Y0 (X and Z already in its own WCS, from a prior job or set manually). Use Existing X0 Y0, Probe Z0: rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS (G10 L20 P<n>); XY stays the fixture's pre-set offset. SET MANUAL (operator jogs to each part) -- Set Manual X0 Y0 Z0: pause so you jog the tool to this part's origin, then record that position as X0 Y0 Z0 (no probe). Set Manual X0 Y0, Probe Z0: pause to jog to this part's origin, record X0 Y0 there, then probe Z. The attach/detach prompts around any probe follow Probe Pause. The safe-Z retract on the traverse is separate (see Retract Across Parts). Not supported on Marlin (single G92 origin -- use separate jobs). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
-    group      : "06 - On WCS/Part/Fixture Change",
+    group      : "06 - On WCS / Part / Fixture Changes",
     type       : "enum",
     values: [
       { title: "Skip/Use Existing X0 Y0 Z0", id: "Skip" },
@@ -406,7 +406,7 @@ properties = {
   C_Probe_Pause: {
     title      : "Probe Pause",
     description: "Operator pauses around each part probe (the first part and each added part) -- the prompts to attach the Z probe (before) and detach it (after). No: no prompts (a fixed/permanent probe). Before: prompt to attach only. Before & After (default): prompt to attach before probing and to detach after -- the manual touch-off. Applies to the part probes in this group only, not the spoilboard base probe (see Probe to Set Base) or the tool-change re-probe.",
-    group      : "06 - On WCS/Part/Fixture Change",
+    group      : "06 - On WCS / Part / Fixture Changes",
     type       : "enum",
     values: [
       { title: "No", id: "No" },
@@ -419,7 +419,7 @@ properties = {
   F_Probe_G382orG28: {
     title      : "Probe with G38.2",
     description: "Probe using G38.2 (On) or G28 (Off). GRBL always uses G38.2 regardless of this setting; RepRap fully supports G38.2 too, so this should be left On there as well. Off (G28) is intended for Marlin builds with no dedicated probe, using the Z homing switch as a substitute reference.",
-    group      : "06 - On WCS/Part/Fixture Change",
+    group      : "06 - On WCS / Part / Fixture Changes",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -427,7 +427,7 @@ properties = {
   G_Probe_G38Target: {
     title      : "G38 Target",
     description: "G38 probing's furthest Z position.",
-    group      : "06 - On WCS/Part/Fixture Change",
+    group      : "06 - On WCS / Part / Fixture Changes",
     type       : "integer",
     value      : -10,
     scope      : "post"
@@ -435,7 +435,7 @@ properties = {
   H_Probe_G38Speed: {
     title      : "G38 Speed",
     description: "G38 probing's speed (mm/min).",
-    group      : "06 - On WCS/Part/Fixture Change",
+    group      : "06 - On WCS / Part / Fixture Changes",
     type       : "integer",
     value      : 30,
     scope      : "post"
@@ -443,7 +443,7 @@ properties = {
   I_Probe_SafeZ: {
     title      : "Safe Z",
     description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when no spoilboard base is reserved; with a base reserved, the Establish Spoilboard Reference group's Safe Z is used instead). Same syntax as \"Map: Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
-    group      : "06 - On WCS/Part/Fixture Change",
+    group      : "06 - On WCS / Part / Fixture Changes",
     type       : "string",
     value      : "Retract:15",
     scope      : "post"
@@ -451,7 +451,7 @@ properties = {
   J_Probe_Thickness: {
     title      : "Plate Thickness",
     description: "Thickness of the probe touchplate.",
-    group      : "06 - On WCS/Part/Fixture Change",
+    group      : "06 - On WCS / Part / Fixture Changes",
     type       : "number",
     value      : 0.8,
     scope      : "post"
@@ -474,16 +474,16 @@ properties = {
   },
   D_Probe_OffsetX: {
     title      : "Probe X Offset",
-    description: "X distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First Origin) and each added part (Subsequent Origin) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin. Does NOT affect the spoilboard base probe (Probe to Set Base), which always touches off at the origin (0,0).",
-    group      : "06 - On WCS/Part/Fixture Change",
+    description: "X distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Subsequent WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin. Does NOT affect the spoilboard base probe (Probe to Set Base), which always touches off at the origin (0,0).",
+    group      : "06 - On WCS / Part / Fixture Changes",
     type       : "integer",
     value      : 0,
     scope      : "post"
   },
   E_Probe_OffsetY: {
     title      : "Probe Y Offset",
-    description: "Y distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First Origin) and each added part (Subsequent Origin) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin. Does NOT affect the spoilboard base probe (Probe to Set Base), which always touches off at the origin (0,0).",
-    group      : "06 - On WCS/Part/Fixture Change",
+    description: "Y distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Subsequent WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin. Does NOT affect the spoilboard base probe (Probe to Set Base), which always touches off at the origin (0,0).",
+    group      : "06 - On WCS / Part / Fixture Changes",
     type       : "integer",
     value      : 0,
     scope      : "post"
@@ -991,7 +991,7 @@ function resolveSafeZHeight(mode, dflt, _section) {
 }
 
 // ---- Probe Safe Z ----------------------------------------------------------
-// I_Probe_SafeZ ("06 - On WCS/Part/Fixture Change" > "Safe Z") uses the SAME expression syntax and
+// I_Probe_SafeZ ("06 - On WCS / Part / Fixture Changes" > "Safe Z") uses the SAME expression syntax and
 // F360-level resolution as the Map-G1s Safe Z (C_MapRapids_SafeZ), but is a fully independent
 // property so the two can be tuned separately. "Retract:15" pulls each operation's F360 retract
 // level when defined and absolute, else falls back to 15.
@@ -1402,7 +1402,7 @@ function writeWCS(section) {
       writeComment(eComment.Important, " >>> WARNING: Marlin uses a G92 origin; work offset " + workOffset + "/G" + (53 + workOffset) + " is not supported and is ignored");
     }
     if (getProperty(properties.B_Probe_OnChange) != "Skip" && workOffset != currentWorkOffset) {
-      writeComment(eComment.Important, " >>> WARNING: Subsequent Origin has no effect on Marlin; Marlin has a single G92 origin, not per-WCS registers");
+      writeComment(eComment.Important, " >>> WARNING: Subsequent WCS / Part has no effect on Marlin; Marlin has a single G92 origin, not per-WCS registers");
     }
     currentWorkOffset = workOffset;
     return;
@@ -1419,7 +1419,7 @@ function writeWCS(section) {
     error("Work offset " + workOffset + " is out of range for " + fw + " (GRBL supports G54-G59, RepRap G54-G59.3).");
     return;
   }
-  // How to establish this added part's origin/Z (B_Probe_OnChange = "Subsequent Origin").
+  // How to establish this added part's origin/Z (B_Probe_OnChange = "Subsequent WCS / Part").
   // Each WCS has its own G10-scoped origin; the first part's is set by A_Probe_OnStart in
   // writeFirstSection(), so this covers the added parts only (guarded by isTraverse below).
   // Two workflows coexist:

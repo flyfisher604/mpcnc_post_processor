@@ -151,21 +151,21 @@ Needed when adding new properties:
 - **Group order** = the `group:` string, zero-padded to two digits (`01 - Job` …
   `11 - Duet`). Padding is required so `11 - Duet` sorts last, not next to `01 - Job`.
   The current order: `01 - Job`, `02 - Establish Machine Coordinates`, `03 - Feeds and Speeds`,
-  `04 - Map G1s to Rapids...`, `05 - Establish Spoilboard Reference`, `06 - On WCS/Part/Fixture
-  Change`, `07 - Tool Changes`, `08 - External Include Files`, `09 - Laser`, `10 - Coolant`,
+  `04 - Map G1s to Rapids...`, `05 - Establish Spoilboard Reference`, `06 - On WCS / Part /
+  Fixture Changes`, `07 - Tool Changes`, `08 - External Include Files`, `09 - Laser`, `10 - Coolant`,
   `11 - Duet`.
   > **Resolved (was: reorder WCS/Probe after Map G1s).** The old combined
   > `03 - Work Coordinate System - WCS / Probe` group was split into two: **`03 - Spoilboard
   > Base`** (`A_Spoilboard_BaseReserve`, `B_Spoilboard_BaseEstablish`,
   > `C_Spoilboard_SafeZAcrossWcs`, `D_Spoilboard_SafeZClearance`) placed right after machine
-  > homing so it reads as a setup thought-walk, and **`06 - On WCS/Part/Fixture Change`** (the part
+  > homing so it reads as a setup thought-walk, and **`06 - On WCS / Part / Fixture Changes`** (the part
   > origins, probe XY offset, and G38/Safe-Z/thickness mechanics) placed after Map G1s.
   > This re-lettered the moved keys and changed four keys' group segment from `Probe` to
   > `Spoilboard`; because the key is the stored identifier, the eight renamed keys reset any
   > saved preset to default — a release-notes item.
   > **Resolved (later): moved the spoilboard group to `05` and renamed it.** The group formerly
   > at `03 - Spoilboard Base` now sits at **`05 - Establish Spoilboard Reference`** (between
-  > Map-G1s and On-WCS/Part/Fixture Change); `04 - Feeds and Speeds` → `03` and
+  > Map-G1s and On WCS / Part / Fixture Changes); `04 - Feeds and Speeds` → `03` and
   > `05 - Map G1s...` → `04` shifted up to fill the gap. Only the `group:` strings changed —
   > the `_Spoilboard_` key segments were kept (the word still fits the new name), so this move
   > does **not** reset saved presets.
@@ -176,15 +176,15 @@ Needed when adding new properties:
   inline). The split `properties` + `propertyDefinitions` form is the *old broken* approach —
   do not reintroduce it.
 
-**Origin/probe controls (Group `06 - On WCS/Part/Fixture Change`).** Three separate controls
+**Origin/probe controls (Group `06 - On WCS / Part / Fixture Changes`).** Three separate controls
 (kept separate — merging the two origin controls was rejected: it would apply job-start
 XY-zeroing to a mid-job WCS change, a positioning bug). Full behavior in the implemented section
 below ("selection-driven origin/probe model"); summary (enum ids in parentheses):
 
-- `A_Probe_OnStart` = **"First Origin"** — `Skip/Use Existing X0 Y0 Z0` (`Skip`) /
+- `A_Probe_OnStart` = **"First WCS / Part"** — `Skip/Use Existing X0 Y0 Z0` (`Skip`) /
   `Set Manual X0 Y0 Z0` (`Zero XYZ`) / `Set Manual X0 Y0, Probe Z0` (`Zero XY & Probe Z`, default).
   First/only part origin.
-- `B_Probe_OnChange` = **"Subsequent Origin"** — `Skip/Use Existing X0 Y0 Z0` (`Skip`) /
+- `B_Probe_OnChange` = **"Subsequent WCS / Part"** — `Skip/Use Existing X0 Y0 Z0` (`Skip`) /
   `Use Existing X0 Y0, Probe Z0` (`Probe Z`, default) / `Set Manual X0 Y0 Z0` (`Zero XYZ`) /
   `Set Manual X0 Y0, Probe Z0` (`Zero XY & Probe Z`). Fires on a genuine WCS change after the
   first section. The *Use Existing* modes take XY from the fixture's pre-set offset (Replicate);
@@ -300,7 +300,7 @@ each with and without a base.
 
 ### Phase 4 — probe XY offset *(implemented — verification pending)*
 
-`D_Probe_OffsetX` / `E_Probe_OffsetY` (`06 - On WCS/Part/Fixture Change` group). The probe touch-point becomes
+`D_Probe_OffsetX` / `E_Probe_OffsetY` (`06 - On WCS / Part / Fixture Changes` group). The probe touch-point becomes
 origin + (offsetX, offsetY), so the origin can sit at a corner / off the material while Z
 probes the stock top. Job-wide, not per-fixture; default `0,0` reproduces prior output.
 Applied at **every part probe** — first part (`writeWcsOnStart`, "Zero XY & Probe Z") and
@@ -343,13 +343,13 @@ item above — not when established.)*
 **Structure (user): a short Action dropdown per stage + the existing shared Pause control**
 (`C_Probe_Pause`, relabelled **"Probe Pause"** — No / Before / Before & After — kept separate; the
 earlier "fold pause into the option names" idea was dropped). Group `06` renamed
-**"On WCS/Part/Fixture Change"**. Option ids are unchanged (stable); only display labels changed,
+**"On WCS / Part / Fixture Changes"**. Option ids are unchanged (stable); only display labels changed,
 so re-labelling alone doesn't reset presets. (Enum ids in parentheses below.)
 
-- **`A_Probe_OnStart` "First Origin"** — same three modes, relabelled:
+- **`A_Probe_OnStart` "First WCS / Part"** — same three modes, relabelled:
   `Skip/Use Existing X0 Y0 Z0` (`Skip`) / `Set Manual X0 Y0 Z0` (`Zero XYZ`) /
   `Set Manual X0 Y0, Probe Z0` (`Zero XY & Probe Z`).
-- **`B_Probe_OnChange` "Subsequent Origin"** — expanded from two to four modes,
+- **`B_Probe_OnChange` "Subsequent WCS / Part"** — expanded from two to four modes,
   two coexisting workflows:
   - *Use existing (pre-set fixture offset / Replicate):* `Skip/Use Existing X0 Y0 Z0` (`Skip`) and
     `Use Existing X0 Y0, Probe Z0` (`Probe Z`) — both auto-position to the stored `X0 Y0`.
@@ -390,7 +390,7 @@ path retracted). The **default** job (`Zero XY, Probe Z`) and single-WCS jobs ar
 A third enum value alongside `Skip` / `Probe Z`: write the first part's probed Z into each
 added copy's own register (`G10 L20 P<n> Z<firstPartZ>`) — a register write, **no motion, no
 probe** — for same-thickness co-planar fixtures. Requires caching the first part's probed Z at
-`A_Probe_OnStart` time. Marlin no-op. The neutral "Subsequent Origin" title already
+`A_Probe_OnStart` time. Marlin no-op. The neutral "Subsequent WCS / Part" title already
 accommodates it. *Deferred until the retract/tool-change work is done.*
 
 ### Phase 4 — closeout tests
