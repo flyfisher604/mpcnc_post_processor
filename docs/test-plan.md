@@ -224,10 +224,11 @@ rather than silently mis-machining.
 This session reworked the dialog and several probe/homing behaviors; defaults are intended
 byte-identical. Re-verify:
 
-- **Group split & renumber.** `03 - Spoilboard Base` (4 items) right after machine homing;
-  `06 - On WCS/Part/Fixture Change` (10 items) after Map G1s; downstream groups renumber through
-  `11 - Duet`. Items order by letter prefix within each group. Renamed / re-lettered keys reset
-  saved presets to default (release-notes item).
+- **Group split & renumber.** `05 - Establish Spoilboard Reference` (4 items) sits between Map-G1s
+  and `06 - On WCS/Part/Fixture Change` (10 items); `03 - Feeds and Speeds` and `04 - Map G1s to
+  Rapids` precede it; downstream groups run through `11 - Duet`. Items order by letter prefix
+  within each group. (The spoilboard-group move to `05` changed only `group:` strings, not keys,
+  so it does **not** reset presets; earlier renamed / re-lettered keys still do.)
 - **Label renames** display correctly: Reserved WCS, Probe to Set Base, Retract Across Parts,
   Safe Z (Spoilboard group), First Origin. Later renames: group `06` → **On WCS/Part/Fixture
   Change**; `A_Probe_OnStart` → **First Origin**; `B_Probe_OnChange` → **Subsequent

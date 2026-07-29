@@ -191,7 +191,7 @@ properties = {
   A_Feeds_TravelSpeedXY: {
     title      : "Travel Speed X/Y",
     description: "High speed for Rapid movements X & Y (mm/min).",
-    group      : "04 - Feeds and Speeds",
+    group      : "03 - Feeds and Speeds",
     type       : "integer",
     value      : 2500,
     scope      : "post"
@@ -199,7 +199,7 @@ properties = {
   B_Feeds_TravelSpeedZ: {
     title      : "Travel Speed Z",
     description: "High speed for Rapid movements Z (mm/min).",
-    group      : "04 - Feeds and Speeds",
+    group      : "03 - Feeds and Speeds",
     type       : "integer",
     value      : 300,
     scope      : "post"
@@ -207,7 +207,7 @@ properties = {
   C_Feeds_EnforceFeedrate: {
     title      : "Enforce Feedrate",
     description: "Feedrate is include on every g-code movement.",
-    group      : "04 - Feeds and Speeds",
+    group      : "03 - Feeds and Speeds",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -215,7 +215,7 @@ properties = {
   D_Feeds_ScaleFeedrate: {
     title      : "Scale Feedrate",
     description: "Scale feedrates to remain less than X, Y, Z axis maximums.",
-    group      : "04 - Feeds and Speeds",
+    group      : "03 - Feeds and Speeds",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -223,7 +223,7 @@ properties = {
   E_Feeds_MaxCutSpeedXY: {
     title      : "Max XY Cut Speed",
     description: "Limit X or Y feedrate to be less then this value (mm/min).",
-    group      : "04 - Feeds and Speeds",
+    group      : "03 - Feeds and Speeds",
     type       : "integer",
     value      : 900,
     scope      : "post"
@@ -231,7 +231,7 @@ properties = {
   F_Feeds_MaxCutSpeedZ: {
     title      : "Max Z Cut Speed",
     description: "Limit Z feedrate to be less then this value (mm/min).",
-    group      : "04 - Feeds and Speeds",
+    group      : "03 - Feeds and Speeds",
     type       : "integer",
     value      : 180,
     scope      : "post"
@@ -239,7 +239,7 @@ properties = {
   G_Feeds_MaxCutSpeedXYZ: {
     title      : "Max Toolpath Speed",
     description: "Maximum scaled toolpath feedrate (mm/min).",
-    group      : "04 - Feeds and Speeds",
+    group      : "03 - Feeds and Speeds",
     type       : "integer",
     value      : 1000,
     scope      : "post"
@@ -248,7 +248,7 @@ properties = {
   A_MapRapids_RestoreFirstRapids: {
     title      : "First G1 -> G0 Rapid",
     description: "Enable to ensure that the first move of a cut starts with a G0 Rapid.",
-    group      : "05 - Map G1s to Rapids (disable when using full license)",
+    group      : "04 - Map G1s to Rapids (disable when using full license)",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -256,7 +256,7 @@ properties = {
   B_MapRapids_RestoreRapids: {
     title      : "Map: G1s -> G0 Rapids",
     description: "Enable to convert G1s to G0s Rapids when safe.",
-    group      : "05 - Map G1s to Rapids (disable when using full license)",
+    group      : "04 - Map G1s to Rapids (disable when using full license)",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -264,7 +264,7 @@ properties = {
   C_MapRapids_SafeZ: {
     title      : "Map: Safe Z to Rapid",
     description: "Z must be above or equal to this value to be mapped G1s --> G0s; Uses Retract level if defined or 15.",
-    group      : "05 - Map G1s to Rapids (disable when using full license)",
+    group      : "04 - Map G1s to Rapids (disable when using full license)",
     type       : "string",
     value      : "Retract:15",
     scope      : "post"
@@ -272,7 +272,7 @@ properties = {
   D_MapRapids_AllowRapidZ: {
     title      : "Map: Allow Rapid Z",
     description: "Enable to include vertical G1 retracts and safe descents as rapids.",
-    group      : "05 - Map G1s to Rapids (disable when using full license)",
+    group      : "04 - Map G1s to Rapids (disable when using full license)",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -346,7 +346,7 @@ properties = {
   A_Spoilboard_BaseReserve: {
     title      : "Reserved WCS",
     description: "Reserve one WCS as a fixed spoilboard base (a stable Z reference for multi-fixture jobs). None (default): feature off, nothing emitted. Otherwise the selected WCS is reserved as the base and no operation may re-establish its origin (see Probe to Set Base). G59.1-G59.3 require RepRap. GRBL/RepRap only -- Marlin has no per-WCS registers, so a base is ignored there.",
-    group      : "03 - Spoilboard Base",
+    group      : "05 - Establish Spoilboard Reference",
     type       : "enum",
     values: [
       { title: "None", id: "None" },
@@ -366,7 +366,7 @@ properties = {
   B_Spoilboard_BaseEstablish: {
     title      : "Probe to Set Base",
     description: "How to establish the reserved spoilboard base's Z at job start. None: skip -- assume the base was set in a previous job (probe-once / run-many), emitting an Info comment. Probe Z: probe the spoilboard into the base WCS (G10 L20 P<n>) with no operator prompt (a fixed/known probe point). Pause, Probe Z, Pause (default): prompt the operator to attach the probe, probe, then prompt to detach -- the manual touch-off. No effect when Reserved WCS is None; ignored on Marlin (no per-WCS registers). Always probed at the current position (0,0 / the job's XY origin) -- the Probe X/Y Offset never applies here.",
-    group      : "03 - Spoilboard Base",
+    group      : "05 - Establish Spoilboard Reference",
     type       : "enum",
     values: [
       { title: "None", id: "None" },
@@ -442,7 +442,7 @@ properties = {
   },
   I_Probe_SafeZ: {
     title      : "Safe Z",
-    description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when no spoilboard base is reserved; with a base reserved, the Spoilboard Base group's Safe Z is used instead). Same syntax as \"Map: Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
+    description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when no spoilboard base is reserved; with a base reserved, the Establish Spoilboard Reference group's Safe Z is used instead). Same syntax as \"Map: Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
     group      : "06 - On WCS/Part/Fixture Change",
     type       : "string",
     value      : "Retract:15",
@@ -459,7 +459,7 @@ properties = {
   C_Spoilboard_SafeZAcrossWcs: {
     title      : "Retract Across Parts",
     description: "Multi-fixture safety. On (default): before traversing between operations that use different WCS, the tool retracts to the Safe Z below so it clears fixtures/clamps/other parts, and the job is validated (Guard B) to reject a multi-WCS job that reserves no spoilboard base -- a clearance height is meaningless across WCS whose offsets are only known after probing at runtime. Single-WCS jobs (including a single operation) are unaffected: no extra retract is emitted and the guard does not apply. Off: no cross-WCS retract and no guard. GRBL/RepRap only (Marlin is single-frame; see Guard C).",
-    group      : "03 - Spoilboard Base",
+    group      : "05 - Establish Spoilboard Reference",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -467,7 +467,7 @@ properties = {
   D_Spoilboard_SafeZClearance: {
     title      : "Safe Z",
     description: "Absolute work-Z height, measured above the reserved spoilboard base, that the tool retracts to before traversing between parts (different WCS). Set it high enough to clear the tallest fixture, clamp, or part in the job. Only used when Retract Across Parts is on and a base is reserved.",
-    group      : "03 - Spoilboard Base",
+    group      : "05 - Establish Spoilboard Reference",
     type       : "integer",
     value      : 40,
     scope      : "post"

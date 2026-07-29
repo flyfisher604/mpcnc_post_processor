@@ -150,9 +150,9 @@ Needed when adding new properties:
 
 - **Group order** = the `group:` string, zero-padded to two digits (`01 - Job` …
   `11 - Duet`). Padding is required so `11 - Duet` sorts last, not next to `01 - Job`.
-  The current order: `01 - Job`, `02 - Establish Machine Coordinates`, `03 - Spoilboard
-  Base`, `04 - Feeds and Speeds`, `05 - Map G1s to Rapids...`, `06 - On WCS/Part/Fixture Change`,
-  `07 - Tool Changes`, `08 - External Include Files`, `09 - Laser`, `10 - Coolant`,
+  The current order: `01 - Job`, `02 - Establish Machine Coordinates`, `03 - Feeds and Speeds`,
+  `04 - Map G1s to Rapids...`, `05 - Establish Spoilboard Reference`, `06 - On WCS/Part/Fixture
+  Change`, `07 - Tool Changes`, `08 - External Include Files`, `09 - Laser`, `10 - Coolant`,
   `11 - Duet`.
   > **Resolved (was: reorder WCS/Probe after Map G1s).** The old combined
   > `03 - Work Coordinate System - WCS / Probe` group was split into two: **`03 - Spoilboard
@@ -163,6 +163,12 @@ Needed when adding new properties:
   > This re-lettered the moved keys and changed four keys' group segment from `Probe` to
   > `Spoilboard`; because the key is the stored identifier, the eight renamed keys reset any
   > saved preset to default — a release-notes item.
+  > **Resolved (later): moved the spoilboard group to `05` and renamed it.** The group formerly
+  > at `03 - Spoilboard Base` now sits at **`05 - Establish Spoilboard Reference`** (between
+  > Map-G1s and On-WCS/Part/Fixture Change); `04 - Feeds and Speeds` → `03` and
+  > `05 - Map G1s...` → `04` shifted up to fill the gap. Only the `group:` strings changed —
+  > the `_Spoilboard_` key segments were kept (the word still fits the new name), so this move
+  > does **not** reset saved presets.
 - **Within-group order** = a single-letter item prefix on the key,
   `<Letter>_<Group>_<Name>` (`A`, `B`, … restarting per group), e.g. `A_Machine_HomeBeforeStart`.
   New properties take the next free letter (re-letter following ones if inserting mid-group).
@@ -208,7 +214,7 @@ is Z high enough to re-emit a cut G1 as a G0?" It is operation-scoped and only p
 the hobby "Map G1s to Rapids" group is on, so it is the wrong source for an inter-op/inter-WCS
 retract (wrong height, and unset for full-license jobs). The cross-part retract instead uses
 a **job-level clearance measured above the spoilboard base** (`D_Spoilboard_SafeZClearance` =
-"Safe Z" in the Spoilboard Base group), the one frame meaningful across all the job's parts. Single-WCS jobs
+"Safe Z" in the Establish Spoilboard Reference group), the one frame meaningful across all the job's parts. Single-WCS jobs
 need none of this — their shared frame makes each operation's own clearance a safe reference,
 so they stay byte-identical.
 
@@ -316,9 +322,9 @@ first-part + base already NC-confirmed earlier. **Still pending:** the added-par
 Dialog wording and number-format fixes; low-risk, do together. Re-lettering / changing an enum
 `id` resets saved presets to default (release-notes item), so prefer keeping ids where noted.
 
-- ✅ **`B_Spoilboard_BaseEstablish` option label (group 03).** Renamed the option to
+- ✅ **`B_Spoilboard_BaseEstablish` option label (group 05).** Renamed the option to
   **`Pause, Probe Z, Pause`**; kept the enum `id` (`Pause & Probe Z`) so saved presets don't reset.
-- ✅ **`D_Spoilboard_SafeZClearance` "Safe Z" (group 03).** `type: "number"` → `"integer"`
+- ✅ **`D_Spoilboard_SafeZClearance` "Safe Z" (group 05).** `type: "number"` → `"integer"`
   (whole-mm clearance; no decimals).
 - ✅ **`D_Probe_OffsetX` / `E_Probe_OffsetY` (group 06).** **Decided: `integer`** (whole mm, no
   fractions — user confirmed no fractional offset needed). Tooltips corrected from "in the job's
