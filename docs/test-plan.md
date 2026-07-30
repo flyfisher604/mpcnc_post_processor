@@ -67,7 +67,7 @@ firmware-variant rows note what changes elsewhere.
 | H5 | Hobbyist — single op, `Use Active WCS X0 Y0 Z0` (trust stored) | PASS |
 | H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | PASS (Marlin + RRF) |
 | H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7b–H7f unrun; ⚠ saved files predate the H7f comment)* |
-| H7f | "Unknown Z" warning — present without a base, suppressed with one | (A) + (B) PASS *(C unrun)* |
+| H7f | "Unknown Z" warning — present without a base, suppressed with one | PASS *(all three)* |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -79,7 +79,7 @@ firmware-variant rows note what changes elsewhere.
 | H7c | Base probes/retracts in its own frame | PASS |
 | H7d | Guard A fires on the reserved base for this mode | PASS *(found a stale control name; fixed)* |
 | D1 | Dialog & defaults audit (modes, renames, integer fields) | |
-| D2 | Header property dump — all 68 properties + resolved values | PASS *(suppression check unrun)* |
+| D2 | Header property dump — all 68 properties + resolved values | PASS *(⚠ Safe-Z lines fixed since — re-post; suppression check unrun)* |
 | D3 | Group order after the homing move — presets must survive | header PASS *(dialog half unrun)* |
 
 ---
@@ -333,7 +333,7 @@ tool) unless a row says otherwise.
         `M291 … S3` probe prompts. No jog buttons (`X1 Y1 Z1`) — this mode has no jog prompt.
         *Result:* ____
 
-  - [ ] **H7f — The "unknown Z" warning appears only when Z really is unknown.** Verifies the Info
+  - [x] **H7f — The "unknown Z" warning appears only when Z really is unknown.** Verifies the Info
         comment added to `partProbe()`'s `zUnknown` branch. The comment tells the operator (and an
         automated review) that the traverse below runs at whatever height the tool physically sits
         at — true only when nothing has established a height first, which is what the three posts
@@ -376,7 +376,7 @@ tool) unless a row says otherwise.
         (**H2** path) and any added-part probe contain the line **nowhere** — it is gated by the
         `zUnknown` parameter that only this one mode passes.
 
-        *Result:* **(A) PASS, (B) PASS. (C) still unrun.**
+        *Result:* **PASS — all three.**
 
         **(A)** — `H7c-a.gcode` (2026-07-30, post `edc38b3`; GRBL, T171, `Reserved base WCS = None`,
         offsets `0`, confirmed from its own property dump). The warning is present and correctly
@@ -396,10 +396,15 @@ tool) unless a row says otherwise.
         is intact: `G59` (L128) → `G38.2` (L136) → `G10 L20 P6 Z0.8` (L137) → `G0 Z40` (L138) → `G54`
         restore.
 
-        **(C) outstanding** — needs `Reserved WCS = G59` **with `Probe to Set Base = None`**. Neither
-        posted file used it (both ran `Pause & Probe Z`), so the `|| == "None"` half of the guard
-        condition is still unverified: nothing yet proves that *reserving* a base without
-        *establishing* it leaves the warning in place.
+        **(C)** — `H7c-c.gcode` (post `edc38b3`; `A_Spoilboard_BaseReserve = 6`,
+        `B_Spoilboard_BaseEstablish = None`, offsets `0`). The warning is **back**, as predicted:
+        `(   assuming base G59 is already established -- from a prior job or set manually)` (L126) →
+        `(   Use stored work origin X0 Y0; probe Z)` (L127) →
+        `(   Ensuring that Z is safe. Unknown Z for XY move.)` (L128) →
+        `(   Move to part origin X0 Y0, then probe Z)` (L129) → `G0 X0 Y0 F2500` (L130). No `G59`
+        select, no `G38.2` on the base, no retract — so nothing established a height, and the guard's
+        `|| B_Spoilboard_BaseEstablish == "None"` half is confirmed. **Reserving a base is not by
+        itself enough to suppress the warning; it must also be established.**
 
 - [ ] **H-REG — Byte-for-byte regression (the key guarantee).** With the default reverted to
       `Set X0 Y0 to Current Pos, Probe Z0`, the **default** single-op output is again the pre-rework
@@ -602,8 +607,18 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       with keys in letter order within each group; enums show their stored **id** (e.g.
       `A_Probe_OnStart = Current XY & Probe Z`, not the display title); unset strings show `<empty>`
       while numeric zeros show `0`. Then a `( Resolved Values:)` block with output unit, resolved
-      firmware, both Safe-Z modes + defaults, reserved base as `G59 (P6)` or `None`, and the probe XY
-      offset / Inter Part Safe Z in output units. Cross-check two or three values against what you
+      firmware, both Safe Zs, reserved base as `G59 / P6` or `None`, and the probe XY
+      offset / Inter Part Safe Z in output units.
+
+      **The two Safe-Z lines must report what the expression actually resolved to, not restate the
+      property.** For `Retract:15` on a job whose operations retract to 5.08, expect
+      `Probe SafeZ = Retract level, fallback 15, resolves to 5.08` — and `5.08` must equal the `G0 Z`
+      the probe retract actually emits. A bare number reads
+      `Const = 15 -- a fixed height, no F360 level consulted`; operations that resolve differently
+      read `varies by operation -- 5.08, 12.7`. **This is the row's sharpest check:** these two lines
+      are the only ones in the whole dump that cannot be read off the property list above them, so if
+      they merely echo `Retract : default = 15` they are worse than absent — a reviewer trusts the
+      block's title and expects `Z15`. Cross-check two or three values against what you
       actually set in the dialog, and confirm the two old blocks (`Feedrate and Scaling Properties`,
       `G1->G0 Mapping Properties`) are gone — their values now appear under the Feeds-and-Speeds and
       Map-G1s groups (`02` and `03` since the homing move; `03`/`04` in files posted before it).
@@ -613,10 +628,22 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       letter-ordered within each group; enums show stored **ids** (`A_Probe_OnStart = Probe Z`,
       `B_Spoilboard_BaseEstablish = Pause & Probe Z` — not the "Pause, Probe Z, Pause" display
       title), `<empty>` on all five group-08 strings while `C_ToolChange_X = 0` prints `0`; the
-      `( Resolved Values:)` block carries output unit, firmware, both Safe-Z modes with defaults,
+      `( Resolved Values:)` block carries output unit, firmware, both Safe Zs,
       the base, the XY offset and the Inter Part Safe Z; the two old hand-written blocks are gone.
       Dialog values cross-checked against the settings this job was posted with. **Still unrun:** the
       suppression check at Comment Level `Important` / `Off`.
+
+      > **⚠ Partly superseded — the two Safe-Z lines were wrong and have been rewritten.** Every
+      > reviewed file (`H7c`, `H7c-a/-b/-c`) shows the old form,
+      > `Map SafeZ mode = Retract : default = 15` / `Probe SafeZ mode = Retract : default = 15`.
+      > Both numbers came straight out of the property string `Retract:15`, which the group-06 dump
+      > already prints verbatim — so the line restated a property under a heading promising a
+      > resolved value, and stated `15` for a job whose probe retract actually emitted `G0 Z5.08`.
+      > `resolveSafeZHeight()` also had to be corrected to query the passed section rather than the
+      > global context, or resolving from the header would have returned the fallback for every
+      > operation and reproduced the same wrong answer. The rest of D2's evidence stands — property
+      > blocks, ordering, counts, enum ids, `<empty>` handling are unaffected. **Re-post to
+      > re-confirm these two lines.**
       *(Note: this block is new default output — see the H-REG re-baseline note.)*
       *(The label fix is confirmed by the later `H7c-a.gcode` / `H7c-b.gcode`: `Firmware resolved =
       Grbl`, `Reserved base WCS = None` / `G59 / P6`, `Probe XY offset in output units`,

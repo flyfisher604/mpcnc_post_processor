@@ -382,9 +382,9 @@ cleared three of the four things that were unverified here:
    → `G54` restore, in that order, with no `G0 X/Y` in the base block. Test-plan **H7c PASS**.
 2. ✅ **Full property dump** — 11 groups, 68 properties, dialog order, stored enum ids. **D2 PASS**
    except the Comment-Level suppression check.
-3. ✅ **The "unknown Z" warning** — **H7f (A) and (B) PASS** (`H7c-a.gcode` / `H7c-b.gcode`): present
-   with no base, suppressed with an established one, and motion byte-identical to `H7.gcode`.
-   **(C)** — base reserved but *not* established — is the one branch still unrun.
+3. ✅ **The "unknown Z" warning** — **H7f PASS, all three** (`H7c-a/-b/-c.gcode`): present with no
+   base, suppressed with an established one, and present again when a base is *reserved but not
+   established*. Motion byte-identical to `H7.gcode`.
 4. ⬜ **Two renames** (group-05 "Safe Z" → **Inter Part Safe Z**; `Use Existing WCS …` →
    **`Use Active WCS …`**) — still need the dialog pass, **D1**.
 
@@ -418,8 +418,8 @@ reference were reordered to match (its doc-sync ref was bumped).
    Nothing else depends on it, and the base machinery underneath it is now verified (H7c).
 2. **Tests, no machine needed:** **D1** and **D3**'s dialog half — both are dialog-only, no posting,
    and D3 (does a saved preset survive the group move?) gates trust in every other dialog row;
-   **H7f (C)** — one post, base reserved with `Probe to Set Base = None`; **H7e** (Marlin/RRF);
-   **P3**; and D2's suppression check (re-post at Comment Level `Important`).
+   **D2**'s two Safe-Z lines (re-post — they were wrong and were rewritten) plus its suppression
+   check at Comment Level `Important`; **H7e** (Marlin/RRF); **P3**.
 3. **Tests needing a multi-part / multi-fixture job to post:** **PB1/PB2**, **PBV1–3**,
    **PA1/PA1b**, **P2** (only its added-part half remains; `H7c.gcode` already evidenced the base and
    first-part halves).
@@ -782,8 +782,17 @@ flip. **Consequence: the H2 / H-REG byte-for-byte anchor must be re-baselined** 
 current-post reference; no *motion* changed, only header comments. Reverting to (c) is a one-line
 guard around the two calls if the header proves too heavy.
 
-Still open if wanted: dumping the *per-section* effective Safe Z (the resolved block reports the
-mode and the fallback, not each operation's resolved height).
+> **Resolved — the two Safe-Z lines now report the resolved height.** As first built they printed
+> `Map/Probe SafeZ mode = Retract : default = 15`: both values lifted straight from the property
+> string, which the group-06 block already prints verbatim. So the one part of the block that was
+> supposed to justify its existence — *"`I_Probe_SafeZ = Retract:15` does not tell you the retract
+> actually resolved to `5.08`"*, the exact complaint above — was the part it failed to deliver, and
+> it printed `15` for jobs emitting `G0 Z5.08`. `describeSafeZ()` now resolves the expression against
+> every section and reports `Retract level, fallback 15, resolves to 5.08`, or
+> `varies by operation -- 5.08, 12.7` when they differ. This also required fixing
+> `resolveSafeZHeight()` to query the **passed** section instead of the global context: the global
+> `hasParameter()` reports on whatever section is current, and at header time none is, so it would
+> have returned the fallback for every operation and reproduced the same wrong number.
 
 ### Future work — a machine-coordinate base probe point (`G53`) *(not started; design sketch)*
 

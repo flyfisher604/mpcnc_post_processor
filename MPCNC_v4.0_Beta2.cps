@@ -987,10 +987,44 @@ function resolveSafeZHeight(mode, dflt, _section) {
       return dflt;
   }
 
-  if (hasParameter(valueParam) && hasParameter(absParam) && _section.getParameter(absParam) == 1) {
+  // Ask the PASSED section, not the global context. The global hasParameter() reports on whatever
+  // section is current, which is only the same thing when this is called from inside that section.
+  // writeResolvedValues() resolves every section from the header, where no section is current --
+  // the global form would report false throughout and silently hand back the fallback for all of
+  // them, which is exactly the misleading answer this function exists to avoid.
+  if (_section.hasParameter(valueParam) && _section.hasParameter(absParam) && _section.getParameter(absParam) == 1) {
     return _section.getParameter(valueParam);
   }
   return dflt;
+}
+
+// Describe a parsed Safe-Z expression for the header block: its mode, its literal fallback, and --
+// the part the stored property string cannot tell you -- what it actually RESOLVES to for this
+// job's operations. "Retract:15" resolving to 5.08 on every section is the case that made reading
+// H7.gcode slow; printing only the mode and the fallback merely restates the property, under a
+// heading that promises a resolved value.
+function describeSafeZ(mode, dflt) {
+  var name = eSafeZ.prop[mode].name;
+  if (mode == eSafeZ.CONST || mode == eSafeZ.ERROR) {
+    return name + " = " + xyzFormat.format(dflt) + " -- a fixed height, no F360 level consulted";
+  }
+
+  var seen = [];
+  var n = getNumberOfSections();
+  for (var i = 0; i < n; ++i) {
+    var h = xyzFormat.format(resolveSafeZHeight(mode, dflt, getSection(i)));
+    if (seen.indexOf(h) < 0) seen.push(h);
+  }
+
+  var resolved;
+  if (seen.length == 0) {
+    resolved = "no operations to resolve against";
+  } else if (seen.length == 1) {
+    resolved = seen[0];
+  } else {
+    resolved = "varies by operation -- " + seen.join(", ");
+  }
+  return name + " level, fallback " + xyzFormat.format(dflt) + ", resolves to " + resolved;
 }
 
 // ---- Probe Safe Z ----------------------------------------------------------
@@ -2166,8 +2200,8 @@ function writeResolvedValues() {
   // No parentheses in any label below: sanitizeMessageText() strips comment markers, which would
   // leave a double space where the parens were (the same defect fixed once in partProbe()).
   writeComment(eComment.Info, "   Firmware resolved = " + fw);
-  writeComment(eComment.Info, "   Map SafeZ mode = " + eSafeZ.prop[safeZMode].name + " : default = " + safeZHeightDefault);
-  writeComment(eComment.Info, "   Probe SafeZ mode = " + eSafeZ.prop[probeSafeZMode].name + " : default = " + probeSafeZHeightDefault);
+  writeComment(eComment.Info, "   Map SafeZ = " + describeSafeZ(safeZMode, safeZHeightDefault));
+  writeComment(eComment.Info, "   Probe SafeZ = " + describeSafeZ(probeSafeZMode, probeSafeZHeightDefault));
   var base = getReservedBaseWcs();
   writeComment(eComment.Info, "   Reserved base WCS = " + (base == 0 ? "None" : wcsName(base) + " / P" + base));
   writeComment(eComment.Info, "   Probe XY offset in output units = X" + xyzFormat.format(probeOffsetX()) + " Y" + xyzFormat.format(probeOffsetY()));
