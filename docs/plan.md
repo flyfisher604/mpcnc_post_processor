@@ -39,9 +39,15 @@ Two principles drive every decision:
   machine frame. Tool length is folded into a **Z re-probe after each tool change** (there
   is no TLO). Homing, where present, gives **X/Y** repeatability only; Z homing (where it
   exists) is for its own sake and never becomes the everyday Z reference.
-- **Graceful degradation.** Defaults keep the simple single-operation job **byte-for-byte
-  unchanged**; every advanced feature (reserved base, cross-part safe-Z, per-part probing)
-  is opt-in and emits nothing until enabled.
+- **Graceful degradation.** Defaults keep the simple single-operation job's **motion**
+  byte-for-byte unchanged; every advanced feature (reserved base, cross-part safe-Z, per-part
+  probing) is opt-in and emits nothing until enabled.
+  > **Amended (header comments excepted).** This was originally "byte-for-byte unchanged" for the
+  > whole file. The full property dump (see *dump ALL properties* below) deliberately broke that by
+  > adding ~98 Info comment lines to **every** posted file, because a file that can't be reviewed
+  > without guessing its settings was judged the worse failure. The guarantee now covers **motion
+  > and emitted commands**, not header comments — so a byte-for-byte regression check must strip
+  > comment lines first, or use a reference captured from the current post.
 
 ---
 
@@ -304,9 +310,10 @@ at `onClose`.
   repositions to the new part's `X0 Y0` before probing; the WCS/Probe relabels + default flip.
   Landed, verification pending: **probe XY offset** (`D_Probe_OffsetX` / `E_Probe_OffsetY`, added
   parts still open). The new first-part **`Use Active WCS X0 Y0, Probe Z0`** mode is **verified on
-  its main path and with a nonzero offset** (test-plan H7 + H7a); still open there are H7b–H7e —
-  jet/tool-0, Guard A, firmware variants, and the base-reserved traverse-height question (H7c).
-  Remaining items below.
+  its main path and with a nonzero offset** (test-plan H7 + H7a); H7b is deferred to the jet/laser
+  workstream; H7c–H7e still open. Also landed unverified: the **base-frame base probe** (select base
+  → probe → retract to Inter Part Safe Z → restore operating WCS), the **Inter Part Safe Z** and
+  **Use Active WCS** renames, and the **full property dump**. Remaining items below.
 - **Phase 5 — not started** (likely no-op).
 
 ---
@@ -324,6 +331,59 @@ the two driving files (this plan + the test plan). Recover the fix rationale fro
   `git log --follow -- docs/float-comparison-review.md`
 
 ---
+
+## Checkpoint — restart here
+
+*Written so a fresh session can resume with no other context. Update it when the situation moves.*
+
+**Baseline.** Branch `wcs-reworked-flow`, at commit **`25768ec`** ("Probe the spoilboard base in its
+own WCS; dump all properties in the header") — pushed. The two driving documents are this file and
+`docs/test-plan.md`; the post is `MPCNC_v4.0_Beta2.cps`. Nothing is in flight: the working tree is
+clean apart from an untracked `MPCNC_v4.0_Beta1.zip` (unrelated to this work — add it or ignore it).
+
+**Landed in the last session, NOT yet verified against real output** — these are the first things to
+check if output looks wrong:
+1. **Base probe now runs in the base's own frame** — `writeBaseEstablish()` selects the base, probes,
+   retracts to the Inter Part Safe Z, restores the operating WCS. Changes output for every
+   base-reserved job. → test-plan **H7c**, **PB1**.
+2. **Full property dump in the header** (`writeAllProperties()` / `writeResolvedValues()`) — ~98 new
+   Info lines on every file. → test-plan **D2**.
+3. **Two renames** — group-05 "Safe Z" → **Inter Part Safe Z**; the four `Use Existing WCS …` origin
+   options → **`Use Active WCS …`** (enum ids kept, so presets don't reset). → test-plan **D1**.
+
+**Verified and done — do not re-run:** H1–H7 and H7a (see the test plan's Results summary for the
+per-row evidence and the standing note explaining why no H row needs a functional retest).
+
+**Next actions, in the order they'd be tackled:**
+1. **Code — the "unknown Z" Info comment** (`Ensuring that Z is safe. Unknown Z for XY move.`) on
+   `writeWcsOnStart()`'s `Probe Z` branch. Small and self-contained; fully specified under
+   *Phase 4 — selection-driven origin/probe model* → **"To do — warn in the file that the traverse Z
+   is unknown"** (that section's heading says *implemented*, but this one item inside it is not).
+2. **Code — tool-change ordering + base-relative park.** The largest remaining item; design settled —
+   see *Phase 4 — tool-change ordering + base-relative park*, the first section under Remaining work.
+   Nothing else depends on it.
+3. **Tests, no machine needed** (posting + reading the file): **D1**, **D2**, **H7d** (Guard A),
+   **H7e** (Marlin/RRF), **P3**.
+4. **Tests needing the machine:** **H7c** (the safety measurement), **PB1/PB2**, **PBV1–3**,
+   **PA1/PA1b**, **P2**.
+5. **Deferred workstream:** jet tools and laser (**J1–J5**) — to be reviewed and tested separately,
+   per an explicit scope decision. `J5` is a design question before it is a test.
+
+**Open decisions carried forward** (each written up in full below): whether first-part `Skip` should
+hold the base clearance instead of descending to the probe Safe Z when a base is reserved; the
+frame-dependence of the `G38.2` probe target; and `wcsDefinitions` offset-`0` handling.
+
+**Workflow notes that saved time.** `node --check MPCNC_v4.0_Beta2.cps` is a valid syntax gate for
+this post — worth running after every edit. The `properties` literal can also be brace-matched out of
+the file and `eval`'d in node (with the `e*` enum declarations pulled from the file head) to test
+logic that iterates it — that is how the property dump's grouping/ordering was verified without
+Fusion. Also: **`git commit -m` with a PowerShell here-string mangles messages containing double
+quotes** — write the message to a file and use `git commit -F`.
+
+**One doc loose end.** `README.md`'s doc-sync marker at the top still points at a pre-`25768ec` ref,
+so it understates what the README covers; the README content itself was brought current (including a
+new *What "Active WCS" means* section). Standing preference is that the README is not touched during
+code changes unless asked — it was asked for last session.
 
 ## Remaining work (pick up here)
 

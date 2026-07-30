@@ -19,6 +19,12 @@ integer offsets / Safe Z). **You run these; record the outcome in each `Result:`
 `FAIL` + a note, and paste the relevant g-code snippet). The granular token-level checks (M1–M6,
 P1–P3) below still apply; each scenario tags which ones it also satisfies so nothing is double-run.
 
+**Where the g-code goes.** Posted files referenced by name below (`H7.gcode`, `H7a.gcode`,
+`H6 - RRF.gcode`, `Face1.gcode`, …) are written to Fusion's NC output folder —
+`C:\Users\don_m\Documents\Fusion 360\NC Programs\` — not into the repo. Name each post after its
+test row so a later review can find it. Diffing two of them is often the fastest check (that is how
+H7a was verified: `Compare-Object` showed only the two intended lines changed).
+
 **Conventions.** Comments are `( ... )` on GRBL and `; ...` on Marlin/RRF — otherwise the tokens
 are identical. `G10 L20 P<n>` is GRBL/RepRap; Marlin uses `G92` and rejects >1 WCS (Guard C).
 Feed placeholders (`F<travelXY>`) are whatever the job's travel feed resolves to. Default probe
