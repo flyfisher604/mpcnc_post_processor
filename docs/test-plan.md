@@ -49,6 +49,15 @@ Part mode is `Set X0 Y0 to Current Pos, Probe Z0` and Subsequent is `Use Active 
 on **GRBL** first (the default firmware); the
 firmware-variant rows note what changes elsewhere.
 
+> **⚠ Blast radius of HR-3 — every saved GRBL `.gcode` differs at the tail.** The manual-spindle
+> stop now prompts on GRBL as it always did on Marlin/RRF, so a default-settings GRBL job ends
+> `M0 (MSG Turn OFF spindle)` where it previously ended `M5`, and each tool change gains the same
+> prompt before `Insert Tool #n`. **No row's assertions are affected** — nothing below asserts on the
+> `*** STOP begin ***` block or on `M5` (checked), and no motion changed. But no saved GRBL file
+> matches byte-for-byte at the end any more, so don't read a tail diff as a regression. **HR3**
+> carries the new tokens; the only row that claims a byte-for-byte property is **M5**
+> (single-WCS regression), which compares two *current* posts to each other and so is unaffected.
+
 ### Results summary (fill as you go)
 
 | ID | Scenario | Result |
@@ -62,6 +71,7 @@ firmware-variant rows note what changes elsewhere.
 | H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7e unrun; H7b → J1)* |
 | H7f | "Unknown Z" warning — present without a base, suppressed with one | PASS *(all three)* |
 | HR1 | Provisional Z0 bounds the `G38 Target` on the two just-positioned probe modes | |
+| HR3 | Manual spindle prompts to switch OFF on GRBL too — job end and tool change | |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -368,6 +378,52 @@ tool) unless a row says otherwise.
 
       **Firmware half:** repeat (A) on Marlin → `G92 X0 Y0 Z0`; on RRF → `G54` + `G10 L20 P1 X0 Y0
       Z0` with `M291 … S3` prompts. Supersedes the saved `H6 - Marlin.gcode` / `H6 - RRF.gcode`.
+      *Result:* ____
+
+- [ ] **HR3 — A hand-switched spindle is told to stop, on GRBL too.** Verifies the HR-3 fix
+      (docs/HReview.md). `spindleOn()` has always honoured **Manual Spindle On/Off** on every
+      firmware; `spindleOff()` branched on firmware first and emitted a bare `M5` on GRBL regardless
+      — which does nothing to a router switched by hand. On the **default** hobbyist configuration
+      (GRBL, Manual Spindle On/Off **on**) the file therefore asked the operator to switch the router
+      on and never asked them to switch it off. `spindleOff()` now branches on the property first.
+
+      **Do (A) — job end, the default config.** GRBL, one milling op, **Manual Spindle On/Off = on**
+      (default), Comment Level = `Info`. **Get (A):** in the `*** STOP begin ***` block —
+      ```
+      ( *** STOP begin ***)
+      ( COMMAND_COOLANT_OFF)
+      G0 X0 Y0 F<travelXY>
+      ( COMMAND_STOP_SPINDLE)
+      M0 (MSG Turn OFF spindle)
+      M30
+      ```
+      **and no `M5` anywhere in the file** — that absence is the discriminator. Also confirm no
+      `M300` (GRBL has no beep command).
+
+      **Do (B) — the automatic branch.** Same job, **Manual Spindle On/Off = off**. **Get (B):**
+      `M3 S<rpm>` at the start and `M5` in the stop block, with **no `Turn ON` / `Turn OFF`
+      prompts**. This is the branch that must not have moved.
+
+      **Do (C) — tool change, the case that matters most.** GRBL, two operations, two tools,
+      `07 - Tool Changes` → Tool Changes are Included = on, Include Relocation Code = on, Manual
+      Spindle On/Off = on. **Get (C):** at the boundary, the turn-off prompt precedes the
+      insert-tool prompt —
+      ```
+      ( Tool Change Start)
+      ... the park rapid to Tool Change X/Y/Z -- order not asserted here, see HR-8 ...
+      ( COMMAND_COOLANT_OFF)
+      ( COMMAND_STOP_SPINDLE)
+      M0 (MSG Turn OFF spindle)
+      M0 (MSG Insert Tool #2 ...)
+      ```
+      **Pass:** the operator is never invited to reach into the machine without first being told to
+      switch the spindle off — the two `M0`s in that order, with no `M5` between them. Before this
+      fix (C) emitted `M5` there and nothing else.
+
+      **Do (D) — firmware regression.** Repeat (A) on Marlin and RRF. **Get (D):** unchanged from
+      the saved `H6` behaviour — `M300 S300 P3000` beep then the turn-off prompt (`M0 …` on Marlin,
+      `M291 … S3` on RRF). **Pass:** the Marlin/RRF path is byte-identical to before; only GRBL moved.
+
       *Result:* ____
 
 - [ ] **H-REG — Byte-for-byte regression (the key guarantee).** With the default reverted to

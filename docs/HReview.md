@@ -375,7 +375,7 @@ discriminator, and confirms the fix is required rather than merely defensive.
 
 ---
 
-### HR-3 — GRBL + Manual Spindle On/Off never prompts the operator to switch the router *off* — **High** · `READ`
+### HR-3 — GRBL + Manual Spindle On/Off never prompts the operator to switch the router *off* — **High** · `READ` · **IMPLEMENTED**
 
 **Reaches it:** HP-1 exactly as documented. GRBL is the default firmware and `Manual Spindle
 On/Off` defaults **true**; the README tells the hobbyist to *"Leave Manual Spindle On/Off on if you
@@ -448,12 +448,35 @@ the router off first**.
  }
 ```
 
-**Verify (Do → Get).**
+#### As built
+
+Implemented in `spindleOff()` ([:2745](../MPCNC_v4.0_Beta2.cps#L2745)) as proposed — the branch order
+inverts, property first and firmware only inside it. `node --check` passes. Two points worth stating
+because both are removals a later reader might question:
+
+- **No `M5` on the manual path, on any firmware.** This mirrors `spindleOn()`, which emits no `M3`
+  under manual control: the post does not command a spindle the operator owns, it asks them. It is
+  also what the Marlin/RepRap manual path already did, so the alternative — prompt *and* emit `M5`
+  as belt-and-braces — would have made GRBL inconsistent with Marlin in the opposite direction. Jet
+  tools never reach here (`onCommand` guards `COMMAND_STOP_SPINDLE` on `!tool.isJetTool()`, and laser
+  power is handled by `laserOff()`), so GRBL laser-mode jobs are unaffected by the missing `M5`.
+- **The `M300` beep stays Marlin/RepRap-only**, guarded inside the manual branch. GRBL has no beep
+  command; emitting one would be HR-10's defect in a new place.
+
+**Blast radius — wider than HR-1's.** Every GRBL job with the default `Manual Spindle On/Off` now
+ends with a prompt instead of `M5`, and gains one at each tool change. That is *every* saved GRBL
+`.gcode` in the H, P and PB series, not just the rows HR-1 touched. No row's assertions move —
+none of them assert on the stop block or on `M5` (checked across the whole test plan) and no motion
+changed — but a tail diff against any saved file will now show a difference that is not a
+regression. Recorded as a banner note in `docs/test-plan.md`'s runbook conventions rather than as a
+⚠ on a dozen individual rows.
+
+**Verify (Do → Get).** Full four-post row is **HR3** in `docs/test-plan.md`; short form:
 *Do:* HP-1 defaults (GRBL, Manual Spindle On/Off on), one milling op. *Get:* `M0 (MSG Turn OFF
-spindle)` in the `*** STOP begin ***` block, and **no** bare `M5`. Repeat with Manual Spindle
-On/Off **off**: `M5`, and no prompt. **Pass:** both branches — the prompt appears exactly when manual
-control is selected. Second post: enable group 07 with Include Relocation Code and confirm the
-turn-off prompt precedes `M0 (MSG Insert Tool #…)`.
+spindle)` in the `*** STOP begin ***` block, and **no** bare `M5` anywhere. Repeat with Manual
+Spindle On/Off **off**: `M3 S<rpm>` and `M5`, no prompts. **Pass:** both branches — the prompt appears
+exactly when manual control is selected. The row's (C) post is the one that matters most: group 07
+enabled, confirming the turn-off prompt precedes `M0 (MSG Insert Tool #…)`.
 
 ---
 
@@ -1148,10 +1171,12 @@ are actioned.
 
 1. **HR-2** — cheapest possible fix, largest unknown, blocks a whole operation type. Do it first and
    post a drill.
-2. ~~**HR-1**~~ **done** (branch `v4.0-hreview-fixes`, uncommitted; test-plan row **HR1** added, H1 /
-   H2 / H6 / P1 marked superseded, H-REG's "no motion changed" claim retracted). One open decision it
-   raised: whether the added-part jog probe should be treated symmetrically — see *As built* above.
-   **HR-3** next — same default path, same safety class, similarly small.
+2. ~~**HR-1**~~ **done** — committed `8d61790` on `v4.0-hreview-fixes`; test-plan row **HR1** added,
+   H1 / H2 / H6 / P1 marked superseded, H-REG's "no motion changed" claim retracted, and
+   `plan.md`'s *Graceful degradation* principle amended a second time. One open decision it raised:
+   whether the added-part jog probe should be treated symmetrically — see its *As built* note.
+   ~~**HR-3**~~ **done** — test-plan row **HR3** added plus a blast-radius banner in the runbook
+   conventions. Neither fix is verified by a post yet: **HR1** and **HR3** are both unrun.
 3. **HR-4**, **HR-5** — correctness of the two features the README tells the hobbyist to enable.
 4. **HR-6**, **HR-10**, **HR-13**, **HR-14** — independent, small, each closes a silent failure.
 5. **HR-7**, **HR-9**, **HR-12** — group-07 behaviour. Consider folding into the Phase-4 tool-change

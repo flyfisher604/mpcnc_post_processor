@@ -2743,19 +2743,23 @@ function spindleOn(_spindleSpeed, _clockwise) {
 }
 
 function spindleOff() {
-  // Is Grbl?
-  if (fw == eFirmware.GRBL) {
-    writeBlock(mFormat.format(5));
-  }
-
-  //Default
-  else {
-    if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
-      writeBlock(mFormat.format(300), sFormat.format(300), pFormat.format(3000));
-      askUser("Turn OFF spindle", "Spindle", false);
-    } else {
-      writeBlock(mFormat.format(5));
+  // Manual control describes the MACHINE -- a hand-switched router -- not the g-code dialect, so
+  // the branch is on the property first and the firmware only inside it. It used to be the other
+  // way round: GRBL emitted a bare M5 whatever the property said, which does nothing to a router
+  // switched by hand. The result was an asymmetry on the DEFAULT hobbyist configuration (GRBL +
+  // Manual Spindle On/Off on): the file asked the operator to switch the router ON, then ended
+  // without ever asking them to switch it off -- and worse, every tool change paused for them to
+  // reach into the machine with the same silence. Marlin/RepRap already prompted correctly, so this
+  // brings GRBL into line with them and with spindleOn(). See docs/HReview.md HR-3.
+  if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
+    // No M5 on this path, mirroring spindleOn(), which emits no M3 under manual control: the post
+    // does not command a spindle the operator owns, it asks them.
+    if (fw != eFirmware.GRBL) {
+      writeBlock(mFormat.format(300), sFormat.format(300), pFormat.format(3000));   // beep -- no M300 on GRBL
     }
+    askUser("Turn OFF spindle", "Spindle", false);
+  } else {
+    writeBlock(mFormat.format(5));
   }
 
   spindleEnabled = false;
