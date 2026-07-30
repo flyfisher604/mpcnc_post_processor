@@ -63,78 +63,102 @@ multi-axis operations are rejected with a clear error.
 The post is a single file, `MPCNC_v4.0_Beta2.cps`.
 
 1. In Fusion, choose **Manage → Post Library**.
-2. If an older copy is installed, select it and use the trash-can icon to remove it
+2. Select My posts/Local in the sidebar.
+3. If an older copy is installed, select it and use the trash-can icon to remove it
    first.
-3. Import `MPCNC_v4.0_Beta2.cps` (or keep it in a folder and select it at post time).
-4. When posting, use **Setup → Use Personal Post Library** and select this post.
-5. Set **Job → CNC Firmware** to match your controller.
+4. Use the Import icon to import `MPCNC_v4.0_Beta2.cps` (or the latest version available).
+5. Close the dialog.
+6. When posting, select **Choose from library...** and select this post.
+7. Review and set the properties as needed.
 
-![screenshot](/screenshot.jpg "screenshot")
+![screenshot](/installation.jpg "install")
 
 ---
 
-# Quick start by user type
+# Quick Start by User Type
 
-## Hobbyist — posting a single operation
+## Hobbyist - Posting a Single Operation
 
-**Who this is:** you're cutting one part in one Setup, usually with a single tool, and
-zeroing by hand. A single operation has no WCS change, so only the **First WCS / Part**
+**Who this is:** you're cutting one part in one Setup containing one Operation, with a single tool, and
+zeroing by hand before posting the job to your CNC. A single operation has no WCS change, so only the **First WCS / Part**
 origin choice applies.
 
-**The flow — walk the property groups in dialog order.** Only three groups need any
-attention; the rest are marked *Accept Defaults*.
+> **Review the property groups in the dialog from top to bottom.**
+> 
+> Only three groups need any attention for users running the hobbyist limited version of Fusion 360;
+> for the rest you may just *Accept the Defaults*.
 
-- **01 - Job** — set **CNC Firmware** to your controller. Leave **Manual Spindle On/Off**
-  on if you start your router/spindle by hand. Otherwise *Accept Defaults*.
-- **02 - Establish Machine Coordinates** — *Accept Defaults* (**Home Before Start =
-  None**). Choose **XY** only if your machine has X/Y endstops and you want squaring.
-- **03 - Feeds and Speeds** — set **Travel Speed X/Y**, **Travel Speed Z**, and the **Max
-  XY Cut Speed** / **Max Z Cut Speed** limits to your machine's real capability. Enable
-  **Scale Feedrate** so cut moves are scaled to stay within those limits, and keep
-  **Enforce Feedrate** on so a feedrate is always emitted.
-- **04 - Map G1s to Rapids** — **turn this group on.** A Personal-license job needs it: it
-  restores safe, properly-ordered travel moves (retract before travelling, travel before
-  descending) and avoids dragging the tool across the work. (See *G1 → G0 rapid mapping*.)
-- **05 - Establish Spoilboard Reference** — *Accept Defaults* (**Reserved WCS = None**). A
-  single-part job uses no base.
-- **06 - On WCS / Part / Fixture Changes** — *Accept Defaults.* **First WCS / Part**
-  defaults to **`Set X0 Y0 to Current Pos, Probe Z0`**: **jog the tool to the part's XY
-  corner before you post** (in your sender), then the post records XY there and probes Z
-  off a touch plate — no run-time jog prompt. Keep **Probe Pause = Before & After** so
-  you're prompted to attach/remove the probe. If you have **no probe**, choose **`Set X0
-  Y0 Z0 to Current Pos`** instead (jog to XY *and* touch off Z by hand before posting).
+- **01 - Job**
+  - set **CNC Firmware** to your controller.
+  - Leave **Manual Spindle On/Off** on if you start your router/spindle by hand.
+  - Other fields *Accept Defaults*.
+- **02 - Establish Machine Coordinates**
+  - *Accept Defaults* (**Home Before Start = None**).
+  - Choose **XY** only if your machine has X/Y endstops and you want squaring included in the post.
+- **03 - Feeds and Speeds**
+  - set **Travel Speed X/Y**, **Travel Speed Z**, and the **Max XY Cut Speed** / **Max Z Cut Speed** limits to your machine's real capability.
+  - Enable **Scale Feedrate** so cut moves are scaled to stay within those limits, and keep
+  **Enforce Feedrate** on so a feedrate is always included on each gcode statement.
+- **04 - Map G1s to Rapids**
+  - **Hobbyists should turn all options in this group on.**
+  - A Personal-license of Fusion 360 forces all rapid moves to be emitted as cutting moves.
+  - Converts some of the cutting movements back to rapids and restores safe, properly-ordered
+  travel moves (retract before travelling, travel before descending) and avoids dragging the tool
+  across the work. (See *G1 → G0 rapid mapping*.)
+- **05 - Establish Spoilboard Reference**
+  - *Accept Defaults* (**Reserved WCS = None**).
+  - Understanding the true zero height of the spoilboard is only important during multi-part moves, not an option in the hobbyist version.
+  - A single-part job requires no base.
+- **06 - On WCS / Part / Fixture Changes**
+  - *Accept Defaults.*
+  - **First WCS / Part** defaults to **`Set X0 Y0 to Current Pos, Probe Z0`**
+    - **Before sending your post to the CNC, jog the tool to the part's XY corner** (in your sender).
+    - The post records the current XY and then probes Z off a touch plate.
+      - Optional: use the X Y probe offset to offset the probing operation.
+    - Keep **Probe Pause = Before & After** so you're prompted to attach/remove the probe.
+    - If you have **no probe** on your CNC, choose **`Set X0 Y0 Z0 to Current Pos`** instead.
+      - Jog your CNC to XY *and* touch Z before posting job to CNC.
+  - **Prefer a guided jog prompt?**
+    - The **`Jog to …`** modes pause mid-run and ask you to jog to the origin instead of pre-jogging.
+    They are not the default because jogging while paused isn't supported on every firmware/sender — see *Jogging at a pause*.
+- **07 - Tool Changes**
+  - *Accept Defaults.* (**Tool Changes are Included = Off**)
+- **08 - External Include Files**
+  - *Accept Defaults.* (**All Empty**)
+- **09 - Laser**
+  - *Accept defaults unless this is a laser job.*
+- **10 - Coolant**
+  - *Accept Defaults unless CNC has coolant hardware.*
+- **11 - Duet**
+  - *Accept Defaults unless running Duet firmware.*
+- **Built-in**
+  - *Consult Fusion 360 documentation before changing.*
 
-Then **post and run.**
+**Then select post.**
 
-> **Prefer a guided jog prompt?** The **`Jog to …`** modes pause mid-run and ask you to
-> jog to the origin instead of pre-jogging. They aren't the default because jogging while
-> paused isn't supported on every firmware/sender — see *Jogging at a pause*.
+## Full Fusion License - WCS, Many Operations, or Multiple Fixtures
 
-Everything else (the spoilboard base, **Subsequent WCS / Part**, cross-part clearance)
-stays at its default and emits nothing on a single-operation job — none of the multi-part
-machinery runs.
-
-## Full user — WCS, many operations, and multiple fixtures
-
-### First: what is a WCS?
+### First: What is a WCS?
 
 A **Work Coordinate System (WCS)** is a *stored origin* the controller remembers.
 On GRBL and RepRap there are several — `G54`, `G55`, `G56`, `G57`, `G58`, `G59` (and
 `G59.1`–`G59.3` on RepRap only). Selecting one (e.g. `G54`) tells the controller "from
-now on, X0 Y0 Z0 means *this* stored point." Each WCS holds its own offset, so you can
+now on, X0 Y0 Z0 means *this* stored position on the CNC." Each WCS holds its own offset, so you can
 define several independent zeros and switch between them mid-program without disturbing
 the others.
 
+Only a full-license user has the option of utilizing WCSs.
+
+Multiple WCS are commonly used when multiple parts are being milled at different positions (fixtures) on
+the CNC. The 0,0 origin of each fixture is set into sequential WCSs prior to posting the job. 
+
 Fusion assigns a WCS to each Setup via its **Work Offset** field (1 → `G54`, 2 → `G55`,
-…). This post emits the matching selection and writes each origin into that WCS's *own*
-register with `G10 L20 P<n>`, so setting one zero never corrupts another.
+…). This post emits the matching WCS when it changes in Fusion.
 
-> **Marlin is the exception.** Marlin has no work-offset table — it has a single global
+> **Marlin firmware is an exception.** Marlin has no work-offset table — it has a single global
 > origin set with `G92`. So on Marlin only *one* coordinate frame exists; a job that
-> uses more than one distinct work offset is rejected at post time (see *Validation
+> uses more than one distinct work offset is rejected at the time the post processor is run (see *Validation
 > guards*). Everything below about multiple WCS applies to GRBL and RepRap.
-
-The full-license user meets WCS in one of three situations:
 
 ### (a) Many operations / tools, one part, one WCS
 
@@ -143,57 +167,69 @@ several tools, all on one part in one Setup — so one WCS throughout.
 
 - Turn the **04 - Map G1s to Rapids** group **off** — the full license already posts real
   `G0` rapids, so the hobby workaround isn't needed.
-- Set **First WCS / Part**: if this Setup's WCS is a pre-set fixture, choose **`Use Existing
-  WCS X0 Y0, Probe Z0`** (rapid to the stored X0 Y0, re-probe Z); otherwise `Set X0 Y0 to
-  Current Pos, Probe Z0` (pre-jog XY). Prefer these over the `Jog` modes.
-- If the job changes tools, enable the **07 - Tool Changes** group. Because there is no
+- Set **First WCS / Part**:
+  - If this Setup's WCS is a pre-set fixture, choose **`Use Existing
+  WCS X0 Y0, Probe Z0`** (rapid to the stored X0 Y0, re-probe Z);
+  - Otherwise `Set X0 Y0 to
+  Current Pos, Probe Z0` (pre-jog XY).
+  - Prefer these methods over the `Jog` modes.
+- If the job changes tools, enable the **07 - Tool Changes** group.
+  - Because there is no
   tool-length system, turn on **Probe After Tool Change** so each new tool re-references
-  Z. The tool-change park position (**Tool Change X/Y/Z**) is relative to the current
+  Z.
+  - The tool-change park position (**Tool Change X/Y/Z**) is relative to the current
   work zero.
-- One WCS means one shared frame, so each operation's own retract already clears the
-  part — no extra cross-part machinery runs.
+  - **EXPECT ENHANCEMENTS TO TOOL CHANGES** in future updates.
+- One WCS means one shared frame, so each operation's own retract moves already clear the
+  part. Since there are no cross-part / cross-WCS moves, there is no need to establish a Spoilboard Reference.
 
 ### (b) Multiple fixtures — several copies of a part (Replicate)
 
 You have jigged up several copies of the same part, one per fixture, each on its own
 WCS (`G54`, `G55`, `G56`, …), and want to cut them all in one program.
 
-- **Reserve a spoilboard base** — set **05 - Establish Spoilboard Reference → Reserved
-  WCS** (recommended `G59`). This is a *fixed-surface* zero (the spoilboard, not any stock
+- **Reserve a spoilboard base**
+  - Set **05 - Establish Spoilboard Reference → Reserved WCS** (recommended `G59`).
+    - This is a *fixed-surface* zero (the spoilboard, not any stock
   top) that gives the post a stable reference to retract to when traversing between parts
-  of possibly different thickness. Keep **Probe to Set Base** at `Pause, Probe Z, Pause`
-  (or `Probe Z` for a fixed probe point) so it's established at job start.
-- Put each copy on its own Fusion Work Offset. Their **XY** comes from each fixture's
-  pre-set offset — the post never sets XY for an added part unless you choose a Jog mode.
-- The **first** copy uses **First WCS / Part** — choose **`Use Existing WCS X0 Y0, Probe
-  Z0`** so it too takes its pre-set XY and re-probes Z (matching the copies below).
-- **Subsequent WCS / Part** decides what happens at each copy after the first. **The
-  best-practice paths use the stored fixture offset — not jogging:**
-  - **Use Existing WCS X0 Y0, Probe Z0** *(default)* — rapid to that copy's stored X0 Y0 and
-    re-probe its stock-top Z (the Replicate / pre-set-fixtures workflow). Handles varying
-    stock thickness.
-  - **Use Existing WCS X0 Y0 Z0** — the copy uses whatever X0 Y0 Z0 is already stored in
-    its WCS; the tool just rapids there (no probe).
-  - **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0** — pause (`M0`) so the operator jogs
-    to each copy's origin. Only for a setup run where the fixtures are *not* pre-set, and
-    only if your firmware/sender supports jogging at the pause (see *Jogging at a pause*).
-- **Retract Across Parts** (on by default) makes the tool retract to **Safe Z** — an
-  absolute height above the spoilboard base — *before* it traverses to the next fixture,
-  so it clears every clamp and part regardless of their heights.
-- Keep the reserved base as the fixed spoilboard reference — don't zero a part to it. A
-  guard trips only if an operation would *re-establish* the base's origin (re-zero or
-  re-probe it); it doesn't otherwise stop you from selecting that WCS.
+  of possibly different thickness.
+    - Keep **Probe to Set Base** at `Pause, Probe Z, Pause`
+  (or `Probe Z` if pausing to probe is not required).
+    - Probing the spoilboard will occur at the current CNC's position. No XY movement will occur prior to the probe.
+    - The Reserved WCS will be utilized to record the Z0 of the spoilboard.
+    - Attempts to change the Reserved WCS Z0 with an operation will cause a post error. Keep the reserved base
+    as the fixed spoilboard reference. A guard trips only if an operation would *re-establish* the base's origin (re-zero or re-probe it); it doesn't otherwise stop you from selecting that WCS for an operation.
+- Put each copy on its own Fusion Work Offset.
+  - Their **XY** comes from each fixture's
+  pre-set offset
+    - The post never sets XY for an added part unless you choose a Jog mode.
+- The **first** copy uses **First WCS / Part**
+  - Choose **`Use Existing WCS X0 Y0, Probe Z0`** so it too takes its pre-set XY and
+  re-probes Z (matching the copies below).
+- **Subsequent WCS / Part** decides what happens at each copy after the first.
+  - **Best-practice paths use the stored fixture offset — not jogging**
+  - **Use Existing WCS X0 Y0, Probe Z0** *(default)*
+    - Rapids to that copy's stored X0 Y0 and re-probes its stock-top Z.
+    - Handles varying stock thickness.
+  - **Use Existing WCS X0 Y0 Z0**
+    - The copy uses whatever X0 Y0 Z0 is already stored in the corresponding WCS; the tool just rapids there (no probe).
+  - **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**
+    - Pause (`M0`) so the operator can jog to each copy's origin.
+    - Only for a setup run where the fixtures are *not* pre-set, and only if your firmware/sender supports
+    jogging during a pause (see *Jogging at a pause*).
+- **Retract Across Parts** (on by default)
+  - Makes the tool retract to **Safe Z** — an absolute height above the spoilboard base — *before* it traverses to the next fixture, so it clears every clamp and part regardless of their heights.
 
 ### (c) One part from multiple references, or a flip — *not* a single job
 
-Re-datuming the same part to a second reference, or flipping it, is **out of scope for a
+Reestablishing the same part for a second reference, or flipping it, is **out of scope for a
 single post run**. On a machine with no homing the post cannot establish the second
 reference's XY, and re-probing the same surface buys nothing. Run each reference / each
-side as a **separate job**.
+side as a **separate job**. Future enhancements may add additional functionality.
 
 ---
 
-# Supporting concepts
+# Supporting Concepts
 
 ## The work-relative coordinate model
 
@@ -339,14 +375,16 @@ selectively converts those `G1` moves back into `G0` rapids where it's safe:
   toolpath (the "tool dragged across the work" problem).
 - **Map: G1s → G0 Rapids** — converts horizontal `G1` moves at or above **Map: Safe Z to
   Rapid** into rapids (assumes anything at that height is a safe air move).
-- **Map: Safe Z to Rapid** — a constant (e.g. `10`) or a Fusion height with a fallback
-  (`Retract:15`, `Feed:5`, `Clearance:7`).
+- **Map: Safe Z to Rapid** — the Z height where a cut move will be considered safe to convert 
+to a rapid. Defined as a Fusion layer followed by a fallback constant used when the layer is not defined
+  (eg `Retract:15`, `Feed:5`, `Clearance:7`).
 - **Map: Allow Rapid Z** — also convert safe vertical moves.
 
-The post emits each `G0` as **two moves** — Z and XY separately, ordered so the tool
+The post emits rapid `G0` moves as **two moves** — Z and XY separately, ordered so the tool
 retracts before travelling and travels before descending — which is what makes these
-conversions safe. A cutting move is never converted. **Full-license users disable this
-whole group** — their posted rapids are already real `G0` moves.
+conversions safe. A true cutting move is never converted. **Full-license users disable this
+whole group** — Fusion 360 will post true rapid `G0` and `G1` cutting moves — **enabling will corrupt
+Full-license posts**.
 
 ## Feeds and feedrate scaling
 
