@@ -382,8 +382,9 @@ cleared three of the four things that were unverified here:
    → `G54` restore, in that order, with no `G0 X/Y` in the base block. Test-plan **H7c PASS**.
 2. ✅ **Full property dump** — 11 groups, 68 properties, dialog order, stored enum ids. **D2 PASS**
    except the Comment-Level suppression check.
-3. ✅ **The "unknown Z" warning suppresses correctly with an established base** — **H7f (B) PASS**.
-   (A) and (C) — the posts that prove it *appears* — are still unrun.
+3. ✅ **The "unknown Z" warning** — **H7f (A) and (B) PASS** (`H7c-a.gcode` / `H7c-b.gcode`): present
+   with no base, suppressed with an established one, and motion byte-identical to `H7.gcode`.
+   **(C)** — base reserved but *not* established — is the one branch still unrun.
 4. ⬜ **Two renames** (group-05 "Safe Z" → **Inter Part Safe Z**; `Use Existing WCS …` →
    **`Use Active WCS …`**) — still need the dialog pass, **D1**.
 
@@ -415,11 +416,10 @@ reference were reordered to match (its doc-sync ref was bumped).
 1. **Code — tool-change ordering + base-relative park.** The top item; design settled — see
    *Phase 4 — tool-change ordering + base-relative park*, the first section under Remaining work.
    Nothing else depends on it, and the base machinery underneath it is now verified (H7c).
-2. **Tests, no machine needed** (posting + reading the file): **D3** (group order + preset survival —
-   do this one first, it is a dialog glance and it gates trust in every other dialog row); **H7f (A)**
-   and **(C)** — one post each, the same job as H7c with the base fields changed; **D1** (dialog only,
-   no post); **H7e** (Marlin/RRF); **P3**; and D2's suppression check (re-post at Comment Level
-   `Important`).
+2. **Tests, no machine needed:** **D1** and **D3**'s dialog half — both are dialog-only, no posting,
+   and D3 (does a saved preset survive the group move?) gates trust in every other dialog row;
+   **H7f (C)** — one post, base reserved with `Probe to Set Base = None`; **H7e** (Marlin/RRF);
+   **P3**; and D2's suppression check (re-post at Comment Level `Important`).
 3. **Tests needing a multi-part / multi-fixture job to post:** **PB1/PB2**, **PBV1–3**,
    **PA1/PA1b**, **P2** (only its added-part half remains; `H7c.gcode` already evidenced the base and
    first-part halves).

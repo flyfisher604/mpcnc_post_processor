@@ -67,7 +67,7 @@ firmware-variant rows note what changes elsewhere.
 | H5 | Hobbyist — single op, `Use Active WCS X0 Y0 Z0` (trust stored) | PASS |
 | H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | PASS (Marlin + RRF) |
 | H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7b–H7f unrun; ⚠ saved files predate the H7f comment)* |
-| H7f | "Unknown Z" warning — present without a base, suppressed with one | (B) PASS *(A/C unrun)* |
+| H7f | "Unknown Z" warning — present without a base, suppressed with one | (A) + (B) PASS *(C unrun)* |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -80,7 +80,7 @@ firmware-variant rows note what changes elsewhere.
 | H7d | Guard A fires on the reserved base for this mode | PASS *(found a stale control name; fixed)* |
 | D1 | Dialog & defaults audit (modes, renames, integer fields) | |
 | D2 | Header property dump — all 68 properties + resolved values | PASS *(suppression check unrun)* |
-| D3 | Group order after the homing move — presets must survive | |
+| D3 | Group order after the homing move — presets must survive | header PASS *(dialog half unrun)* |
 
 ---
 
@@ -232,7 +232,7 @@ tool) unless a row says otherwise.
       Z5.08` → `M0 (MSG Detach ZProbe)`. **No `G10 L20 P1 X0 Y0`** (the discriminator vs H2), no jog
       `M0`, and no `G0 Z` before the traverse. Arcs/plane restores and section rapids independently
       checked sound. **H7a PASS** (see below); **H7b deferred to J1**. Sub-check status since:
-      **H7c PASS**, **H7d PASS**, **H7f (B) PASS / (A) and (C) unrun**, **H7e still unrun** (this job
+      **H7c PASS**, **H7d PASS**, **H7f (A) and (B) PASS / (C) unrun**, **H7e still unrun** (this job
       had no base and was GRBL only, so it could not cover any of them).
 
       > **⚠ `H7.gcode` and `H7a.gcode` now predate current output.** The follow-up filed by this row
@@ -369,16 +369,37 @@ tool) unless a row says otherwise.
         and no retract, so nothing established a height — reserving a base is not by itself enough.
 
         **Pass:** the discriminator is the **suppression**, not the appearance — (A) and (C) carry
-        the line, (B) does not. Also confirm the blast radius is nil: diff (A) against `H7.gcode` and
-        the *only* difference is that one comment line; and a default-settings post (**H2** path)
-        and any added-part probe contain the line **nowhere** — it is gated by the `zUnknown`
-        parameter that only this one mode passes.
+        the line, (B) does not. Also confirm the blast radius is nil: **(A)'s motion must be
+        byte-identical to `H7.gcode`'s** (compare non-comment lines only — `H7.gcode` predates both
+        the property dump and the group reorder, so its *header* differs wholesale and a raw diff is
+        useless here), the only added body line being the warning itself; and a default-settings post
+        (**H2** path) and any added-part probe contain the line **nowhere** — it is gated by the
+        `zUnknown` parameter that only this one mode passes.
 
-        *Result:* **(B) PASS** — `H7c.gcode` (same file as H7c above): the warning is **absent**;
-        `(   Use stored work origin X0 Y0; probe Z)` (L142) is followed directly by
-        `(   Move to probe point = origin + offset X10 Y5, then probe Z)` (L143). The suppression
-        guard fires as designed with an established base. **(A) and (C) still unrun** — they are the
-        two that prove the comment actually appears.
+        *Result:* **(A) PASS, (B) PASS. (C) still unrun.**
+
+        **(A)** — `H7c-a.gcode` (2026-07-30, post `edc38b3`; GRBL, T171, `Reserved base WCS = None`,
+        offsets `0`, confirmed from its own property dump). The warning is present and correctly
+        placed: `(   Use stored work origin X0 Y0; probe Z)` (L126) →
+        `(   Ensuring that Z is safe. Unknown Z for XY move.)` (L127) →
+        `(   Move to part origin X0 Y0, then probe Z)` (L128) → `G0 X0 Y0 F2500` (L129), which is the
+        **first motion in the program** — exactly the case the warning exists for. Blast radius nil:
+        against `H7.gcode`, **motion is byte-identical (39 lines each, zero differences)** and the
+        warning is the only added body line; every other difference is the property dump replacing
+        the two old hand-written blocks, plus the timestamp.
+
+        **(B)** — confirmed twice, at both offset settings: `H7c.gcode` (offsets X10 Y5) and
+        `H7c-b.gcode` (offsets `0`, `A_Spoilboard_BaseReserve = 6`, `B_Spoilboard_BaseEstablish =
+        Pause & Probe Z`). In `H7c-b` the warning is **absent** — `(   Restore operating WCS G54
+        after base probe)` → `G54` (L140-141) → `(   Use stored work origin X0 Y0; probe Z)` (L142) →
+        `(   Move to part origin X0 Y0, then probe Z)` (L143) with no warning between. The base block
+        is intact: `G59` (L128) → `G38.2` (L136) → `G10 L20 P6 Z0.8` (L137) → `G0 Z40` (L138) → `G54`
+        restore.
+
+        **(C) outstanding** — needs `Reserved WCS = G59` **with `Probe to Set Base = None`**. Neither
+        posted file used it (both ran `Pause & Probe Z`), so the `|| == "None"` half of the guard
+        condition is still unverified: nothing yet proves that *reserving* a base without
+        *establishing* it leaves the warning in place.
 
 - [ ] **H-REG — Byte-for-byte regression (the key guarantee).** With the default reverted to
       `Set X0 Y0 to Current Pos, Probe Z0`, the **default** single-op output is again the pre-rework
@@ -562,7 +583,16 @@ fixtures) — so either turn it off or reserve a base for this workflow.
 
       **Then post any job** and confirm the header dump reordered to match (it sorts on the same
       strings) — `02 - Feeds and Speeds` now appears before `03 - Map G1s ...`, and
-      `04 - Establish Machine Coordinates` between Map-G1s and the spoilboard group. *Result:* ____
+      `04 - Establish Machine Coordinates` between Map-G1s and the spoilboard group.
+
+      *Result:* **header half PASS** — `H7c-a.gcode` / `H7c-b.gcode` (post `edc38b3`) both dump the
+      groups in the new order: `01 - Job`, `02 - Feeds and Speeds`, `03 - Map G1s ...`,
+      `04 - Establish Machine Coordinates`, `05 - Establish Spoilboard Reference`, `06 - On WCS ...`,
+      `07`–`11` unchanged; counts still 9/7/4/2/4/10/8/5/7/10/2 = 68. **Dialog half outstanding** —
+      the preset-survival check needs eyes on the dialog. The posted values *look* intact (both
+      origin controls on the non-default `Probe Z`, `H7c-b` holding base `6`), but a posted file
+      cannot distinguish "the preset survived" from "the values were re-entered", which is the whole
+      point of the check.
 
 ---
 
@@ -588,10 +618,13 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       Dialog values cross-checked against the settings this job was posted with. **Still unrun:** the
       suppression check at Comment Level `Important` / `Off`.
       *(Note: this block is new default output — see the H-REG re-baseline note.)*
-      *(⚠ The reviewed file predates the label fix in `90d3c95`'s successor: it shows
-      `Firmware  resolved  =`, `G59  P6 `, `Probe XY offset  output units ` and `Inter Part Safe Z
-      output units ` with stripped parens / double spaces. A fresh post reads `Firmware resolved`,
-      `G59 / P6`, and `... in output units`. Cosmetic only — no value changed.)*
+      *(The label fix is confirmed by the later `H7c-a.gcode` / `H7c-b.gcode`: `Firmware resolved =
+      Grbl`, `Reserved base WCS = None` / `G59 / P6`, `Probe XY offset in output units`,
+      `Inter Part Safe Z in output units` — no stripped-paren double spaces. The earlier
+      `H7c.gcode` still shows the old mangled form; cosmetic only, no value changed. One known
+      leftover: the group-03 **name** itself contains parentheses, so its heading still prints as
+      `03 - Map G1s to Rapids  disable when using full license :`. Deliberately not changed — it
+      would alter a visible dialog label.)*
 
 ## Jet tools & laser operations — deferred
 
