@@ -181,14 +181,19 @@ Needed when adding new properties:
 XY-zeroing to a mid-job WCS change, a positioning bug). Full behavior in the implemented section
 below ("selection-driven origin/probe model"); summary (enum ids in parentheses):
 
-- `A_Probe_OnStart` = **"First WCS / Part"** — `Skip/Use Existing X0 Y0 Z0` (`Skip`) /
-  `Set Manual X0 Y0 Z0` (`Zero XYZ`) / `Set Manual X0 Y0, Probe Z0` (`Zero XY & Probe Z`, default).
-  First/only part origin.
-- `B_Probe_OnChange` = **"Subsequent WCS / Part"** — `Skip/Use Existing X0 Y0 Z0` (`Skip`) /
-  `Use Existing X0 Y0, Probe Z0` (`Probe Z`, default) / `Set Manual X0 Y0 Z0` (`Zero XYZ`) /
-  `Set Manual X0 Y0, Probe Z0` (`Zero XY & Probe Z`). Fires on a genuine WCS change after the
-  first section. The *Use Existing* modes take XY from the fixture's pre-set offset (Replicate);
-  the *Set Manual* modes let the operator jog to each part and record its origin.
+- `A_Probe_OnStart` = **"First WCS / Part"** (dropdown order, default first) —
+  `Set X0 Y0 to Current Pos, Probe Z0` (`Current XY & Probe Z`, default) /
+  `Set X0 Y0 Z0 to Current Pos` (`Current XYZ`) / `Use Existing WCS X0 Y0, Probe Z0` (`Probe Z`) /
+  `Use Existing WCS X0 Y0 Z0` (`Skip`) / `Jog to X0 Y0, Probe Z0` (`Jog XY & Probe Z`) /
+  `Jog to X0 Y0 Z0` (`Jog XYZ`). First/only part origin. The *Current Pos* modes assume a pre-jog
+  before start (no prompt); the *Use Existing WCS* modes trust the stored fixture offset (rapid to
+  its X0 Y0, optionally re-probe Z); the *Jog* modes pause (M0) so the operator jogs during the run.
+- `B_Probe_OnChange` = **"Subsequent WCS / Part"** (dropdown order, default first) —
+  `Use Existing WCS X0 Y0, Probe Z0` (`Probe Z`, default) / `Use Existing WCS X0 Y0 Z0` (`Skip`) /
+  `Jog to X0 Y0, Probe Z0` (`Jog XY & Probe Z`) / `Jog to X0 Y0 Z0` (`Jog XYZ`). Fires on a genuine
+  WCS change after the first section. The *Use Existing* modes take XY from the fixture's pre-set
+  offset (Replicate); the *Jog* modes let the operator jog to each part and record its origin.
+  Defaults are the no-prompt modes because jogging at the pause isn't universally supported.
 - `C_Probe_Pause` = **"Probe Pause"** — `No` / `Before` / `Before & After` (default). Gates the
   operator attach(before)/detach(after) prompts for the **part** probes (first + added). It
   does not add new stops — it turns the existing `Attach ZProbe` / `Detach ZProbe` prompts on
@@ -303,7 +308,7 @@ each with and without a base.
 `D_Probe_OffsetX` / `E_Probe_OffsetY` (`06 - On WCS / Part / Fixture Changes` group). The probe touch-point becomes
 origin + (offsetX, offsetY), so the origin can sit at a corner / off the material while Z
 probes the stock top. Job-wide, not per-fixture; default `0,0` reproduces prior output.
-Applied at **every part probe** — first part (`writeWcsOnStart`, "Zero XY & Probe Z") and
+Applied at **every part probe** — first part (`writeWcsOnStart`, "Current XY & Probe Z") and
 each added part (`writeWCS` `probeNewPart` branch) — and **never** the spoilboard base probe
 (`writeBaseEstablish`, always at the origin) nor the tool-change re-probe (that reposition is
 part of the ordering item above). Default byte-identical: first-part emits the reposition
@@ -343,20 +348,26 @@ item above — not when established.)*
 **Structure (user): a short Action dropdown per stage + the existing shared Pause control**
 (`C_Probe_Pause`, relabelled **"Probe Pause"** — No / Before / Before & After — kept separate; the
 earlier "fold pause into the option names" idea was dropped). Group `06` renamed
-**"On WCS / Part / Fixture Changes"**. Option ids are unchanged (stable); only display labels changed,
-so re-labelling alone doesn't reset presets. (Enum ids in parentheses below.)
+**"On WCS / Part / Fixture Changes"**. The group rename and the Probe Pause relabel don't reset
+presets (keys/ids unchanged), but the later Current-Pos/Jog split *did* rename and add origin-mode
+ids, which resets those presets. (Current enum ids in parentheses below.)
 
-- **`A_Probe_OnStart` "First WCS / Part"** — same three modes, relabelled:
-  `Skip/Use Existing X0 Y0 Z0` (`Skip`) / `Set Manual X0 Y0 Z0` (`Zero XYZ`) /
-  `Set Manual X0 Y0, Probe Z0` (`Zero XY & Probe Z`).
-- **`B_Probe_OnChange` "Subsequent WCS / Part"** — expanded from two to four modes,
-  two coexisting workflows:
-  - *Use existing (pre-set fixture offset / Replicate):* `Skip/Use Existing X0 Y0 Z0` (`Skip`) and
-    `Use Existing X0 Y0, Probe Z0` (`Probe Z`) — both auto-position to the stored `X0 Y0`.
-  - *Set manual (operator jogs):* `Set Manual X0 Y0 Z0` (`Zero XYZ`) and
-    `Set Manual X0 Y0, Probe Z0` (`Zero XY & Probe Z`) — pause (jog-enabled) so the operator jogs
-    to this part, then record the origin there (mirrors the first-part options).
-  Adding the two new options resets a saved `B_Probe_OnChange` preset (release-notes).
+- **`A_Probe_OnStart` "First WCS / Part"** — reworked into an explicit *Current Pos* (no prompt)
+  vs *Use Existing WCS* (no prompt) vs *Jog* (M0 prompt) taxonomy, dropdown ordered default-first:
+  `Set X0 Y0 to Current Pos, Probe Z0` (`Current XY & Probe Z`, default) /
+  `Set X0 Y0 Z0 to Current Pos` (`Current XYZ`) / `Use Existing WCS X0 Y0, Probe Z0` (`Probe Z`) /
+  `Use Existing WCS X0 Y0 Z0` (`Skip`) / `Jog to X0 Y0, Probe Z0` (`Jog XY & Probe Z`) /
+  `Jog to X0 Y0 Z0` (`Jog XYZ`). The new `Probe Z` (first part) mirrors the Subsequent `Probe Z`:
+  rapid to the WCS's stored X0 Y0 and re-probe Z (`partProbe(false)`), no XY re-zero.
+- **`B_Probe_OnChange` "Subsequent WCS / Part"** — four modes, two coexisting workflows,
+  ordered default-first:
+  - *Use existing (pre-set fixture offset / Replicate):* `Use Existing WCS X0 Y0, Probe Z0` (`Probe Z`,
+    default) and `Use Existing WCS X0 Y0 Z0` (`Skip`) — both auto-position to the stored `X0 Y0`.
+  - *Jog (operator jogs):* `Jog to X0 Y0, Probe Z0` (`Jog XY & Probe Z`) and `Jog to X0 Y0 Z0`
+    (`Jog XYZ`) — pause (jog-enabled) so the operator jogs to this part, then record the origin
+    there (mirrors the first-part options).
+  Both default to the no-prompt mode because jogging at the pause isn't universally supported.
+  The renamed/added ids reset a saved `A_Probe_OnStart` / `B_Probe_OnChange` preset (release-notes).
 
 **Safe arrival at X0 Y0 (user).** Every genuine WCS change now retracts to a safe Z *first*
 (base-relative through the spoilboard base when reserved + Retract Across Parts on, else to the
@@ -364,10 +375,10 @@ probe Safe Z in the outgoing frame — whose Z is established), then dispatches 
 - `Skip` — rapids to the stored `X0 Y0` (X/Y only, so the safe Z holds) — the "do nothing but get
   there safely" case.
 - `Probe Z` — `partProbe(false)` travels to the probe point and probes.
-- `Zero XYZ` / `Zero XY, Probe Z` — `askUser(..., allowJog=true)` prompts the operator to jog, then
+- `Jog XYZ` / `Jog XY & Probe Z` — `askUser(..., allowJog=true)` prompts the operator to jog, then
   writes the origin (`G10 L20 P<n>` / G92) and, for the probe variant, `partProbe(true)`.
 
-**Selection-aware prompts.** The manual modes emit a jog prompt ("Jog to this part's X0 Y0 …");
+**Selection-aware prompts.** The jog modes emit a jog prompt ("Jog to X0 Y0 …");
 probe attach/detach prompts continue to follow `C_Probe_Pause` via `partProbe()`.
 
 **Reconciled decisions (updated):**
@@ -382,7 +393,7 @@ retracts to the probe Safe Z (milling only) and rapids to the stored `X0 Y0` ins
 nothing — Skip uses a stored origin, so the tool must travel there. Added-part `Skip` retracts
 (base-relative or probe Safe Z in the outgoing frame) then rapids to `X0 Y0`. Non-base multi-WCS
 `Skip`/manual now also retract before the switch (previously only base-relative or the re-probe
-path retracted). The **default** job (`Zero XY, Probe Z`) and single-WCS jobs are unaffected.
+path retracted). The **default** job (`Set X0 Y0 to Current Pos, Probe Z0`) and single-WCS jobs are unaffected.
 *Verification pending — see `docs/test-plan.md`.*
 
 ### Phase 4 — backlog: "Copy first part's Z" option on `B_Probe_OnChange`
@@ -450,7 +461,7 @@ Observations from reviewing real F360 g-code output that need no immediate actio
 - **Multi-WCS supports two coexisting per-part workflows** *(updated — was "Replicate-only")* —
   milling multiple parts/copies, one WCS per part. (1) *Pre-set fixture offsets (Replicate):*
   `B_Probe_OnChange` = `Skip` (use stored X/Z) or `Probe Z` (stored XY, re-probe Z). (2) *Manual
-  per-part:* `Zero XYZ` / `Zero XY, Probe Z` — the operator jogs to each part and the post records
+  per-part:* `Jog XYZ` / `Jog XY & Probe Z` — the operator jogs to each part and the post records
   its origin. The reserved base + Safe Z give the cross-part clearance in either. One part from
   multiple datums, or a flip, is still out of scope for a single run (separate jobs).
 - **Tool-change position:** base-relative when a base is reserved (fixed spot across fixtures),

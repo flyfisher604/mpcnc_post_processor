@@ -1,7 +1,7 @@
-<!-- doc-sync: MPCNC_v4.0_Beta2.cps @ 1c3ec33
+<!-- doc-sync: MPCNC_v4.0_Beta2.cps @ db7644b
      This README documents the post as of the commit above. It is NOT kept in sync
      automatically. To refresh it, review only what changed in the post since that ref:
-       git diff 1c3ec33..HEAD -- MPCNC_v4.0_Beta2.cps
+       git diff db7644b..HEAD -- MPCNC_v4.0_Beta2.cps
      Then bump the ref to the new HEAD. -->
 Fusion 360 CAM Post Processor for MPCNC / LowRider
 ====
@@ -40,8 +40,8 @@ retracts, traverses between parts — is measured relative to that zero. Where a
 
 The post is designed to **degrade gracefully**:
 
-- A **hobby** job — one operation, one part, no probe — needs almost no setup. Jog to
-  your zero, post, run.
+- A **hobby** job — one operation, one part — needs almost no setup. Jog to your zero,
+  accept the defaults (the post records XY there and probes Z for you), post, run.
 - A **full** job — many operations, multiple tools, or multiple fixtures making several
   copies — has the extra structure (WCS handling, a reserved spoilboard base, per-part
   probing, safe cross-part traverses) available and validated, without complicating the
@@ -78,33 +78,41 @@ The post is a single file, `MPCNC_v4.0_Beta2.cps`.
 ## Hobbyist — posting a single operation
 
 **Who this is:** you're cutting one part in one Setup, usually with a single tool, and
-zeroing by hand. No probe or fixturing required.
+zeroing by hand. A single operation has no WCS change, so only the **First WCS / Part**
+origin choice applies.
 
-**The flow:**
+**The flow — walk the property groups in dialog order.** Only three groups need any
+attention; the rest are marked *Accept Defaults*.
 
-1. **Job → CNC Firmware** — pick your controller.
-2. **Feeds and Speeds** — set the speeds to what your machine is actually capable of:
-   **Travel Speed X/Y**, **Travel Speed Z**, and the **Max XY Cut Speed** / **Max Z Cut
-   Speed** limits. Enable **Scale Feedrate** so cut moves are scaled to stay within those
-   axis limits, and **Enforce Feedrate** so a feedrate is always emitted — together they
-   keep the job within your CNC's capabilities.
-3. **Map G1s to Rapids** — a hobbyist job may benefit from these optimizations: they
-   restore safe, properly-ordered travel moves (retract before travelling, travel before
-   descending) and avoid dragging the tool across the work. Leave this group **on** to
-   enable them. (See *G1 → G0 rapid mapping* below.)
-4. **Probe / Work Origin** — set how the single part gets its zero:
-   - **First Part: Set Work Origin**:
-     - **Zero XYZ (no probe)** — jog the tool to the part origin (the XY corner *and*
-       down to touch the stock top); this records that position as X0 Y0 Z0. The classic
-       manual touch-off; also the choice for a laser/pen where Z is set by hand.
-     - **Zero XY, probe Z** — jog to the XY corner and the post probes Z off a touch
-       plate for you. (Default.)
-     - **Skip** — do nothing (you've already zeroed in your sender).
-5. Post and run.
+- **01 - Job** — set **CNC Firmware** to your controller. Leave **Manual Spindle On/Off**
+  on if you start your router/spindle by hand. Otherwise *Accept Defaults*.
+- **02 - Establish Machine Coordinates** — *Accept Defaults* (**Home Before Start =
+  None**). Choose **XY** only if your machine has X/Y endstops and you want squaring.
+- **03 - Feeds and Speeds** — set **Travel Speed X/Y**, **Travel Speed Z**, and the **Max
+  XY Cut Speed** / **Max Z Cut Speed** limits to your machine's real capability. Enable
+  **Scale Feedrate** so cut moves are scaled to stay within those limits, and keep
+  **Enforce Feedrate** on so a feedrate is always emitted.
+- **04 - Map G1s to Rapids** — **turn this group on.** A Personal-license job needs it: it
+  restores safe, properly-ordered travel moves (retract before travelling, travel before
+  descending) and avoids dragging the tool across the work. (See *G1 → G0 rapid mapping*.)
+- **05 - Establish Spoilboard Reference** — *Accept Defaults* (**Reserved WCS = None**). A
+  single-part job uses no base.
+- **06 - On WCS / Part / Fixture Changes** — *Accept Defaults.* **First WCS / Part**
+  defaults to **`Set X0 Y0 to Current Pos, Probe Z0`**: **jog the tool to the part's XY
+  corner before you post** (in your sender), then the post records XY there and probes Z
+  off a touch plate — no run-time jog prompt. Keep **Probe Pause = Before & After** so
+  you're prompted to attach/remove the probe. If you have **no probe**, choose **`Set X0
+  Y0 Z0 to Current Pos`** instead (jog to XY *and* touch off Z by hand before posting).
 
-Everything else (the spoilboard base, "On Each Added Part", cross-part clearance) stays
-at its default and emits nothing. A single-operation job is byte-for-byte what you'd
-expect — none of the multi-part machinery runs.
+Then **post and run.**
+
+> **Prefer a guided jog prompt?** The **`Jog to …`** modes pause mid-run and ask you to
+> jog to the origin instead of pre-jogging. They aren't the default because jogging while
+> paused isn't supported on every firmware/sender — see *Jogging at a pause*.
+
+Everything else (the spoilboard base, **Subsequent WCS / Part**, cross-part clearance)
+stays at its default and emits nothing on a single-operation job — none of the multi-part
+machinery runs.
 
 ## Full user — WCS, many operations, and multiple fixtures
 
@@ -133,11 +141,12 @@ The full-license user meets WCS in one of three situations:
 The common full-license job: several operations (face, pocket, contour), possibly
 several tools, all on one part in one Setup — so one WCS throughout.
 
-- Turn the **Map G1s to Rapids** group **off** — the full license already posts real
+- Turn the **04 - Map G1s to Rapids** group **off** — the full license already posts real
   `G0` rapids, so the hobby workaround isn't needed.
-- Set **First Part: Set Work Origin** as above (probe Z is the usual full-license
-  choice).
-- If the job changes tools, enable the **Tool Changes** group. Because there is no
+- Set **First WCS / Part**: if this Setup's WCS is a pre-set fixture, choose **`Use Existing
+  WCS X0 Y0, Probe Z0`** (rapid to the stored X0 Y0, re-probe Z); otherwise `Set X0 Y0 to
+  Current Pos, Probe Z0` (pre-jog XY). Prefer these over the `Jog` modes.
+- If the job changes tools, enable the **07 - Tool Changes** group. Because there is no
   tool-length system, turn on **Probe After Tool Change** so each new tool re-references
   Z. The tool-change park position (**Tool Change X/Y/Z**) is relative to the current
   work zero.
@@ -149,19 +158,28 @@ several tools, all on one part in one Setup — so one WCS throughout.
 You have jigged up several copies of the same part, one per fixture, each on its own
 WCS (`G54`, `G55`, `G56`, …), and want to cut them all in one program.
 
-- **Reserve a spoilboard base** — set **WCS for Spoilboard** (default choice `G59`). This
-  is a *fixed-surface* zero (the spoilboard, not any stock top) that gives the post a
-  stable reference to retract to when traversing between parts of possibly different
-  thickness. Keep **Probe Z to Set Spoilboard WCS** on so it's established at job start.
+- **Reserve a spoilboard base** — set **05 - Establish Spoilboard Reference → Reserved
+  WCS** (recommended `G59`). This is a *fixed-surface* zero (the spoilboard, not any stock
+  top) that gives the post a stable reference to retract to when traversing between parts
+  of possibly different thickness. Keep **Probe to Set Base** at `Pause, Probe Z, Pause`
+  (or `Probe Z` for a fixed probe point) so it's established at job start.
 - Put each copy on its own Fusion Work Offset. Their **XY** comes from each fixture's
-  pre-set offset — the post never sets XY for an added part.
-- **On Each Added Part** decides Z for each copy after the first:
-  - **Probe Z** (default) — at each new copy the post rapids to that copy's origin and
-    probes its stock-top Z.
-  - **Skip** — the copy uses whatever Z is already stored in its WCS.
-- **Safe Z Retract Across Parts** (on by default) makes the tool retract to **Cross Part
-  Clearance** — an absolute height above the spoilboard base — *before* it traverses to
-  the next fixture, so it clears every clamp and part regardless of their heights.
+  pre-set offset — the post never sets XY for an added part unless you choose a Jog mode.
+- The **first** copy uses **First WCS / Part** — choose **`Use Existing WCS X0 Y0, Probe
+  Z0`** so it too takes its pre-set XY and re-probes Z (matching the copies below).
+- **Subsequent WCS / Part** decides what happens at each copy after the first. **The
+  best-practice paths use the stored fixture offset — not jogging:**
+  - **Use Existing WCS X0 Y0, Probe Z0** *(default)* — rapid to that copy's stored X0 Y0 and
+    re-probe its stock-top Z (the Replicate / pre-set-fixtures workflow). Handles varying
+    stock thickness.
+  - **Use Existing WCS X0 Y0 Z0** — the copy uses whatever X0 Y0 Z0 is already stored in
+    its WCS; the tool just rapids there (no probe).
+  - **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0** — pause (`M0`) so the operator jogs
+    to each copy's origin. Only for a setup run where the fixtures are *not* pre-set, and
+    only if your firmware/sender supports jogging at the pause (see *Jogging at a pause*).
+- **Retract Across Parts** (on by default) makes the tool retract to **Safe Z** — an
+  absolute height above the spoilboard base — *before* it traverses to the next fixture,
+  so it clears every clamp and part regardless of their heights.
 - Keep the reserved base as the fixed spoilboard reference — don't zero a part to it. A
   guard trips only if an operation would *re-establish* the base's origin (re-zero or
   re-probe it); it doesn't otherwise stop you from selecting that WCS.
@@ -194,55 +212,99 @@ setter). Most V1E machines have none of the three fully, so this post takes a de
 This matches the GRBL ecosystem (Shapeoko / OpenBuilds / Onefinity all zero to the work
 and probe Z) and works on the lowest-common-denominator machine.
 
+## Origin modes — First vs Subsequent WCS / Part
+
+Group **06 - On WCS / Part / Fixture Changes** holds the two origin controls. Each is an
+explicit **taxonomy** with three families:
+
+- **Set … to Current Pos** — no prompt. The tool is assumed to already be at the origin
+  (you pre-jogged before starting, or machine homing / the spoilboard base left it there);
+  the post records the current position. *(First WCS / Part only.)*
+- **Use Existing WCS …** — no prompt. Trust the origin already stored in that WCS (a
+  pre-set fixture offset / a prior job): rapid to its stored X0 Y0, and either re-probe Z
+  (`… X0 Y0, Probe Z0`) or trust the stored Z too (`… X0 Y0 Z0`, no probe). The
+  best-practice path for pre-set fixtures.
+- **Jog to …** — the post pauses with an `M0` (or RepRap `M291`) so the operator jogs to
+  the origin *during* the run, then records it there.
+
+Each probe family comes in a **Z-manual** variant (`… X0 Y0 Z0`, no probe) and a
+**probe-Z** variant (`… X0 Y0, Probe Z0`). On a jet tool or tool 0 the probe is skipped
+automatically. **The defaults avoid any run-time jog pause** (which not every
+firmware/sender supports — see *Jogging at a pause*): **First WCS / Part** defaults to
+**`Set X0 Y0 to Current Pos, Probe Z0`** (pre-jog XY in your sender, then probe Z), and
+**Subsequent WCS / Part** to **`Use Existing WCS X0 Y0, Probe Z0`** (pre-set fixture XY,
+re-probe Z). Pick a `Jog to …` mode only when you want the post to pause and guide you
+*and* your setup supports jogging at the pause.
+
+> **A jet tool or tool 0 never probes.** Any probe-Z mode degrades to recording the origin
+> with no `G38.2`, on every firmware.
+
+## Jogging at a pause
+
+The **Jog** origin modes (and the pre-homing prompt) pause the program and expect you to
+jog the tool by hand, then resume. **Whether you can actually jog while paused depends on
+your firmware and sender:**
+
+- **RepRap / Duet** — fully supported by design. The post emits `M291 … S3 X1 Y1 Z1`, a
+  blocking dialog with on-screen jog buttons for X/Y/Z.
+- **GRBL / FluidNC** — the post emits a plain `M0` pause; whether you can jog then is a
+  property of your **sender**, not the firmware. CNCjs, UGS, and bCNC keep GRBL in *Idle*
+  at the pause and let you jog, then resume with cycle-start; a bare-bones sender may hold
+  GRBL in a state that refuses `$J=` until you resume.
+- **Marlin** — jog from the **LCD/controller** (Move-Axis menu) while paused at the `M0`.
+  Host-streamed jog moves would just queue behind the pause and not run until you resume.
+
 ## Establishing the machine frame (homing / MCS)
 
-Group **02 - Establish Machine Coordinates** decides, per axis, how the machine frame is
-set. Each axis (**X**, **Y**, **Z**) is either:
+Group **02 - Establish Machine Coordinates → Home Before Start** decides whether the
+machine homes at job start to establish a repeatable machine frame:
 
-- **Power-On** (default) — accept the current position as zero; the post emits no motion.
-  The fallback for an axis with no endstop; this also covers an axis you have already
-  homed yourself at the controller/console.
-- **Home** — the post emits the homing command and the axis runs to its endstop.
+- **None** (default) — emit no homing; accept the current position (already homed at the
+  controller, or a power-on `0,0,0`). The safe default — a wrong home command is a crash.
+- **XY** — home X and Y (the usual case: XY repeatability and gantry squaring; Z stays on
+  the work-Z probe touch-off).
+- **XYZ** — also home Z, *only* if the machine is actually wired to home Z (LowRider
+  switches, or the Marlin movable-plate trick).
 
 Homing command by firmware:
 
 | Firmware | Command |
 |---|---|
-| Marlin / RRF (Duet) | `G28 X` / `G28 Y` / `G28 Z` — independent per axis set to Home |
+| Marlin / RRF (Duet) | `G28 X` / `G28 Y` / `G28 Z` — each axis homed independently |
 | GRBL / FluidNC | `$H` only — one command homes all configured axes together |
 
-On GRBL/FluidNC the per-axis dropdowns can't each trigger their own command (`$H` is
-all-or-nothing): any axis set to **Home** causes one `$H`, and the three dropdowns
-document which axes you assert are wired to sense a homing operation (not to be confused
-with a probe operation). **Prompt Before Z Home** pauses before a Marlin `G28 Z` so you
-can place a movable Z plate — it never fires for X/Y or on GRBL/RRF.
-
-Out of the box every axis is **Power-On**, so the post emits no homing (a wrong home
-command is a crash).
+On GRBL/FluidNC `$H` is all-or-nothing, so **XY** and **XYZ** emit the same `$H` (the
+choice just documents intent). **Prompt Before Home** pauses before homing so you can
+prepare the machine (place a movable Z plate, clear the bed); it fires whenever homing
+runs, so it never needs revisiting when the machine changes.
 
 ## The reserved spoilboard base
 
-For multi-fixture jobs, one WCS can be reserved as a **spoilboard base** (**WCS for
-Spoilboard**, default off / `None`). Because it is zeroed to a *fixed surface* (the
-spoilboard, independent of stock thickness), it is the one frame in which a safe height
-is meaningful across all of a job's parts. It is:
+For multi-fixture jobs, one WCS can be reserved as a **spoilboard base** (**05 - Establish
+Spoilboard Reference → Reserved WCS**, default `None`). Because it is zeroed to a *fixed
+surface* (the spoilboard, independent of stock thickness), it is the one frame in which a
+safe height is meaningful across all of a job's parts. It is:
 
-- **Established at job start** by probing the spoilboard (**Probe Z to Set Spoilboard
-  WCS** on), or assumed pre-set from a prior job (off — probe once, run many). This base
-  probe is always taken at the origin (0,0 — the tool's position at job start); the **Probe
-  X/Y Offset** below shifts only *part* probes, never the spoilboard probe.
+- **Established at job start** by **Probe to Set Base**: `Pause, Probe Z, Pause` (prompt,
+  probe, prompt — the manual touch-off, default), `Probe Z` (probe with no prompt, a
+  fixed point), or `None` (assume pre-set from a prior job — probe once, run many). This
+  base probe is always taken at the origin (0,0 — the tool's position at job start); the
+  **Probe X/Y Offset** shifts only *part* probes, never the spoilboard probe.
 - **Transited, not parked**: when the tool must move between parts, the post briefly
-  selects the base to retract to **Cross Part Clearance**, then selects the destination
-  WCS. It never leaves the base active into a cut, and never selects it without a real
-  move.
+  selects the base to retract to **Safe Z** (the group's cross-part clearance), then
+  selects the destination WCS. It never leaves the base active into a cut, and never
+  selects it without a real move.
 - Recommended slot **`G59`** (the highest GRBL supports, keeping `G54` free for parts).
   `G59.1`–`G59.3` are RepRap-only; a base is ignored on Marlin.
 
 ## Probing and tool changes
 
 - **Work-Z probing only.** `G38.2` down to a touch plate (thickness compensated via
-  **Plate Thickness**), with attach/remove pauses. There is no tool-length system, and
-  X/Y is never probed (jog manually).
+  **Plate Thickness**), with attach/remove pauses governed by **Probe Pause**. There is no
+  tool-length system, and X/Y is never probed (jog manually).
+- **Probe Pause** (default `Before & After`) controls the operator prompts around each
+  *part* probe — attach before, detach after; set `No` for a fixed/permanent probe. It
+  does not affect the spoilboard base probe (see **Probe to Set Base**).
 - **Probe X/Y Offset** (default `0,0`) moves the Z-probe touch-point away from the work
   origin by a fixed XY distance, so the origin can sit at a part corner or off the material
   while Z is still read on the stock top. It applies at **every part probe** — the first
@@ -260,9 +322,9 @@ before emitting bad g-code:
 
 - **No base redefine** — using the reserved base is fine; a job that would *re-establish*
   its origin is an error ("assign this operation to another WCS").
-- **Safe-Z across parts needs a base** — if **Safe Z Retract Across Parts** is on and the
-  job uses more than one WCS on GRBL/RRF with no base reserved, it errors (a clearance
-  height is meaningless across un-probed offsets). Single-WCS jobs are exempt.
+- **Safe-Z across parts needs a base** — if **Retract Across Parts** is on and the job
+  uses more than one WCS on GRBL/RRF with no base reserved, it errors (a clearance height
+  is meaningless across un-probed offsets). Single-WCS jobs are exempt.
 - **Marlin is single-frame** — a Marlin job that uses more than one distinct work offset
   is a hard error (`G92` can't fake multiple WCS).
 
@@ -270,7 +332,7 @@ before emitting bad g-code:
 
 The Personal license restricts all moves to the max cut speed — and Fusion implements
 this by turning every `G0` rapid into a `G1` cut. The side effect is dragging cuts and
-collisions at the start of jobs and after tool changes. Group **05 - Map G1s to Rapids**
+collisions at the start of jobs and after tool changes. Group **04 - Map G1s to Rapids**
 selectively converts those `G1` moves back into `G0` rapids where it's safe:
 
 - **First G1 → G0 Rapid** — restores the lost initial positioning move at the start of a
@@ -304,7 +366,7 @@ Groups appear in the Fusion dialog in the order below.
 ## 01 - Job
 |Title|Description|Default|
 |---|---|---|
-|CNC Firmware|Dialect of g-code to create (GRBL / Marlin / RepRap).|**GRBL 1.1**|
+|CNC Firmware|Dialect of g-code to create (GRBL / Marlin / RepRap).|**GRBL**|
 |Manual Spindle On/Off|Issue pauses to manually turn the spindle on/off.|**true**|
 |Comment Level|Verbosity: Off, Important, Info, Debug.|**Info**|
 |Use Arcs|Use G2/G3 for circular moves.|**true**|
@@ -317,18 +379,10 @@ Groups appear in the Fusion dialog in the order below.
 ## 02 - Establish Machine Coordinates
 |Title|Description|Default|
 |---|---|---|
-|X / Y / Z|Per axis: **Power-On** (accept current position, no motion) or **Home** (run to endstop). GRBL homes all axes with one `$H` if any is set to Home.|**Power-On**|
-|Prompt Before Z Home|Pause before a Marlin `G28 Z` to place a movable Z plate. Marlin-only.|**false**|
+|Home Before Start|Home at job start to establish the machine frame: **None** (no homing), **XY** (home X/Y), **XYZ** (also home Z, only if wired for it). GRBL homes all axes with one `$H` if XY or XYZ.|**None**|
+|Prompt Before Home|Pause before homing so you can prepare the machine (place a movable Z plate, clear the bed). Fires whenever homing runs.|**false**|
 
-## 03 - Spoilboard Base
-|Title|Description|Default|
-|---|---|---|
-|WCS for Spoilboard|Reserve one WCS as a fixed spoilboard base. `None` = off. `G59.1`–`G59.3` are RepRap-only; ignored on Marlin.|**None**|
-|Probe Z to Set Spoilboard WCS|Probe the spoilboard into the base at job start (off = assume pre-set). The base probe is always at the origin (0,0) — the Probe X/Y Offset never applies to it.|**true**|
-|Safe Z Retract Across Parts|Retract to Cross Part Clearance before traversing between WCS; drives Guard B. GRBL/RepRap only.|**true**|
-|Cross Part Clearance (above spoilboard)|Absolute height above the base to retract to between parts — clear the tallest fixture.|**40**|
-
-## 04 - Feeds and Speeds
+## 03 - Feeds and Speeds
 |Title|Description|Default|
 |---|---|---|
 |Travel Speed X/Y|`G0` travel speed X & Y (mm/min).|**2500**|
@@ -339,7 +393,7 @@ Groups appear in the Fusion dialog in the order below.
 |Max Z Cut Speed|Max Z cut speed (mm/min).|**180**|
 |Max Toolpath Speed|Cap for the scaled toolpath feed (mm/min).|**1000**|
 
-## 05 - Map G1s to Rapids (disable when using full license)
+## 04 - Map G1s to Rapids (disable when using full license)
 |Title|Description|Default|
 |---|---|---|
 |First G1 → G0 Rapid|Convert the first `G1` of a toolpath to a rapid.|**false**|
@@ -347,18 +401,27 @@ Groups appear in the Fusion dialog in the order below.
 |Map: Safe Z to Rapid|Threshold Z: a number, or a Fusion height with fallback (e.g. `Retract:15`).|**Retract:15**|
 |Map: Allow Rapid Z|Also convert safe vertical moves.|**false**|
 
-## 06 - Probe / Work Origin
+## 05 - Establish Spoilboard Reference
 |Title|Description|Default|
 |---|---|---|
-|First Part: Set Work Origin|First/only part origin: **Skip** / **Zero XYZ (no probe)** / **Zero XY, probe Z**.|**Zero XY, probe Z**|
-|On Each Added Part|Multi-fixture only: **Skip** or **Probe Z** at each added copy's WCS.|**Probe Z**|
-|Probe X Offset|X from a part's origin to its Z-probe touch-point. Applied at every part probe (first + added), never to the spoilboard base probe. `0` = probe at the origin.|**0**|
-|Probe Y Offset|Y from a part's origin to its Z-probe touch-point. Applied at every part probe (first + added), never to the spoilboard base probe. `0` = probe at the origin.|**0**|
-|G38.2 (On) or G28 (Off)|Probe with `G38.2` (On) or `G28` (Off). GRBL always `G38.2`.|**On**|
+|Reserved WCS|Reserve one WCS as a fixed spoilboard base. `None` = off. `G59.1`–`G59.3` are RepRap-only; ignored on Marlin.|**None**|
+|Probe to Set Base|Set the base's Z at job start: **None** (assume pre-set), **Probe Z** (probe, no prompt), **Pause, Probe Z, Pause** (manual touch-off). Always at the origin (0,0) — Probe X/Y Offset never applies.|**Pause, Probe Z, Pause**|
+|Retract Across Parts|Retract to **Safe Z** (below) before traversing between WCS; drives the safe-Z guard. GRBL/RepRap only.|**true**|
+|Safe Z|Absolute height above the base to retract to between parts — clear the tallest fixture.|**40**|
+
+## 06 - On WCS / Part / Fixture Changes
+|Title|Description|Default|
+|---|---|---|
+|First WCS / Part|Origin for the first/only part: **Set X0 Y0 to Current Pos, Probe Z0** / **Set X0 Y0 Z0 to Current Pos** / **Use Existing WCS X0 Y0, Probe Z0** / **Use Existing WCS X0 Y0 Z0** / **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**.|**Set X0 Y0 to Current Pos, Probe Z0**|
+|Subsequent WCS / Part|Multi-part only — what to do at each added part's WCS: **Use Existing WCS X0 Y0, Probe Z0** / **Use Existing WCS X0 Y0 Z0** / **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**. Not supported on Marlin.|**Use Existing WCS X0 Y0, Probe Z0**|
+|Probe Pause|Operator prompts around each part probe: **No** / **Before** / **Before & After**.|**Before & After**|
+|Probe with G38.2|Probe with `G38.2` (On) or `G28` (Off). GRBL always `G38.2`.|**On**|
 |G38 Target|Furthest Z the probe move travels to.|**-10**|
 |G38 Speed|Probe feedrate (mm/min).|**30**|
-|Safe Z|Retract height after probing; also the no-base added-part re-probe retract.|**40**|
+|Safe Z|Retract height after probing; also the no-base added-part re-probe retract. A number or a Fusion height (e.g. `Retract:15`).|**Retract:15**|
 |Plate Thickness|Touch-plate thickness (compensated into Z).|**0.8**|
+|Probe X Offset|X from a part's origin to its Z-probe touch-point. Applied at every part probe (first + added), never to the spoilboard base probe. `0` = probe at the origin.|**0**|
+|Probe Y Offset|Y from a part's origin to its Z-probe touch-point. Applied at every part probe (first + added), never to the spoilboard base probe. `0` = probe at the origin.|**0**|
 
 ## 07 - Tool Changes
 |Title|Description|Default|
