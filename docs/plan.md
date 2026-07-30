@@ -371,59 +371,48 @@ update that file's Results summary. The full rule is at the top of the test plan
 not a courtesy — a stale PASS is worse than an unrun test.
 
 **Baseline.** Branch `wcs-reworked-flow`. The two driving documents are this file and
-`docs/test-plan.md`; the post is `MPCNC_v4.0_Beta2.cps`. Nothing is in flight: the working tree is
-clean apart from an untracked `MPCNC_v4.0_Beta1.zip` (unrelated to this work — add it or ignore it).
-Recent commits: `25768ec` (base probed in its own WCS + full property dump) → `3ae1d24` (this
-checkpoint) → `90d3c95` (the "unknown Z" warning + H7f) → the current one (H7c review fixes).
+`docs/test-plan.md`; the post is `MPCNC_v4.0_Beta2.cps`. Nothing is in flight — the working tree is
+clean apart from an untracked `MPCNC_v4.0_Beta1.zip` (unrelated; add it or ignore it). **Nothing is
+known-broken and nothing is half-done.**
 
-**Landed and now verified against real output** — `H7c.gcode` (posted 2026-07-30 at `90d3c95`)
-cleared three of the four things that were unverified here:
-1. ✅ **Base probe runs in the base's own frame** — `G59` → `G38.2` → `G10 L20 P6 Z0.8` → `G0 Z40`
-   → `G54` restore, in that order, with no `G0 X/Y` in the base block. Test-plan **H7c PASS**.
-2. ✅ **Full property dump** — 11 groups, 68 properties, dialog order, stored enum ids. **D2 PASS**
-   except the Comment-Level suppression check.
-3. ✅ **The "unknown Z" warning** — **H7f PASS, all three** (`H7c-a/-b/-c.gcode`): present with no
-   base, suppressed with an established one, and present again when a base is *reserved but not
-   established*. Motion byte-identical to `H7.gcode`.
-4. ⬜ **Two renames** (group-05 "Safe Z" → **Inter Part Safe Z**; `Use Existing WCS …` →
-   **`Use Active WCS …`**) — still need the dialog pass, **D1**.
+**How verification works here:** post the job from Fusion, read the g-code. Machine dry-runs and
+physical measurements are out of scope, so every test row must stand on the posted file alone.
 
-**Found while reviewing `H7c.gcode`** (both fixed in the current commit):
-- **The base probe emits no XY move** — it touches off wherever the tool is parked, so parking over
-  the stock silently records the stock top as "the spoilboard". The docs claimed "always probed at
-  the origin (0,0)", which was false. Now documented as an operator precondition in
-  `writeBaseEstablish()`, in the *Reserved spoilboard base* section above, and in the README.
-  **No code change** — the base establish runs before any origin exists, so there is no frame
-  in which an XY target could be trusted. Revisit only if a *base probe point* property is added.
-- **Parens in the Resolved Values labels were stripped** by `sanitizeMessageText`, leaving double
-  spaces (`Firmware  resolved  =`, `G59  P6 `). Same defect previously fixed in `partProbe()`;
-  labels reworded to avoid parens entirely.
+**Everything landed since the last checkpoint is verified.** In order: the "unknown Z" warning on
+the first-part `Probe Z` path (**H7f**, all three branches); the base-frame base probe (**H7c**);
+Guard A on the reserved base (**H7d**); the full property dump (**D2**); the property-group reorder
+that moved homing next to the spoilboard (**D3** header half); and the Resolved Values Safe-Z lines
+now reporting what the expression actually resolves to rather than restating the property.
 
-**Verified and done — do not re-run:** H1–H7, H7a, H7c, H7d, H7f (B), D2 (bar suppression). See
-the test plan's Results summary for per-row evidence and the standing note explaining why no H row
-needs a functional retest. ⚠ `H7.gcode` / `H7a.gcode` now predate the "unknown Z" line, and
-`H7c.gcode` predates the label fix — comment-only in both cases, so no retest, but do not diff a
-fresh post against them blind.
+**Three defects were found by those runs and fixed** — each is the kind that only a real posted file
+exposes, which is worth remembering when tempted to skip the posting step:
+- Guard A named **pre-rework dialog titles** (`Probe at Job Start`), sending the operator hunting for
+  a field that no longer exists.
+- The Resolved Values block **restated the property instead of resolving it** — `Retract : default =
+  15` on a job emitting `G0 Z5.08`. Fixing it also required correcting `resolveSafeZHeight()`, which
+  queried the global context while reading from the passed section.
+- Parentheses in comment strings are **stripped by `sanitizeMessageText`**, leaving double spaces.
+  Fixed twice now; a third instance survives in the tapping warning and in the group-03 name.
 
-**Property groups were reordered** (latest commit): homing moved to sit immediately before the
-spoilboard group, so the positional groups are contiguous and the three "Establish" groups run in
-machine-execution order — `01 Job`, `02 Feeds`, `03 Map-G1s`, `04 Machine Coords`, `05 Spoilboard`,
-`06 On WCS`, `07`–`11` unchanged. Only `group:` strings changed, so **no preset resets** — but that
-is exactly what test-plan **D3** exists to confirm. README's Quick Start walkthrough and Property
-reference were reordered to match (its doc-sync ref was bumped).
+**One behavior worth knowing before touching the base code:** `writeBaseEstablish()` emits **no XY
+move** — it probes whatever is under the tool at job start, so parking over the stock silently
+records the stock top as "the spoilboard". Deliberate (no trustworthy frame exists that early) and
+documented as an operator precondition in the code, this file and the README. The durable fix is
+sketched under *Future work — a machine-coordinate base probe point (`G53`)*.
 
 **Next actions, in the order they'd be tackled:**
-1. **Code — tool-change ordering + base-relative park.** The top item; design settled — see
-   *Phase 4 — tool-change ordering + base-relative park*, the first section under Remaining work.
-   Nothing else depends on it, and the base machinery underneath it is now verified (H7c).
-2. **Tests, no machine needed:** **D1** and **D3**'s dialog half — both are dialog-only, no posting,
-   and D3 (does a saved preset survive the group move?) gates trust in every other dialog row;
-   **D2**'s suppression check at Comment Level `Important` / `Off`; **H7e** (Marlin/RRF); **P3**.
-3. **Tests needing a multi-part / multi-fixture job to post:** **PB1/PB2**, **PBV1–3**,
-   **PA1/PA1b**, **P2** (only its added-part half remains; `H7c.gcode` already evidenced the base and
-   first-part halves).
-4. **Deferred workstream:** jet tools and laser (**J1–J5**) — to be reviewed and tested separately,
-   per an explicit scope decision. `J5` is a design question before it is a test.
+1. **Code — tool-change ordering + base-relative park.** The last substantial code item; design
+   settled, see *Phase 4 — tool-change ordering + base-relative park* under Remaining work. Nothing
+   depends on it, and the base machinery underneath it is now verified.
+2. **Dialog-only checks, no posting:** **D1** (labels/defaults audit) and **D3**'s dialog half — does
+   a *saved preset* survive the group move? Only `group:` strings changed so it should, but a posted
+   file cannot tell a surviving preset from re-entered values. D3 gates trust in every dialog row.
+3. **Single-post checks:** **D2**'s suppression check at Comment Level `Important` / `Off`;
+   **H7e** (H7 on Marlin and RRF).
+4. **Needs a multi-part / multi-fixture job to post:** **PB1/PB2**, **PBV1–3**, **PA1/PA1b**,
+   **P2**/**P3** (only the added-part halves remain).
+5. **Deferred workstream:** jet tools and laser (**J1–J5**), a separate scope decision. `J5` is a
+   design question before it is a test.
 
 **Open decisions carried forward** (each written up in full below): whether first-part `Skip` should
 hold the base clearance instead of descending to the probe Safe Z when a base is reserved; the

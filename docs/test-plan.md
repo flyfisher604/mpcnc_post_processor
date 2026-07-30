@@ -30,22 +30,15 @@ Design/behavior detail lives in `docs/plan.md`.
 
 ## Execution runbook — hobbyist & professional flows
 
-End-to-end, persona-driven scenarios covering the current changes (the reworked **First /
-Subsequent WCS / Part** origin modes — an explicit *Set … to Current Pos* (no prompt) vs *Jog to …*
-(M0 jog prompt) taxonomy, with the **no-prompt modes as the defaults** — First = `Set X0 Y0 to
-Current Pos, Probe Z0`, Subsequent = `Use Active WCS X0 Y0, Probe Z0` (the `Jog to …` modes are opt-in
-because jogging at the pause isn't supported on every firmware/sender); the new first-part
-`Use Active WCS X0 Y0, Probe Z0` mode (**H7**); safe-Z arrival
-on every WCS change; the first-part **Skip** behavior change; the group-06 rename; and the whole-mm
-integer offsets / Safe Z). **You run these; record the outcome in each `Result:` line** (`PASS` /
-`FAIL` + a note, and paste the relevant g-code snippet). The granular token-level checks (M1–M6,
+End-to-end, persona-driven scenarios covering the reworked **First / Subsequent WCS / Part** origin
+modes, safe-Z arrival on every WCS change, and the whole-mm integer offsets / Safe Z. **You run
+these; record `PASS` / `FAIL` in each `Result:` line.** The granular token-level checks (M1–M6,
 P1–P3) below still apply; each scenario tags which ones it also satisfies so nothing is double-run.
 
-**Where the g-code goes.** Posted files referenced by name below (`H7.gcode`, `H7a.gcode`,
-`H6 - RRF.gcode`, `Face1.gcode`, …) are written to Fusion's NC output folder —
+**Where the g-code goes.** Posted files named below are written to Fusion's NC output folder —
 `C:\Users\don_m\Documents\Fusion 360\NC Programs\` — not into the repo. Name each post after its
-test row so a later review can find it. Diffing two of them is often the fastest check (that is how
-H7a was verified: `Compare-Object` showed only the two intended lines changed).
+test row so a later review can find it. Diffing two of them is often the fastest check; strip
+comment lines first when the two posts straddle a header change.
 
 **Conventions.** Comments are `( ... )` on GRBL and `; ...` on Marlin/RRF — otherwise the tokens
 are identical. `G10 L20 P<n>` is GRBL/RepRap; Marlin uses `G92` and rejects >1 WCS (Guard C).
@@ -66,7 +59,7 @@ firmware-variant rows note what changes elsewhere.
 | H4 | Hobbyist — single op, `Set X0 Y0 Z0 to Current Pos` (manual Z, no prompt) | PASS *(jet/tool-0 → J1)* |
 | H5 | Hobbyist — single op, `Use Active WCS X0 Y0 Z0` (trust stored) | PASS |
 | H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | PASS (Marlin + RRF) |
-| H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7b–H7f unrun; ⚠ saved files predate the H7f comment)* |
+| H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7e unrun; H7b → J1)* |
 | H7f | "Unknown Z" warning — present without a base, suppressed with one | PASS *(all three)* |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
@@ -77,7 +70,8 @@ firmware-variant rows note what changes elsewhere.
 | PA1 | Pro A — 2nd WCS same part/fixture, `Jog to X0 Y0, Probe Z0` | |
 | PA1b | Pro A — 2nd WCS same part, Z-only re-probe (`Use Active WCS X0 Y0, Probe Z0`) | |
 | H7c | Base probes/retracts in its own frame | PASS |
-| H7d | Guard A fires on the reserved base for this mode | PASS *(found a stale control name; fixed)* |
+| H7d | Guard A fires on the reserved base for this mode | PASS |
+| H7e | H7 on Marlin and RRF | |
 | D1 | Dialog & defaults audit (modes, renames, integer fields) | |
 | D2 | Header property dump — all 68 properties + resolved values | PASS *(suppression check unrun)* |
 | D3 | Group order after the homing move — presets must survive | header PASS *(dialog half unrun)* |
@@ -92,22 +86,10 @@ its modes. The default is now **H2** (`Set X0 Y0 to Current Pos, Probe Z0`, no p
 opt-in guided-jog path. Do them on **GRBL**, one 3-axis milling op, real tool (tool ≠ 0, not a jet
 tool) unless a row says otherwise.
 
-> **Retest determination (reviewed against commits `5d89838` → `01c69a3`).** **No H row needs a
-> functional retest.** The only change to any already-verified H path is **operator-prompt text**:
-> four `askUser()` strings were shortened and the RepRap dialog title `"Set part origin"` became
-> `"Set origin"`. Motion, origin writes, probe commands, and comment structure are untouched, so
-> H1–H6 stand as verified. Consequences to be aware of when re-reading the saved g-code:
-> - **H1 / H3** — their `.gcode` files predate the wording change (each row already notes it), so
->   their `M0 (MSG …)` text differs from the expected blocks below, which carry the **current**
->   wording. Cosmetic — do not re-post for this.
-> - **H2 / H4 / H5** — no operator prompt on these paths at all; wholly unaffected.
-> - **H6** was re-posted after the spurious-Marlin-warning removal, and that removal shipped in the
->   *same* commit (`01c69a3`) as the wording change — so `H6 - Marlin.gcode` / `H6 - RRF.gcode`
->   should already show the current message text (and RRF the current `R"Set origin"` title, since
->   RRF is the only firmware that emits the `askUser` title). Spot-check if in doubt; no re-post.
->
-> What the recent commits *did* leave untested is a **whole new sixth mode**, `Use Active WCS X0
-> Y0, Probe Z0` on First WCS / Part — a new branch in `writeWcsOnStart()`. That is **H7** below.
+> **No H row needs a functional retest.** Since they were verified, the only change to any H path
+> has been operator-prompt wording (`askUser()` strings shortened, RRF title `"Set part origin"` →
+> `"Set origin"`). Motion, origin writes, probe commands and comment structure are untouched, so the
+> saved `H1.gcode` / `H3.gcode` differ from the expected blocks below only in `M0 (MSG …)` text.
 
 - [x] **H1 — `Jog to X0 Y0, Probe Z0` (opt-in guided-jog path).** Set First WCS / Part = `Jog to X0
       Y0, Probe Z0` (**no longer the default**); Probe Pause = `Before & After`.
@@ -124,11 +106,7 @@ tool) unless a row says otherwise.
       ... retract to probe Safe Z, then the cut ...
       ```
       **Pass:** with the jog mode selected the job pauses (`M0`) for the operator to jog to the part
-      origin, then zeroes XY there and probes Z — both into `P1`. *Result:* **PASS** — verified against
-      `H1.gcode`: `G54` → `M0` jog prompt → `G10 L20 P1 X0 Y0` → `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8`,
-      both writes into `P1`. G-code independently checked as valid/collision-safe (modal G0 across the
-      section boundary, all arcs close, safe retract ordering). *(Jog `M0` message wording was
-      operator-edited; unscaled CAM feeds/DOC pass through as designed — not H1 concerns.)*
+      origin, then zeroes XY there and probes Z — both into `P1`. *Result:* **PASS** (`H1.gcode`).
 
 - [x] **H2 — Default `Set X0 Y0 to Current Pos, Probe Z0` (pre-jog, no prompt — the zero-change
       path).** Leave **every** property at its default (First WCS / Part = `Set X0 Y0 to Current Pos,
@@ -137,11 +115,7 @@ tool) unless a row says otherwise.
       `(   Set current X,Y position to 0,0)` → `G10 L20 P1 X0 Y0` → probe. **Pass:** with zero
       settings touched this reproduces the **pre-rework default output** (no jog prompt; XY zeroes at
       the parked position) and is the H-REG regression anchor below. *(Matches P1's offset-0
-      first-part shape.)* *Result:* **PASS** —
-      verified against `H2.gcode`: `G54` steps straight into `START begin` with **no jog `M0`** →
-      `(   Set current X,Y position to 0,0)` → `G10 L20 P1 X0 Y0` → `M0 (MSG Attach ZProbe)` →
-      `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8` → `M0 (MSG Detach ZProbe)`, both writes into `P1`. Real
-      tool (T171), GRBL comments. Confirms the pre-rework default shape; ready as the H-REG anchor.
+      first-part shape.)* *Result:* **PASS** (`H2.gcode`).
 
 - [x] **H3 — `Jog to X0 Y0 Z0` (manual Z, jog prompt, no probe).** One change: First WCS / Part =
       `Jog to X0 Y0 Z0` (operator with no probe). *Expected:*
@@ -153,23 +127,15 @@ tool) unless a row says otherwise.
       ... straight into the cut, no G38.2, no probe prompts ...
       ```
       **Pass:** the job pauses to jog all three axes to the origin, records `X0 Y0 Z0`, and cuts — no
-      `G38.2`. *Result:* **PASS** — verified against `H3.gcode`: `G54` → jog `M0` prompt →
-      `(   Set current position to 0,0,0)` → `G10 L20 P1 X0 Y0 Z0` (all three axes, `Z0` present) →
-      straight into the cut. **No `G38.2`** and **no probe attach/detach `M0`** anywhere. Real tool
-      (T171), GRBL. *(Jog `M0` wording was operator-edited since — now `Jog to X0 Y0 Z0, then
-      continue` — a non-functional change, per the H1 note.)*
+      `G38.2`. *Result:* **PASS** (`H3.gcode`).
 
 - [x] **H4 — `Set X0 Y0 Z0 to Current Pos` (manual Z, no prompt).** Same as H3 but First WCS / Part =
       `Set X0 Y0 Z0 to Current Pos`; jog to the part origin (all three axes) **before** posting.
       *Expected:* `G54` → `(   Set current position to 0,0,0)` → `G10 L20 P1 X0 Y0 Z0` → cut, with
       **no `M0` jog prompt and no probe**. **Pass:** one dialog change gives a fully manual no-prompt
       touch-off (the old H2 behavior). This is also the jet/laser path — a jet tool or tool 0 records
-      the origin with no probe regardless. *Result:* **PASS** — verified against `H4.gcode`: `G54`
-      steps straight into `START begin` with **no jog `M0`** → `(   Set current position to 0,0,0)` →
-      `G10 L20 P1 X0 Y0 Z0` (all three axes) → straight into the cut. **No `G38.2`** and **no probe
-      attach/detach `M0`** anywhere (the sole `M0` is the spindle manual-on prompt). Real tool (T171),
-      GRBL. Confirms the pre-rework fully-manual touch-off shape. *(Jet/tool-0 sub-check **deferred to
-      J1** — see [Jet tools & laser operations](#jet-tools--laser-operations--deferred).)*
+      the origin with no probe regardless. *Result:* **PASS** (`H4.gcode`). *(Jet/tool-0 sub-check
+      **deferred to J1** — see [Jet tools & laser operations](#jet-tools--laser-operations--deferred).)*
 
 - [x] **H5 — `Use Active WCS X0 Y0 Z0` (trust the stored origin).** First WCS / Part =
       `Use Active WCS X0 Y0 Z0`; the WCS already holds an origin (prior job / set manually).
@@ -189,17 +155,9 @@ tool) unless a row says otherwise.
 - [x] **H6 — Firmware variant (Marlin or RRF).** Repeat H1 (`Jog to X0 Y0, Probe Z0`) with Firmware = Marlin
       (and again RRF if you use it). **Pass:** comments switch to `; ...`; Marlin emits `G92` instead
       of `G10 L20`; the jog prompt and single-op flow are otherwise identical. Confirm no spurious
-      multi-WCS warning on a single-op Marlin job. *Result:* **Marlin: PASS** — verified against
-      `H6 - Marlin.gcode`: `; ...` comments, `M84 S0` startup (no `G94`/`G17` — Marlin is units/min
-      and XY-plane-arc only), **no `G54`**, `G92 X0 Y0` → `G38.2 F30 Z-10` → `G92 Z0.8` (G92 not
-      `G10 L20`), plain-text `M0` jog/probe prompts, GRBL helical lead-in linearized to `G1`. First
-      post emitted a **spurious** `Subsequent WCS / Part` multi-WCS warning on this single-op job;
-      fixed by removing the unreachable warning block in `writeWCS()` (Guard C already blocks real
-      multi-WCS Marlin jobs), re-posted clean. **RRF: PASS** — verified against `H6 - RRF.gcode`:
-      `; ...` comments and `M84 S0` startup (no `G94`/`G17`) like Marlin, but `G54` **is** emitted and
-      origin writes are `G10 L20 P1 …` (not `G92`); every operator pause is an `M291 … S3` dialog, with
-      `X1 Y1 Z1` jog buttons on the jog prompt only. Single `G38.2`, no spurious warning, helical
-      lead-in linearized to `G1`.
+      multi-WCS warning on a single-op Marlin job. *Result:* **PASS — Marlin and RRF**
+      (`H6 - Marlin.gcode`, `H6 - RRF.gcode`). RRF differs from Marlin as expected: `G54` **is**
+      emitted and origins are `G10 L20 P1 …` not `G92`, with `M291 … S3` dialogs for every pause.
 
 - [ ] **H7 — `Use Active WCS X0 Y0, Probe Z0` (new mode: stored XY, re-probe Z).** The sixth
       First WCS / Part mode, added in `01c69a3` — the no-prompt first-part path for a pre-set
@@ -225,22 +183,13 @@ tool) unless a row says otherwise.
       **Z note (by design, worth confirming):** with no base reserved this mode emits *no* Z move
       before the XY traverse — Z is stale pending the probe, so the post refuses to make an
       absolute Z move in that frame and instead traverses at whatever height the tool physically
-      sits at from job start. Record that height. *Result:* **PASS** — verified against `H7.gcode`
-      (GRBL, single op, T171, no base, offsets 0): `G54` → `(   Use stored work origin X0 Y0; probe
-      Z)` → `(   Move to part origin X0 Y0, then probe Z)` → `G0 X0 Y0 F2500` as the **first motion
-      in the program** → `M0 (MSG Attach ZProbe)` → `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8` → `G0
-      Z5.08` → `M0 (MSG Detach ZProbe)`. **No `G10 L20 P1 X0 Y0`** (the discriminator vs H2), no jog
-      `M0`, and no `G0 Z` before the traverse. Arcs/plane restores and section rapids independently
-      checked sound. **H7a PASS** (see below); **H7b deferred to J1**. Sub-check status since:
-      **H7c PASS**, **H7d PASS**, **H7f (A) and (B) PASS / (C) unrun**, **H7e still unrun** (this job
-      had no base and was GRBL only, so it could not cover any of them).
+      sits at from job start. Record that height.
+      *Result:* **PASS** (`H7.gcode`). Sub-checks: **H7a, H7c, H7d, H7f PASS**; **H7b deferred to
+      J1**; **H7e** unrun.
 
-      > **⚠ `H7.gcode` and `H7a.gcode` now predate current output.** The follow-up filed by this row
-      > — the `Ensuring that Z is safe. Unknown Z for XY move.` Info comment — **is implemented**, and
-      > it lands on exactly this path with no base reserved. Both saved files therefore lack one line
-      > that a fresh post emits. **Comment-only: no motion, no origin write, no probe changed**, so
-      > H7 and H7a stand as verified and need no functional retest — the new line is verified by
-      > **H7f** below instead. Do not diff a fresh post against these files without expecting it.
+      > **⚠ `H7.gcode` / `H7a.gcode` predate the `Ensuring that Z is safe…` line** added since
+      > (verified separately by **H7f**). Comment-only, so both rows stand — but don't diff a fresh
+      > post against them blind.
 
   Sub-checks:
 
@@ -248,14 +197,8 @@ tool) unless a row says otherwise.
         becomes `(   Move to probe point = origin + offset X10 Y5, then probe Z)` and the rapid is
         `G0 X10 Y5`, still with **no** `G10 L20 P1 X0 Y0`. (Closes the first-part `Probe Z` ×
         offset gap: P1 covers the offset only on the `Set X0 Y0 to Current Pos` path.)
-        *Result:* **PASS** — verified against `H7a.gcode`, diffed against `H7.gcode`: apart from the
-        timestamp the **only** two differing lines are the expected ones — the comment
-        `(   Move to probe point = origin + offset X10 Y5, then probe Z)` replacing
-        `(   Move to part origin X0 Y0, then probe Z)`, and `G0 X10 Y5 F2500` replacing
-        `G0 X0 Y0 F2500`. Still **no** `G10 L20 P1 X0 Y0` (the only `G10` is `G10 L20 P1 Z0.8`), and
-        the emitted X/Y equal the entered whole-mm offsets in an mm-output job. The offset is fully
-        localised to the probe-point reposition — Z retract, section body, and STOP block are
-        byte-identical to H7, so a nonzero offset perturbs nothing downstream.
+        *Result:* **PASS** (`H7a.gcode`). Diffed against `H7.gcode`: only the two intended lines
+        differ, so the offset is fully localised to the probe-point reposition.
 
   - **H7b — jet tool / tool 0. → DEFERRED** to
     **[Jet tools & laser operations](#jet-tools--laser-operations--deferred)** (J-series). The
@@ -293,16 +236,8 @@ tool) unless a row says otherwise.
         reposition; and the `Ensuring that Z is safe. Unknown Z for XY move.` line is **absent** —
         the base retract made the height known (this file doubles as **H7f (B)**).
 
-        *Result:* **PASS** — `H7c.gcode` (2026-07-30, post `90d3c95`; GRBL, T171, base `G59`,
-        Inter Part Safe Z 40, offsets X10 Y5). All five criteria hold:
-        `G59` (L128) precedes `G38.2 F30 Z-10` (L136); `G10 L20 P6 Z0.8` (L137) → `G0 Z40 F300`
-        (L138) — the Inter Part Safe Z, visibly distinct from the part probe's `G0 Z5.08` (L155);
-        `(   Restore operating WCS G54 after base probe)` → `G54` (L140-141) precedes
-        `(   Use stored work origin X0 Y0; probe Z)` (L142); **no `G0 X/Y` anywhere in the base
-        block**; and no "unknown Z" warning (**H7f (B)** — see that row). The part probe repositioned
-        to `X10 Y5` while the base did not, so this file also evidences **P2**'s base assertion. The
-        traverse `X10 Y5 F2500` (L144) carries no `G0` word — correct, `G0` is modal from L138 and
-        `G54` does not reset the motion group.
+        *Result:* **PASS** (`H7c.gcode`, offsets X10 Y5 — so it also evidences **P2**'s
+        base-ignores-offset assertion and doubles as **H7f (B)**).
 
   - [x] **H7d — Guard A still fires for this mode.** Assign the first section to the reserved base
         WCS (e.g. base `G59`, Setup WCS = `6`) with First WCS / Part = `Use Active WCS X0 Y0,
@@ -311,22 +246,8 @@ tool) unless a row says otherwise.
         Part` — so the operator can go find it. The new mode writes a Z origin, so it must count as
         origin-establishing (`baseOriginWriteReason()` classifies every mode except `Skip` that way).
 
-        *Result:* **PASS** — `H7d.log` (2026-07-30, post `710b9d4`):
-        ```
-        Error: G59 is reserved as the spoilboard base -- assign this operation to
-        another WCS (would be re-established by: Probe at Job Start).
-        Error at line: 1299
-        Failed while processing onOpen().
-        ```
-        Guard fires in `onOpen()` before any output, and no `H7d.gcode` was written (confirmed on
-        disk, not inferred from the log). **Defect found and fixed:** the error named
-        **`Probe at Job Start`**, a control that no longer exists — `A_Probe_OnStart` was retitled
-        **First WCS / Part** in the origin-mode rework and `baseOriginWriteReason()` was never
-        updated, so the message sent the operator hunting for a field that isn't in the dialog.
-        `B_Probe_OnChange`'s string (`Probe on WCS Change` → **Subsequent WCS / Part**) was stale the
-        same way; `Probe After Tool Change` was already correct. All three now carry a comment tying
-        them to the dialog titles. A re-post would show the corrected text — behavior is unchanged,
-        so this row stands as passed.
+        *Result:* **PASS** (`H7d.log`; no `H7d.gcode` written, confirmed on disk). The run found the
+        error naming the *pre-rework* titles — fixed, so a re-post shows `First WCS / Part`.
 
   - [ ] **H7e — firmware variant (low priority).** Repeat H7 on Marlin and RRF. **Pass:** Marlin
         emits `G92 Z0.8` only (no XY word, no `G54`); RRF emits `G54` + `G10 L20 P1 Z0.8` with
@@ -376,50 +297,19 @@ tool) unless a row says otherwise.
         (**H2** path) and any added-part probe contain the line **nowhere** — it is gated by the
         `zUnknown` parameter that only this one mode passes.
 
-        *Result:* **PASS — all three.**
-
-        **(A)** — `H7c-a.gcode` (2026-07-30, post `edc38b3`; GRBL, T171, `Reserved base WCS = None`,
-        offsets `0`, confirmed from its own property dump). The warning is present and correctly
-        placed: `(   Use stored work origin X0 Y0; probe Z)` (L126) →
-        `(   Ensuring that Z is safe. Unknown Z for XY move.)` (L127) →
-        `(   Move to part origin X0 Y0, then probe Z)` (L128) → `G0 X0 Y0 F2500` (L129), which is the
-        **first motion in the program** — exactly the case the warning exists for. Blast radius nil:
-        against `H7.gcode`, **motion is byte-identical (39 lines each, zero differences)** and the
-        warning is the only added body line; every other difference is the property dump replacing
-        the two old hand-written blocks, plus the timestamp.
-
-        **(B)** — confirmed twice, at both offset settings: `H7c.gcode` (offsets X10 Y5) and
-        `H7c-b.gcode` (offsets `0`, `A_Spoilboard_BaseReserve = 6`, `B_Spoilboard_BaseEstablish =
-        Pause & Probe Z`). In `H7c-b` the warning is **absent** — `(   Restore operating WCS G54
-        after base probe)` → `G54` (L140-141) → `(   Use stored work origin X0 Y0; probe Z)` (L142) →
-        `(   Move to part origin X0 Y0, then probe Z)` (L143) with no warning between. The base block
-        is intact: `G59` (L128) → `G38.2` (L136) → `G10 L20 P6 Z0.8` (L137) → `G0 Z40` (L138) → `G54`
-        restore.
-
-        **(C)** — `H7c-c.gcode` (`A_Spoilboard_BaseReserve = 6`, `B_Spoilboard_BaseEstablish = None`,
-        offsets `0`); confirmed on the original post `edc38b3` and again on the `e1a526f` re-post,
-        where the Safe-Z header fix left this path's line numbering untouched. The warning is
-        **back**, as predicted:
-        `(   assuming base G59 is already established -- from a prior job or set manually)` (L126) →
-        `(   Use stored work origin X0 Y0; probe Z)` (L127) →
-        `(   Ensuring that Z is safe. Unknown Z for XY move.)` (L128) →
-        `(   Move to part origin X0 Y0, then probe Z)` (L129) → `G0 X0 Y0 F2500` (L130). No `G59`
-        select, no `G38.2` on the base, no retract — so nothing established a height, and the guard's
-        `|| B_Spoilboard_BaseEstablish == "None"` half is confirmed. **Reserving a base is not by
-        itself enough to suppress the warning; it must also be established.**
+        *Result:* **PASS — all three.** (A) `H7c-a.gcode`, (B) `H7c-b.gcode` and `H7c.gcode`
+        (confirmed at both zero and nonzero offsets), (C) `H7c-c.gcode`. (A)'s motion is
+        byte-identical to `H7.gcode`'s — the warning added one comment line and nothing else.
 
 - [ ] **H-REG — Byte-for-byte regression (the key guarantee).** With the default reverted to
       `Set X0 Y0 to Current Pos, Probe Z0`, the **default** single-op output is again the pre-rework
       Current-Pos+Probe path (no jog `M0`) — so the byte-identical anchor is back on the default
       (**H2**). Post the H2 single-op job and diff it against the pre-rework default output (prior
       tagged `.cps` or a saved reference `.gcode`). **Pass:** **byte-for-byte identical** — the
-      Current-Pos+Probe path preserves the old default exactly. *Result:* **OMITTED** — not run (no
-      practical way to produce and diff the pre-rework reference here). The structural equivalence of
-      the Current-Pos+Probe path is already covered by **H2**, which is once again the default.
-      **⚠ Re-baseline required.** The header property dump (D2) adds ~98 Info comment lines to
-      **every** posted file, so any byte-for-byte comparison against a pre-dump reference now fails on
-      the header alone. If this anchor is ever revived, diff **motion only** (strip comment lines
-      first), or capture a fresh reference from the current post. No motion changed.
+      Current-Pos+Probe path preserves the old default exactly. *Result:* **OMITTED** — no practical
+      way to produce the pre-rework reference; **H2** covers the path structurally. If ever revived,
+      diff **motion only** — the property dump adds ~98 header comment lines to every file, so a raw
+      diff against any pre-dump reference fails on the header alone. No motion changed.
 
 ---
 
@@ -592,15 +482,9 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       strings) — `02 - Feeds and Speeds` now appears before `03 - Map G1s ...`, and
       `04 - Establish Machine Coordinates` between Map-G1s and the spoilboard group.
 
-      *Result:* **header half PASS** — `H7c-a.gcode` / `H7c-b.gcode` (post `edc38b3`) and the
-      re-posted `H7c-c.gcode` (post `e1a526f`) all dump the
-      groups in the new order: `01 - Job`, `02 - Feeds and Speeds`, `03 - Map G1s ...`,
-      `04 - Establish Machine Coordinates`, `05 - Establish Spoilboard Reference`, `06 - On WCS ...`,
-      `07`–`11` unchanged; counts still 9/7/4/2/4/10/8/5/7/10/2 = 68. **Dialog half outstanding** —
-      the preset-survival check needs eyes on the dialog. The posted values *look* intact (both
-      origin controls on the non-default `Probe Z`, `H7c-b` holding base `6`), but a posted file
-      cannot distinguish "the preset survived" from "the values were re-entered", which is the whole
-      point of the check.
+      *Result:* **header half PASS** (`H7c-a/-b/-c.gcode` — new order, counts still summing to 68).
+      **Dialog half outstanding** — a posted file cannot distinguish "the preset survived" from "the
+      values were re-entered", which is the whole point of the check, so this one needs the dialog.
 
 ---
 
@@ -626,40 +510,12 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       `G1->G0 Mapping Properties`) are gone — their values now appear under the Feeds-and-Speeds and
       Map-G1s groups (`02` and `03` since the homing move; `03`/`04` in files posted before it).
       Also confirm the dump is **suppressed** at Comment Level `Important` and `Off`.
-      *Result:* **PASS except the suppression check** — `H7c.gcode` (post `90d3c95`): all **11**
-      group blocks in dialog order `01`→`11`, **68** properties total (9/2/7/4/4/10/8/5/7/10/2),
-      letter-ordered within each group; enums show stored **ids** (`A_Probe_OnStart = Probe Z`,
-      `B_Spoilboard_BaseEstablish = Pause & Probe Z` — not the "Pause, Probe Z, Pause" display
-      title), `<empty>` on all five group-08 strings while `C_ToolChange_X = 0` prints `0`; the
-      `( Resolved Values:)` block carries output unit, firmware, both Safe Zs,
-      the base, the XY offset and the Inter Part Safe Z; the two old hand-written blocks are gone.
-      Dialog values cross-checked against the settings this job was posted with. **Still unrun:** the
-      suppression check at Comment Level `Important` / `Off`.
-
-      **Safe-Z lines — re-confirmed after the fix.** Re-posted `H7c-c.gcode` (post `e1a526f`) reads:
-      ```
-      (   Map SafeZ = Retract level, fallback 15, resolves to 5.08)
-      (   Probe SafeZ = Retract level, fallback 15, resolves to 5.08)
-      ```
-      and `5.08` is **the number the file actually uses** — `(   Retract the tool to 5.08)` and
-      `G0 Z5.08 F300` on the probe retract. The header now predicts the body, which is the whole
-      point of the block. Zero lines match the old `SafeZ mode = … : default =` form, and the
-      Resolved block carries no stripped-paren double spaces. Blast radius nil: the re-post is
-      **207 lines with identical numbering** to the previous H7c-c, so exactly those two lines
-      changed and no motion moved.
-      *(Prior form, now gone: `Map/Probe SafeZ mode = Retract : default = 15` — both numbers lifted
-      from the property string `Retract:15` that the group-06 block already prints verbatim, stating
-      `15` for a job emitting `G0 Z5.08`. `resolveSafeZHeight()` had to be corrected alongside it to
-      query the passed section rather than the global context, or header-time resolution would have
-      returned the fallback for every operation and reproduced the same wrong number.)*
-      *(Note: this block is new default output — see the H-REG re-baseline note.)*
-      *(The label fix is confirmed by the later `H7c-a.gcode` / `H7c-b.gcode`: `Firmware resolved =
-      Grbl`, `Reserved base WCS = None` / `G59 / P6`, `Probe XY offset in output units`,
-      `Inter Part Safe Z in output units` — no stripped-paren double spaces. The earlier
-      `H7c.gcode` still shows the old mangled form; cosmetic only, no value changed. One known
-      leftover: the group-03 **name** itself contains parentheses, so its heading still prints as
-      `03 - Map G1s to Rapids  disable when using full license :`. Deliberately not changed — it
-      would alter a visible dialog label.)*
+      *Result:* **PASS except the suppression check** — dump structure verified on `H7c.gcode`, the
+      resolved Safe-Z lines on the `H7c-c.gcode` re-post (`resolves to 5.08`, matching the `G0 Z5.08`
+      the file emits). **Still unrun:** Comment Level `Important` / `Off`.
+      *(Known leftover: the group-03 **name** contains parentheses, which `sanitizeMessageText`
+      strips, so its heading prints as `03 - Map G1s to Rapids  disable when using full license :`.
+      Left alone — fixing it would alter a visible dialog label.)*
 
 ## Jet tools & laser operations — deferred
 
@@ -759,13 +615,14 @@ isn't universally supported. Re-verify:
   first item of each** (First = `Set X0 Y0 to Current Pos, Probe Z0`, Subsequent = `Use Active WCS
   X0 Y0, Probe Z0`). The renamed/added ids reset any saved `A_Probe_OnStart` / `B_Probe_OnChange`
   preset.
-- **Group 02 — Home Before Start** (None / XY / XYZ). `None` (default) → no homing,
+- **Group 04 — Home Before Start** (None / XY / XYZ). `None` (default) → no homing,
   byte-identical. `XY` → one `$H` (GRBL/FluidNC) or `G28 X` / `G28 Y` (Marlin/RRF). `XYZ` → also
   `G28 Z` (Marlin/RRF; GRBL `$H` already homes all configured axes). `Prompt Before Home`
   (default off) pauses once before any homing, on every firmware and axis set.
 - **Probe to Set Base** enum: `None` → Info "assumed pre-set", no probe; `Probe Z` → probe with
   no attach/detach prompt; `Pause, Probe Z, Pause` (default) → attach → probe → detach
-  (byte-identical to the old On). Still writes `G10 L20 P<base> Z<thk>` at the origin.
+  (byte-identical to the old On). Still writes `G10 L20 P<base> Z<thk>`, probing wherever the tool
+  is parked — it emits no XY move.
 - **Probe Pause** (No / Before / Before & After). Gates the `Attach ZProbe` (before) /
   `Detach ZProbe` (after) prompts on the first + added part probes: `No` = neither, `Before` =
   attach only, `Before & After` (default) = both (byte-identical). The tool-change re-probe
@@ -783,14 +640,15 @@ isn't universally supported. Re-verify:
 ## Probe XY offset — verification steps
 
 Purpose: confirm the part Z-probe touch-point moves to *origin + (offsetX, offsetY)* at the
-**first part and each added part**, while the **spoilboard base probe stays at the origin** and a
+**first part and each added part**, while the **spoilboard base probe ignores the offset entirely**
+(it emits no XY move at all) and a
 **zero offset stays byte-identical**. Firmware note: comments are `(...)` on GRBL and `;...` on
 Marlin/RRF — the tokens below are otherwise identical. Coordinates are in the job's output units
 (the emitted `G0 X/Y` values should equal the offsets you entered; check this in an inch job too).
 
 Already confirmed by NC inspection — **do not re-run** (see Verified → Phase 4):
 - Offset `0,0`, first/only part: no reposition, straight from `G10 L20 P1 X0 Y0` into `G38.2`.
-- Spoilboard base probe: always touches off at the origin, no `G0 X/Y` before its `G38.2`.
+- Spoilboard base probe: no `G0 X/Y` before its `G38.2` — the offset never reaches it.
 
 Run these:
 
@@ -798,11 +656,7 @@ Run these:
 > (`writeWcsOnStart()` → `partProbe(false)`, no XY origin write) and is covered by **H7a** — not
 > repeated here. P1 below covers the offset on the `Set X0 Y0 to Current Pos, Probe Z0` path.
 
-- [x] **P1 — Nonzero offset, first/only part.** ✅ **Verified** via `Face1.gcode` (single part,
-      offset X10 Y5, base `G59` reserved — GRBL/inch-doc-in-mm-out): `G10 L20 P1 X0 Y0` →
-      `X10 Y5 F2500` (G0 modal reposition) → `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8`; the reserved
-      base probed with **no** reposition (`G10 L20 P6 Z0.8`), confirming the base ignores the
-      offset. (Original procedure below, for reference.) Single-WCS, **no base**. Set
+- [x] **P1 — Nonzero offset, first/only part.** Single-WCS. Set
       `Probe X Offset = 10`, `Probe Y Offset = 5`; `First WCS / Part = Set X0 Y0 to Current Pos, Probe Z0`;
       one real milling op (tool ≠ 0, not a jet tool). Post and confirm the first-part probe reads:
       ```
@@ -815,9 +669,8 @@ Run these:
       ```
       **Pass:** the `Move to probe point = origin + offset X10 Y5` comment and the `G0 X10 Y5`
       reposition appear *before* `G38.2`; the emitted `X`/`Y` equal the entered offsets; the Z
-      result is still written to `P1`. *(Note: the earlier `Face1.gcode` post that verified the
-      reposition predates the comment-wording fix, so it showed the old parenthesised form — the
-      motion is unchanged; only the comment text changed.)*
+      result is still written to `P1`. *Result:* **PASS** (`Face1.gcode`, which also showed the
+      reserved base probing with no reposition).
 
 - [ ] **P2 — Nonzero offset, multi-part Replicate + reserved base.** 2-part Replicate job (WCS
       `P1` + `P2`), **reserved base `G59`**, `Subsequent WCS / Part = Use Active WCS X0 Y0, Probe Z0`, same `10/5` offsets.
@@ -904,11 +757,9 @@ move. Marlin is out of scope (single frame; Guard C blocks multi-WCS).
 
 ### Phase 3 — reserved base + guards
 - Base `None` (default): byte-for-byte identical to the Phase-2 baseline.
-- **⚠ Superseded by the base-frame probe change** — the base establish now wraps its probe in a
-  `G59` select / `G54` restore and retracts to the Inter Part Safe Z in the base frame. The
-  register write is unchanged; the surrounding blocks are not. **Re-verified** by **H7c** against
-  `H7c.gcode` (block order, the `Z40` base-frame retract, and the `G54` restore all confirmed); the
-  multi-part case (**PB1**) is still outstanding.
+- Base establish now wraps its probe in a `G59` select / `G54` restore and retracts to the Inter
+  Part Safe Z in the base frame — **re-verified by H7c**; the multi-part case (**PB1**) is still
+  outstanding.
 - Base establish (now `Pause & Probe Z`, was On): spoilboard probe → `G10 L20 P6 Z<thk>`
   **before** the first section's own origin/probe; `G54` work still probes separately.
 - Base establish `None` (was Off): no probe; Info comment
@@ -916,7 +767,7 @@ move. Marlin is out of scope (single frame; Guard C blocks multi-WCS).
   *(The new `Probe Z` variant — probe with no attach/detach prompt — is in the re-verify list.)*
 - **Guard A:** assigning an origin-establishing op to the reserved base aborts in `onOpen()`
   (`G59 is reserved as the spoilboard base -- assign this operation to another WCS ...`), naming
-  the triggering feature; no g-code emitted.
+  the triggering feature; no g-code emitted. *(Re-confirmed by **H7d**.)*
 - **Guard C:** Marlin job with 2+ distinct offsets aborts
   (`Marlin has a single coordinate frame ...`); single-WCS Marlin posts unchanged.
 - RepRap-only base on GRBL aborts (`Reserved base G59.1 requires RepRap ...`); accepted on RepRap.
@@ -943,9 +794,7 @@ move. Marlin is out of scope (single frame; Guard C blocks multi-WCS).
 - **Single retract per boundary** (Test D): re-probe boundary transits once (`G59`/`Z40`), then
   `X0 Y0`/probe — no second Safe-Z retract.
 - **Same-WCS boundary** (Test C): `WCS unchanged`, no `G59` round-trip.
-- **Probe XY offset — offset `0` first part + base probe** (NC inspection of `Setup1-Face1.gcode`,
-  current-post `G10 L20`/`G38.2` output): the first/only part goes `G10 L20 P1 X0 Y0` →
-  `( COMMAND_TOOL_MEASURE)` → `G38.2` with **no reposition rapid** (byte-identical); the reserved
-  `G59` base probes with **no `G0 X/Y`** before its `G38.2` → `G10 L20 P6 Z0.8` (offset never
-  applies to the base). Nonzero and added-part paths remain in *Probe XY offset — verification
-  steps* (P1–P3) — no on-disk NC file exercises them yet.
+- **Probe XY offset — offset `0` first part + base probe** (`Setup1-Face1.gcode`): first/only part
+  goes `G10 L20 P1 X0 Y0` → `G38.2` with **no reposition rapid**; the reserved `G59` base probes with
+  **no `G0 X/Y`**. Nonzero first-part is **P1/H7a** (passed); the added-part paths (**P2**, **P3**)
+  remain — no posted file exercises them yet.
