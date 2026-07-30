@@ -2161,13 +2161,15 @@ function writeResolvedValues() {
   writeComment(eComment.Info, " ");
   writeComment(eComment.Info, " Resolved Values:");
   writeComment(eComment.Info, "   Output unit = " + (unit == IN ? "inch" : "mm"));
-  writeComment(eComment.Info, "   Firmware (resolved) = " + fw);
+  // No parentheses in any label below: sanitizeMessageText() strips comment markers, which would
+  // leave a double space where the parens were (the same defect fixed once in partProbe()).
+  writeComment(eComment.Info, "   Firmware resolved = " + fw);
   writeComment(eComment.Info, "   Map SafeZ mode = " + eSafeZ.prop[safeZMode].name + " : default = " + safeZHeightDefault);
   writeComment(eComment.Info, "   Probe SafeZ mode = " + eSafeZ.prop[probeSafeZMode].name + " : default = " + probeSafeZHeightDefault);
   var base = getReservedBaseWcs();
-  writeComment(eComment.Info, "   Reserved base WCS = " + (base == 0 ? "None" : wcsName(base) + " (P" + base + ")"));
-  writeComment(eComment.Info, "   Probe XY offset (output units) = X" + xyzFormat.format(probeOffsetX()) + " Y" + xyzFormat.format(probeOffsetY()));
-  writeComment(eComment.Info, "   Inter Part Safe Z (output units) = " + xyzFormat.format(propertyMmToUnit(getProperty(properties.D_Spoilboard_SafeZClearance))));
+  writeComment(eComment.Info, "   Reserved base WCS = " + (base == 0 ? "None" : wcsName(base) + " / P" + base));
+  writeComment(eComment.Info, "   Probe XY offset in output units = X" + xyzFormat.format(probeOffsetX()) + " Y" + xyzFormat.format(probeOffsetY()));
+  writeComment(eComment.Info, "   Inter Part Safe Z in output units = " + xyzFormat.format(propertyMmToUnit(getProperty(properties.D_Spoilboard_SafeZClearance))));
 }
 
 // Implements A_Machine_HomeBeforeStart: establishes the machine frame (MCS) at job
@@ -2289,6 +2291,13 @@ function writeBaseEstablish() {
   }
 
   if (tool.number != 0 && !tool.isJetTool()) {
+    // OPERATOR PRECONDITION -- the base is probed WHEREVER THE TOOL ALREADY SITS. No XY move is
+    // emitted here (deliberately: this runs before any origin is established, so there is no frame
+    // in which an XY target would be trustworthy, and the base's own X0 Y0 may never have been
+    // set). Consequently the surface under the tool at job start BECOMES the base's Z0 -- park
+    // over bare spoilboard, clear of the stock and clamps, or the "spoilboard base" silently
+    // records the stock top and every clearance derived from it is short by the stock thickness.
+    // The probe XY offset is never applied here (see probeOffsetX/Y).
     writeComment(eComment.Important, " Establish spoilboard base " + gname);
 
     // Do the base's Z work in the BASE's own frame. G10 L20 writes a register without selecting
@@ -2333,7 +2342,9 @@ function writeBaseEstablish() {
 // touch-point for a PART is its WCS origin plus this offset, so the origin can sit at a
 // corner / off the material while Z is read on the stock top. Applied to the first part
 // (A_Probe_OnStart) and each added part (B_Probe_OnChange) only -- NOT to the spoilboard
-// base probe, which always touches off at the origin (0,0).
+// base probe, which emits no XY move of any kind: it touches off wherever the tool already
+// sits when writeBaseEstablish() runs. See that function's note on what the operator must
+// therefore guarantee.
 function probeOffsetX() { return propertyMmToUnit(getProperty(properties.D_Probe_OffsetX)); }
 function probeOffsetY() { return propertyMmToUnit(getProperty(properties.E_Probe_OffsetY)); }
 

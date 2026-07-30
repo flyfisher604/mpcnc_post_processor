@@ -62,7 +62,7 @@ firmware-variant rows note what changes elsewhere.
 | H5 | Hobbyist — single op, `Use Active WCS X0 Y0 Z0` (trust stored) | PASS |
 | H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | PASS (Marlin + RRF) |
 | H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7b–H7f unrun; ⚠ saved files predate the H7f comment)* |
-| H7f | "Unknown Z" warning — present without a base, suppressed with one | |
+| H7f | "Unknown Z" warning — present without a base, suppressed with one | (B) PASS *(A/C unrun)* |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -71,8 +71,9 @@ firmware-variant rows note what changes elsewhere.
 | PBV3 | Pro B-variant — production run (trust stored Z) | |
 | PA1 | Pro A — 2nd WCS same part/fixture, `Jog to X0 Y0, Probe Z0` | |
 | PA1b | Pro A — 2nd WCS same part, Z-only re-probe (`Use Active WCS X0 Y0, Probe Z0`) | |
+| H7c | Base probes/retracts in its own frame (static + physical) | static PASS *(physical unrun)* |
 | D1 | Dialog & defaults audit (modes, renames, integer fields) | |
-| D2 | Header property dump — all 68 properties + resolved values | |
+| D2 | Header property dump — all 68 properties + resolved values | PASS *(suppression check unrun)* |
 
 ---
 
@@ -258,13 +259,20 @@ tool) unless a row says otherwise.
 
         **Settings.** GRBL, real tool, one milling op. Reserved WCS = `G59`; Probe to Set Base =
         `Pause, Probe Z, Pause`; Inter Part Safe Z = `40`; First WCS / Part = `Use Active WCS X0 Y0,
-        Probe Z0`; Probe X/Y Offset = `0`.
+        Probe Z0`. Probe X/Y Offset = `0` **or** a nonzero pair — either works here; the base probe
+        ignores the offset, so it changes only the *part* probe's reposition (a nonzero run also
+        evidences P2's base-ignores-offset assertion).
 
         **Bed setup** (makes the stale datum as bad as it realistically gets):
         1. At the controller, set `G54`'s origin on the **bare spoilboard** — jog to the intended
            part X0 Y0, touch off on the spoilboard, zero X/Y/Z.
         2. Clamp stock **≥19 mm** thick, positioned so the path from the base probe point to
            `X0 Y0` crosses it.
+        3. **Park the tool over bare spoilboard, clear of the stock and clamps, before starting.**
+           Not optional and not cosmetic: `writeBaseEstablish()` emits **no XY move**, so it probes
+           whatever is under the tool at job start. Park over the stock and the base's Z0 silently
+           becomes the stock top — `G0 Z40` then measures 40 mm above the *stock*, the physical
+           check below passes for the wrong reason, and the base is wrong for the rest of the job.
 
         **Expected g-code:**
         ```
@@ -291,7 +299,18 @@ tool) unless a row says otherwise.
         **Pass — physical** (dry-run: spindle off, E-stop in hand, single-block through the `G0 Z40`
         and `G54`, measure *before* letting `G0 X0 Y0` run): the tool sits **40 mm above the
         spoilboard**, ~21 mm clear of the stock, and the `G54` reselect moves nothing.
-        *Result:* ____
+
+        *Result:* **static PASS** — `H7c.gcode` (2026-07-30, post `90d3c95`; GRBL, T171, base `G59`,
+        Inter Part Safe Z 40, offsets X10 Y5). All five static criteria hold:
+        `G59` (L128) precedes `G38.2 F30 Z-10` (L136); `G10 L20 P6 Z0.8` (L137) → `G0 Z40 F300`
+        (L138) — the Inter Part Safe Z, visibly distinct from the part probe's `G0 Z5.08` (L155);
+        `(   Restore operating WCS G54 after base probe)` → `G54` (L140-141) precedes
+        `(   Use stored work origin X0 Y0; probe Z)` (L142); **no `G0 X/Y` anywhere in the base
+        block**; and no "unknown Z" warning (**H7f (B)** — see that row). The part probe repositioned
+        to `X10 Y5` while the base did not, so this file also evidences **P2**'s base assertion. The
+        traverse `X10 Y5 F2500` (L144) carries no `G0` word — correct, `G0` is modal from L138 and
+        `G54` does not reset the motion group. **Physical half still unrun** — and note this post
+        predates step 3 of the bed setup above, so re-park before running it.
 
   - [ ] **H7d — Guard A still fires for this mode.** Assign the first section to the reserved base
         WCS (e.g. base `G59`, Setup WCS = `6`) with First WCS / Part = `Use Active WCS X0 Y0,
@@ -343,7 +362,13 @@ tool) unless a row says otherwise.
         the line, (B) does not. Also confirm the blast radius is nil: diff (A) against `H7.gcode` and
         the *only* difference is that one comment line; and a default-settings post (**H2** path)
         and any added-part probe contain the line **nowhere** — it is gated by the `zUnknown`
-        parameter that only this one mode passes. *Result:* ____
+        parameter that only this one mode passes.
+
+        *Result:* **(B) PASS** — `H7c.gcode` (same file as H7c above): the warning is **absent**;
+        `(   Use stored work origin X0 Y0; probe Z)` (L142) is followed directly by
+        `(   Move to probe point = origin + offset X10 Y5, then probe Z)` (L143). The suppression
+        guard fires as designed with an established base. **(A) and (C) still unrun** — they are the
+        two that prove the comment actually appears.
 
 - [ ] **H-REG — Byte-for-byte regression (the key guarantee).** With the default reverted to
       `Set X0 Y0 to Current Pos, Probe Z0`, the **default** single-op output is again the pre-rework
@@ -509,8 +534,21 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       offset / Inter Part Safe Z in output units. Cross-check two or three values against what you
       actually set in the dialog, and confirm the two old blocks (`Feedrate and Scaling Properties`,
       `G1->G0 Mapping Properties`) are gone — their values now appear under groups `03` and `04`.
-      Also confirm the dump is **suppressed** at Comment Level `Important` and `Off`. *Result:* ____
+      Also confirm the dump is **suppressed** at Comment Level `Important` and `Off`.
+      *Result:* **PASS except the suppression check** — `H7c.gcode` (post `90d3c95`): all **11**
+      group blocks in dialog order `01`→`11`, **68** properties total (9/2/7/4/4/10/8/5/7/10/2),
+      letter-ordered within each group; enums show stored **ids** (`A_Probe_OnStart = Probe Z`,
+      `B_Spoilboard_BaseEstablish = Pause & Probe Z` — not the "Pause, Probe Z, Pause" display
+      title), `<empty>` on all five group-08 strings while `C_ToolChange_X = 0` prints `0`; the
+      `( Resolved Values:)` block carries output unit, firmware, both Safe-Z modes with defaults,
+      the base, the XY offset and the Inter Part Safe Z; the two old hand-written blocks are gone.
+      Dialog values cross-checked against the settings this job was posted with. **Still unrun:** the
+      suppression check at Comment Level `Important` / `Off`.
       *(Note: this block is new default output — see the H-REG re-baseline note.)*
+      *(⚠ The reviewed file predates the label fix in `90d3c95`'s successor: it shows
+      `Firmware  resolved  =`, `G59  P6 `, `Probe XY offset  output units ` and `Inter Part Safe Z
+      output units ` with stripped parens / double spaces. A fresh post reads `Firmware resolved`,
+      `G59 / P6`, and `... in output units`. Cosmetic only — no value changed.)*
 
 ## Jet tools & laser operations — deferred
 
@@ -683,6 +721,10 @@ Run these:
         G10 L20 P2 Z<thickness>
         ```
       **Pass:** both part probes reposition to `(10, 5)`; the base probe does **not**.
+      *Partial evidence already on disk:* `H7c.gcode` (base `G59` + offsets X10 Y5, single WCS)
+      confirms the **base** and **first part** halves — base probes with no `G0 X/Y`, first part
+      repositions to `X10 Y5`. Only the **added part (`P2`)** half remains, which needs the 2-part
+      Replicate job.
 
 - [ ] **P3 — Zero-offset added-part regression** (the one offset-`0` path not yet on disk). Same
       2-part job as P2 but `Probe X/Y Offset = 0`. Confirm each **added** part emits the bare-origin
