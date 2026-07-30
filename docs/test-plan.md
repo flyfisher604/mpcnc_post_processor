@@ -225,8 +225,9 @@ tool) unless a row says otherwise.
       in the program** → `M0 (MSG Attach ZProbe)` → `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8` → `G0
       Z5.08` → `M0 (MSG Detach ZProbe)`. **No `G10 L20 P1 X0 Y0`** (the discriminator vs H2), no jog
       `M0`, and no `G0 Z` before the traverse. Arcs/plane restores and section rapids independently
-      checked sound. **H7a PASS** (see below); **H7b deferred to J1**; **H7c/H7d/H7e/H7f remain
-      unrun** (this job had no base and was GRBL only).
+      checked sound. **H7a PASS** (see below); **H7b deferred to J1**. Sub-check status since:
+      **H7c static PASS / physical unrun**, **H7f (B) PASS / (A) and (C) unrun**, **H7d and H7e still
+      unrun** (this job had no base and was GRBL only, so it could not cover any of them).
 
       > **⚠ `H7.gcode` and `H7a.gcode` now predate current output.** The follow-up filed by this row
       > — the `Ensuring that Z is safe. Unknown Z for XY move.` Info comment — **is implemented**, and
@@ -829,7 +830,9 @@ move. Marlin is out of scope (single frame; Guard C blocks multi-WCS).
 - Base `None` (default): byte-for-byte identical to the Phase-2 baseline.
 - **⚠ Superseded by the base-frame probe change** — the base establish now wraps its probe in a
   `G59` select / `G54` restore and retracts to the Inter Part Safe Z in the base frame. The
-  register write is unchanged; the surrounding blocks are not. Re-verify via H7c / PB1.
+  register write is unchanged; the surrounding blocks are not. **Re-verified statically** by
+  **H7c** against `H7c.gcode` (block order, the `Z40` base-frame retract, and the `G54` restore all
+  confirmed); the **physical** measurement and the multi-part case (**PB1**) are still outstanding.
 - Base establish (now `Pause & Probe Z`, was On): spoilboard probe → `G10 L20 P6 Z<thk>`
   **before** the first section's own origin/probe; `G54` work still probes separately.
 - Base establish `None` (was Off): no probe; Info comment
