@@ -83,6 +83,30 @@ machines have none fully, hence the work-relative stance above.
   Marlin job that uses more than one distinct work offset is a hard error (Guard C).
 - **`workOffset 0`** (Fusion's "default / unset") aliases to WCS 1 / `G54`.
 
+**The post asserts the WCS selection; it never inherits it.** Worth stating because it's the
+justification for the ordering in `writeFirstSection()` and the answer to "what if the operator
+changed WCS at the sender first?":
+
+- Fusion **always** supplies a work offset per section (`section.getWorkOffset()` → `0` for
+  unset/default, else `1`–`9`), so the post always has a design-time answer for every section.
+- `currentWorkOffset` is **not** the machine's state. `onOpen()` sets it to `undefined` — "no work
+  offset emitted yet". It records only what *this post* has emitted, and exists to suppress redundant
+  selects.
+- Because it starts undefined, the `workOffset == currentWorkOffset` suppression cannot match on the
+  first section, so the first section **unconditionally emits its select**, overwriting whatever the
+  sender left modal. From then on the post is the only thing changing the selection, so its model and
+  the controller agree by construction. This is exactly why `writeWCS()` runs before `Start()`, the
+  base establish, and `writeWcsOnStart()` — it defends against both "a stale WCS left active by a
+  prior job" and "the controller's power-on default".
+- **The distinction that matters:** the post always knows *which* frame is active (it commanded it);
+  it never knows *where* that frame is. Register contents are controller-side runtime state (GRBL
+  persists `G10 L20` to EEPROM), set by prior jobs or manual touch-offs, and the post cannot read
+  them back (no `$#`, no round trip). So **selection is deterministic, origin is trusted** — and every
+  "Use Active WCS" mode is a trust assertion, which is why the *defaults* establish an origin
+  rather than rely on one. On a fresh GRBL controller all offsets are `0`, so `G54` means machine
+  coordinates — on a machine with no endstops, power-on position.
+- Undefendable by any post: an operator typing `G55` into the console *mid-run*. Out of scope.
+
 Helper `writeWcsOrigin(wcsNumber, x, y, z)` persists a position into a WCS's own origin
 (any axis `undefined` = leave alone); `G10 L20` on GRBL/RepRap, `G92` on Marlin.
 
@@ -183,15 +207,15 @@ below ("selection-driven origin/probe model"); summary (enum ids in parentheses)
 
 - `A_Probe_OnStart` = **"First WCS / Part"** (dropdown order, default first) —
   `Set X0 Y0 to Current Pos, Probe Z0` (`Current XY & Probe Z`, default) /
-  `Set X0 Y0 Z0 to Current Pos` (`Current XYZ`) / `Use Existing WCS X0 Y0, Probe Z0` (`Probe Z`) /
-  `Use Existing WCS X0 Y0 Z0` (`Skip`) / `Jog to X0 Y0, Probe Z0` (`Jog XY & Probe Z`) /
+  `Set X0 Y0 Z0 to Current Pos` (`Current XYZ`) / `Use Active WCS X0 Y0, Probe Z0` (`Probe Z`) /
+  `Use Active WCS X0 Y0 Z0` (`Skip`) / `Jog to X0 Y0, Probe Z0` (`Jog XY & Probe Z`) /
   `Jog to X0 Y0 Z0` (`Jog XYZ`). First/only part origin. The *Current Pos* modes assume a pre-jog
-  before start (no prompt); the *Use Existing WCS* modes trust the stored fixture offset (rapid to
+  before start (no prompt); the *Use Active WCS* modes trust the stored fixture offset (rapid to
   its X0 Y0, optionally re-probe Z); the *Jog* modes pause (M0) so the operator jogs during the run.
 - `B_Probe_OnChange` = **"Subsequent WCS / Part"** (dropdown order, default first) —
-  `Use Existing WCS X0 Y0, Probe Z0` (`Probe Z`, default) / `Use Existing WCS X0 Y0 Z0` (`Skip`) /
+  `Use Active WCS X0 Y0, Probe Z0` (`Probe Z`, default) / `Use Active WCS X0 Y0 Z0` (`Skip`) /
   `Jog to X0 Y0, Probe Z0` (`Jog XY & Probe Z`) / `Jog to X0 Y0 Z0` (`Jog XYZ`). Fires on a genuine
-  WCS change after the first section. The *Use Existing* modes take XY from the fixture's pre-set
+  WCS change after the first section. The *Use Active WCS* modes take XY from the fixture's pre-set
   offset (Replicate); the *Jog* modes let the operator jog to each part and record its origin.
   Defaults are the no-prompt modes because jogging at the pause isn't universally supported.
 - `C_Probe_Pause` = **"Probe Pause"** — `No` / `Before` / `Before & After` (default). Gates the
@@ -219,9 +243,31 @@ is Z high enough to re-emit a cut G1 as a G0?" It is operation-scoped and only p
 the hobby "Map G1s to Rapids" group is on, so it is the wrong source for an inter-op/inter-WCS
 retract (wrong height, and unset for full-license jobs). The cross-part retract instead uses
 a **job-level clearance measured above the spoilboard base** (`D_Spoilboard_SafeZClearance` =
-"Safe Z" in the Establish Spoilboard Reference group), the one frame meaningful across all the job's parts. Single-WCS jobs
+"Inter Part Safe Z" in the Establish Spoilboard Reference group), the one frame meaningful across all the job's parts. Single-WCS jobs
 need none of this — their shared frame makes each operation's own clearance a safe reference,
 so they stay byte-identical.
+
+**Why the Inter Part Safe Z can't be an F360 expression (asked and answered).** The Safe-Z
+expression syntax (`parseSafeZExpr`) already accepts `Feed:`, `Retract:` and `Clearance:` with a
+fallback constant, and F360's **Clearance Height** *is* its "clears everything" concept — the height
+the tool rapids to on the way in and retracts to at the end. So `Clearance:40` would parse today, and
+`eSafeZ.CLEARANCE` → `operation:clearanceHeight_value` is already wired. **It is still the wrong
+source for this property, and deliberately not offered:**
+
+- Every F360 height parameter is **per-operation and expressed in that operation's own WCS** (and
+  only usable when `..._absolute == 1`). The Inter Part Safe Z must be expressed in the **base's**
+  frame. Feeding a part-frame number into a base-frame `G0 Z` under-clears by the stock thickness —
+  precisely the failure mode the base exists to prevent, and it would fail *silently*.
+- F360 has **no job-level "above the machine table" height at all**. It knows nothing of a
+  spoilboard; every height it exposes is relative to the model / stock / WCS. The base frame is a
+  post-invented concept, so no F360 parameter can express a height in it.
+- The two are also scoped differently: F360's clearance height is per-operation and may legitimately
+  differ between operations, whereas this is one job-wide physical height.
+
+So it stays a plain whole-mm `integer`. If an expression is ever wanted here, the only sound use is
+as a **floor** (`max(constant, resolved)`), never a substitute — and the resolved value would still
+need converting from the part frame to the base frame, which the post cannot do at post time (the
+numeric relation between two WCS is only known after runtime probing).
 
 ### Base WCS is transited, not parked (R1/R2)
 
@@ -256,7 +302,10 @@ at `onClose`.
   base-relative traverse retract on **every** inter-part WCS change (transit-through-base),
   verified on both the re-probe and non-re-probe (Skip) boundaries; added-part re-probe
   repositions to the new part's `X0 Y0` before probing; the WCS/Probe relabels + default flip.
-  Landed, verification pending: **probe XY offset** (`D_Probe_OffsetX` / `E_Probe_OffsetY`).
+  Landed, verification pending: **probe XY offset** (`D_Probe_OffsetX` / `E_Probe_OffsetY`, added
+  parts still open). The new first-part **`Use Active WCS X0 Y0, Probe Z0`** mode is **verified on
+  its main path and with a nonzero offset** (test-plan H7 + H7a); still open there are H7b–H7e —
+  jet/tool-0, Guard A, firmware variants, and the base-reserved traverse-height question (H7c).
   Remaining items below.
 - **Phase 5 — not started** (likely no-op).
 
@@ -319,7 +368,10 @@ probes at 0,0.
 *Verification status:* **first-part nonzero path + base-at-origin confirmed** via `Face1.gcode`
 (single part, offset X10 Y5, base `G59` reserved): `G10 L20 P1 X0 Y0` → reposition `X10 Y5` →
 `G38.2` → `G10 L20 P1 Z0.8`, and the base probes with no reposition (`G10 L20 P6 Z0.8`). Offset-0
-first-part + base already NC-confirmed earlier. **Still pending:** the added-part paths — nonzero
+first-part + base already NC-confirmed earlier. The offset on the other first-part probing mode
+(`Use Active WCS X0 Y0, Probe Z0`) is confirmed too, via `H7a.gcode` — diffed against `H7.gcode`,
+the offset changes only the probe-point comment and reposition rapid, nothing downstream (test-plan
+H7a). **Still pending:** the added-part paths — nonzero
 (P2) and zero-offset (P3) — need a multi-part Replicate run. See `docs/test-plan.md` P1–P3.
 
 ### Phase 4 — dialog / property polish *(from the Face1.gcode review)*
@@ -337,11 +389,32 @@ Dialog wording and number-format fixes; low-risk, do together. Re-lettering / ch
 - ✅ **Cosmetic — probe-point comment.** Reworded to `Move to probe point = origin + offset X.. Y..,
   then probe Z` (no parens) in `partProbe()`, so `sanitizeMessageText` no longer leaves double spaces.
 
-*(Verified, not a bug: the spoilboard base probe writes `G10 L20 P6` and emits no `G59` select —
-`G10 L20` does not change the active WCS, and the section's WCS `G54` is selected before base
-establish and stays active into the cut, so the section runs under the correct WCS. The base is
-only transit-selected when it is later **consumed** for a cross-part retract — the base-consume
-item above — not when established.)*
+- ✅ **`Use Existing WCS …` → `Use Active WCS …` (both dropdowns, group 06).** "Existing" read as a
+  *temporal* claim — "the WCS that was already active before the job" — which is wrong: the register
+  is the one **this operation's Fusion Setup designates**, and the post *selects* it at job start,
+  overwriting whatever the sender had. (The word was accurate about the register's *contents*, which
+  is why the misread is easy.) Renamed all four option titles; **enum ids `Probe Z` / `Skip` kept, so
+  saved presets do not reset**. Both tooltips now spell out: which register (the Setup's Work Offset,
+  selected by the post), that it is *not* the sender's current selection, and that the stored values
+  are trusted-not-verified because the post cannot read them back. README gained a
+  *What "Active WCS" means* section with a safe-to-use / watch-out-for table and the fresh-controller
+  caveat (all offsets `0` → `G54` is machine coordinates).
+- ✅ **`D_Spoilboard_SafeZClearance` title (group 05).** Renamed **"Safe Z" → "Inter Part Safe Z"**:
+  the old title collided with the group-06 `I_Probe_SafeZ`, also titled "Safe Z", and the two mean
+  different heights in different frames. Key unchanged, so saved presets don't reset. The tooltip now
+  documents both consumers (the post-base-probe retract and the inter-part traverse) and states it is
+  whole mm above the spoilboard.
+
+> ~~*Verified, not a bug: the spoilboard base probe writes `G10 L20 P6` and emits no `G59` select —
+> `G10 L20` does not change the active WCS, and the section's WCS `G54` is selected before base
+> establish and stays active into the cut, so the section runs under the correct WCS. The base is
+> only transit-selected when it is later consumed for a cross-part retract — not when established.*~~
+>
+> **Superseded — the missing select *was* the defect.** The reasoning above is correct that the
+> section ends up under the right WCS, but it missed that the base's own probe and, critically, its
+> post-probe retract then execute in the *part's* frame, whose Z may be stale. The base establish now
+> transit-selects the base and restores the operating WCS afterwards; see the H7c open-question
+> section below for the full analysis and what changed.
 
 ### Phase 4 — selection-driven origin/probe model for first + added parts *(implemented)*
 
@@ -353,16 +426,16 @@ presets (keys/ids unchanged), but the later Current-Pos/Jog split *did* rename a
 ids, which resets those presets. (Current enum ids in parentheses below.)
 
 - **`A_Probe_OnStart` "First WCS / Part"** — reworked into an explicit *Current Pos* (no prompt)
-  vs *Use Existing WCS* (no prompt) vs *Jog* (M0 prompt) taxonomy, dropdown ordered default-first:
+  vs *Use Active WCS* (no prompt) vs *Jog* (M0 prompt) taxonomy, dropdown ordered default-first:
   `Set X0 Y0 to Current Pos, Probe Z0` (`Current XY & Probe Z`, default) /
-  `Set X0 Y0 Z0 to Current Pos` (`Current XYZ`) / `Use Existing WCS X0 Y0, Probe Z0` (`Probe Z`) /
-  `Use Existing WCS X0 Y0 Z0` (`Skip`) / `Jog to X0 Y0, Probe Z0` (`Jog XY & Probe Z`) /
+  `Set X0 Y0 Z0 to Current Pos` (`Current XYZ`) / `Use Active WCS X0 Y0, Probe Z0` (`Probe Z`) /
+  `Use Active WCS X0 Y0 Z0` (`Skip`) / `Jog to X0 Y0, Probe Z0` (`Jog XY & Probe Z`) /
   `Jog to X0 Y0 Z0` (`Jog XYZ`). The new `Probe Z` (first part) mirrors the Subsequent `Probe Z`:
   rapid to the WCS's stored X0 Y0 and re-probe Z (`partProbe(false)`), no XY re-zero.
 - **`B_Probe_OnChange` "Subsequent WCS / Part"** — four modes, two coexisting workflows,
   ordered default-first:
-  - *Use existing (pre-set fixture offset / Replicate):* `Use Existing WCS X0 Y0, Probe Z0` (`Probe Z`,
-    default) and `Use Existing WCS X0 Y0 Z0` (`Skip`) — both auto-position to the stored `X0 Y0`.
+  - *Use Active WCS (pre-set fixture offset / Replicate):* `Use Active WCS X0 Y0, Probe Z0` (`Probe Z`,
+    default) and `Use Active WCS X0 Y0 Z0` (`Skip`) — both auto-position to the stored `X0 Y0`.
   - *Jog (operator jogs):* `Jog to X0 Y0, Probe Z0` (`Jog XY & Probe Z`) and `Jog to X0 Y0 Z0`
     (`Jog XYZ`) — pause (jog-enabled) so the operator jogs to this part, then record the origin
     there (mirrors the first-part options).
@@ -388,6 +461,124 @@ probe attach/detach prompts continue to follow `C_Probe_Pause` via `partProbe()`
 - `A_Probe_OnStart` / `B_Probe_OnChange` remain **separate controls** (only their option sets are
   now symmetric); `C_Probe_Pause` remains a separate shared control.
 
+**Open question — the first-part `Probe Z` mode's traverse height when a base is reserved.** The
+`Probe Z` branch of `writeWcsOnStart()` deliberately emits **no absolute Z move**: the part WCS's Z
+is stale (about to be re-probed), so it travels to the stored `X0 Y0` at whatever height the tool
+already holds. That premise is sound with no base, but `writeBaseEstablish()` runs immediately
+before it and its `probeTool()` retract (`rapidMovementsZ(probeSafeZ())`) is an absolute `G0 Z`
+evaluated in the **still-stale part WCS**. So a base-reserved job traverses at
+`staleZ0 + probeSafeZ`, colliding when the new stock top rises more than `probeSafeZ` above where
+the stale Z0 was set — reachable in exactly the changed-stock case this mode exists for.
+*Verification: `docs/test-plan.md` H7c.*
+
+Two things this is **not**, both worth stating because they're the obvious first guesses:
+
+- **It is not the group-05 `Safe Z` retracting too low.** `D_Spoilboard_SafeZClearance` ("Safe Z",
+  group 05, default 40) is *not used at all* by the base establish. Its single consumer is
+  `retractThroughBaseClearance()`, and its own tooltip scopes it to "when Retract Across Parts is on
+  and a base is reserved". The base establish retracts via `probeTool()` → `probeSafeZ()`, which is
+  the **group-06 `I_Probe_SafeZ`** — a different property that also happens to be titled "Safe Z".
+  Two properties, same label, different groups, different frames of reference: that collision is
+  itself a fix candidate (rename one, e.g. group-05 → "Cross-Part Clearance Z").
+- **It is not the base probe changing the WCS.** `writeBaseEstablish()` emits no WCS select at all,
+  and `G10 L20 P<base>` writes a register without selecting it, so the operating WCS is never
+  disturbed and `currentWorkOffset` is never touched. There is nothing to save and restore. The
+  defect is the **opposite**: because the base is never selected, the base's own probe *and* retract
+  both execute in the part's stale frame.
+
+**Framing (user): the first WCS change is deliberately suppressed — should it be?** In `writeWCS()`,
+`isTraverse = (previousWorkOffset != undefined)` is false on the first section (`currentWorkOffset`
+starts undefined), so the first section skips **both** the safe-Z retract and the origin/probe
+dispatch that every later WCS change gets. That asymmetry is the real root of this item: every
+inter-part traverse arrives safely, the *first* arrival does not — which is exactly why `H7.gcode`
+opens with a full-bed rapid at an unknown height. So the instinct is right: the first section should
+get a safe-arrival retract too. But **un-suppressing it where it currently sits does not work**:
+
+- **Ordering.** `writeWCS()` is step 3 of `writeFirstSection()`; `writeBaseEstablish()` is step 5. At
+  step 3 *neither* the part WCS's Z nor the base's Z has been established, so both retract paths
+  would emit an absolute `G0 Z` into a stale frame — the same defect relocated, not fixed.
+- **Direction.** An absolute Z against a stale zero can move the tool *down*. Emitting nothing at
+  least leaves it where the operator parked it, so a naive un-suppress is potentially worse than
+  today's behavior.
+- **Byte-identical.** With `isTraverse` true on the first section the `else if (isTraverse)` fallback
+  fires on *every* job including the default, adding a `G0 Z<probeSafeZ>` at the start of all output
+  and breaking the H2 / H-REG anchor.
+
+The resolution keeps the intent and fixes the placement: give the first section its safe-arrival
+retract **after** the base establish, in the base's frame — which is the same emitted g-code as the
+fix below, just structurally homed on the first-part path rather than bolted inside
+`writeBaseEstablish()`. And note the hard limit this exposes: **with no base reserved there is no
+established frame at job start at all**, so no retract can be made safe there — that case is
+handled only by the "unknown Z" Info comment (next item). The clean split is *base reserved →
+retract base-relative; no base → say so in a comment*.
+
+**Fix — IMPLEMENTED (mirrors R1/R2).** Do the base's Z work in the base's frame and hand back the
+operating WCS — structurally the save/restore shape, just with the selection added rather than a
+stray one removed:
+
+1. Transit-select the base (low-level `writeBlock`, as `retractThroughBaseClearance()` does — no
+   re-probe, no origin write) *before* probing, so both the `G38.2` target and the retract are
+   measured against the base.
+2. Probe (`G38.2` → `G10 L20 P<base> Z<thk>`), then retract to the **Inter Part Safe Z**. After that
+   register write the base's Z0 is a known height on a fixed physical surface, so *now* the height
+   means what its tooltip claims: clearance above the spoilboard, independent of stock thickness.
+3. Re-select the operating WCS (**R1** — never leave the base active) and continue. The reselect
+   moves nothing, so `writeWcsOnStart()`'s subsequent `G0 X0 Y0` traverses at spoilboard +
+   clearance — safe by construction, and no longer dependent on any stale datum.
+
+**As built.** `writeBaseEstablish()` saves `currentWorkOffset`, emits the base select (+ `resetAll()`
+— a frame change invalidates the tracked coordinates), probes, then restores and resets again. Both
+selects are skipped when the section already runs on the base (`switched` false), which is only
+reachable with `A_Probe_OnStart = Skip` since Guard A otherwise blocks a section on the base.
+`probeTool()` gained an optional second parameter `retractZ`, defaulting to `probeSafeZ()` — so the
+only caller whose output changes is the base establish; the part probes and the tool-change re-probe
+are byte-identical.
+
+**Decisions taken:** (a) the Inter Part Safe Z is used here **regardless of Retract Across Parts** —
+a reserved base is sufficient reason to want a clearance above the spoilboard, and the tooltip was
+rewritten to document both consumers; (b) the base-frame retract applies to **every** base establish,
+not just when the first-part mode has a stale Z — simpler, safer, and uniform, at the cost of
+changing output for base-reserved jobs.
+
+**Output changes (base-reserved jobs only — default `None` is untouched, so H2/H-REG hold).** Adds a
+base select, a restore select, two Info comments, and changes the base retract height from the
+group-06 probe Safe Z to the Inter Part Safe Z. This **supersedes** the previously verified Phase-3
+base-establish shape and the "*Verified, not a bug*" note above about the base emitting no `G59`
+select — that suppression was the defect. Re-verify via test-plan **H7c** and **PB1**.
+
+**Incidental improvement.** The base probe's `G38.2` target is now evaluated in the *base's* prior
+Z0 rather than the part's — and since the spoilboard doesn't move between runs, the base's own stale
+Z0 is far more likely to be a sane reference than a part WCS's. The general frame-dependence of the
+probe target remains (see the wrinkle below).
+
+**Follow-on to consider (not done).** First-part `Skip` (`writeWcsOnStart`) still retracts to the
+group-06 probe Safe Z **in the part's frame**. That is legitimate on its own terms — `Skip` trusts
+the stored Z, so the height is meaningful — but with a base now reserved the tool arrives at
+spoilboard + Inter Part Safe Z and then *descends* to a part-relative hop that may not clear a taller
+clamp elsewhere on the bed. Worth deciding whether `Skip` (and the added-part `Skip`) should hold the
+base clearance instead when a base is reserved. `Skip` is a verified path (H5), so this is a
+deliberate change, not a silent one.
+
+**Related pre-existing wrinkle (separate item).** The base probe's `G38.2` **target**
+(`G_Probe_G38Target`, default `-10`) is likewise evaluated in the active frame, so a stale Z0 can
+make the base probe under-travel (never reaches the spoilboard → probe alarm) or over-travel.
+Selecting the base first does *not* fix this — the base's Z is also stale *before* its probe. Probing
+is inherently "descend until trigger", so the target is a travel limit whose meaning is frame-
+dependent no matter what; worth documenting, and possibly worth a more generous target for the base
+probe specifically.
+
+**To do — warn in the file that the traverse Z is unknown.** In the `Probe Z` first-part mode the
+`G0 X0 Y0` to the stored origin is the **first motion in the program** and runs at whatever height
+the operator left the tool at — confirmed in `H7.gcode`, where that full-bed rapid is the very first
+motion and nothing in the file hints at its height. The post cannot emit a Z move here (the frame's
+Z is stale by definition), so it must say so instead: add an **Info comment** along the lines of
+`Ensuring that Z is safe. Unknown Z for XY move.` immediately before that rapid, so both the
+operator and an automated review of the g-code can see the precondition. Emit it only on the path
+that actually has an unknown Z (`writeWcsOnStart()`'s `Probe Z` branch — **not** `Skip`, which
+retracts to a known height first). *Note the byte-identical constraint below: the default Comment
+Level is `Info`, so this adds a line to default output on this non-default mode's path only — the
+default `Set X0 Y0 to Current Pos, Probe Z0` path is untouched, so the H2 / H-REG anchor holds.*
+
 *Safe arrival applies to `Skip` at both stages:* first-part `Skip` (`writeWcsOnStart`) now
 retracts to the probe Safe Z (milling only) and rapids to the stored `X0 Y0` instead of emitting
 nothing — Skip uses a stored origin, so the tool must travel there. Added-part `Skip` retracts
@@ -395,6 +586,66 @@ nothing — Skip uses a stored origin, so the tool must travel there. Added-part
 `Skip`/manual now also retract before the switch (previously only base-relative or the re-probe
 path retracted). The **default** job (`Set X0 Y0 to Current Pos, Probe Z0`) and single-WCS jobs are unaffected.
 *Verification pending — see `docs/test-plan.md`.*
+
+### Phase 4 — dump ALL properties in the file header *(IMPLEMENTED)*
+
+**Original finding.** `writeInformation()` dumped only **11 of 68** properties at Info level: the
+seven `03 - Feeds and Speeds` values and the four `04 - Map G1s to Rapids` values. **57 were absent**,
+including every group that the WCS/probe rework touches:
+
+| Group | Dumped? | Notably missing |
+|---|---|---|
+| `01 - Job` (9) | ✗ | **Firmware**, Comment Level, arcs, spindle control, sequence numbers |
+| `02 - Establish Machine Coordinates` (2) | ✗ | Home Before Start, Prompt Before Home |
+| `03 - Feeds and Speeds` (7) | ✓ | — |
+| `04 - Map G1s to Rapids` (4) | ✓ | — |
+| `05 - Establish Spoilboard Reference` (4) | ✗ | Reserved WCS, Probe to Set Base, Retract Across Parts, Safe Z |
+| `06 - On WCS / Part / Fixture Changes` (10) | ✗ | **First WCS / Part**, **Subsequent WCS / Part**, Probe Pause, Probe X/Y Offset, G38 target/speed, probe Safe Z, thickness |
+| `07 - Tool Changes` (8) | ✗ | all, incl. Probe After Change and the change position |
+| `08 - External Include Files` (5) | ✗ | all |
+| `09 - Laser` (7) / `10 - Coolant` (10) / `11 - Duet` (2) | ✗ | all |
+
+**Why it matters.** Reviewing a posted `.gcode` — by a person or an agent — currently means
+*inferring* the settings from the output. Verifying `H7.gcode` required deducing from motion and
+comment text alone that the firmware was GRBL, First WCS / Part was `Use Active WCS X0 Y0, Probe
+Z0`, the probe offsets were `0`, Probe Pause was `Before & After`, and no base was reserved. Each
+inference is a chance to mis-review, and a negative ("no base reserved") can only ever be inferred
+from an *absence*, which is exactly the weakest kind of evidence. A full dump turns every test row's
+setup into an assertion the file itself carries.
+
+**As built.** Two new functions, called from `writeInformation()` in place of the two hand-written
+blocks (whose contents are now covered by their own groups, so nothing was lost but the friendly
+labels):
+
+- **`writeAllProperties()`** — buckets `properties` by `group`, sorts the group names and the keys
+  within each, and emits one Info block per group. It **iterates the object rather than listing
+  keys**, so a newly added property is dumped for free and this cannot drift. The zero-padded
+  `group:` strings mean a plain lexicographic sort reproduces the dialog order, and the
+  single-letter key prefix does the same within a group — the two conventions already documented
+  above now do double duty. Values print in their **stored** form: an enum shows its `id`, not its
+  display title, so the dump survives dialog relabelling (the ids have already outlived two rounds
+  of retitling). An unset string prints `<empty>` — a typed check, so a numeric `0` isn't caught.
+- **`writeResolvedValues()`** — the things that are *not* any property's stored value: output unit
+  (Fusion's, not the dialog's), resolved firmware, **both** Safe-Z modes with their resolved
+  defaults, the reserved base as `G59 (P6)`, and the probe XY offset and Inter Part Safe Z converted
+  to output units. Without this the dump misleads: `I_Probe_SafeZ = Retract:15` does not tell you the
+  retract actually resolved to `5.08` for a given operation, which is exactly what cost time reading
+  `H7.gcode`.
+
+Verified by a harness against the real `properties` object: **11 groups, all 68 properties, none
+missing, correct dialog order** within and between groups.
+
+**Route taken on the byte-identical question: (a) — unconditional at Info.** Default Comment Level is
+`Info`, so this **does** change default output: roughly 98 comment lines are added to every posted
+file's header. The alternatives were (b) hide it behind Debug and (c) gate it on a new "Dump All
+Properties" property defaulting off. (a) was chosen because the whole purpose — a posted file that
+carries its own configuration for review — is defeated by a switch a reviewer has to remember to
+flip. **Consequence: the H2 / H-REG byte-for-byte anchor must be re-baselined** against a
+current-post reference; no *motion* changed, only header comments. Reverting to (c) is a one-line
+guard around the two calls if the header proves too heavy.
+
+Still open if wanted: dumping the *per-section* effective Safe Z (the resolved block reports the
+mode and the fallback, not each operation's resolved height).
 
 ### Phase 4 — backlog: "Copy first part's Z" option on `B_Probe_OnChange`
 

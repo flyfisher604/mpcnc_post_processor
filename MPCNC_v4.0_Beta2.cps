@@ -378,14 +378,14 @@ properties = {
   },
   A_Probe_OnStart: {
     title      : "First WCS / Part",
-    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 at the current position, then probe the stock-top Z -- pre-jog the tool to the part's X0 Y0 before starting (no prompt). Set X0 Y0 Z0 to Current Pos: record the tool's CURRENT position as X0 Y0 Z0 with no probe and no prompt -- pre-jog to the part origin before starting (a manual touch-off, or a jet/laser where Z is set by hand; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Use Existing WCS X0 Y0, Probe Z0: use the WCS's stored X0 Y0 (a pre-set fixture offset) -- rapid there and probe the stock-top Z, writing Z into that WCS; XY is not re-zeroed. Use Existing WCS X0 Y0 Z0: use the full origin already stored in that WCS (from a prior job or set manually) -- no re-zero and no probe; the tool retracts and rapids to the stored X0 Y0. Jog to X0 Y0, Probe Z0: pause (M0) so you jog the tool to the origin during the run, record X0 Y0, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to the origin during the run, then record X0 Y0 Z0 there, no probe. (Jogging at the pause needs sender/firmware support -- see the README.) On GRBL/RepRap the origin writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent WCS / Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
+    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 at the current position, then probe the stock-top Z -- pre-jog the tool to the part's X0 Y0 before starting (no prompt). Set X0 Y0 Z0 to Current Pos: record the tool's CURRENT position as X0 Y0 Z0 with no probe and no prompt -- pre-jog to the part origin before starting (a manual touch-off, or a jet/laser where Z is set by hand; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Use Active WCS X0 Y0, Probe Z0: use the X0 Y0 already stored in the active WCS's register (a pre-set fixture offset) -- rapid there and probe the stock-top Z, writing Z into that WCS; XY is not re-zeroed. Use Active WCS X0 Y0 Z0: use the full origin already stored in the active WCS -- no re-zero and no probe; the tool retracts and rapids to the stored X0 Y0. IMPORTANT -- \"active WCS\" means the register this operation's Fusion Setup designates (its Work Offset: WCS 1 / G54 unless you changed it), which the post SELECTS at job start before doing anything else. It is NOT whatever WCS your sender or controller happened to have active -- the post overwrites that. What the register holds, however, is runtime state left by a prior job or a manual touch-off, and the post cannot read it back to check: the two Use Active WCS modes TRUST those stored values. Jog to X0 Y0, Probe Z0: pause (M0) so you jog the tool to the origin during the run, record X0 Y0, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to the origin during the run, then record X0 Y0 Z0 there, no probe. (Jogging at the pause needs sender/firmware support -- see the README.) On GRBL/RepRap the origin writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent WCS / Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
     group      : "06 - On WCS / Part / Fixture Changes",
     type       : "enum",
     values: [
       { title: "Set X0 Y0 to Current Pos, Probe Z0", id: "Current XY & Probe Z" },
       { title: "Set X0 Y0 Z0 to Current Pos", id: "Current XYZ" },
-      { title: "Use Existing WCS X0 Y0, Probe Z0", id: "Probe Z" },
-      { title: "Use Existing WCS X0 Y0 Z0", id: "Skip" },
+      { title: "Use Active WCS X0 Y0, Probe Z0", id: "Probe Z" },
+      { title: "Use Active WCS X0 Y0 Z0", id: "Skip" },
       { title: "Jog to X0 Y0, Probe Z0", id: "Jog XY & Probe Z" },
       { title: "Jog to X0 Y0 Z0", id: "Jog XYZ" }
     ],
@@ -394,12 +394,12 @@ properties = {
   },
   B_Probe_OnChange: {
     title      : "Subsequent WCS / Part",
-    description: "Multi-part jobs -- milling several parts/copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). Every mode first retracts to a safe Z, then acts. USE EXISTING (pre-set fixture offsets / Replicate) -- Use Existing WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS (G10 L20 P<n>); XY stays the fixture's pre-set offset. Use Existing WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X and Z already in its own WCS, from a prior job or set manually). JOG (operator jogs to each part; jogging at the pause needs sender/firmware support) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0 (no probe). The attach/detach prompts around any probe follow Probe Pause. The safe-Z retract on the traverse is separate (see Retract Across Parts). Not supported on Marlin (single G92 origin -- use separate jobs). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
+    description: "Multi-part jobs -- milling several parts/copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...) -- \"active WCS\" below means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS (G10 L20 P<n>); XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X and Z already in its own WCS, from a prior job or set manually). JOG (operator jogs to each part; jogging at the pause needs sender/firmware support) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0 (no probe). The attach/detach prompts around any probe follow Probe Pause. The safe-Z retract on the traverse is separate (see Retract Across Parts). Not supported on Marlin (single G92 origin -- use separate jobs). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
     group      : "06 - On WCS / Part / Fixture Changes",
     type       : "enum",
     values: [
-      { title: "Use Existing WCS X0 Y0, Probe Z0", id: "Probe Z" },
-      { title: "Use Existing WCS X0 Y0 Z0", id: "Skip" },
+      { title: "Use Active WCS X0 Y0, Probe Z0", id: "Probe Z" },
+      { title: "Use Active WCS X0 Y0 Z0", id: "Skip" },
       { title: "Jog to X0 Y0, Probe Z0", id: "Jog XY & Probe Z" },
       { title: "Jog to X0 Y0 Z0", id: "Jog XYZ" }
     ],
@@ -468,8 +468,8 @@ properties = {
     scope      : "post"
   },
   D_Spoilboard_SafeZClearance: {
-    title      : "Safe Z",
-    description: "Absolute work-Z height, measured above the reserved spoilboard base, that the tool retracts to before traversing between parts (different WCS). Set it high enough to clear the tallest fixture, clamp, or part in the job. Only used when Retract Across Parts is on and a base is reserved.",
+    title      : "Inter Part Safe Z",
+    description: "Absolute work-Z height in whole mm, measured above the reserved spoilboard base, that the tool retracts to whenever it must clear everything on the bed. Set it high enough to clear the tallest fixture, clamp, or part in the job. Used at two points: (1) immediately after the spoilboard base is probed at job start -- that retract is made in the base's own frame, so this is the height the tool holds while it travels to the first part's X0 Y0; and (2) before each traverse between parts (a different WCS), when Retract Across Parts is on. Because it is measured above the spoilboard rather than the stock, it is the one clearance that stays valid across parts of differing thickness. Requires a Reserved WCS -- ignored when none is reserved, and on Marlin (no per-WCS registers).",
     group      : "05 - Establish Spoilboard Reference",
     type       : "integer",
     value      : 40,
@@ -2096,26 +2096,78 @@ function writeInformation() {
     }
   }
 
-  // Display the Feedrate and Scaling Properties
-  writeComment(eComment.Info, " ");
-  writeComment(eComment.Info, " Feedrate and Scaling Properties:");
-  writeComment(eComment.Info, "   Feed: Travel speed X/Y = " + getProperty(properties.A_Feeds_TravelSpeedXY));
-  writeComment(eComment.Info, "   Feed: Travel Speed Z = " + getProperty(properties.B_Feeds_TravelSpeedZ));
-  writeComment(eComment.Info, "   Feed: Enforce Feedrate = " + getProperty(properties.C_Feeds_EnforceFeedrate));
-  writeComment(eComment.Info, "   Feed: Scale Feedrate = " + getProperty(properties.D_Feeds_ScaleFeedrate));
-  writeComment(eComment.Info, "   Feed: Max XY Cut Speed = " + getProperty(properties.E_Feeds_MaxCutSpeedXY));
-  writeComment(eComment.Info, "   Feed: Max Z Cut Speed = " + getProperty(properties.F_Feeds_MaxCutSpeedZ));
-  writeComment(eComment.Info, "   Feed: Max Toolpath Speed = " + getProperty(properties.G_Feeds_MaxCutSpeedXYZ));
- 
-  // Display the G1->G0 Mapping Properties
-  writeComment(eComment.Info, " ");
-  writeComment(eComment.Info, " G1->G0 Mapping Properties:");
-  writeComment(eComment.Info, "   Map: First G1 -> G0 Rapid = " + getProperty(properties.A_MapRapids_RestoreFirstRapids));
-  writeComment(eComment.Info, "   Map: G1s -> G0 Rapids = " + getProperty(properties.B_MapRapids_RestoreRapids));
-  writeComment(eComment.Info, "   Map: SafeZ Mode = " + eSafeZ.prop[safeZMode].name + " : default = " + safeZHeightDefault);
-  writeComment(eComment.Info, "   Map: Allow Rapid Z = " + getProperty(properties.D_MapRapids_AllowRapidZ));
+  // Display every post property, grouped, plus the values that are resolved rather than
+  // stored. The two hand-written blocks this replaced (Feedrate/Scaling and G1->G0 Mapping)
+  // are covered by their own groups below.
+  writeAllProperties();
+  writeResolvedValues();
 
   writeComment(eComment.Info, " ");
+}
+
+// Dump EVERY post property as Info comments, one block per dialog group. The point is that a
+// posted file should carry the settings that produced it, so reviewing it -- by eye or by an
+// automated/AI pass -- never means inferring the configuration from the motion (and a negative
+// like "no base was reserved" can be read directly instead of guessed from an absence).
+//
+// Iterates the `properties` object rather than listing keys, so a newly added property is dumped
+// automatically and this can't drift out of date. Values print as the STORED form: an enum shows
+// its `id`, not its display title, so the dump stays stable across dialog relabelling (the ids
+// outlived two rounds of retitling already).
+function writeAllProperties() {
+  // Bucket the keys by group, then sort. The `group:` strings are zero-padded ("01 - Job" ...
+  // "11 - Duet") precisely so a plain lexicographic sort reproduces the dialog's own order;
+  // within a group the single-letter key prefix does the same.
+  var byGroup = {};
+  var groupNames = [];
+  var key;
+  for (key in properties) {
+    var g = properties[key].group;
+    if (g == undefined) {
+      continue;                       // not a dialog property
+    }
+    if (byGroup[g] == undefined) {
+      byGroup[g] = [];
+      groupNames.push(g);
+    }
+    byGroup[g].push(key);
+  }
+  groupNames.sort();
+
+  for (var i = 0; i < groupNames.length; ++i) {
+    var name = groupNames[i];
+    var keys = byGroup[name];
+    keys.sort();
+    writeComment(eComment.Info, " ");
+    writeComment(eComment.Info, " Properties -- " + name + ":");
+    for (var j = 0; j < keys.length; ++j) {
+      var k = keys[j];
+      var v = getProperty(properties[k]);
+      // Make an unset string property visible as such -- an empty value would otherwise read
+      // as a truncated line. Typed check so a numeric 0 isn't caught by it.
+      if ((typeof v == "string") && (v.length == 0)) {
+        v = "<empty>";
+      }
+      writeComment(eComment.Info, "   " + k + " = " + v);
+    }
+  }
+}
+
+// Values a reviewer needs that are NOT any property's stored value -- either resolved from an
+// expression, converted to output units, or supplied by Fusion rather than the dialog. Without
+// these the dump is misleading: "I_Probe_SafeZ = Retract:15" does not tell you the retract
+// actually resolved to 5.08 for this operation.
+function writeResolvedValues() {
+  writeComment(eComment.Info, " ");
+  writeComment(eComment.Info, " Resolved Values:");
+  writeComment(eComment.Info, "   Output unit = " + (unit == IN ? "inch" : "mm"));
+  writeComment(eComment.Info, "   Firmware (resolved) = " + fw);
+  writeComment(eComment.Info, "   Map SafeZ mode = " + eSafeZ.prop[safeZMode].name + " : default = " + safeZHeightDefault);
+  writeComment(eComment.Info, "   Probe SafeZ mode = " + eSafeZ.prop[probeSafeZMode].name + " : default = " + probeSafeZHeightDefault);
+  var base = getReservedBaseWcs();
+  writeComment(eComment.Info, "   Reserved base WCS = " + (base == 0 ? "None" : wcsName(base) + " (P" + base + ")"));
+  writeComment(eComment.Info, "   Probe XY offset (output units) = X" + xyzFormat.format(probeOffsetX()) + " Y" + xyzFormat.format(probeOffsetY()));
+  writeComment(eComment.Info, "   Inter Part Safe Z (output units) = " + xyzFormat.format(propertyMmToUnit(getProperty(properties.D_Spoilboard_SafeZClearance))));
 }
 
 // Implements A_Machine_HomeBeforeStart: establishes the machine frame (MCS) at job
@@ -2238,12 +2290,40 @@ function writeBaseEstablish() {
 
   if (tool.number != 0 && !tool.isJetTool()) {
     writeComment(eComment.Important, " Establish spoilboard base " + gname);
+
+    // Do the base's Z work in the BASE's own frame. G10 L20 writes a register without selecting
+    // it, so without this select the base's G38.2 target and -- the part that matters -- its
+    // post-probe retract would both be measured against the OPERATING WCS, whose Z is still
+    // whatever a prior job left there. Selecting the base makes the retract mean what the Inter
+    // Part Safe Z tooltip claims: a height above the spoilboard, valid regardless of stock
+    // thickness. The tool holds that physical height through the restore below, so the first
+    // part's travel to its X0 Y0 starts from a known-clear Z.
+    var operatingWcs = currentWorkOffset;
+    var switched = (operatingWcs != undefined && operatingWcs != base);
+    if (switched) {
+      writeComment(eComment.Info, "   Select base " + gname + " to probe and retract in its own frame");
+      writeBlock(gFormat.format(wcsGcode(base)));   // transit-select the base (no re-probe, no origin write)
+      currentWorkOffset = base;
+      resetAll();                                   // frame changed -- tracked coordinates no longer apply
+    }
+
     // "Pause & Probe Z" prompts the operator to attach/detach the probe; "Probe Z" runs the
     // probe with no prompts (a fixed/known probe point).
     var pause = (mode == "Pause & Probe Z");
     probePauseBefore = pause;
     probePauseAfter = pause;
-    probeTool(base);
+    // Retract to the Inter Part Safe Z, not the probe Safe Z -- see probeTool()'s retractZ note.
+    probeTool(base, propertyMmToUnit(getProperty(properties.D_Spoilboard_SafeZClearance)));
+
+    // R1 -- never leave the base active. Restore the operating WCS before anything that depends
+    // on it: the first part's origin write / "Use Active WCS" travel (writeWcsOnStart) and the
+    // section's cutting. The reselect moves nothing, so the cleared Z carries over.
+    if (switched) {
+      writeComment(eComment.Info, "   Restore operating WCS " + wcsName(operatingWcs) + " after base probe");
+      writeBlock(gFormat.format(wcsGcode(operatingWcs)));
+      currentWorkOffset = operatingWcs;
+      resetAll();
+    }
   } else {
     writeComment(eComment.Debug, " writeBaseEstablish: probe skipped (tool 0 or jet tool)");
   }
@@ -2305,7 +2385,7 @@ function writeWcsOnStart() {
   writeComment(eComment.Debug, " writeWcsOnStart: A_Probe_OnStart: " + mode + " wcs: " + currentWorkOffset);
 
   if (mode == "Skip") {
-    // "Use Existing WCS X0 Y0 Z0": do nothing to the origin -- use the WCS's full stored offset --
+    // "Use Active WCS X0 Y0 Z0": do nothing to the origin -- use the WCS's full stored offset --
     // but still reach its X0 Y0 safely: retract to the probe Safe Z (milling only), then rapid
     // there. This mode trusts the stored Z, so probeSafeZ() is a meaningful clearance height in
     // that frame. Z is retracted before the XY traverse.
@@ -2320,7 +2400,7 @@ function writeWcsOnStart() {
   }
 
   if (mode == "Probe Z") {
-    // "Use Existing WCS X0 Y0, Probe Z0": use the WCS's stored X0 Y0 (a pre-set fixture offset)
+    // "Use Active WCS X0 Y0, Probe Z0": use the WCS's stored X0 Y0 (a pre-set fixture offset)
     // and re-probe Z -- do NOT write XY. Unlike Skip, Z is stale (about to be probed), so we emit
     // no absolute Z move in this frame: the tool is at its safe job-start height (post-home /
     // power-on / spoilboard base probe), partProbe(false) travels to the stored X0 Y0 (X/Y only)
@@ -2758,16 +2838,24 @@ function toolChange() {
 // Probe Z and write it as the origin of a WCS. targetWcs defaults to the active
 // work offset (the normal tool/section probe); the reserved-base establishment passes
 // the base WCS number so the spoilboard Z lands in the base register instead.
-function probeTool(targetWcs) {
+function probeTool(targetWcs, retractZ) {
   if (targetWcs == undefined) {
     targetWcs = currentWorkOffset;
+  }
+  // Post-probe retract height, in output units and in the ACTIVE frame. Defaults to the probe
+  // Safe Z -- correct for a part probe, whose frame's Z the probe just established. The
+  // spoilboard base establish passes the Inter Part Safe Z instead: that retract is made in the
+  // base's own frame and has to clear the stock, which the probe Safe Z (a small hop above a
+  // part's stock top) does not.
+  if (retractZ == undefined) {
+    retractZ = probeSafeZ();
   }
   // Command comment block
   writeComment(eComment.Important, " Probe to Zero Z");
   if (probePauseBefore) writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
   writeComment(eComment.Info, "   Do Probing");
   writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(getProperty(properties.J_Probe_Thickness))));
-  writeComment(eComment.Info, "   Retract the tool to " + probeSafeZ());
+  writeComment(eComment.Info, "   Retract the tool to " + retractZ);
   if (probePauseAfter) writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
 
   if (probePauseBefore) askUser("Attach ZProbe", "Probe", false);
@@ -2793,7 +2881,7 @@ function probeTool(targetWcs) {
 
   resetAll();
   // move up tool to safe height again after probing
-  rapidMovementsZ(probeSafeZ());
+  rapidMovementsZ(retractZ);
 
   flushMotions();
 

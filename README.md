@@ -168,7 +168,7 @@ several tools, all on one part in one Setup — so one WCS throughout.
 - Turn the **04 - Map G1s to Rapids** group **off** — the full license already posts real
   `G0` rapids, so the hobby workaround isn't needed.
 - Set **First WCS / Part**:
-  - If this Setup's WCS is a pre-set fixture, choose **`Use Existing
+  - If this Setup's WCS is a pre-set fixture, choose **`Use Active
   WCS X0 Y0, Probe Z0`** (rapid to the stored X0 Y0, re-probe Z);
   - Otherwise `Set X0 Y0 to
   Current Pos, Probe Z0` (pre-jog XY).
@@ -204,14 +204,14 @@ WCS (`G54`, `G55`, `G56`, …), and want to cut them all in one program.
   pre-set offset
     - The post never sets XY for an added part unless you choose a Jog mode.
 - The **first** copy uses **First WCS / Part**
-  - Choose **`Use Existing WCS X0 Y0, Probe Z0`** so it too takes its pre-set XY and
+  - Choose **`Use Active WCS X0 Y0, Probe Z0`** so it too takes its pre-set XY and
   re-probes Z (matching the copies below).
 - **Subsequent WCS / Part** decides what happens at each copy after the first.
   - **Best-practice paths use the stored fixture offset — not jogging**
-  - **Use Existing WCS X0 Y0, Probe Z0** *(default)*
+  - **Use Active WCS X0 Y0, Probe Z0** *(default)*
     - Rapids to that copy's stored X0 Y0 and re-probes its stock-top Z.
     - Handles varying stock thickness.
-  - **Use Existing WCS X0 Y0 Z0**
+  - **Use Active WCS X0 Y0 Z0**
     - The copy uses whatever X0 Y0 Z0 is already stored in the corresponding WCS; the tool just rapids there (no probe).
   - **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**
     - Pause (`M0`) so the operator can jog to each copy's origin.
@@ -256,10 +256,11 @@ explicit **taxonomy** with three families:
 - **Set … to Current Pos** — no prompt. The tool is assumed to already be at the origin
   (you pre-jogged before starting, or machine homing / the spoilboard base left it there);
   the post records the current position. *(First WCS / Part only.)*
-- **Use Existing WCS …** — no prompt. Trust the origin already stored in that WCS (a
+- **Use Active WCS …** — no prompt. Trust the origin already stored in that WCS (a
   pre-set fixture offset / a prior job): rapid to its stored X0 Y0, and either re-probe Z
   (`… X0 Y0, Probe Z0`) or trust the stored Z too (`… X0 Y0 Z0`, no probe). The
-  best-practice path for pre-set fixtures.
+  best-practice path for pre-set fixtures. **See *What "Active WCS" means* below — it is
+  not whatever WCS your sender currently has selected.**
 - **Jog to …** — the post pauses with an `M0` (or RepRap `M291`) so the operator jogs to
   the origin *during* the run, then records it there.
 
@@ -268,12 +269,41 @@ Each probe family comes in a **Z-manual** variant (`… X0 Y0 Z0`, no probe) and
 automatically. **The defaults avoid any run-time jog pause** (which not every
 firmware/sender supports — see *Jogging at a pause*): **First WCS / Part** defaults to
 **`Set X0 Y0 to Current Pos, Probe Z0`** (pre-jog XY in your sender, then probe Z), and
-**Subsequent WCS / Part** to **`Use Existing WCS X0 Y0, Probe Z0`** (pre-set fixture XY,
+**Subsequent WCS / Part** to **`Use Active WCS X0 Y0, Probe Z0`** (pre-set fixture XY,
 re-probe Z). Pick a `Jog to …` mode only when you want the post to pause and guide you
 *and* your setup supports jogging at the pause.
 
 > **A jet tool or tool 0 never probes.** Any probe-Z mode degrades to recording the origin
 > with no `G38.2`, on every firmware.
+
+### What "Active WCS" means
+
+**The WCS your Fusion Setup designates — not the one your sender happens to have selected.**
+Worth being precise about, because the two are easy to conflate:
+
+- Each Fusion **Setup** carries a Work Offset (its WCS). That is what the post uses:
+  `G54` unless you set it to something else, and one WCS per part in a multi-part job.
+- The post **selects** that WCS itself, at job start, before it establishes any origin. So if
+  you left `G55` active in your sender and this Setup says WCS 1, the file emits `G54` and the
+  job runs there regardless. The post overwrites the selection — it never inherits it. You do
+  **not** need to pre-select a WCS in your sender.
+- What the post cannot do is *read* that WCS's stored origin. Register contents are runtime
+  state in the controller (GRBL keeps them through a power cycle), written by a previous job or
+  by your own manual touch-off. A post is a one-way g-code generator — there is no round trip.
+
+So the split is: **which WCS is certain; what it contains is trusted.** That is exactly what the
+`Use Active WCS …` modes assume, and why they are the right choice only when you know the stored
+origin is still good:
+
+| | Safe to use | Watch out for |
+|---|---|---|
+| `Use Active WCS X0 Y0, Probe Z0` | XY fixtures are pre-set and unchanged; stock thickness may vary (Z is re-probed) | A fixture that moved — XY is trusted blindly |
+| `Use Active WCS X0 Y0 Z0` | Nothing has changed since the origin was set, incl. stock thickness | New/different stock — the stored Z will be wrong |
+
+On a **fresh controller** every offset is `0`, so `G54` means machine coordinates — on a machine
+with no endstops, wherever it powered on. Don't use a `Use Active WCS …` mode until the WCS has
+actually been set (by a prior run, or by hand). The `Set … to Current Pos` and `Jog to …` families
+establish the origin instead of relying on one, which is why one of them is the default.
 
 ## Jogging at a pause
 
@@ -450,8 +480,8 @@ Groups appear in the Fusion dialog in the order below.
 ## 06 - On WCS / Part / Fixture Changes
 |Title|Description|Default|
 |---|---|---|
-|First WCS / Part|Origin for the first/only part: **Set X0 Y0 to Current Pos, Probe Z0** / **Set X0 Y0 Z0 to Current Pos** / **Use Existing WCS X0 Y0, Probe Z0** / **Use Existing WCS X0 Y0 Z0** / **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**.|**Set X0 Y0 to Current Pos, Probe Z0**|
-|Subsequent WCS / Part|Multi-part only — what to do at each added part's WCS: **Use Existing WCS X0 Y0, Probe Z0** / **Use Existing WCS X0 Y0 Z0** / **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**. Not supported on Marlin.|**Use Existing WCS X0 Y0, Probe Z0**|
+|First WCS / Part|Origin for the first/only part: **Set X0 Y0 to Current Pos, Probe Z0** / **Set X0 Y0 Z0 to Current Pos** / **Use Active WCS X0 Y0, Probe Z0** / **Use Active WCS X0 Y0 Z0** / **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**.|**Set X0 Y0 to Current Pos, Probe Z0**|
+|Subsequent WCS / Part|Multi-part only — what to do at each added part's WCS: **Use Active WCS X0 Y0, Probe Z0** / **Use Active WCS X0 Y0 Z0** / **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**. Not supported on Marlin.|**Use Active WCS X0 Y0, Probe Z0**|
 |Probe Pause|Operator prompts around each part probe: **No** / **Before** / **Before & After**.|**Before & After**|
 |Probe with G38.2|Probe with `G38.2` (On) or `G28` (Off). GRBL always `G38.2`.|**On**|
 |G38 Target|Furthest Z the probe move travels to.|**-10**|

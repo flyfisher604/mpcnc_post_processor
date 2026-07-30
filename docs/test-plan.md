@@ -11,8 +11,9 @@ Design/behavior detail lives in `docs/plan.md`.
 End-to-end, persona-driven scenarios covering the current changes (the reworked **First /
 Subsequent WCS / Part** origin modes — an explicit *Set … to Current Pos* (no prompt) vs *Jog to …*
 (M0 jog prompt) taxonomy, with the **no-prompt modes as the defaults** — First = `Set X0 Y0 to
-Current Pos, Probe Z0`, Subsequent = `Use Existing WCS X0 Y0, Probe Z0` (the `Jog to …` modes are opt-in
-because jogging at the pause isn't supported on every firmware/sender); safe-Z arrival
+Current Pos, Probe Z0`, Subsequent = `Use Active WCS X0 Y0, Probe Z0` (the `Jog to …` modes are opt-in
+because jogging at the pause isn't supported on every firmware/sender); the new first-part
+`Use Active WCS X0 Y0, Probe Z0` mode (**H7**); safe-Z arrival
 on every WCS change; the first-part **Skip** behavior change; the group-06 rename; and the whole-mm
 integer offsets / Safe Z). **You run these; record the outcome in each `Result:` line** (`PASS` /
 `FAIL` + a note, and paste the relevant g-code snippet). The granular token-level checks (M1–M6,
@@ -22,7 +23,7 @@ P1–P3) below still apply; each scenario tags which ones it also satisfies so n
 are identical. `G10 L20 P<n>` is GRBL/RepRap; Marlin uses `G92` and rejects >1 WCS (Guard C).
 Feed placeholders (`F<travelXY>`) are whatever the job's travel feed resolves to. Default probe
 target/speed/thickness = `Z-10` / `F30` / `Z0.8` unless you changed them. The default First WCS /
-Part mode is `Set X0 Y0 to Current Pos, Probe Z0` and Subsequent is `Use Existing WCS X0 Y0, Probe Z0`
+Part mode is `Set X0 Y0 to Current Pos, Probe Z0` and Subsequent is `Use Active WCS X0 Y0, Probe Z0`
 — both no-prompt; the `Jog to …` modes (which emit an `M0` jog prompt) are opt-in. Do every scenario
 on **GRBL** first (the default firmware); the
 firmware-variant rows note what changes elsewhere.
@@ -32,30 +33,49 @@ firmware-variant rows note what changes elsewhere.
 | ID | Scenario | Result |
 |----|----------|--------|
 | H1 | Hobbyist — single op, `Jog to X0 Y0, Probe Z0` (opt-in jog mode) | PASS |
-| H2 | Hobbyist — single op, **default** `Set X0 Y0 to Current Pos, Probe Z0` (no-prompt) | |
-| H3 | Hobbyist — single op, `Jog to X0 Y0 Z0` (manual Z, jog) | |
-| H4 | Hobbyist — single op, `Set X0 Y0 Z0 to Current Pos` (manual Z, no prompt) | |
-| H5 | Hobbyist — single op, `Use Existing WCS X0 Y0 Z0` (trust stored) | |
-| H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | |
-| H-REG | Hobbyist — byte-for-byte regression via the H2 path | |
-| PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Existing WCS X0 Y0, Probe Z0`) | |
+| H2 | Hobbyist — single op, **default** `Set X0 Y0 to Current Pos, Probe Z0` (no-prompt) | PASS |
+| H3 | Hobbyist — single op, `Jog to X0 Y0 Z0` (manual Z, jog) | PASS |
+| H4 | Hobbyist — single op, `Set X0 Y0 Z0 to Current Pos` (manual Z, no prompt) | PASS *(jet/tool-0 → J1)* |
+| H5 | Hobbyist — single op, `Use Active WCS X0 Y0 Z0` (trust stored) | PASS |
+| H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | PASS (Marlin + RRF) |
+| H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7b–H7e unrun)* |
+| H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
+| PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
 | PBV1 | Pro B-variant — setup run (record fixtures) | |
 | PBV2 | Pro B-variant — production run (re-probe Z) | |
 | PBV3 | Pro B-variant — production run (trust stored Z) | |
 | PA1 | Pro A — 2nd WCS same part/fixture, `Jog to X0 Y0, Probe Z0` | |
-| PA1b | Pro A — 2nd WCS same part, Z-only re-probe (`Use Existing WCS X0 Y0, Probe Z0`) | |
+| PA1b | Pro A — 2nd WCS same part, Z-only re-probe (`Use Active WCS X0 Y0, Probe Z0`) | |
 | D1 | Dialog & defaults audit (modes, renames, integer fields) | |
+| D2 | Header property dump — all 68 properties + resolved values | |
 
 ---
 
 ### Hobbyist — Fusion Personal, a single milling operation
 
 The design goal: **the default dialog posts a correct job with the fewest possible changes.** A
-single op has no WCS change, so only **First WCS / Part** is exercised — these rows walk all five of
+single op has no WCS change, so only **First WCS / Part** is exercised — these rows walk all six of
 its modes. The default is now **H2** (`Set X0 Y0 to Current Pos, Probe Z0`, no prompt); H1 is the
 opt-in guided-jog path. Do them on **GRBL**, one 3-axis milling op, real tool (tool ≠ 0, not a jet
 tool) unless a row says otherwise.
+
+> **Retest determination (reviewed against commits `5d89838` → `01c69a3`).** **No H row needs a
+> functional retest.** The only change to any already-verified H path is **operator-prompt text**:
+> four `askUser()` strings were shortened and the RepRap dialog title `"Set part origin"` became
+> `"Set origin"`. Motion, origin writes, probe commands, and comment structure are untouched, so
+> H1–H6 stand as verified. Consequences to be aware of when re-reading the saved g-code:
+> - **H1 / H3** — their `.gcode` files predate the wording change (each row already notes it), so
+>   their `M0 (MSG …)` text differs from the expected blocks below, which carry the **current**
+>   wording. Cosmetic — do not re-post for this.
+> - **H2 / H4 / H5** — no operator prompt on these paths at all; wholly unaffected.
+> - **H6** was re-posted after the spurious-Marlin-warning removal, and that removal shipped in the
+>   *same* commit (`01c69a3`) as the wording change — so `H6 - Marlin.gcode` / `H6 - RRF.gcode`
+>   should already show the current message text (and RRF the current `R"Set origin"` title, since
+>   RRF is the only firmware that emits the `askUser` title). Spot-check if in doubt; no re-post.
+>
+> What the recent commits *did* leave untested is a **whole new sixth mode**, `Use Active WCS X0
+> Y0, Probe Z0` on First WCS / Part — a new branch in `writeWcsOnStart()`. That is **H7** below.
 
 - [x] **H1 — `Jog to X0 Y0, Probe Z0` (opt-in guided-jog path).** Set First WCS / Part = `Jog to X0
       Y0, Probe Z0` (**no longer the default**); Probe Pause = `Before & After`.
@@ -116,10 +136,11 @@ tool) unless a row says otherwise.
       steps straight into `START begin` with **no jog `M0`** → `(   Set current position to 0,0,0)` →
       `G10 L20 P1 X0 Y0 Z0` (all three axes) → straight into the cut. **No `G38.2`** and **no probe
       attach/detach `M0`** anywhere (the sole `M0` is the spindle manual-on prompt). Real tool (T171),
-      GRBL. Confirms the pre-rework fully-manual touch-off shape. *(Jet/tool-0 sub-check not yet run.)*
+      GRBL. Confirms the pre-rework fully-manual touch-off shape. *(Jet/tool-0 sub-check **deferred to
+      J1** — see [Jet tools & laser operations](#jet-tools--laser-operations--deferred).)*
 
-- [x] **H5 — `Use Existing WCS X0 Y0 Z0` (trust the stored origin).** First WCS / Part =
-      `Use Existing WCS X0 Y0 Z0`; the WCS already holds an origin (prior job / set manually).
+- [x] **H5 — `Use Active WCS X0 Y0 Z0` (trust the stored origin).** First WCS / Part =
+      `Use Active WCS X0 Y0 Z0`; the WCS already holds an origin (prior job / set manually).
       *Expected:*
       ```
       G54
@@ -148,6 +169,111 @@ tool) unless a row says otherwise.
       `X1 Y1 Z1` jog buttons on the jog prompt only. Single `G38.2`, no spurious warning, helical
       lead-in linearized to `G1`.
 
+- [ ] **H7 — `Use Active WCS X0 Y0, Probe Z0` (new mode: stored XY, re-probe Z).** The sixth
+      First WCS / Part mode, added in `01c69a3` — the no-prompt first-part path for a pre-set
+      fixture: trust the WCS's stored X0 Y0, re-probe Z for the new stock. First WCS / Part =
+      `Use Active WCS X0 Y0, Probe Z0`; `G54` already holds a valid X0 Y0 (prior job or set at
+      the controller); Probe Pause = `Before & After`; Probe X/Y Offset = `0`; **no base**; real
+      tool. Park the tool clear in Z before starting (see the Z note below). *Expected:*
+      ```
+      G54
+      (   Use stored work origin X0 Y0; probe Z)
+      (   Move to part origin X0 Y0, then probe Z)
+      G0 X0 Y0 F<travelXY>
+      ... M0 attach-probe prompt ...
+      G38.2 F30 Z-10
+      G10 L20 P1 Z0.8
+      G0 Z<probeSafeZ>
+      ... M0 detach-probe prompt ...
+      ... into the cut ...
+      ```
+      **Pass — the discriminator is what is ABSENT:** **no `G10 L20 P1 X0 Y0`** (XY is not
+      re-zeroed — this is the only difference from H2), no jog `M0`, and **no `G0 Z` before the
+      `G0 X0 Y0`**. Both Info comments appear, in that order. Z is written to `P1` by the probe.
+      **Z note (by design, worth confirming):** with no base reserved this mode emits *no* Z move
+      before the XY traverse — Z is stale pending the probe, so the post refuses to make an
+      absolute Z move in that frame and instead traverses at whatever height the tool physically
+      sits at from job start. Record that height. *Result:* **PASS** — verified against `H7.gcode`
+      (GRBL, single op, T171, no base, offsets 0): `G54` → `(   Use stored work origin X0 Y0; probe
+      Z)` → `(   Move to part origin X0 Y0, then probe Z)` → `G0 X0 Y0 F2500` as the **first motion
+      in the program** → `M0 (MSG Attach ZProbe)` → `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8` → `G0
+      Z5.08` → `M0 (MSG Detach ZProbe)`. **No `G10 L20 P1 X0 Y0`** (the discriminator vs H2), no jog
+      `M0`, and no `G0 Z` before the traverse. Arcs/plane restores and section rapids independently
+      checked sound. **Follow-up filed:** the file gives the operator no cue that the first rapid's Z
+      is unknown — plan.md calls for an Info comment (`Ensuring that Z is safe. Unknown Z for XY
+      move.`) on this branch. **H7a PASS** (see below); **H7b deferred to J1**; **H7c/H7d/H7e remain
+      unrun** (this job had no base and was GRBL only).
+
+  Sub-checks:
+
+  - [x] **H7a — nonzero offset.** Same job with Probe X/Y Offset = `10` / `5`. Confirm the comment
+        becomes `(   Move to probe point = origin + offset X10 Y5, then probe Z)` and the rapid is
+        `G0 X10 Y5`, still with **no** `G10 L20 P1 X0 Y0`. (Closes the first-part `Probe Z` ×
+        offset gap: P1 covers the offset only on the `Set X0 Y0 to Current Pos` path.)
+        *Result:* **PASS** — verified against `H7a.gcode`, diffed against `H7.gcode`: apart from the
+        timestamp the **only** two differing lines are the expected ones — the comment
+        `(   Move to probe point = origin + offset X10 Y5, then probe Z)` replacing
+        `(   Move to part origin X0 Y0, then probe Z)`, and `G0 X10 Y5 F2500` replacing
+        `G0 X0 Y0 F2500`. Still **no** `G10 L20 P1 X0 Y0` (the only `G10` is `G10 L20 P1 Z0.8`), and
+        the emitted X/Y equal the entered whole-mm offsets in an mm-output job. The offset is fully
+        localised to the probe-point reposition — Z retract, section body, and STOP block are
+        byte-identical to H7, so a nonzero offset perturbs nothing downstream.
+
+  - **H7b — jet tool / tool 0. → DEFERRED** to
+    **[Jet tools & laser operations](#jet-tools--laser-operations--deferred)** (J-series). The
+    milling assertions above don't depend on it, so H7 is complete without it.
+
+  - [ ] **H7c — Base probe runs in the base's frame; traverse clears the stock.** Verifies the
+        base-frame probe/retract fix. *(Mechanism and history: plan.md, "first-part `Probe Z` mode's
+        traverse height when a base is reserved".)*
+
+        **Settings.** GRBL, real tool, one milling op. Reserved WCS = `G59`; Probe to Set Base =
+        `Pause, Probe Z, Pause`; Inter Part Safe Z = `40`; First WCS / Part = `Use Active WCS X0 Y0,
+        Probe Z0`; Probe X/Y Offset = `0`.
+
+        **Bed setup** (makes the stale datum as bad as it realistically gets):
+        1. At the controller, set `G54`'s origin on the **bare spoilboard** — jog to the intended
+           part X0 Y0, touch off on the spoilboard, zero X/Y/Z.
+        2. Clamp stock **≥19 mm** thick, positioned so the path from the base probe point to
+           `X0 Y0` crosses it.
+
+        **Expected g-code:**
+        ```
+        ( Establish spoilboard base G59)
+        (   Select base G59 to probe and retract in its own frame)
+        G59
+        ... M0 attach-probe prompt ...
+        G38.2 F30 Z-10
+        G10 L20 P6 Z0.8
+        G0 Z40                       ( Inter Part Safe Z, in the BASE frame )
+        ... M0 detach-probe prompt ...
+        (   Restore operating WCS G54 after base probe)
+        G54
+        (   Use stored work origin X0 Y0; probe Z)
+        G0 X0 Y0 F<travelXY>
+        ```
+
+        **Pass — static:** `G59` appears *before* the `G38.2`; the retract is `G0 Z40` (matching
+        `(   Retract the tool to 40)`) and **not** the group-06 probe Safe Z; the `G54` restore
+        appears before the `Use stored work origin` line; the base probe has **no `G0 X/Y`**
+        reposition.
+
+        **Pass — physical** (dry-run: spindle off, E-stop in hand, single-block through the `G0 Z40`
+        and `G54`, measure *before* letting `G0 X0 Y0` run): the tool sits **40 mm above the
+        spoilboard**, ~21 mm clear of the stock, and the `G54` reselect moves nothing.
+        *Result:* ____
+
+  - [ ] **H7d — Guard A still fires for this mode.** Assign the first section to the reserved base
+        WCS (e.g. base `G59`, Setup WCS = `6`) with First WCS / Part = `Use Active WCS X0 Y0,
+        Probe Z0`. **Pass:** the post aborts in `onOpen()` naming `Probe at Job Start`, with no
+        g-code emitted — the new mode writes a Z origin, so it must count as origin-establishing
+        (`baseOriginWriteReason()` classifies every mode except `Skip` that way). *Result:* ____
+
+  - [ ] **H7e — firmware variant (low priority).** Repeat H7 on Marlin and RRF. **Pass:** Marlin
+        emits `G92 Z0.8` only (no XY word, no `G54`); RRF emits `G54` + `G10 L20 P1 Z0.8` with
+        `M291 … S3` probe prompts. No jog buttons (`X1 Y1 Z1`) — this mode has no jog prompt.
+        *Result:* ____
+
 - [ ] **H-REG — Byte-for-byte regression (the key guarantee).** With the default reverted to
       `Set X0 Y0 to Current Pos, Probe Z0`, the **default** single-op output is again the pre-rework
       Current-Pos+Probe path (no jog `M0`) — so the byte-identical anchor is back on the default
@@ -156,6 +282,10 @@ tool) unless a row says otherwise.
       Current-Pos+Probe path preserves the old default exactly. *Result:* **OMITTED** — not run (no
       practical way to produce and diff the pre-rework reference here). The structural equivalence of
       the Current-Pos+Probe path is already covered by **H2**, which is once again the default.
+      **⚠ Re-baseline required.** The header property dump (D2) adds ~98 Info comment lines to
+      **every** posted file, so any byte-for-byte comparison against a pre-dump reference now fails on
+      the header alone. If this anchor is ever revived, diff **motion only** (strip comment lines
+      first), or capture a fresh reference from the current post. No motion changed.
 
 ---
 
@@ -164,9 +294,11 @@ tool) unless a row says otherwise.
 Use a **2-copy job**: Setup 1 → WCS `1` (G54), Setup 2 → WCS `2` (G55), reserved base **`G59`**,
 **Retract Across Parts = On**, real tool. Satisfies P2 and M-series checks as tagged.
 
-- [ ] **PB1 — Re-probe per copy** (Subsequent WCS / Part = `Use Existing WCS X0 Y0, Probe Z0` — now the
+- [ ] **PB1 — Re-probe per copy** (Subsequent WCS / Part = `Use Active WCS X0 Y0, Probe Z0` — now the
       default). *Expected at job start:* base establish `( Establish spoilboard
-      base G59)` → `G38.2` → `G10 L20 P6 Z0.8`; then first copy per First WCS / Part into `P1`.
+      base G59)` → `(   Select base G59 …)` → `G59` → `G38.2` → `G10 L20 P6 Z0.8` → `G0 Z40`
+      (Inter Part Safe Z, base frame) → `(   Restore operating WCS G54 …)` → `G54`; then first copy
+      per First WCS / Part into `P1`.
       *Expected at the `P1→P2` boundary:*
       ```
       ... transit through base: G59 → G0 Z40 ...
@@ -180,7 +312,7 @@ Use a **2-copy job**: Setup 1 → WCS `1` (G54), Setup 2 → WCS `2` (G55), rese
       XY; the traverse retracts base-relative to `Z40` before switching WCS. *(Satisfies M2, P2.)*
       *Result:* ____
 
-- [ ] **PB2 — Trust the stored Z** (Subsequent WCS / Part = `Use Existing WCS X0 Y0 Z0`). Same job.
+- [ ] **PB2 — Trust the stored Z** (Subsequent WCS / Part = `Use Active WCS X0 Y0 Z0`). Same job.
       *Expected at `P1→P2`:*
       ```
       ... G59 → G0 Z40 ...
@@ -210,7 +342,7 @@ On, real tool. This is the workflow the Jog origin modes exist for.
       set origins. *(Satisfies M3, M4.)* *Result:* ____
 
 - [ ] **PBV2 — Production run: reuse fixtures, re-probe Z.** First WCS / Part =
-      `Use Existing WCS X0 Y0 Z0`, Subsequent WCS / Part = `Use Existing WCS X0 Y0, Probe Z0`. **Do not
+      `Use Active WCS X0 Y0 Z0`, Subsequent WCS / Part = `Use Active WCS X0 Y0, Probe Z0`. **Do not
       re-jog** — the origins from PBV1 are already stored. *Expected:* first part —
       `(   Use stored work origin; move to X0 Y0 at Safe Z)` → `G0 Z<probeSafeZ>` → `G0 X0 Y0`
       (no origin write, no jog prompt); at `P1→P2` — retract → `G55` → `G0 X0 Y0` → `G38.2` →
@@ -218,7 +350,7 @@ On, real tool. This is the workflow the Jog origin modes exist for.
       fixtures; Z is re-probed per copy for the new stock. *(Satisfies M6, M2.)* *Result:* ____
 
 - [ ] **PBV3 — Production run: trust stored Z too.** Same as PBV2 but Subsequent WCS / Part =
-      `Use Existing WCS X0 Y0 Z0`. **Pass:** no probe anywhere on the added copies; each copy
+      `Use Active WCS X0 Y0 Z0`. **Pass:** no probe anywhere on the added copies; each copy
       just retracts and arrives at its stored `X0 Y0`. Use only when every copy's stock is the
       same thickness as the setup run. *Result:* ____
 
@@ -264,7 +396,7 @@ fixtures) — so either turn it off or reserve a base for this workflow.
 
 - [ ] **PA1b — Variant: new WCS XY already known, only Z re-references.** Same job, but WCS `2`'s
       X0 Y0 was already established (or equals G54's) so no jog is needed:
-      **Subsequent WCS / Part = `Use Existing WCS X0 Y0, Probe Z0`**. *Expected at `G54→G55`:* retract →
+      **Subsequent WCS / Part = `Use Active WCS X0 Y0, Probe Z0`**. *Expected at `G54→G55`:* retract →
       `G55` → `(   Move to part origin X0 Y0, then probe Z)` → `G0 X0 Y0` → `G38.2 F30 Z-10` →
       `G10 L20 P2 Z0.8` — **no jog prompt**. **Pass:** rapids to the stored X0 Y0 and re-probes Z on
       the machined face into `P2`. *(Satisfies M2.)* *Result:* ____
@@ -283,17 +415,64 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       **First WCS / Part**, **Subsequent WCS / Part**, **Probe Pause**, **Probe with G38.2**; the
       base-establish option reads **Pause, Probe Z, Pause**; the **First WCS / Part** dropdown lists
       all six modes in order (`Set X0 Y0 to Current Pos, Probe Z0`, `Set X0 Y0 Z0 to Current Pos`,
-      `Use Existing WCS X0 Y0, Probe Z0`, `Use Existing WCS X0 Y0 Z0`, `Jog to X0 Y0, Probe Z0`,
+      `Use Active WCS X0 Y0, Probe Z0`, `Use Active WCS X0 Y0 Z0`, `Jog to X0 Y0, Probe Z0`,
       `Jog to X0 Y0 Z0`) and **defaults to the first, `Set X0 Y0 to Current Pos, Probe Z0`**; the
-      **Subsequent WCS / Part** dropdown lists its four modes in order (`Use Existing WCS X0 Y0, Probe
-      Z0`, `Use Existing WCS X0 Y0 Z0`, `Jog to X0 Y0, Probe Z0`, `Jog to X0 Y0 Z0`) and **defaults to
-      the first, `Use Existing WCS X0 Y0, Probe Z0`** (no `Set … to Current Pos` modes here); **Probe
-      X/Y Offset** and both **Safe Z** fields accept only
+      **Subsequent WCS / Part** dropdown lists its four modes in order (`Use Active WCS X0 Y0, Probe
+      Z0`, `Use Active WCS X0 Y0 Z0`, `Jog to X0 Y0, Probe Z0`, `Jog to X0 Y0 Z0`) and **defaults to
+      the first, `Use Active WCS X0 Y0, Probe Z0`** (no `Set … to Current Pos` modes here); **Probe
+      X/Y Offset**, group-05 **Inter Part Safe Z** (renamed from "Safe Z" — confirm no group still
+      shows two fields both titled "Safe Z"), and group-06 **Safe Z** accept only
       whole numbers (reject a decimal like `2.5`) and are labeled/understood as **whole mm**.
       Cross-check against the fuller **Beta-2 dialog & behavior rework — re-verify** list below.
       *Result:* ____
 
 ---
+
+- [ ] **D2 — Header property dump.** Post any job and inspect the header. **Pass:** after the Ranges
+      and Tools tables there is one `( Properties -- <group>:)` block for **each of the 11 groups**, in
+      dialog order (`01 - Job` → `11 - Duet`), listing **all 68 properties** as `   <Key> = <value>`
+      with keys in letter order within each group; enums show their stored **id** (e.g.
+      `A_Probe_OnStart = Current XY & Probe Z`, not the display title); unset strings show `<empty>`
+      while numeric zeros show `0`. Then a `( Resolved Values:)` block with output unit, resolved
+      firmware, both Safe-Z modes + defaults, reserved base as `G59 (P6)` or `None`, and the probe XY
+      offset / Inter Part Safe Z in output units. Cross-check two or three values against what you
+      actually set in the dialog, and confirm the two old blocks (`Feedrate and Scaling Properties`,
+      `G1->G0 Mapping Properties`) are gone — their values now appear under groups `03` and `04`.
+      Also confirm the dump is **suppressed** at Comment Level `Important` and `Off`. *Result:* ____
+      *(Note: this block is new default output — see the H-REG re-baseline note.)*
+
+## Jet tools & laser operations — deferred
+
+**Scope decision (user).** Jet-tool / tool-0 behavior and laser operations are a **separate
+workstream**, to be reviewed and tested on their own rather than as sub-checks bolted onto the
+milling rows. Every milling row above stands on its own without them. Nothing here blocks the
+WCS/probe work; all of it blocks a release that claims laser/jet support.
+
+The shared mechanic behind most of these: `tool.number != 0 && !tool.isJetTool()` is the post's
+"can this tool probe?" test, and it gates the probe **and** the Z retract on every origin path. So a
+jet tool or tool 0 takes a *different branch* in `writeWcsOnStart()`, `writeWCS()`, `partProbe()`,
+and `writeBaseEstablish()` — those branches are essentially unexercised.
+
+- [ ] **J1 — First WCS / Part, all six modes with a jet tool and with tool 0.** Confirm each mode
+      records the origin with **no probe** and no probe prompts, and note which ones also skip the Z
+      retract. Collects the deferred sub-checks: **H4** (`Set X0 Y0 Z0 to Current Pos` — the
+      documented jet/laser path), **H5 / M6** (`Use Active WCS X0 Y0 Z0` — emits the `X0 Y0` move
+      but **no** Z retract), and **H7b** (`Use Active WCS X0 Y0, Probe Z0` — expect the Debug
+      comment `writeWcsOnStart: probe skipped (tool 0 or jet tool) -- moving to stored X0 Y0`, a bare
+      `G0 X0 Y0`, no `G38.2`). *Result:* ____
+- [ ] **J2 — Subsequent WCS / Part with a jet tool.** The `canProbe` false branches in `writeWCS()`
+      (`Probe Z` → move to stored `X0 Y0` instead of probing; `Jog XY & Probe Z` → jog, write XY, no
+      probe). *Result:* ____
+- [ ] **J3 — Spoilboard base with a jet tool.** `writeBaseEstablish()` skips the probe entirely
+      (Debug `probe skipped (tool 0 or jet tool)`) — so the base is **never established** on a laser
+      job even when reserved. Decide whether that should warn rather than pass silently. *Result:* ____
+- [ ] **J4 — Laser property group (`09 - Laser`, 7 properties).** On Vaporize / On Through / On Etch,
+      Marlin mode + pin, GRBL mode, laser coolant — none are covered by any current row, and none
+      appear in the header property dump. Plus `11 - Duet` `B_Duet_LaserMode`. *Result:* ____
+- [ ] **J5 — Laser/jet + the Phase-4 features.** Whether reserved base, Retract Across Parts, and
+      the safe-Z retracts are coherent at all for a jet job (no Z probing, Z often fixed by focus).
+      This is a **design review before a test** — the answer may be "not applicable, and the dialog
+      should say so". *Result:* ____
 
 ## Outstanding — to run before release
 
@@ -334,8 +513,8 @@ fixtures) — so either turn it off or reserve a base for this workflow.
 
 This session reworked the dialog and several probe/homing behaviors. Defaults remain effectively
 byte-identical to the pre-rework post: the **First / Subsequent WCS / Part** origin modes default to
-the **no-prompt** modes (First = `Set X0 Y0 to Current Pos, Probe Z0`, Subsequent = `Use Existing X0
-Y0, Probe Z0`) — the `Jog to …` modes that add a jog `M0` are opt-in, since jogging at the pause
+the **no-prompt** modes (First = `Set X0 Y0 to Current Pos, Probe Z0`, Subsequent = `Use Active WCS
+X0 Y0, Probe Z0`) — the `Jog to …` modes that add a jog `M0` are opt-in, since jogging at the pause
 isn't universally supported. Re-verify:
 
 - **Group split & renumber.** `05 - Establish Spoilboard Reference` (4 items) sits between Map-G1s
@@ -344,16 +523,18 @@ isn't universally supported. Re-verify:
   within each group. (The spoilboard-group move to `05` changed only `group:` strings, not keys,
   so it does **not** reset presets; earlier renamed / re-lettered keys still do.)
 - **Label renames** display correctly: Reserved WCS, Probe to Set Base, Retract Across Parts,
-  Safe Z (Spoilboard group). Current labels: group `06` → **On WCS / Part / Fixture Changes**;
+  **Inter Part Safe Z** (Spoilboard group — renamed from "Safe Z", which collided with the group-06
+  field of the same name; key unchanged, so presets don't reset). Current labels: group `06` →
+  **On WCS / Part / Fixture Changes**;
   `A_Probe_OnStart` → **First WCS / Part**; `B_Probe_OnChange` → **Subsequent WCS / Part**;
   `C_Probe_Pause` → **Probe Pause**; `F_Probe_G382orG28` → **Probe with G38.2**; base-establish
   option → **Pause, Probe Z, Pause**. Origin-mode options were reworked into an explicit *Current
-  Pos* (no prompt) vs *Use Existing WCS* (no prompt) vs *Jog* (M0 prompt) taxonomy, ordered
+  Pos* (no prompt) vs *Use Active WCS* (no prompt) vs *Jog* (M0 prompt) taxonomy, ordered
   default-first: **First WCS / Part** → `Set X0 Y0 to Current Pos, Probe Z0` / `Set X0 Y0 Z0 to
-  Current Pos` / `Use Existing WCS X0 Y0, Probe Z0` / `Use Existing WCS X0 Y0 Z0` / `Jog to X0 Y0,
-  Probe Z0` / `Jog to X0 Y0 Z0`; **Subsequent WCS / Part** → `Use Existing WCS X0 Y0, Probe Z0` /
-  `Use Existing WCS X0 Y0 Z0` / `Jog to X0 Y0, Probe Z0` / `Jog to X0 Y0 Z0`. **Defaults are the
-  first item of each** (First = `Set X0 Y0 to Current Pos, Probe Z0`, Subsequent = `Use Existing WCS
+  Current Pos` / `Use Active WCS X0 Y0, Probe Z0` / `Use Active WCS X0 Y0 Z0` / `Jog to X0 Y0,
+  Probe Z0` / `Jog to X0 Y0 Z0`; **Subsequent WCS / Part** → `Use Active WCS X0 Y0, Probe Z0` /
+  `Use Active WCS X0 Y0 Z0` / `Jog to X0 Y0, Probe Z0` / `Jog to X0 Y0 Z0`. **Defaults are the
+  first item of each** (First = `Set X0 Y0 to Current Pos, Probe Z0`, Subsequent = `Use Active WCS
   X0 Y0, Probe Z0`). The renamed/added ids reset any saved `A_Probe_OnStart` / `B_Probe_OnChange`
   preset.
 - **Group 02 — Home Before Start** (None / XY / XYZ). `None` (default) → no homing,
@@ -391,6 +572,10 @@ Already confirmed by NC inspection — **do not re-run** (see Verified → Phase
 
 Run these:
 
+> The **first-part `Use Active WCS X0 Y0, Probe Z0`** mode × nonzero offset is a separate path
+> (`writeWcsOnStart()` → `partProbe(false)`, no XY origin write) and is covered by **H7a** — not
+> repeated here. P1 below covers the offset on the `Set X0 Y0 to Current Pos, Probe Z0` path.
+
 - [x] **P1 — Nonzero offset, first/only part.** ✅ **Verified** via `Face1.gcode` (single part,
       offset X10 Y5, base `G59` reserved — GRBL/inch-doc-in-mm-out): `G10 L20 P1 X0 Y0` →
       `X10 Y5 F2500` (G0 modal reposition) → `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8`; the reserved
@@ -413,12 +598,13 @@ Run these:
       motion is unchanged; only the comment text changed.)*
 
 - [ ] **P2 — Nonzero offset, multi-part Replicate + reserved base.** 2-part Replicate job (WCS
-      `P1` + `P2`), **reserved base `G59`**, `Subsequent WCS / Part = Use Existing WCS X0 Y0, Probe Z0`, same `10/5` offsets.
+      `P1` + `P2`), **reserved base `G59`**, `Subsequent WCS / Part = Use Active WCS X0 Y0, Probe Z0`, same `10/5` offsets.
       Post and confirm all three probes:
-      - **Base (`G59`)** — `( Establish spoilboard base G59)` → `G38.2` → `G10 L20 P6 Z<thk>` with
-        **no `G0 X/Y` reposition** (base ignores the offset).
+      - **Base (`G59`)** — `( Establish spoilboard base G59)` → `G59` select → `G38.2` →
+        `G10 L20 P6 Z<thk>` → `G0 Z<Inter Part Safe Z>` → `G54` restore, with **no `G0 X/Y`
+        reposition** (base ignores the offset).
       - **First part (`P1`)** — reposition to `X10 Y5` before `G38.2`, exactly as P1 above.
-      - **Added part (`P2`)** — with `Subsequent WCS / Part = Use Existing WCS X0 Y0, Probe Z0` (Replicate auto-position):
+      - **Added part (`P2`)** — with `Subsequent WCS / Part = Use Active WCS X0 Y0, Probe Z0` (Replicate auto-position):
         ```
         (   Move to probe point = origin + offset X10 Y5, then probe Z)
         G0 X10 Y5 F<travelXY>
@@ -448,12 +634,12 @@ job** (WCS `P1` + `P2`), a reserved base `G59` + Retract Across Parts on, tool �
 part, every mode first **retracts to a safe Z, then acts** — confirm that retract precedes any XY
 move. Marlin is out of scope (single frame; Guard C blocks multi-WCS).
 
-- [ ] **M1 — `Skip` reaches X0 Y0 safely (behavior change).** `Subsequent WCS / Part = Use Existing WCS X0 Y0 Z0`. On the
+- [ ] **M1 — `Skip` reaches X0 Y0 safely (behavior change).** `Subsequent WCS / Part = Use Active WCS X0 Y0 Z0`. On the
       `P1→P2` boundary confirm: base-relative retract (`G59` → `Z<SafeZ>`) → `G55` → **`G0 X0 Y0`**
       → straight into cutting, **no probe**. The `G0 X0 Y0` after the WCS switch is the new
       "do-nothing-but-arrive-safely" move (previously `Skip` went straight into cutting with no
       X0 Y0 rapid — this supersedes the old Verified "Test B" behavior).
-- [ ] **M2 — `Probe Z` (Replicate auto-position).** `Subsequent WCS / Part = Use Existing WCS X0 Y0, Probe Z0`. Confirm the
+- [ ] **M2 — `Probe Z` (Replicate auto-position).** `Subsequent WCS / Part = Use Active WCS X0 Y0, Probe Z0`. Confirm the
       existing behavior is unchanged: retract → `G55` → rapid to `X0 Y0` (+ offset) → `G38.2` →
       `G10 L20 P2 Z`. XY comes from `P2`'s stored offset (not re-zeroed).
 - [ ] **M3 — `Jog to X0 Y0 Z0` (jog, no probe).** `Subsequent WCS / Part = Jog to X0 Y0 Z0`. Confirm:
@@ -492,6 +678,9 @@ move. Marlin is out of scope (single frame; Guard C blocks multi-WCS).
 
 ### Phase 3 — reserved base + guards
 - Base `None` (default): byte-for-byte identical to the Phase-2 baseline.
+- **⚠ Superseded by the base-frame probe change** — the base establish now wraps its probe in a
+  `G59` select / `G54` restore and retracts to the Inter Part Safe Z in the base frame. The
+  register write is unchanged; the surrounding blocks are not. Re-verify via H7c / PB1.
 - Base establish (now `Pause & Probe Z`, was On): spoilboard probe → `G10 L20 P6 Z<thk>`
   **before** the first section's own origin/probe; `G54` work still probes separately.
 - Base establish `None` (was Off): no probe; Info comment
