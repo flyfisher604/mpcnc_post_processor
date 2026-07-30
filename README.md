@@ -87,24 +87,30 @@ origin choice applies.
 > 
 > Only three groups need any attention for users running the hobbyist limited version of Fusion 360;
 > for the rest you may just *Accept the Defaults*.
+>
+> The groups are ordered to be worked through in sequence. Groups **01–03** describe your machine
+> and how it should move; groups **04–06** — *Establish Machine Coordinates*, *Establish Spoilboard
+> Reference*, *On WCS / Part / Fixture Changes* — decide **where things are**, and are listed in the
+> order the machine does them: find the machine's own zero, then the spoilboard, then each part.
+> Groups **07–11** are optional hardware and add-ons.
 
 - **01 - Job**
   - set **CNC Firmware** to your controller.
   - Leave **Manual Spindle On/Off** on if you start your router/spindle by hand.
   - Other fields *Accept Defaults*.
-- **02 - Establish Machine Coordinates**
-  - *Accept Defaults* (**Home Before Start = None**).
-  - Choose **XY** only if your machine has X/Y endstops and you want squaring included in the post.
-- **03 - Feeds and Speeds**
+- **02 - Feeds and Speeds**
   - set **Travel Speed X/Y**, **Travel Speed Z**, and the **Max XY Cut Speed** / **Max Z Cut Speed** limits to your machine's real capability.
   - Enable **Scale Feedrate** so cut moves are scaled to stay within those limits, and keep
   **Enforce Feedrate** on so a feedrate is always included on each gcode statement.
-- **04 - Map G1s to Rapids**
+- **03 - Map G1s to Rapids**
   - **Hobbyists should turn all options in this group on.**
   - A Personal-license of Fusion 360 forces all rapid moves to be emitted as cutting moves.
   - Converts some of the cutting movements back to rapids and restores safe, properly-ordered
   travel moves (retract before travelling, travel before descending) and avoids dragging the tool
   across the work. (See *G1 → G0 rapid mapping*.)
+- **04 - Establish Machine Coordinates**
+  - *Accept Defaults* (**Home Before Start = None**).
+  - Choose **XY** only if your machine has X/Y endstops and you want squaring included in the post.
 - **05 - Establish Spoilboard Reference**
   - *Accept Defaults* (**Reserved WCS = None**).
   - Understanding the true zero height of the spoilboard is only important during multi-part moves, not an option in the hobbyist version.
@@ -165,7 +171,7 @@ Fusion assigns a WCS to each Setup via its **Work Offset** field (1 → `G54`, 2
 The common full-license job: several operations (face, pocket, contour), possibly
 several tools, all on one part in one Setup — so one WCS throughout.
 
-- Turn the **04 - Map G1s to Rapids** group **off** — the full license already posts real
+- Turn the **03 - Map G1s to Rapids** group **off** — the full license already posts real
   `G0` rapids, so the hobby workaround isn't needed.
 - Set **First WCS / Part**:
   - If this Setup's WCS is a pre-set fixture, choose **`Use Active
@@ -218,7 +224,7 @@ WCS (`G54`, `G55`, `G56`, …), and want to cut them all in one program.
     - Only for a setup run where the fixtures are *not* pre-set, and only if your firmware/sender supports
     jogging during a pause (see *Jogging at a pause*).
 - **Retract Across Parts** (on by default)
-  - Makes the tool retract to **Safe Z** — an absolute height above the spoilboard base — *before* it traverses to the next fixture, so it clears every clamp and part regardless of their heights.
+  - Makes the tool retract to **Inter Part Safe Z** — an absolute height above the spoilboard base — *before* it traverses to the next fixture, so it clears every clamp and part regardless of their heights.
 
 ### (c) One part from multiple references, or a flip — *not* a single job
 
@@ -322,7 +328,7 @@ your firmware and sender:**
 
 ## Establishing the machine frame (homing / MCS)
 
-Group **02 - Establish Machine Coordinates → Home Before Start** decides whether the
+Group **04 - Establish Machine Coordinates → Home Before Start** decides whether the
 machine homes at job start to establish a repeatable machine frame:
 
 - **None** (default) — emit no homing; accept the current position (already homed at the
@@ -353,11 +359,14 @@ safe height is meaningful across all of a job's parts. It is:
 
 - **Established at job start** by **Probe to Set Base**: `Pause, Probe Z, Pause` (prompt,
   probe, prompt — the manual touch-off, default), `Probe Z` (probe with no prompt, a
-  fixed point), or `None` (assume pre-set from a prior job — probe once, run many). This
-  base probe is always taken at the origin (0,0 — the tool's position at job start); the
-  **Probe X/Y Offset** shifts only *part* probes, never the spoilboard probe.
+  fixed point), or `None` (assume pre-set from a prior job — probe once, run many).
+  > **⚠ Park over bare spoilboard before you start.** The base probe makes **no XY move** — it
+  > touches off whatever is under the tool at job start. Park over the stock and the "spoilboard
+  > base" silently records the *stock top* instead, and every clearance measured from it is short
+  > by the stock thickness. The **Probe X/Y Offset** shifts only *part* probes and cannot be used
+  > to move this one.
 - **Transited, not parked**: when the tool must move between parts, the post briefly
-  selects the base to retract to **Safe Z** (the group's cross-part clearance), then
+  selects the base to retract to **Inter Part Safe Z** (the group's cross-part clearance), then
   selects the destination WCS. It never leaves the base active into a cut, and never
   selects it without a real move.
 - Recommended slot **`G59`** (the highest GRBL supports, keeping `G54` free for parts).
@@ -375,7 +384,7 @@ safe height is meaningful across all of a job's parts. It is:
   origin by a fixed XY distance, so the origin can sit at a part corner or off the material
   while Z is still read on the stock top. It applies at **every part probe** — the first
   part and each added copy — and is job-wide, not per-fixture. It never applies to the
-  spoilboard base probe, which always touches off at the origin (0,0).
+  spoilboard base probe, which makes no XY move at all (see *The reserved spoilboard base*).
 - **Re-probe after every tool change** is the tool-length substitute — enable **Probe
   After Tool Change**.
 - **Manual tool changes** (no ATC): retract, move to the work-relative change position,
@@ -398,7 +407,7 @@ before emitting bad g-code:
 
 The Personal license restricts all moves to the max cut speed — and Fusion implements
 this by turning every `G0` rapid into a `G1` cut. The side effect is dragging cuts and
-collisions at the start of jobs and after tool changes. Group **04 - Map G1s to Rapids**
+collisions at the start of jobs and after tool changes. Group **03 - Map G1s to Rapids**
 selectively converts those `G1` moves back into `G0` rapids where it's safe:
 
 - **First G1 → G0 Rapid** — restores the lost initial positioning move at the start of a
@@ -444,13 +453,7 @@ Groups appear in the Fusion dialog in the order below.
 |Include Whitespace|Whitespace separation between words.|**true**|
 |At End Go to 0,0|Go to X0 Y0 at program end; Z unchanged.|**true**|
 
-## 02 - Establish Machine Coordinates
-|Title|Description|Default|
-|---|---|---|
-|Home Before Start|Home at job start to establish the machine frame: **None** (no homing), **XY** (home X/Y), **XYZ** (also home Z, only if wired for it). GRBL homes all axes with one `$H` if XY or XYZ.|**None**|
-|Prompt Before Home|Pause before homing so you can prepare the machine (place a movable Z plate, clear the bed). Fires whenever homing runs.|**false**|
-
-## 03 - Feeds and Speeds
+## 02 - Feeds and Speeds
 |Title|Description|Default|
 |---|---|---|
 |Travel Speed X/Y|`G0` travel speed X & Y (mm/min).|**2500**|
@@ -461,7 +464,7 @@ Groups appear in the Fusion dialog in the order below.
 |Max Z Cut Speed|Max Z cut speed (mm/min).|**180**|
 |Max Toolpath Speed|Cap for the scaled toolpath feed (mm/min).|**1000**|
 
-## 04 - Map G1s to Rapids (disable when using full license)
+## 03 - Map G1s to Rapids (disable when using full license)
 |Title|Description|Default|
 |---|---|---|
 |First G1 → G0 Rapid|Convert the first `G1` of a toolpath to a rapid.|**false**|
@@ -469,13 +472,19 @@ Groups appear in the Fusion dialog in the order below.
 |Map: Safe Z to Rapid|Threshold Z: a number, or a Fusion height with fallback (e.g. `Retract:15`).|**Retract:15**|
 |Map: Allow Rapid Z|Also convert safe vertical moves.|**false**|
 
+## 04 - Establish Machine Coordinates
+|Title|Description|Default|
+|---|---|---|
+|Home Before Start|Home at job start to establish the machine frame: **None** (no homing), **XY** (home X/Y), **XYZ** (also home Z, only if wired for it). GRBL homes all axes with one `$H` if XY or XYZ.|**None**|
+|Prompt Before Home|Pause before homing so you can prepare the machine (place a movable Z plate, clear the bed). Fires whenever homing runs.|**false**|
+
 ## 05 - Establish Spoilboard Reference
 |Title|Description|Default|
 |---|---|---|
 |Reserved WCS|Reserve one WCS as a fixed spoilboard base. `None` = off. `G59.1`–`G59.3` are RepRap-only; ignored on Marlin.|**None**|
-|Probe to Set Base|Set the base's Z at job start: **None** (assume pre-set), **Probe Z** (probe, no prompt), **Pause, Probe Z, Pause** (manual touch-off). Always at the origin (0,0) — Probe X/Y Offset never applies.|**Pause, Probe Z, Pause**|
-|Retract Across Parts|Retract to **Safe Z** (below) before traversing between WCS; drives the safe-Z guard. GRBL/RepRap only.|**true**|
-|Safe Z|Absolute height above the base to retract to between parts — clear the tallest fixture.|**40**|
+|Probe to Set Base|Set the base's Z at job start: **None** (assume pre-set), **Probe Z** (probe, no prompt), **Pause, Probe Z, Pause** (manual touch-off). Probes **wherever the tool is parked** — no XY move is made and Probe X/Y Offset never applies, so park over bare spoilboard.|**Pause, Probe Z, Pause**|
+|Retract Across Parts|Retract to **Inter Part Safe Z** (below) before traversing between WCS; drives the safe-Z guard. GRBL/RepRap only.|**true**|
+|Inter Part Safe Z|Absolute height above the base to retract to between parts — clear the tallest fixture.|**40**|
 
 ## 06 - On WCS / Part / Fixture Changes
 |Title|Description|Default|

@@ -169,7 +169,7 @@ properties = {
   A_Machine_HomeBeforeStart: {
     title      : "Home Before Start",
     description: "Home the machine at job start to establish a repeatable machine frame (MCS). None (default): emit no homing -- accept the current position (already homed at the controller, or a power-on 0,0,0). XY: home X and Y (the usual case -- gives XY repeatability and gantry squaring; Z stays on the work-Z probe touch-off). XYZ: also home Z, only if the machine is actually wired to home Z (LowRider switches, or the Marlin movable-plate trick). Per firmware: on GRBL/FluidNC one $H homes every configured axis, so XY and XYZ emit the same $H (the choice just documents intent); on Marlin/RepRap each axis is homed independently (G28 X / G28 Y / G28 Z). Homing gives X/Y repeatability only -- the everyday Z cutting reference is always the work-Z touch-off (see First WCS / Part), never this.",
-    group      : "02 - Establish Machine Coordinates",
+    group      : "04 - Establish Machine Coordinates",
     type       : "enum",
     values: [
       { title: "None", id: "None" },
@@ -182,7 +182,7 @@ properties = {
   B_Machine_PromptBeforeHome: {
     title      : "Prompt Before Home",
     description: "Pause once before any homing motion so the operator can prepare the machine (e.g. place a movable Z-homing plate, or clear the bed). Fires whenever Home Before Start runs homing (any firmware, any axes) -- so it never needs revisiting when the machine changes. No effect when Home Before Start is None.",
-    group      : "02 - Establish Machine Coordinates",
+    group      : "04 - Establish Machine Coordinates",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -191,7 +191,7 @@ properties = {
   A_Feeds_TravelSpeedXY: {
     title      : "Travel Speed X/Y",
     description: "High speed for Rapid movements X & Y (mm/min).",
-    group      : "03 - Feeds and Speeds",
+    group      : "02 - Feeds and Speeds",
     type       : "integer",
     value      : 2500,
     scope      : "post"
@@ -199,7 +199,7 @@ properties = {
   B_Feeds_TravelSpeedZ: {
     title      : "Travel Speed Z",
     description: "High speed for Rapid movements Z (mm/min).",
-    group      : "03 - Feeds and Speeds",
+    group      : "02 - Feeds and Speeds",
     type       : "integer",
     value      : 300,
     scope      : "post"
@@ -207,7 +207,7 @@ properties = {
   C_Feeds_EnforceFeedrate: {
     title      : "Enforce Feedrate",
     description: "Feedrate is include on every g-code movement.",
-    group      : "03 - Feeds and Speeds",
+    group      : "02 - Feeds and Speeds",
     type       : "boolean",
     value      : true,
     scope      : "post"
@@ -215,7 +215,7 @@ properties = {
   D_Feeds_ScaleFeedrate: {
     title      : "Scale Feedrate",
     description: "Scale feedrates to remain less than X, Y, Z axis maximums.",
-    group      : "03 - Feeds and Speeds",
+    group      : "02 - Feeds and Speeds",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -223,7 +223,7 @@ properties = {
   E_Feeds_MaxCutSpeedXY: {
     title      : "Max XY Cut Speed",
     description: "Limit X or Y feedrate to be less then this value (mm/min).",
-    group      : "03 - Feeds and Speeds",
+    group      : "02 - Feeds and Speeds",
     type       : "integer",
     value      : 900,
     scope      : "post"
@@ -231,7 +231,7 @@ properties = {
   F_Feeds_MaxCutSpeedZ: {
     title      : "Max Z Cut Speed",
     description: "Limit Z feedrate to be less then this value (mm/min).",
-    group      : "03 - Feeds and Speeds",
+    group      : "02 - Feeds and Speeds",
     type       : "integer",
     value      : 180,
     scope      : "post"
@@ -239,7 +239,7 @@ properties = {
   G_Feeds_MaxCutSpeedXYZ: {
     title      : "Max Toolpath Speed",
     description: "Maximum scaled toolpath feedrate (mm/min).",
-    group      : "03 - Feeds and Speeds",
+    group      : "02 - Feeds and Speeds",
     type       : "integer",
     value      : 1000,
     scope      : "post"
@@ -248,7 +248,7 @@ properties = {
   A_MapRapids_RestoreFirstRapids: {
     title      : "First G1 -> G0 Rapid",
     description: "Enable to ensure that the first move of a cut starts with a G0 Rapid.",
-    group      : "04 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids (disable when using full license)",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -256,7 +256,7 @@ properties = {
   B_MapRapids_RestoreRapids: {
     title      : "Map: G1s -> G0 Rapids",
     description: "Enable to convert G1s to G0s Rapids when safe.",
-    group      : "04 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids (disable when using full license)",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -264,7 +264,7 @@ properties = {
   C_MapRapids_SafeZ: {
     title      : "Map: Safe Z to Rapid",
     description: "Z must be above or equal to this value to be mapped G1s --> G0s; Uses Retract level if defined or 15.",
-    group      : "04 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids (disable when using full license)",
     type       : "string",
     value      : "Retract:15",
     scope      : "post"
@@ -272,7 +272,7 @@ properties = {
   D_MapRapids_AllowRapidZ: {
     title      : "Map: Allow Rapid Z",
     description: "Enable to include vertical G1 retracts and safe descents as rapids.",
-    group      : "04 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids (disable when using full license)",
     type       : "boolean",
     value      : false,
     scope      : "post"

@@ -150,7 +150,7 @@ tool-change work.
 
 ## Machine frame (homing / MCS)
 
-Group `02 - Establish Machine Coordinates`, one enum `A_Machine_HomeBeforeStart`:
+Group `04 - Establish Machine Coordinates`, one enum `A_Machine_HomeBeforeStart`:
 **None** (default — accept the current position, incl. an axis already homed at the controller
 or a power-on 0,0,0; no motion), **XY** (home X and Y — the usual case), or **XYZ** (also home
 Z, only where the machine is wired for it). The per-axis granularity was dropped: the only
@@ -193,10 +193,25 @@ Needed when adding new properties:
 
 - **Group order** = the `group:` string, zero-padded to two digits (`01 - Job` …
   `11 - Duet`). Padding is required so `11 - Duet` sorts last, not next to `01 - Job`.
-  The current order: `01 - Job`, `02 - Establish Machine Coordinates`, `03 - Feeds and Speeds`,
-  `04 - Map G1s to Rapids...`, `05 - Establish Spoilboard Reference`, `06 - On WCS / Part /
+  The current order: `01 - Job`, `02 - Feeds and Speeds`, `03 - Map G1s to Rapids...`,
+  `04 - Establish Machine Coordinates`, `05 - Establish Spoilboard Reference`, `06 - On WCS / Part /
   Fixture Changes`, `07 - Tool Changes`, `08 - External Include Files`, `09 - Laser`, `10 - Coolant`,
   `11 - Duet`.
+
+  > **Resolved (latest): homing moved to sit immediately before the spoilboard.** Groups `04` and
+  > `05` — *Establish Machine Coordinates* and *Establish Spoilboard Reference* — are one physical
+  > setup sequence: homing is what makes machine zero repeatable, and a repeatable machine zero is
+  > what makes a stored spoilboard base (and any "Use Active WCS" origin) mean the same place on the
+  > next run. Separating them with *Feeds and Speeds* and *Map G1s to Rapids* — two tuning groups
+  > with no bearing on where anything is — broke that thought-walk and left the dialog reading
+  > **home → tune → tune → establish surfaces → establish parts**. It now reads **tune → tune →
+  > home → establish surfaces → establish parts**: everything positional is contiguous, and the
+  > three "Establish" groups (`04`, `05`, `06`) run in the order the machine executes them.
+  > Mechanically: `02 - Establish Machine Coordinates` → `04`, with `03 - Feeds and Speeds` → `02`
+  > and `04 - Map G1s...` → `03` shifting up to fill the gap. Groups `05`–`11` are untouched.
+  > **Only `group:` strings changed — no key, id, title or default moved, so saved presets do not
+  > reset** (same as the earlier spoilboard move). The header property dump reorders to match for
+  > free, since it sorts on the same strings.
   > **Resolved (was: reorder WCS/Probe after Map G1s).** The old combined
   > `03 - Work Coordinate System - WCS / Probe` group was split into two: **`03 - Spoilboard
   > Base`** (`A_Spoilboard_BaseReserve`, `B_Spoilboard_BaseEstablish`,
@@ -389,13 +404,22 @@ needs a functional retest. ⚠ `H7.gcode` / `H7a.gcode` now predate the "unknown
 `H7c.gcode` predates the label fix — comment-only in both cases, so no retest, but do not diff a
 fresh post against them blind.
 
+**Property groups were reordered** (latest commit): homing moved to sit immediately before the
+spoilboard group, so the positional groups are contiguous and the three "Establish" groups run in
+machine-execution order — `01 Job`, `02 Feeds`, `03 Map-G1s`, `04 Machine Coords`, `05 Spoilboard`,
+`06 On WCS`, `07`–`11` unchanged. Only `group:` strings changed, so **no preset resets** — but that
+is exactly what test-plan **D3** exists to confirm. README's Quick Start walkthrough and Property
+reference were reordered to match (its doc-sync ref was bumped).
+
 **Next actions, in the order they'd be tackled:**
 1. **Code — tool-change ordering + base-relative park.** The top item; design settled — see
    *Phase 4 — tool-change ordering + base-relative park*, the first section under Remaining work.
    Nothing else depends on it, and the base machinery underneath it is now verified (H7c static).
-2. **Tests, no machine needed** (posting + reading the file): **H7f (A)** and **(C)** — one post each,
-   the same job as H7c with the base fields changed; **D1** (dialog only, no post); **H7d** (Guard A);
-   **H7e** (Marlin/RRF); **P3**; and D2's suppression check (re-post at Comment Level `Important`).
+2. **Tests, no machine needed** (posting + reading the file): **D3** (group order + preset survival —
+   do this one first, it is a dialog glance and it gates trust in every other dialog row); **H7f (A)**
+   and **(C)** — one post each, the same job as H7c with the base fields changed; **D1** (dialog only,
+   no post); **H7d** (Guard A); **H7e** (Marlin/RRF); **P3**; and D2's suppression check (re-post at
+   Comment Level `Important`).
 3. **Tests needing the machine:** **H7c physical** (the 40 mm measurement — re-park first, per the new
    bed-setup step 3), **PB1/PB2**, **PBV1–3**, **PA1/PA1b**, **P2** (only its added-part half remains;
    `H7c.gcode` already evidenced the base and first-part halves).
@@ -405,7 +429,9 @@ fresh post against them blind.
 **Open decisions carried forward** (each written up in full below): whether first-part `Skip` should
 hold the base clearance instead of descending to the probe Safe Z when a base is reserved; the
 frame-dependence of the `G38.2` probe target; `wcsDefinitions` offset-`0` handling; and whether the
-spoilboard base should gain an explicit probe-point XY rather than relying on the park precondition.
+spoilboard base should gain an explicit probe-point XY rather than relying on the park precondition
+(written up as *Future work — a machine-coordinate base probe point (`G53`)*, which also carries the
+"homing makes the WCS trustworthy, it doesn't change it" analysis and the standing `G53` conflict).
 
 **Workflow notes that saved time.** `node --check MPCNC_v4.0_Beta2.cps` is a valid syntax gate for
 this post — worth running after every edit. The `properties` literal can also be brace-matched out of
@@ -701,15 +727,16 @@ path retracted). The **default** job (`Set X0 Y0 to Current Pos, Probe Z0`) and 
 ### Phase 4 — dump ALL properties in the file header *(IMPLEMENTED)*
 
 **Original finding.** `writeInformation()` dumped only **11 of 68** properties at Info level: the
-seven `03 - Feeds and Speeds` values and the four `04 - Map G1s to Rapids` values. **57 were absent**,
+seven Feeds-and-Speeds values and the four Map-G1s-to-Rapids values (groups `03`/`04` at the time,
+`02`/`03` after the homing move). **57 were absent**,
 including every group that the WCS/probe rework touches:
 
 | Group | Dumped? | Notably missing |
 |---|---|---|
 | `01 - Job` (9) | ✗ | **Firmware**, Comment Level, arcs, spindle control, sequence numbers |
-| `02 - Establish Machine Coordinates` (2) | ✗ | Home Before Start, Prompt Before Home |
-| `03 - Feeds and Speeds` (7) | ✓ | — |
-| `04 - Map G1s to Rapids` (4) | ✓ | — |
+| `02 - Feeds and Speeds` (7) | ✓ | — |
+| `03 - Map G1s to Rapids` (4) | ✓ | — |
+| `04 - Establish Machine Coordinates` (2) | ✗ | Home Before Start, Prompt Before Home |
 | `05 - Establish Spoilboard Reference` (4) | ✗ | Reserved WCS, Probe to Set Base, Retract Across Parts, Safe Z |
 | `06 - On WCS / Part / Fixture Changes` (10) | ✗ | **First WCS / Part**, **Subsequent WCS / Part**, Probe Pause, Probe X/Y Offset, G38 target/speed, probe Safe Z, thickness |
 | `07 - Tool Changes` (8) | ✗ | all, incl. Probe After Change and the change position |
@@ -757,6 +784,60 @@ guard around the two calls if the header proves too heavy.
 
 Still open if wanted: dumping the *per-section* effective Safe Z (the resolved block reports the
 mode and the fallback, not each operation's resolved height).
+
+### Future work — a machine-coordinate base probe point (`G53`) *(not started; design sketch)*
+
+Raised by the H7c review: the base probes wherever the tool is parked (see *Reserved spoilboard
+base*), which is defended only by an operator precondition. The durable fix is to give the base an
+explicit **probe point in machine coordinates** — `G53 G0 X<n> Y<n>` before the `G38.2` — so the
+touch-off lands on the same bare-spoilboard spot every run, independent of every WCS.
+
+**Why machine coordinates are the right frame here, and why homing is the enabler.** Establishing the
+question first: *does homing change any WCS's coordinates?* **No.** `G54`–`G59` hold offsets **from
+machine zero**, persisted in EEPROM on GRBL; `$H` writes the machine position and never touches those
+registers — the stored numbers are identical before and after. What homing changes is whether they
+still *mean* anything: on a homed machine, machine zero returns to the same physical spot, so a
+stored offset points at the same physical place across power cycles; on a machine with no endstops,
+machine zero is wherever the controller was last reset, so last session's offsets now point somewhere
+else entirely. **Homing doesn't change the WCS — it makes the WCS trustworthy**, which is the missing
+half of the "every *Use Active WCS* mode is a trust assertion" note in *Coordinate model*. It also
+means the combination `A_Machine_HomeBeforeStart = None` + `Use Active WCS X0 Y0` after a power cycle
+is quietly unsound today, and worth a warning independent of this item.
+
+**Rejected: `G53 G0 X0 Y0` (machine zero itself).** Tempting because it needs no new property, but
+wrong on three counts:
+- **It's the worst spot on the bed.** Machine zero is the homing corner — the extreme of travel,
+  offset only by the pull-off. Whether that's the far corner with a negative work envelope (default
+  GRBL) or the near corner depends on `$23` / `$27` / `$130`–`$132`. It is routinely off the
+  spoilboard entirely, over the frame or a rail.
+- **It's machine-config dependent**, which is itself the argument against hard-coding it: whatever
+  layout is assumed is wrong on someone else's machine.
+- **Z is unsolved, and the move makes it worse.** Homing XY gives no Z reference. Today the base
+  establish emits *no motion at all*, so the unknown Z is inert — the only exposure is probing the
+  wrong surface. Adding a traverse converts that into a full-bed diagonal at an unknown height: a
+  collision risk traded for a bookkeeping improvement. It is only safe under `XYZ` homing, which most
+  target machines cannot do (no Z endstop).
+
+**Sketch, if built.** A `05` group property pair (base probe point X/Y, machine coordinates, whole
+mm), emitted as `G53 G0 X<n> Y<n>` immediately before the base `G38.2`, plus:
+- **Guard: requires homing.** Refuse (or warn) when `A_Machine_HomeBeforeStart = None` — machine zero
+  is arbitrary there, so the point means nothing. This is the first place the machine-frame group and
+  the spoilboard group interact, and the reason they now sit adjacent as groups `04` and `05`.
+- **An answer for Z**, one of: require `XYZ` homing; or precede the move with an `M0` *"jog clear in
+  Z, then continue"*, converting an unknown-Z traverse into an operator-confirmed one. The prompt
+  option is preferred — it works on the no-Z-endstop machines that are the majority of the target set.
+- **Default off** (empty / unset = today's probe-where-parked behavior), so no existing job changes.
+
+**Reconcile `G53` across all three uses before building any of it.** The plan currently carries a
+standing **"Never `G53`"** decision (see *Decisions* → tool-change position, resolved in favour of a
+base-relative park), while the code comment at the tool-change position still argues the opposite —
+that the change position "should probably be a `G53` move" so it lands at the same physical spot
+regardless of WCS. That comment predates the decision and is stale. The three candidate uses — base
+probe point, tool-change park, cross-part retract — should be decided **together**, not one at a
+time, since they share the same underlying question: *does this post ever address the machine frame
+directly, or is everything work-relative?* The current answer is "everything work-relative"; this
+item is the strongest case for revisiting it, because a spoilboard is the one thing in the job that
+genuinely is fixed to the machine.
 
 ### Phase 4 — backlog: "Copy first part's Z" option on `B_Probe_OnChange`
 

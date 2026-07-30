@@ -74,6 +74,7 @@ firmware-variant rows note what changes elsewhere.
 | H7c | Base probes/retracts in its own frame (static + physical) | static PASS *(physical unrun)* |
 | D1 | Dialog & defaults audit (modes, renames, integer fields) | |
 | D2 | Header property dump — all 68 properties + resolved values | PASS *(suppression check unrun)* |
+| D3 | Group order after the homing move — presets must survive | |
 
 ---
 
@@ -522,6 +523,38 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       Cross-check against the fuller **Beta-2 dialog & behavior rework — re-verify** list below.
       *Result:* ____
 
+- [ ] **D3 — Group order after the homing move.** The setup groups were reordered so everything
+      positional is contiguous and the three "Establish" groups run in machine-execution order.
+
+      **Do:** open the dialog with a **saved preset** loaded (any job whose settings you have
+      previously customised — that is the part of this test that matters).
+
+      **Get:** the group list reads, top to bottom:
+      ```
+      01 - Job
+      02 - Feeds and Speeds
+      03 - Map G1s to Rapids (disable when using full license)
+      04 - Establish Machine Coordinates
+      05 - Establish Spoilboard Reference
+      06 - On WCS / Part / Fixture Changes
+      07 - Tool Changes
+      08 - External Include Files
+      09 - Laser
+      10 - Coolant
+      11 - Duet
+      ```
+      with **9 / 7 / 4 / 2 / 4 / 10 / 8 / 5 / 7 / 10 / 2** properties in them respectively (68 total).
+
+      **Pass — the discriminator is that nothing reset.** Only `group:` strings changed; no key, enum
+      id, title or default moved. So **every customised value in your preset must survive** — spot-check
+      Home Before Start, the two origin-mode dropdowns, and any nonzero Probe X/Y Offset, all of which
+      should read exactly what they did before this change. A field back at its default means a key
+      changed and the move was done wrong. Also confirm no group appears twice and none is empty.
+
+      **Then post any job** and confirm the header dump reordered to match (it sorts on the same
+      strings) — `02 - Feeds and Speeds` now appears before `03 - Map G1s ...`, and
+      `04 - Establish Machine Coordinates` between Map-G1s and the spoilboard group. *Result:* ____
+
 ---
 
 - [ ] **D2 — Header property dump.** Post any job and inspect the header. **Pass:** after the Ranges
@@ -533,7 +566,8 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       firmware, both Safe-Z modes + defaults, reserved base as `G59 (P6)` or `None`, and the probe XY
       offset / Inter Part Safe Z in output units. Cross-check two or three values against what you
       actually set in the dialog, and confirm the two old blocks (`Feedrate and Scaling Properties`,
-      `G1->G0 Mapping Properties`) are gone — their values now appear under groups `03` and `04`.
+      `G1->G0 Mapping Properties`) are gone — their values now appear under the Feeds-and-Speeds and
+      Map-G1s groups (`02` and `03` since the homing move; `03`/`04` in files posted before it).
       Also confirm the dump is **suppressed** at Comment Level `Important` and `Off`.
       *Result:* **PASS except the suppression check** — `H7c.gcode` (post `90d3c95`): all **11**
       group blocks in dialog order `01`→`11`, **68** properties total (9/2/7/4/4/10/8/5/7/10/2),
@@ -626,7 +660,9 @@ the **no-prompt** modes (First = `Set X0 Y0 to Current Pos, Probe Z0`, Subsequen
 X0 Y0, Probe Z0`) — the `Jog to …` modes that add a jog `M0` are opt-in, since jogging at the pause
 isn't universally supported. Re-verify:
 
-- **Group split & renumber.** `05 - Establish Spoilboard Reference` (4 items) sits between Map-G1s
+- **Group split & renumber.** *(Superseded in part by the homing move — see **D3**; the current
+  order is `01 Job`, `02 Feeds`, `03 Map-G1s`, `04 Machine Coords`, `05 Spoilboard`, `06 On WCS`.)*
+  `05 - Establish Spoilboard Reference` (4 items) sits between Map-G1s
   and `06 - On WCS / Part / Fixture Changes` (10 items); `03 - Feeds and Speeds` and `04 - Map G1s to
   Rapids` precede it; downstream groups run through `11 - Duet`. Items order by letter prefix
   within each group. (The spoilboard-group move to `05` changed only `group:` strings, not keys,
