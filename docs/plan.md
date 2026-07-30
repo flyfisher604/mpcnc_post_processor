@@ -48,6 +48,18 @@ Two principles drive every decision:
   > without guessing its settings was judged the worse failure. The guarantee now covers **motion
   > and emitted commands**, not header comments — so a byte-for-byte regression check must strip
   > comment lines first, or use a reference captured from the current post.
+  >
+  > **Amended again (the guarantee no longer holds for the default probe path).** The HR-1 fix
+  > appends `Z0` to the default `Set X0 Y0 to Current Pos, Probe Z0` origin write — a provisional
+  > zero that bounds the `G38 Target`, which was otherwise an absolute Z evaluated against whatever
+  > a prior run left in the register. That is an **emitted command changing on a default job**, so
+  > it breaks this principle rather than sidestepping it, and it is the first change to do so. The
+  > trade was accepted for the same reason as the dump: an unbounded probing descent on the path
+  > every hobbyist uses is the worse failure. What survives of the principle is the *shape* —
+  > advanced features (base, cross-part safe-Z, per-part probing, jog prompts) still emit nothing
+  > until enabled. What does not survive is any byte anchor against a pre-rework reference; see
+  > `docs/test-plan.md` **H-REG** and **HR1**, and `docs/HReview.md` HR-1. Treat a future
+  > default-output change as a decision to be argued, not a line that cannot be crossed.
 
 ---
 

@@ -53,14 +53,15 @@ firmware-variant rows note what changes elsewhere.
 
 | ID | Scenario | Result |
 |----|----------|--------|
-| H1 | Hobbyist — single op, `Jog to X0 Y0, Probe Z0` (opt-in jog mode) | PASS |
-| H2 | Hobbyist — single op, **default** `Set X0 Y0 to Current Pos, Probe Z0` (no-prompt) | PASS |
+| H1 | Hobbyist — single op, `Jog to X0 Y0, Probe Z0` (opt-in jog mode) | PASS ⚠ *(superseded by HR1)* |
+| H2 | Hobbyist — single op, **default** `Set X0 Y0 to Current Pos, Probe Z0` (no-prompt) | PASS ⚠ *(superseded by HR1)* |
 | H3 | Hobbyist — single op, `Jog to X0 Y0 Z0` (manual Z, jog) | PASS |
 | H4 | Hobbyist — single op, `Set X0 Y0 Z0 to Current Pos` (manual Z, no prompt) | PASS *(jet/tool-0 → J1)* |
 | H5 | Hobbyist — single op, `Use Active WCS X0 Y0 Z0` (trust stored) | PASS |
-| H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | PASS (Marlin + RRF) |
+| H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | PASS (Marlin + RRF) ⚠ *(superseded by HR1)* |
 | H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7e unrun; H7b → J1)* |
 | H7f | "Unknown Z" warning — present without a base, suppressed with one | PASS *(all three)* |
+| HR1 | Provisional Z0 bounds the `G38 Target` on the two just-positioned probe modes | |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -108,6 +109,11 @@ tool) unless a row says otherwise.
       **Pass:** with the jog mode selected the job pauses (`M0`) for the operator to jog to the part
       origin, then zeroes XY there and probes Z — both into `P1`. *Result:* **PASS** (`H1.gcode`).
 
+      > **⚠ Superseded by HR1** — this mode now writes a provisional `Z0` with the XY zero, so the
+      > expected block above is `G10 L20 P1 X0 Y0 Z0` preceded by one extra Info comment.
+      > `H1.gcode` no longer matches current output. The row's own assertion (jog prompt → XY zeroed
+      > at the jogged position → Z probed into `P1`) still holds; **HR1** carries the new tokens.
+
 - [x] **H2 — Default `Set X0 Y0 to Current Pos, Probe Z0` (pre-jog, no prompt — the zero-change
       path).** Leave **every** property at its default (First WCS / Part = `Set X0 Y0 to Current Pos,
       Probe Z0`, Probe Pause = `Before & After`). Jog to the part origin (XY) **before** posting.
@@ -116,6 +122,15 @@ tool) unless a row says otherwise.
       settings touched this reproduces the **pre-rework default output** (no jog prompt; XY zeroes at
       the parked position) and is the H-REG regression anchor below. *(Matches P1's offset-0
       first-part shape.)* *Result:* **PASS** (`H2.gcode`).
+
+      > **⚠ Superseded by HR1 — and the byte-identical anchor is now formally broken.** The default
+      > path writes `G10 L20 P1 X0 Y0 Z0` (provisional Z0, overwritten by the probe) plus one Info
+      > comment, so `H2.gcode` no longer matches current output and this row can no longer claim
+      > "reproduces the pre-rework default output". That claim was already only nominal — H-REG is
+      > `OMITTED` and the property dump had displaced the header wholesale — but it is now untrue of
+      > the **motion-and-commands** half too, which is the guarantee `plan.md` still asserts. The
+      > break is deliberate: see docs/HReview.md HR-1 for why an unbounded probe descent was the
+      > worse failure. Structural coverage of this mode moves to **HR1**.
 
 - [x] **H3 — `Jog to X0 Y0 Z0` (manual Z, jog prompt, no probe).** One change: First WCS / Part =
       `Jog to X0 Y0 Z0` (operator with no probe). *Expected:*
@@ -158,6 +173,11 @@ tool) unless a row says otherwise.
       multi-WCS warning on a single-op Marlin job. *Result:* **PASS — Marlin and RRF**
       (`H6 - Marlin.gcode`, `H6 - RRF.gcode`). RRF differs from Marlin as expected: `G54` **is**
       emitted and origins are `G10 L20 P1 …` not `G92`, with `M291 … S3` dialogs for every pause.
+
+      > **⚠ Superseded by HR1** on both firmwares — Marlin's origin write becomes `G92 X0 Y0 Z0`
+      > and RRF's `G10 L20 P1 X0 Y0 Z0`. Both saved files predate it. **HR1**'s firmware half
+      > re-covers this; the row's own assertions (comment style, `G92`-vs-`G10`, no spurious
+      > multi-WCS warning) are unaffected.
 
 - [ ] **H7 — `Use Active WCS X0 Y0, Probe Z0` (new mode: stored XY, re-probe Z).** The sixth
       First WCS / Part mode, added in `01c69a3` — the no-prompt first-part path for a pre-set
@@ -301,6 +321,55 @@ tool) unless a row says otherwise.
         (confirmed at both zero and nonzero offsets), (C) `H7c-c.gcode`. (A)'s motion is
         byte-identical to `H7.gcode`'s — the warning added one comment line and nothing else.
 
+- [ ] **HR1 — A provisional `Z0` bounds the `G38 Target` on the two just-positioned probe modes.**
+      Verifies the HR-1 fix (docs/HReview.md). `G_Probe_G38Target` is emitted as an **absolute** `Z`
+      word, so before this change its meaning depended on whatever Z0 a previous run had persisted
+      into the register — the same `Z-10` could be a 10 mm descent, a 45 mm one, or point upward.
+      Writing `Z0` at the current height alongside the XY zero makes it a true travel limit; the
+      probe overwrites that Z0 with the plate thickness three blocks later, so it never survives
+      into the cut. **Deliberately scoped to the two modes where the operator has just placed the
+      tool at the origin themselves** — the (C) and (D) posts below are what prove the scope.
+
+      **Common settings:** GRBL, one 3-axis milling op, real tool (≠ 0, not a jet), Probe Pause =
+      `Before & After`, Probe X/Y Offset = `0`, no base, Comment Level = `Info` (default).
+
+      **Do (A):** First WCS / Part = `Set X0 Y0 to Current Pos, Probe Z0` (the default — this is the
+      H2 path). **Get (A):**
+      ```
+      (   Set current X,Y position to 0,0)
+      (   Provisional Z0 at the current height so the probe target is a relative limit)
+      G10 L20 P1 X0 Y0 Z0
+      ... M0 attach-probe prompt ...
+      G38.2 F30 Z-10
+      G10 L20 P1 Z0.8
+      G0 Z<probeSafeZ>
+      ```
+
+      **Do (B):** First WCS / Part = `Jog to X0 Y0, Probe Z0`. **Get (B):** identical to (A) but with
+      `M0 (MSG Jog to X0 Y0 above Z0, probe)` ahead of the `Set current X,Y position` comment — the
+      provisional `Z0` and its comment appear on this mode too (shared code path).
+
+      **Do (C):** First WCS / Part = `Use Active WCS X0 Y0, Probe Z0`. **Get (C):** **no `G10 L20 P1
+      Z0`, no provisional-Z0 comment** — output identical to `H7c-a.gcode`. This probe starts from a
+      retracted clearance, so a provisional zero there would make `Z-10` too *tight* and turn a
+      working probe into a "did not contact" alarm.
+
+      **Do (D):** First WCS / Part = `Set X0 Y0 to Current Pos, Probe Z0` with a **jet tool or tool
+      0**. **Get (D):** `G10 L20 P1 X0 Y0` — XY only, **no `Z0`**, no provisional-Z0 comment. No
+      probe means no target to bound, and writing Z0 here would silently turn this mode into
+      `Set X0 Y0 Z0 to Current Pos`. *(Fold into **J1** if the jet workstream runs first.)*
+
+      **Pass — the discriminator is the pair of absences.** (A) and (B) carry ` Z0` on the origin
+      write; (C) and (D) must not. A fix that only proved (A) would not distinguish "bounded where it
+      is sound" from "bounded everywhere", which is the failure mode this row exists to catch.
+      Confirm too that the blast radius is nil: (A)'s output differs from `H2.gcode` in exactly two
+      lines (the added comment, and ` Z0` appended to the `G10 L20`), and **H3/H4/H5** — which
+      already write Z0 or write no origin at all — are untouched.
+
+      **Firmware half:** repeat (A) on Marlin → `G92 X0 Y0 Z0`; on RRF → `G54` + `G10 L20 P1 X0 Y0
+      Z0` with `M291 … S3` prompts. Supersedes the saved `H6 - Marlin.gcode` / `H6 - RRF.gcode`.
+      *Result:* ____
+
 - [ ] **H-REG — Byte-for-byte regression (the key guarantee).** With the default reverted to
       `Set X0 Y0 to Current Pos, Probe Z0`, the **default** single-op output is again the pre-rework
       Current-Pos+Probe path (no jog `M0`) — so the byte-identical anchor is back on the default
@@ -310,6 +379,12 @@ tool) unless a row says otherwise.
       way to produce the pre-rework reference; **H2** covers the path structurally. If ever revived,
       diff **motion only** — the property dump adds ~98 header comment lines to every file, so a raw
       diff against any pre-dump reference fails on the header alone. No motion changed.
+
+      > **⚠ Do not revive this row as written.** The HR-1 fix appends ` Z0` to the default path's
+      > `G10 L20` origin write, so a motion-only diff against a pre-rework reference now fails too —
+      > the last sentence above ("No motion changed") no longer holds. Structural coverage of the
+      > default path is **H2** + **HR1**; if a byte anchor is ever wanted again it must be
+      > re-baselined against a current post, not against anything pre-rework.
 
 ---
 
@@ -647,7 +722,10 @@ Marlin/RRF — the tokens below are otherwise identical. Coordinates are in the 
 (the emitted `G0 X/Y` values should equal the offsets you entered; check this in an inch job too).
 
 Already confirmed by NC inspection — **do not re-run** (see Verified → Phase 4):
-- Offset `0,0`, first/only part: no reposition, straight from `G10 L20 P1 X0 Y0` into `G38.2`.
+- Offset `0,0`, first/only part: no reposition, straight from the origin write into `G38.2`.
+  *(⚠ that origin write is now `G10 L20 P1 X0 Y0 Z0` on the `Set X0 Y0 to Current Pos` /
+  `Jog to X0 Y0` modes — HR-1's provisional Z0. The offset assertion is unaffected: the fix adds a
+  `Z` word to an existing block and emits no motion.)*
 - Spoilboard base probe: no `G0 X/Y` before its `G38.2` — the offset never reaches it.
 
 Run these:
@@ -671,6 +749,12 @@ Run these:
       reposition appear *before* `G38.2`; the emitted `X`/`Y` equal the entered offsets; the Z
       result is still written to `P1`. *Result:* **PASS** (`Face1.gcode`, which also showed the
       reserved base probing with no reposition).
+
+      > **⚠ `Face1.gcode` predates the HR-1 provisional Z0** — the expected block's origin write is
+      > now `G10 L20 P1 X0 Y0 Z0`, preceded by the provisional-Z0 Info comment. **The row still
+      > stands:** its assertions are all about the reposition rapid and the offset words, and HR-1
+      > adds a `Z` word to a preceding block without emitting motion. Don't diff a fresh post against
+      > the saved file blind.
 
 - [ ] **P2 — Nonzero offset, multi-part Replicate + reserved base.** 2-part Replicate job (WCS
       `P1` + `P2`), **reserved base `G59`**, `Subsequent WCS / Part = Use Active WCS X0 Y0, Probe Z0`, same `10/5` offsets.
@@ -780,7 +864,9 @@ move. Marlin is out of scope (single frame; Guard C blocks multi-WCS).
 - **Added-part re-probe repositions** (`Test2.gcode`): `Z<SafeZ>` → `G55` → `X0 Y0` → `G38.2` →
   `G10 L20 P2 Z` (was probing the previous part's end point).
 - **First-part probe unchanged:** `G10 L20 P1 X0 Y0` + probe at the parked position, no `X0 Y0`
-  rapid.
+  rapid. **⚠ Superseded by HR-1** — the origin write is now `G10 L20 P1 X0 Y0 Z0` (provisional Z0,
+  overwritten by the probe) on the `Set X0 Y0 to Current Pos` / `Jog to X0 Y0` modes. Still no
+  `X0 Y0` rapid at offset 0; re-verify under **HR1**.
 - **WCS/Probe relabels + default flip** verified in the dialog (Test 3) at the time; the group
   has since been split and keys renamed/re-lettered (see re-verify above), so the dialog needs
   another pass. First-part middle option showed `Zero XYZ (no probe)` (Test A) — since superseded by
@@ -797,4 +883,5 @@ move. Marlin is out of scope (single frame; Guard C blocks multi-WCS).
 - **Probe XY offset — offset `0` first part + base probe** (`Setup1-Face1.gcode`): first/only part
   goes `G10 L20 P1 X0 Y0` → `G38.2` with **no reposition rapid**; the reserved `G59` base probes with
   **no `G0 X/Y`**. Nonzero first-part is **P1/H7a** (passed); the added-part paths (**P2**, **P3**)
-  remain — no posted file exercises them yet.
+  remain — no posted file exercises them yet. **⚠ HR-1** appends ` Z0` to that origin write (and a
+  comment before it); the offset findings hold, the saved file no longer matches byte-for-byte.

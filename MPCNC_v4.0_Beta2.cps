@@ -2495,12 +2495,33 @@ function writeWcsOnStart() {
 
   // "Current XY & Probe Z" or "Jog XY & Probe Z"
   writeComment(eComment.Info, "   Set current X,Y position to 0,0");
-  writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
   if (canProbe) {
+    // Z0 is written PROVISIONALLY here, alongside XY: probeTool() overwrites it with the plate
+    // thickness a few blocks below, so it never survives into the cut. Its only job is to give
+    // G_Probe_G38Target ("G38 Target") the meaning its title claims -- with Z0 at the tool's
+    // current height, "G38 Target -10" is a 10 mm travel limit. Written the old way (XY only) the
+    // target was an absolute Z evaluated against whatever Z0 a PREVIOUS run persisted into this
+    // register, which the post cannot read back: on GRBL the offset survives in EEPROM while an
+    // un-homed machine's Z resets at power-on, so the same "-10" could be a 45 mm descent at probe
+    // feed, or point upward so the probe never contacts and the controller alarms. No setting of
+    // G38 Target could be made reliable while its reference point was unknowable at post time.
+    //
+    // Sound on these two modes ONLY, because the operator has just put the tool at the origin
+    // themselves (pre-jog, or the M0 jog prompt above), so the target is measured from a height
+    // they chose. Deliberately NOT applied where the probe starts from a retracted clearance --
+    // "Use Active WCS X0 Y0, Probe Z0", the added-part probes, the spoilboard base establish:
+    // there the same provisional zero would make the target too TIGHT and turn a working probe
+    // into a "did not contact" alarm. See docs/HReview.md HR-1.
+    writeComment(eComment.Info, "   Provisional Z0 at the current height so the probe target is a relative limit");
+    writeWcsOrigin(currentWorkOffset, 0, 0, 0);
     // The origin is the current position; partProbe() steps to the probe point (origin + XY
-    // offset) only when an offset is set, so a zero-offset job stays byte-identical.
+    // offset) only when an offset is set.
     partProbe(true);
   } else {
+    // Tool 0 / jet tool: no probe, so there is no G38 target to bound and nothing for a
+    // provisional Z0 to fix -- writing one would silently turn this mode into
+    // "Set X0 Y0 Z0 to Current Pos". XY only, unchanged.
+    writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
     writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool)");
   }
 }
