@@ -1817,6 +1817,28 @@ function onCircular(clockwise, cx, cy, cz, x, y, z, feed) {
   circular(clockwise, cx, cy, cz, x, y, z, feed);
 }
 
+// Is the current operation a WCS / inspection PROBING operation (Fusion's probe strategies), as
+// opposed to an ordinary drill / bore / tap cycle? Only onCyclePoint() below asks.
+//
+// Defined locally on purpose. In the Autodesk reference posts `isProbeOperation()` is a post-local
+// helper, not a kernel global, so calling it without a definition made the whole canned-cycle path
+// depend on whether this kernel revision happens to supply one -- and if it does not, the first
+// drilled hole in a job aborts the post with a bare ReferenceError and no file. Defining it here is
+// harmless if the kernel also provides one, and drilling is a routine hobbyist operation.
+//
+// Two independent signals, because either alone can miss one. The operation STRATEGY names the
+// probing operation as a whole; the CYCLE TYPE names the individual cycle at each point
+// ("probing-x", "probing-xy-outer-corner", ...). Every probing cycle type is prefixed "probing", so
+// the prefix test needs no per-cycle list to stay current across Fusion versions. `cycleType` is a
+// kernel global set for the duration of a cycle -- guarded with typeof so this stays safe if it is
+// ever absent.
+function isProbeOperation() {
+  if (hasParameter("operation-strategy") && (getParameter("operation-strategy") == "probe")) {
+    return true;
+  }
+  return (typeof cycleType != "undefined") && (String(cycleType).indexOf("probing") == 0);
+}
+
 // Drilling / canned cycles.
 // None of the supported firmwares handle G81/G82/G83 canned cycles as drilling:
 // GRBL has no canned cycles, Marlin only supports them in an opt-in custom build

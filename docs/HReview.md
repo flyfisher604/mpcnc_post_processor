@@ -319,7 +319,7 @@ Y0, Probe Z0` and a jet/tool-0 job must **not** gain the `Z0`.
 
 ---
 
-### HR-2 — `isProbeOperation()` has no definition in this file — any drilling operation may abort the post — **High** · `POST`
+### HR-2 — `isProbeOperation()` has no definition in this file — any drilling operation may abort the post — **High** · `POST` · **IMPLEMENTED**
 
 **Reaches it:** HP-1/HP-5 with any drill, peck, bore or tap operation — i.e. any hobbyist who drills
 a hole.
@@ -367,11 +367,64 @@ three lines, is what every reference post does, and is harmless if the kernel al
  // Drilling / canned cycles.
 ```
 
-**Verify (Do → Get).**
+#### As built — one deviation from the diff above
+
+Defined at [:1820](../MPCNC_v4.0_Beta2.cps#L1820), immediately above `onCyclePoint()`, its only
+caller. `node --check` passes.
+
+**Two signals, not one.** The diff above proposed the reference-post form — the `operation-strategy`
+test alone. As built it also returns true when `cycleType` is prefixed `probing`:
+
+```js
+function isProbeOperation() {
+  if (hasParameter("operation-strategy") && (getParameter("operation-strategy") == "probe")) {
+    return true;
+  }
+  return (typeof cycleType != "undefined") && (String(cycleType).indexOf("probing") == 0);
+}
+```
+
+The reason is that the two signals answer slightly different questions and either can miss alone.
+The strategy names the *operation*; `cycleType` names the *individual cycle at each point*
+(`probing-x`, `probing-xy-outer-corner`, …). If the strategy string ever differs from `"probe"` —
+across Fusion versions, or for a probing cycle embedded in an operation Fusion labels otherwise —
+the strategy-only form falls through to `expandCyclePoint()` and emits **plain `G0`/`G1` motion where
+a probe was intended**. That is precisely the silent-wrong outcome the existing comment at
+[:1849](../MPCNC_v4.0_Beta2.cps#L1849) says the guard exists to prevent, so letting a string
+comparison be the single point of failure seemed the wrong trade. Every probing cycle type is
+prefixed `probing`, so the prefix test needs no per-cycle list to stay current. `typeof` guards
+`cycleType` in case it is ever absent.
+
+**This makes the guard broader, which is a behaviour change worth naming:** a job containing a
+probing cycle whose strategy was not `"probe"` previously *posted* (silently, as non-probing motion)
+and now *errors*. Failing loud is the intent, but it is a change, not just a fix. Trimming back to
+the three-line reference form is a two-line edit if you would rather stay strictly idiomatic.
+
+**Unit-checked at the JS level**, since the probing half cannot be posted on a Personal licence (see
+below). The helper was extracted and run against stubbed `hasParameter`/`getParameter`/`cycleType`:
+strategy `probe` → true; `probing-x` / `probing-xy-outer-corner` / `probing-z` → true;
+`drilling` / `tapping` / `boring` → false; no strategy parameter → false; `cycleType` absent →
+false. Eight cases, all passing.
+
+**Verify (Do → Get).** Full row is **HR2** in `docs/test-plan.md`; short form:
 *Do:* add one **Drill** operation to the hobby Setup and post. *Get:* the drill points expand to
-`G0`/`G1` plunge-and-retract pairs and the file completes through `*** STOP end ***`. **Pass:** the
-post produces a file at all — a `ReferenceError`/abort with no `.gcode` written is the failing
-discriminator, and confirms the fix is required rather than merely defensive.
+`G0`/`G1` plunge-and-retract pairs, no `G81`/`G82`/`G83`, and the file completes through
+`*** STOP end ***`. **Pass:** the post produces a file at all — a `ReferenceError`/abort with no
+`.gcode` written is the failing discriminator, and would confirm the definition was load-bearing
+rather than merely defensive.
+
+**The probing half is not postable by this persona.** Fusion's probing / Inspection strategies
+require the Machining Extension, so a Personal-licence hobbyist cannot create one — which is also
+why the drilling path has never been exercised by the test plan while the probing guard sat
+unreachable. The unit check above is the substitute evidence; **HR2 (B)** records it as *not
+applicable* rather than unrun, so nobody later reads a blank as a gap.
+
+**Worth noting what this does not resolve.** Whether the kernel supplies `isProbeOperation()` at
+`minimumRevision = 45917` is now *moot* — a local definition shadows it either way — so the original
+open question can be closed without ever being answered. But that also means **HR2 (A) no longer
+distinguishes "the fix was necessary" from "the fix was redundant"**: a passing drill post is
+consistent with both. If you want that answered, post a drill from a stashed pre-fix copy of the
+`.cps` first; if it aborts, the finding was live. Only worth the trouble if you care for the record.
 
 ---
 
@@ -1169,8 +1222,9 @@ are actioned.
 
 ## 6. Suggested action order
 
-1. **HR-2** — cheapest possible fix, largest unknown, blocks a whole operation type. Do it first and
-   post a drill.
+1. ~~**HR-2**~~ **done** (uncommitted) — test-plan row **HR2** added, including (A2) tapping, which
+   doubles as the first evidence for HR-17's parenthesis stripping. Unit-checked at the JS level; the
+   posted half still wants a drill.
 2. ~~**HR-1**~~ **done** — committed `8d61790` on `v4.0-hreview-fixes`; test-plan row **HR1** added,
    H1 / H2 / H6 / P1 marked superseded, H-REG's "no motion changed" claim retracted, and
    `plan.md`'s *Graceful degradation* principle amended a second time. One open decision it raised:

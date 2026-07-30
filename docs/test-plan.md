@@ -71,6 +71,7 @@ firmware-variant rows note what changes elsewhere.
 | H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7e unrun; H7b → J1)* |
 | H7f | "Unknown Z" warning — present without a base, suppressed with one | PASS *(all three)* |
 | HR1 | Provisional Z0 bounds the `G38 Target` on the two just-positioned probe modes | |
+| HR2 | Canned cycles: a drill/tap operation posts at all; probing is rejected | |
 | HR3 | Manual spindle prompts to switch OFF on GRBL too — job end and tool change | |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
@@ -378,6 +379,53 @@ tool) unless a row says otherwise.
 
       **Firmware half:** repeat (A) on Marlin → `G92 X0 Y0 Z0`; on RRF → `G54` + `G10 L20 P1 X0 Y0
       Z0` with `M291 … S3` prompts. Supersedes the saved `H6 - Marlin.gcode` / `H6 - RRF.gcode`.
+      *Result:* ____
+
+- [ ] **HR2 — A canned-cycle operation posts at all; probing is still rejected.** Verifies the HR-2
+      fix (docs/HReview.md). `onCyclePoint()` calls `isProbeOperation()`, which had **no definition
+      anywhere in the post** — it is a post-local helper in the Autodesk reference posts, not a kernel
+      global. If this kernel revision does not supply one, the first cycle point in a job throws a
+      `ReferenceError` and the post aborts with no file: **the entire drilling path would be
+      unusable**, and nothing else in the post would show a symptom. Now defined locally.
+
+      **This row's whole point is that no existing row exercises `onCyclePoint` at all.** Every H, P,
+      PB and PA row is contour/pocket/face milling. Until this posts, drilling is untested.
+
+      **Do (A) — a plain drill.** GRBL, hobby defaults, one **Drill** operation (several holes, any
+      depth) alongside or instead of the milling op. **Get (A):** each hole expands into ordinary
+      moves — no `G81`/`G82`/`G83` anywhere — roughly:
+      ```
+      ( MOVEMENT_RAPID)
+      G0 X<hole> Y<hole> F<travelXY>
+      ( MOVEMENT_PLUNGE)
+      G1 Z<depth> F<plunge>
+      ( MOVEMENT_RAPID)
+      G0 Z<retract> F<travelZ>
+      ```
+      and the file runs through to `( *** STOP end ***)`. **Pass — the discriminator is that a file
+      exists and reaches STOP end.** An abort with no `.gcode` written (the H7d shape) is the failure,
+      and would prove the local definition was load-bearing rather than merely defensive.
+
+      **Do (A2) — a tap, same post if convenient.** Add a **Tapping** operation. **Get (A2):** the
+      cycle expands the same way, and each affected move carries
+      `( >>> WARNING: Speed-feed synchronization  rigid tapping  is not supported; a floating/tension tap holder is required)`.
+      **Pass:** the warning is present. Note the **double spaces** where `(rigid tapping)` was — that
+      is the known `sanitizeMessageText` parenthesis-stripping cosmetic defect (HReview HR-17), and
+      this post is the first file to evidence it; do not "fix" it by editing the expectation.
+
+      **Do (B) — probing must still be refused.** A WCS/inspection **probe** operation. **Get (B):**
+      the post fails with Fusion's `cycleNotSupported()` error and writes no g-code; in particular
+      **no plain `G0`/`G1` motion is emitted in place of the probe**, which is the silent-wrong
+      outcome the guard exists to prevent.
+      > **(B) may not be runnable on this licence.** Fusion's probing / Inspection strategies need
+      > the Machining Extension, so a Personal-licence hobbyist cannot create one — which is also why
+      > this half was never reachable in the hobbyist runbook. Where (B) cannot be posted, the
+      > available evidence is a **unit check of the helper against stubbed kernel globals** (strategy
+      > `probe`, and cycle types `probing-x` / `probing-xy-outer-corner` / `probing-z` → `true`;
+      > `drilling` / `tapping` / `boring` → `false`; `cycleType` absent → `false`). That harness was
+      > run when the fix landed and passed all eight cases. Record (B) as *not applicable — no
+      > extension* rather than blank, so a later reader does not mistake it for unrun.
+
       *Result:* ____
 
 - [ ] **HR3 — A hand-switched spindle is told to stop, on GRBL too.** Verifies the HR-3 fix
