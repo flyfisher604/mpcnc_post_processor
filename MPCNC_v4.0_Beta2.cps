@@ -843,8 +843,12 @@ var eSafeZ = {
 };
 
 var safeZMode = eSafeZ.CONST;
+// The literal fallback parsed out of the Safe-Z property, in MILLIMETRES -- every dialog dimension
+// is mm by contract (README, "Units"), whatever unit the job outputs in. Convert with
+// propertyMmToUnit() before comparing it against, or emitting it as, a coordinate. Contrast
+// safeZHeight below, which is the RESOLVED height in the job's output unit.
 var safeZHeightDefault = 15;
-var safeZHeight;
+var safeZHeight;   // resolved height, in the OUTPUT unit
 
 // Parse a Safe-Z expression string -- a bare number, or Feed:/Retract:/Clearance:<fallback> --
 // into { mode, dflt }. Shared by the Map-G1s Safe Z (C_MapRapids_SafeZ) and the probe Safe Z
@@ -885,12 +889,18 @@ function parseSafeZProperty() {
   writeComment(eComment.Debug, " parseSafeZProperty: safeZHeightDefault = " + safeZHeightDefault);
 }
 
-function safeZforSection(_section) 
+function safeZforSection(_section)
 {
   if (getProperty(properties.B_MapRapids_RestoreRapids)) {
+    // The fallback is a dialog literal, so it is mm and must be converted to the output unit before
+    // it can be compared against a coordinate. The F360 level values below are NOT converted --
+    // Fusion already reports those in the output unit. Getting this wrong on an inch job made the
+    // whole G1 -> G0 mapper silently inert: every Z was compared against a threshold of "15 inch",
+    // which no toolpath ever reaches, so no move was ever converted and nothing said so.
+    var dfltInUnit = propertyMmToUnit(safeZHeightDefault);
     switch (safeZMode) {
       case eSafeZ.CONST:
-        safeZHeight = safeZHeightDefault;
+        safeZHeight = dfltInUnit;
         writeComment(eComment.Important, " SafeZ using const: " + safeZHeight);
         break;
 
@@ -904,12 +914,12 @@ function safeZforSection(_section)
             writeComment(eComment.Info, " SafeZ feed level: " + safeZHeight);
           }
           else {
-            safeZHeight = safeZHeightDefault;
+            safeZHeight = dfltInUnit;
             writeComment(eComment.Important, " SafeZ feed level not abs: " + safeZHeight);
           }
         }
         else {
-          safeZHeight = safeZHeightDefault;
+          safeZHeight = dfltInUnit;
           writeComment(eComment.Important, " SafeZ feed level not defined: " + safeZHeight);
         }
         break;
@@ -924,12 +934,12 @@ function safeZforSection(_section)
             writeComment(eComment.Info, " SafeZ retract level: " + safeZHeight);
           }
           else {
-            safeZHeight = safeZHeightDefault;
+            safeZHeight = dfltInUnit;
             writeComment(eComment.Important, " SafeZ retract level not abs: " + safeZHeight);
           }
         }
         else {
-          safeZHeight = safeZHeightDefault;
+          safeZHeight = dfltInUnit;
           writeComment(eComment.Important, " SafeZ: retract level not defined: " + safeZHeight);
         }
         break;
@@ -944,18 +954,18 @@ function safeZforSection(_section)
             writeComment(eComment.Info, " SafeZ clearance level: " + safeZHeight);
           }
           else {
-            safeZHeight = safeZHeightDefault;
+            safeZHeight = dfltInUnit;
             writeComment(eComment.Important, " SafeZ clearance level not abs: " + safeZHeight);
           }
         }
         else {
-          safeZHeight = safeZHeightDefault;
+          safeZHeight = dfltInUnit;
           writeComment(eComment.Important, " SafeZ clearance level not defined: " + safeZHeight);
         }
         break;
         
       case eSafeZ.ERROR:
-        safeZHeight = safeZHeightDefault;
+        safeZHeight = dfltInUnit;
         writeComment(eComment.Important, " >>> WARNING: " + properties.C_MapRapids_SafeZ.title + " format error: " + safeZHeight);
         break;
     }
@@ -963,11 +973,19 @@ function safeZforSection(_section)
 }
 
 // Resolve a parsed Safe-Z expression against one section's F360 levels, returning a concrete
-// height in the OUTPUT unit -- the same convention safeZforSection() uses: F360 level values
-// and the literal fallback are used as-is, never mm-converted. Feed/Retract/Clearance pull the
-// matching operation level when it is defined and absolute; otherwise the literal fallback is
-// used. Pure: emits no output.
+// height in the OUTPUT unit -- the same convention safeZforSection() uses. Feed/Retract/Clearance
+// pull the matching operation level when it is defined and absolute; otherwise the literal fallback
+// is used. Pure: emits no output.
+//
+// The two inputs arrive in DIFFERENT units and only one converts:
+//   - an F360 level value is already in the output unit, so it is returned untouched;
+//   - the literal fallback is a dialog value, and every dialog dimension is mm by contract
+//     (README, "Units"), so it converts.
+// Both fallback returns below therefore go through propertyMmToUnit(). Missing that on an inch job
+// made this function hand back "15" meaning 15 inch -- 381 mm -- which probeSafeZ()'s caller then
+// emitted as an absolute G0 Z: a full-travel retract into the Z limit.
 function resolveSafeZHeight(mode, dflt, _section) {
+  var fallback = propertyMmToUnit(dflt);
   var valueParam;
   var absParam;
   switch (mode) {
@@ -984,7 +1002,7 @@ function resolveSafeZHeight(mode, dflt, _section) {
       absParam   = "operation:clearanceHeight_absolute";
       break;
     default:  // CONST or ERROR -- use the literal fallback
-      return dflt;
+      return fallback;
   }
 
   // Ask the PASSED section, not the global context. The global hasParameter() reports on whatever
@@ -993,9 +1011,9 @@ function resolveSafeZHeight(mode, dflt, _section) {
   // the global form would report false throughout and silently hand back the fallback for all of
   // them, which is exactly the misleading answer this function exists to avoid.
   if (_section.hasParameter(valueParam) && _section.hasParameter(absParam) && _section.getParameter(absParam) == 1) {
-    return _section.getParameter(valueParam);
+    return _section.getParameter(valueParam);   // already in the output unit
   }
-  return dflt;
+  return fallback;
 }
 
 // Describe a parsed Safe-Z expression for the header block: its mode, its literal fallback, and --
@@ -1003,10 +1021,16 @@ function resolveSafeZHeight(mode, dflt, _section) {
 // job's operations. "Retract:15" resolving to 5.08 on every section is the case that made reading
 // H7.gcode slow; printing only the mode and the fallback merely restates the property, under a
 // heading that promises a resolved value.
+// `dflt` arrives in mm (the parsed dialog literal). Everything this function PRINTS is in the output
+// unit, so the fallback is converted for display -- the resolved value beside it comes back from
+// resolveSafeZHeight() already converted, and printing one in mm next to the other in inch would
+// make the header contradict itself. resolveSafeZHeight() is still handed the raw mm value: it does
+// its own conversion, so pre-converting here would apply it twice.
 function describeSafeZ(mode, dflt) {
   var name = eSafeZ.prop[mode].name;
+  var fallbackText = xyzFormat.format(propertyMmToUnit(dflt));
   if (mode == eSafeZ.CONST || mode == eSafeZ.ERROR) {
-    return name + " = " + xyzFormat.format(dflt) + " -- a fixed height, no F360 level consulted";
+    return name + " = " + fallbackText + " -- a fixed height, no F360 level consulted";
   }
 
   var seen = [];
@@ -1024,16 +1048,16 @@ function describeSafeZ(mode, dflt) {
   } else {
     resolved = "varies by operation -- " + seen.join(", ");
   }
-  return name + " level, fallback " + xyzFormat.format(dflt) + ", resolves to " + resolved;
+  return name + " level, fallback " + fallbackText + ", resolves to " + resolved;
 }
 
 // ---- Probe Safe Z ----------------------------------------------------------
 // I_Probe_SafeZ ("06 - On WCS / Part / Fixture Changes" > "Safe Z") uses the SAME expression syntax and
 // F360-level resolution as the Map-G1s Safe Z (C_MapRapids_SafeZ), but is a fully independent
 // property so the two can be tuned separately. "Retract:15" pulls each operation's F360 retract
-// level when defined and absolute, else falls back to 15.
+// level when defined and absolute, else falls back to 15 mm.
 var probeSafeZMode = eSafeZ.CONST;
-var probeSafeZHeightDefault = 15;
+var probeSafeZHeightDefault = 15;   // the parsed literal fallback, in MILLIMETRES (see safeZHeightDefault)
 
 function parseProbeSafeZProperty() {
   var parsed = parseSafeZExpr(getProperty(properties.I_Probe_SafeZ));
@@ -1044,8 +1068,11 @@ function parseProbeSafeZProperty() {
   writeComment(eComment.Debug, " parseProbeSafeZProperty: probeSafeZHeightDefault = " + probeSafeZHeightDefault);
 }
 
-// Resolve I_Probe_SafeZ for the current operation. Returns a height in the output unit --
-// already unit-correct, so callers must NOT wrap it in propertyMmToUnit().
+// Resolve I_Probe_SafeZ for the current operation. Returns a height in the output unit -- already
+// unit-correct, so callers must NOT wrap it in propertyMmToUnit(). That now holds on BOTH paths:
+// an F360 level arrives in the output unit, and resolveSafeZHeight() converts the mm fallback. It
+// previously held only for the level path, so an inch job that fell back returned inches-worth of
+// millimetres straight into an absolute G0 Z.
 function probeSafeZ() {
   return resolveSafeZHeight(probeSafeZMode, probeSafeZHeightDefault, currentSection);
 }

@@ -533,7 +533,7 @@ enabled, confirming the turn-off prompt precedes `M0 (MSG Insert Tool #…)`.
 
 ---
 
-### HR-4 — Safe-Z fallback constants are never converted from mm to output units — **Medium-High** · `READ`
+### HR-4 — Safe-Z fallback constants are never converted from mm to output units — **Medium-High** · `READ` · **IMPLEMENTED**
 
 **Reaches it:** HP-1 on an **inch** Setup — a large share of the V1E audience — whenever the Safe-Z
 expression falls back to its literal, i.e. a bare number, a malformed string, or a Fusion level that
@@ -599,16 +599,52 @@ branches (five assignments of `safeZHeightDefault`), most cleanly by converting 
 ```
 …then use `dfltInUnit` in place of `safeZHeightDefault` at every assignment inside the switch.
 
-Also worth doing regardless of the decision: `describeSafeZ()`'s Resolved Values line already prints
-the resolved height, so an inch job would show `Const = 15.0000` next to a body emitting
-`G0 Z15.0000` — the header is honest about it. Once fixed it will read `0.5906`, which is the number
-the reviewer needs.
+#### As built — the diff above understated the work
 
-**Verify (Do → Get).**
+`node --check` passes. Four call sites, not the two the diff showed. **Three corrections to what I
+originally wrote**, all found by reading the code again rather than trusting the earlier pass:
+
+1. **`resolveSafeZHeight()` has TWO `return dflt` sites, not one.** The diff patched only the
+   `default:` switch case. The second is the fall-through at the end of the function — reached
+   whenever the named F360 level is *relative* (`..._absolute != 1`) or absent, which is a far more
+   common path than a bare number. Patching only the first would have left `Retract:15` on an inch
+   job still returning 15 inch in exactly the case a hobbyist is most likely to hit. Both now go
+   through a single `fallback` local computed once at the top.
+2. **`safeZforSection()` has EIGHT fallback assignments, not the "five" I claimed.** One each for
+   `CONST` and `ERROR`, and *two* each for `FEED`/`RETRACT`/`CLEARANCE` (level-not-absolute and
+   level-not-defined). All eight now assign a `dfltInUnit` local.
+3. **`describeSafeZ()` needed converting too — the diff did not mention it.** It prints the fallback
+   *beside* the resolved value, and the resolved value now comes back converted. Left alone, an inch
+   job's header would read `fallback 15.000, resolves to 0.2000` — mm and inch on the same line,
+   which is worse than the original error because it looks authoritative. The fallback is now
+   converted for display while `resolveSafeZHeight()` is still handed the **raw mm** value, since it
+   does its own conversion and pre-converting would apply it twice.
+
+Also updated: the unit is now named at both `safeZHeightDefault` and `probeSafeZHeightDefault`
+declarations (they hold mm; `safeZHeight` holds the resolved output-unit height), and
+`probeSafeZ()`'s "callers must NOT wrap this in `propertyMmToUnit()`" comment now records that the
+claim finally holds on *both* paths rather than only the F360-level one.
+
+**mm jobs are bit-for-bit unchanged**, because `propertyMmToUnit()` is the identity in mm. That is
+what keeps HR-4 from invalidating a single existing PASS row — every saved reference file is a mm
+job. It is the one fix in this series with no blast radius.
+
+**Harness-verified across both units** before landing. Extracting `parseSafeZExpr` /
+`resolveSafeZHeight` / `describeSafeZ` and stubbing `unit` + `propertyMmToUnit` + a section:
+
+| expression | F360 level | mm job | inch job |
+|---|---|---|---|
+| `Retract:15` | 5 / 0.2, absolute | `5` | `0.2` — level passes through untouched |
+| `Retract:15` | relative | `15` | `0.5906` |
+| `Retract:15` | absent | `15` | `0.5906` |
+| `20` | n/a | `20` | `0.7874` |
+| `Retract:` (malformed) | n/a | `15` | `0.5906` |
+
+**Verify (Do → Get).** Full four-post row is **HR4** in `docs/test-plan.md`; short form:
 *Do:* an **inch** Setup, `Safe Z` = `20` (bare number, so no F360 level is consulted), one op with a
 probe. *Get:* the post-probe retract is `G0 Z0.7874` and Resolved Values reads
-`Probe SafeZ = Const = 0.7874`. **Pass:** `Z0.7874`, not `Z20`. Second post: mm Setup, same
-property → `G0 Z20` unchanged (proves the conversion is a no-op in mm and nothing regressed).
+`Probe SafeZ = Const = 0.7874`. **Pass:** `Z0.7874`, not `Z20`. The row's (B) post — mm Setup, same
+property, `G0 Z20` unchanged — is the one that proves nothing regressed for existing users.
 
 ---
 
@@ -1231,7 +1267,9 @@ are actioned.
    whether the added-part jog probe should be treated symmetrically — see its *As built* note.
    ~~**HR-3**~~ **done** — test-plan row **HR3** added plus a blast-radius banner in the runbook
    conventions. Neither fix is verified by a post yet: **HR1** and **HR3** are both unrun.
-3. **HR-4**, **HR-5** — correctness of the two features the README tells the hobbyist to enable.
+3. ~~**HR-4**~~ **done** (uncommitted) — test-plan row **HR4** added; mm jobs unchanged, so no
+   existing PASS row is invalidated. **HR-5** still open — the other half of "the two features the
+   README tells the hobbyist to enable".
 4. **HR-6**, **HR-10**, **HR-13**, **HR-14** — independent, small, each closes a silent failure.
 5. **HR-7**, **HR-9**, **HR-12** — group-07 behaviour. Consider folding into the Phase-4 tool-change
    ordering work already scoped in `docs/plan.md` rather than patching twice.

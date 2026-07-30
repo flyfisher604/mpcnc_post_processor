@@ -73,6 +73,7 @@ firmware-variant rows note what changes elsewhere.
 | HR1 | Provisional Z0 bounds the `G38 Target` on the two just-positioned probe modes | |
 | HR2 | Canned cycles: a drill/tap operation posts at all; probing is rejected | |
 | HR3 | Manual spindle prompts to switch OFF on GRBL too — job end and tool change | |
+| HR4 | Safe-Z literal fallbacks convert mm→output unit; inch jobs stop retracting to 15 in | |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -471,6 +472,56 @@ tool) unless a row says otherwise.
       **Do (D) — firmware regression.** Repeat (A) on Marlin and RRF. **Get (D):** unchanged from
       the saved `H6` behaviour — `M300 S300 P3000` beep then the turn-off prompt (`M0 …` on Marlin,
       `M291 … S3` on RRF). **Pass:** the Marlin/RRF path is byte-identical to before; only GRBL moved.
+
+      *Result:* ____
+
+- [ ] **HR4 — Safe-Z literal fallbacks are in mm, like every other dialog dimension.** Verifies the
+      HR-4 fix (docs/HReview.md). Both Safe-Z properties accept `Feed:`/`Retract:`/`Clearance:<n>` or
+      a bare number. A **resolved F360 level** arrives from Fusion already in the output unit; the
+      **literal fallback** is a dialog value and so is mm by the README's own contract. Only the
+      second needed converting, and neither did. Two symptoms followed on an **inch** Setup:
+      `I_Probe_SafeZ` retracted to `Z15` meaning 15 **inch** (381 mm — a full-travel move into the Z
+      limit), and `C_MapRapids_SafeZ` compared every Z against a threshold of 15 inch, which no
+      toolpath reaches, so the G1→G0 mapper silently converted nothing.
+
+      **The fallback is reached more often than it looks** — not just by a bare number, but whenever
+      the named F360 level is *relative* (`..._absolute != 1`) or absent, and whenever the expression
+      is malformed. So `Retract:15` on an inch job with a relative retract height hits it.
+
+      **Do (A) — inch job, bare-number probe Safe Z.** A Setup in **inches**, one milling op with a
+      probe, `Safe Z` (group 06) = `20`. **Get (A):** the post-probe retract is
+      ```
+      (   Retract the tool to 0.7874015748031497)
+      G0 Z0.7874 F<travelZ>
+      ```
+      and Resolved Values reads `Probe SafeZ = Const = 0.7874`. **Pass:** `Z0.7874`, **not** `Z20`.
+      *(The unformatted number in the comment is pre-existing — `probeTool()` prints `retractZ` raw
+      rather than through `zFormat`. Cosmetic; don't chase it here.)*
+
+      **Do (B) — mm regression, the half that must not move.** The same job with the Setup in **mm**
+      and `Safe Z` = `20`. **Get (B):** `G0 Z20` and `Probe SafeZ = Const = 20.000`, exactly as
+      before. **Pass:** byte-identical to a pre-fix post. `propertyMmToUnit()` is the identity in mm,
+      so **no existing mm-based PASS row is invalidated by HR-4** — this row is what proves that.
+
+      **Do (C) — the mapper, inch job.** Inch Setup, `03 - Map G1s to Rapids` all on,
+      `Map: Safe Z to Rapid` = `20`. **Get (C):** the per-section comment reads
+      `( SafeZ using const: 0.7874015748031497)` — it was `( SafeZ using const: 20)` — and
+      `( Safe G1 --> G0)` conversions now appear for moves at or above 20 mm. **Pass:** the threshold
+      comment shows the converted value, and at least one `Safe G1 --> G0` appears where a pre-fix
+      post of the same job had none. That comment is `Important` level, so it survives even at
+      Comment Level `Important`.
+
+      **Do (D) — header coherence.** Any inch job with `Retract:15` on both Safe-Z properties.
+      **Get (D):** `Map SafeZ = Retract level, fallback 0.5906, resolves to <n>` — fallback and
+      resolved value in the **same** unit. **Pass:** no line mixes mm and inch. Before the fix the
+      fallback printed `15.000` beside a resolved `0.2000`.
+
+      > **Harness evidence already on record.** The resolution logic was extracted and run in node
+      > across both units at the time the fix landed: mm returns `15 / 15 / 15 / 20 / 15` for
+      > level-absolute / level-relative / level-absent / bare-20 / malformed, and inch returns
+      > `0.2 / 0.5906 / 0.5906 / 0.7874 / 0.5906` — F360 level values passing through untouched, every
+      > fallback converted. That covers the arithmetic; the posts above are what confirm the values
+      > reach the file.
 
       *Result:* ____
 
