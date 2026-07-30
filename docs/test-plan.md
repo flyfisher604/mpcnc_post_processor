@@ -20,6 +20,11 @@ Design/behavior detail lives in `docs/plan.md`.
 >
 > Cover **both** branches of any new condition — the path that emits and the path that suppresses.
 > A test that only proves output appears cannot catch a guard that never fires.
+>
+> **How rows are verified:** post the job from Fusion and **read the resulting g-code** — by eye and
+> with AI review. Expectations must therefore be written as things visible *in the file*: exact
+> tokens, their order, and what must be absent. Machine dry-runs and physical measurements are not
+> part of this plan, so a row's Pass criteria must stand on the file alone.
 
 ---
 
@@ -71,7 +76,7 @@ firmware-variant rows note what changes elsewhere.
 | PBV3 | Pro B-variant — production run (trust stored Z) | |
 | PA1 | Pro A — 2nd WCS same part/fixture, `Jog to X0 Y0, Probe Z0` | |
 | PA1b | Pro A — 2nd WCS same part, Z-only re-probe (`Use Active WCS X0 Y0, Probe Z0`) | |
-| H7c | Base probes/retracts in its own frame (static + physical) | static PASS *(physical unrun)* |
+| H7c | Base probes/retracts in its own frame | PASS |
 | D1 | Dialog & defaults audit (modes, renames, integer fields) | |
 | D2 | Header property dump — all 68 properties + resolved values | PASS *(suppression check unrun)* |
 | D3 | Group order after the homing move — presets must survive | |
@@ -226,8 +231,8 @@ tool) unless a row says otherwise.
       Z5.08` → `M0 (MSG Detach ZProbe)`. **No `G10 L20 P1 X0 Y0`** (the discriminator vs H2), no jog
       `M0`, and no `G0 Z` before the traverse. Arcs/plane restores and section rapids independently
       checked sound. **H7a PASS** (see below); **H7b deferred to J1**. Sub-check status since:
-      **H7c static PASS / physical unrun**, **H7f (B) PASS / (A) and (C) unrun**, **H7d and H7e still
-      unrun** (this job had no base and was GRBL only, so it could not cover any of them).
+      **H7c PASS**, **H7f (B) PASS / (A) and (C) unrun**, **H7d and H7e still unrun** (this job had
+      no base and was GRBL only, so it could not cover any of them).
 
       > **⚠ `H7.gcode` and `H7a.gcode` now predate current output.** The follow-up filed by this row
       > — the `Ensuring that Z is safe. Unknown Z for XY move.` Info comment — **is implemented**, and
@@ -255,26 +260,15 @@ tool) unless a row says otherwise.
     **[Jet tools & laser operations](#jet-tools--laser-operations--deferred)** (J-series). The
     milling assertions above don't depend on it, so H7 is complete without it.
 
-  - [ ] **H7c — Base probe runs in the base's frame; traverse clears the stock.** Verifies the
-        base-frame probe/retract fix. *(Mechanism and history: plan.md, "first-part `Probe Z` mode's
-        traverse height when a base is reserved".)*
+  - [x] **H7c — Base probe runs in the base's frame.** Verifies the base-frame probe/retract fix.
+        *(Mechanism and history: plan.md, "first-part `Probe Z` mode's traverse height when a base
+        is reserved".)*
 
         **Settings.** GRBL, real tool, one milling op. Reserved WCS = `G59`; Probe to Set Base =
         `Pause, Probe Z, Pause`; Inter Part Safe Z = `40`; First WCS / Part = `Use Active WCS X0 Y0,
         Probe Z0`. Probe X/Y Offset = `0` **or** a nonzero pair — either works here; the base probe
         ignores the offset, so it changes only the *part* probe's reposition (a nonzero run also
         evidences P2's base-ignores-offset assertion).
-
-        **Bed setup** (makes the stale datum as bad as it realistically gets):
-        1. At the controller, set `G54`'s origin on the **bare spoilboard** — jog to the intended
-           part X0 Y0, touch off on the spoilboard, zero X/Y/Z.
-        2. Clamp stock **≥19 mm** thick, positioned so the path from the base probe point to
-           `X0 Y0` crosses it.
-        3. **Park the tool over bare spoilboard, clear of the stock and clamps, before starting.**
-           Not optional and not cosmetic: `writeBaseEstablish()` emits **no XY move**, so it probes
-           whatever is under the tool at job start. Park over the stock and the base's Z0 silently
-           becomes the stock top — `G0 Z40` then measures 40 mm above the *stock*, the physical
-           check below passes for the wrong reason, and the base is wrong for the rest of the job.
 
         **Expected g-code:**
         ```
@@ -292,18 +286,14 @@ tool) unless a row says otherwise.
         G0 X0 Y0 F<travelXY>
         ```
 
-        **Pass — static:** `G59` appears *before* the `G38.2`; the retract is `G0 Z40` (matching
+        **Pass:** `G59` appears *before* the `G38.2`; the retract is `G0 Z40` (matching
         `(   Retract the tool to 40)`) and **not** the group-06 probe Safe Z; the `G54` restore
         appears before the `Use stored work origin` line; the base probe has **no `G0 X/Y`**
         reposition; and the `Ensuring that Z is safe. Unknown Z for XY move.` line is **absent** —
         the base retract made the height known (this file doubles as **H7f (B)**).
 
-        **Pass — physical** (dry-run: spindle off, E-stop in hand, single-block through the `G0 Z40`
-        and `G54`, measure *before* letting `G0 X0 Y0` run): the tool sits **40 mm above the
-        spoilboard**, ~21 mm clear of the stock, and the `G54` reselect moves nothing.
-
-        *Result:* **static PASS** — `H7c.gcode` (2026-07-30, post `90d3c95`; GRBL, T171, base `G59`,
-        Inter Part Safe Z 40, offsets X10 Y5). All five static criteria hold:
+        *Result:* **PASS** — `H7c.gcode` (2026-07-30, post `90d3c95`; GRBL, T171, base `G59`,
+        Inter Part Safe Z 40, offsets X10 Y5). All five criteria hold:
         `G59` (L128) precedes `G38.2 F30 Z-10` (L136); `G10 L20 P6 Z0.8` (L137) → `G0 Z40 F300`
         (L138) — the Inter Part Safe Z, visibly distinct from the part probe's `G0 Z5.08` (L155);
         `(   Restore operating WCS G54 after base probe)` → `G54` (L140-141) precedes
@@ -311,8 +301,7 @@ tool) unless a row says otherwise.
         block**; and no "unknown Z" warning (**H7f (B)** — see that row). The part probe repositioned
         to `X10 Y5` while the base did not, so this file also evidences **P2**'s base assertion. The
         traverse `X10 Y5 F2500` (L144) carries no `G0` word — correct, `G0` is modal from L138 and
-        `G54` does not reset the motion group. **Physical half still unrun** — and note this post
-        predates step 3 of the bed setup above, so re-park before running it.
+        `G54` does not reset the motion group.
 
   - [ ] **H7d — Guard A still fires for this mode.** Assign the first section to the reserved base
         WCS (e.g. base `G59`, Setup WCS = `6`) with First WCS / Part = `Use Active WCS X0 Y0,
@@ -830,9 +819,9 @@ move. Marlin is out of scope (single frame; Guard C blocks multi-WCS).
 - Base `None` (default): byte-for-byte identical to the Phase-2 baseline.
 - **⚠ Superseded by the base-frame probe change** — the base establish now wraps its probe in a
   `G59` select / `G54` restore and retracts to the Inter Part Safe Z in the base frame. The
-  register write is unchanged; the surrounding blocks are not. **Re-verified statically** by
-  **H7c** against `H7c.gcode` (block order, the `Z40` base-frame retract, and the `G54` restore all
-  confirmed); the **physical** measurement and the multi-part case (**PB1**) are still outstanding.
+  register write is unchanged; the surrounding blocks are not. **Re-verified** by **H7c** against
+  `H7c.gcode` (block order, the `Z40` base-frame retract, and the `G54` restore all confirmed); the
+  multi-part case (**PB1**) is still outstanding.
 - Base establish (now `Pause & Probe Z`, was On): spoilboard probe → `G10 L20 P6 Z<thk>`
   **before** the first section's own origin/probe; `G54` work still probes separately.
 - Base establish `None` (was Off): no probe; Info comment
