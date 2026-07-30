@@ -79,7 +79,7 @@ firmware-variant rows note what changes elsewhere.
 | H7c | Base probes/retracts in its own frame | PASS |
 | H7d | Guard A fires on the reserved base for this mode | PASS *(found a stale control name; fixed)* |
 | D1 | Dialog & defaults audit (modes, renames, integer fields) | |
-| D2 | Header property dump — all 68 properties + resolved values | PASS *(⚠ Safe-Z lines fixed since — re-post; suppression check unrun)* |
+| D2 | Header property dump — all 68 properties + resolved values | PASS *(suppression check unrun)* |
 | D3 | Group order after the homing move — presets must survive | header PASS *(dialog half unrun)* |
 
 ---
@@ -396,8 +396,10 @@ tool) unless a row says otherwise.
         is intact: `G59` (L128) → `G38.2` (L136) → `G10 L20 P6 Z0.8` (L137) → `G0 Z40` (L138) → `G54`
         restore.
 
-        **(C)** — `H7c-c.gcode` (post `edc38b3`; `A_Spoilboard_BaseReserve = 6`,
-        `B_Spoilboard_BaseEstablish = None`, offsets `0`). The warning is **back**, as predicted:
+        **(C)** — `H7c-c.gcode` (`A_Spoilboard_BaseReserve = 6`, `B_Spoilboard_BaseEstablish = None`,
+        offsets `0`); confirmed on the original post `edc38b3` and again on the `e1a526f` re-post,
+        where the Safe-Z header fix left this path's line numbering untouched. The warning is
+        **back**, as predicted:
         `(   assuming base G59 is already established -- from a prior job or set manually)` (L126) →
         `(   Use stored work origin X0 Y0; probe Z)` (L127) →
         `(   Ensuring that Z is safe. Unknown Z for XY move.)` (L128) →
@@ -590,7 +592,8 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       strings) — `02 - Feeds and Speeds` now appears before `03 - Map G1s ...`, and
       `04 - Establish Machine Coordinates` between Map-G1s and the spoilboard group.
 
-      *Result:* **header half PASS** — `H7c-a.gcode` / `H7c-b.gcode` (post `edc38b3`) both dump the
+      *Result:* **header half PASS** — `H7c-a.gcode` / `H7c-b.gcode` (post `edc38b3`) and the
+      re-posted `H7c-c.gcode` (post `e1a526f`) all dump the
       groups in the new order: `01 - Job`, `02 - Feeds and Speeds`, `03 - Map G1s ...`,
       `04 - Establish Machine Coordinates`, `05 - Establish Spoilboard Reference`, `06 - On WCS ...`,
       `07`–`11` unchanged; counts still 9/7/4/2/4/10/8/5/7/10/2 = 68. **Dialog half outstanding** —
@@ -633,17 +636,22 @@ fixtures) — so either turn it off or reserve a base for this workflow.
       Dialog values cross-checked against the settings this job was posted with. **Still unrun:** the
       suppression check at Comment Level `Important` / `Off`.
 
-      > **⚠ Partly superseded — the two Safe-Z lines were wrong and have been rewritten.** Every
-      > reviewed file (`H7c`, `H7c-a/-b/-c`) shows the old form,
-      > `Map SafeZ mode = Retract : default = 15` / `Probe SafeZ mode = Retract : default = 15`.
-      > Both numbers came straight out of the property string `Retract:15`, which the group-06 dump
-      > already prints verbatim — so the line restated a property under a heading promising a
-      > resolved value, and stated `15` for a job whose probe retract actually emitted `G0 Z5.08`.
-      > `resolveSafeZHeight()` also had to be corrected to query the passed section rather than the
-      > global context, or resolving from the header would have returned the fallback for every
-      > operation and reproduced the same wrong answer. The rest of D2's evidence stands — property
-      > blocks, ordering, counts, enum ids, `<empty>` handling are unaffected. **Re-post to
-      > re-confirm these two lines.**
+      **Safe-Z lines — re-confirmed after the fix.** Re-posted `H7c-c.gcode` (post `e1a526f`) reads:
+      ```
+      (   Map SafeZ = Retract level, fallback 15, resolves to 5.08)
+      (   Probe SafeZ = Retract level, fallback 15, resolves to 5.08)
+      ```
+      and `5.08` is **the number the file actually uses** — `(   Retract the tool to 5.08)` and
+      `G0 Z5.08 F300` on the probe retract. The header now predicts the body, which is the whole
+      point of the block. Zero lines match the old `SafeZ mode = … : default =` form, and the
+      Resolved block carries no stripped-paren double spaces. Blast radius nil: the re-post is
+      **207 lines with identical numbering** to the previous H7c-c, so exactly those two lines
+      changed and no motion moved.
+      *(Prior form, now gone: `Map/Probe SafeZ mode = Retract : default = 15` — both numbers lifted
+      from the property string `Retract:15` that the group-06 block already prints verbatim, stating
+      `15` for a job emitting `G0 Z5.08`. `resolveSafeZHeight()` had to be corrected alongside it to
+      query the passed section rather than the global context, or header-time resolution would have
+      returned the fallback for every operation and reproduced the same wrong number.)*
       *(Note: this block is new default output — see the H-REG re-baseline note.)*
       *(The label fix is confirmed by the later `H7c-a.gcode` / `H7c-b.gcode`: `Firmware resolved =
       Grbl`, `Reserved base WCS = None` / `G59 / P6`, `Probe XY offset in output units`,

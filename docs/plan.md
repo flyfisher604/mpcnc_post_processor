@@ -418,8 +418,7 @@ reference were reordered to match (its doc-sync ref was bumped).
    Nothing else depends on it, and the base machinery underneath it is now verified (H7c).
 2. **Tests, no machine needed:** **D1** and **D3**'s dialog half — both are dialog-only, no posting,
    and D3 (does a saved preset survive the group move?) gates trust in every other dialog row;
-   **D2**'s two Safe-Z lines (re-post — they were wrong and were rewritten) plus its suppression
-   check at Comment Level `Important`; **H7e** (Marlin/RRF); **P3**.
+   **D2**'s suppression check at Comment Level `Important` / `Off`; **H7e** (Marlin/RRF); **P3**.
 3. **Tests needing a multi-part / multi-fixture job to post:** **PB1/PB2**, **PBV1–3**,
    **PA1/PA1b**, **P2** (only its added-part half remains; `H7c.gcode` already evidenced the base and
    first-part halves).
@@ -793,6 +792,9 @@ guard around the two calls if the header proves too heavy.
 > `resolveSafeZHeight()` to query the **passed** section instead of the global context: the global
 > `hasParameter()` reports on whatever section is current, and at header time none is, so it would
 > have returned the fallback for every operation and reproduced the same wrong number.
+> **Verified** on the re-posted `H7c-c.gcode`: `Probe SafeZ = Retract level, fallback 15, resolves to
+> 5.08`, matching the `G0 Z5.08` the file actually emits — the header now predicts the body. Two
+> lines changed, nothing else (identical line numbering across the re-post). Test-plan **D2**.
 
 ### Future work — a machine-coordinate base probe point (`G53`) *(not started; design sketch)*
 
