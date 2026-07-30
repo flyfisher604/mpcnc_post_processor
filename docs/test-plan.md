@@ -4,6 +4,23 @@ Verification tracking for `MPCNC_v4.0_Beta1.cps` → `MPCNC_v4.0_Beta2.cps`. **O
 tests are listed first; **verified** items are summarized below so they aren't re-run.
 Design/behavior detail lives in `docs/plan.md`.
 
+> ## Standing rule — a code change is not done until this file is updated
+>
+> **Every change to `MPCNC_v4.0_Beta2.cps` updates this file in the same commit.** Not afterwards,
+> not "when we get to testing". Three things to do, in this order:
+>
+> 1. **Add the row(s)** that verify the new behavior, written as **Do this → get that**: the exact
+>    dialog settings to set, the exact g-code to expect (a block, not a description), and a **Pass**
+>    line naming the *discriminator* — the one token whose presence or absence proves the change
+>    (often an absence: "no `G10 L20 P1 X0 Y0`").
+> 2. **Mark what the change invalidates.** If an already-`PASS` row's saved `.gcode` no longer
+>    matches current output, say so on that row (⚠ + what differs + which new row supersedes it).
+>    A stale PASS is worse than an unrun test.
+> 3. **Update the Results summary table** so the new rows are visible without reading the file.
+>
+> Cover **both** branches of any new condition — the path that emits and the path that suppresses.
+> A test that only proves output appears cannot catch a guard that never fires.
+
 ---
 
 ## Execution runbook — hobbyist & professional flows
@@ -44,7 +61,8 @@ firmware-variant rows note what changes elsewhere.
 | H4 | Hobbyist — single op, `Set X0 Y0 Z0 to Current Pos` (manual Z, no prompt) | PASS *(jet/tool-0 → J1)* |
 | H5 | Hobbyist — single op, `Use Active WCS X0 Y0 Z0` (trust stored) | PASS |
 | H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | PASS (Marlin + RRF) |
-| H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7b–H7e unrun)* |
+| H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7b–H7f unrun; ⚠ saved files predate the H7f comment)* |
+| H7f | "Unknown Z" warning — present without a base, suppressed with one | |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -205,10 +223,15 @@ tool) unless a row says otherwise.
       in the program** → `M0 (MSG Attach ZProbe)` → `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8` → `G0
       Z5.08` → `M0 (MSG Detach ZProbe)`. **No `G10 L20 P1 X0 Y0`** (the discriminator vs H2), no jog
       `M0`, and no `G0 Z` before the traverse. Arcs/plane restores and section rapids independently
-      checked sound. **Follow-up filed:** the file gives the operator no cue that the first rapid's Z
-      is unknown — plan.md calls for an Info comment (`Ensuring that Z is safe. Unknown Z for XY
-      move.`) on this branch. **H7a PASS** (see below); **H7b deferred to J1**; **H7c/H7d/H7e remain
+      checked sound. **H7a PASS** (see below); **H7b deferred to J1**; **H7c/H7d/H7e/H7f remain
       unrun** (this job had no base and was GRBL only).
+
+      > **⚠ `H7.gcode` and `H7a.gcode` now predate current output.** The follow-up filed by this row
+      > — the `Ensuring that Z is safe. Unknown Z for XY move.` Info comment — **is implemented**, and
+      > it lands on exactly this path with no base reserved. Both saved files therefore lack one line
+      > that a fresh post emits. **Comment-only: no motion, no origin write, no probe changed**, so
+      > H7 and H7a stand as verified and need no functional retest — the new line is verified by
+      > **H7f** below instead. Do not diff a fresh post against these files without expecting it.
 
   Sub-checks:
 
@@ -262,7 +285,8 @@ tool) unless a row says otherwise.
         **Pass — static:** `G59` appears *before* the `G38.2`; the retract is `G0 Z40` (matching
         `(   Retract the tool to 40)`) and **not** the group-06 probe Safe Z; the `G54` restore
         appears before the `Use stored work origin` line; the base probe has **no `G0 X/Y`**
-        reposition.
+        reposition; and the `Ensuring that Z is safe. Unknown Z for XY move.` line is **absent** —
+        the base retract made the height known (this file doubles as **H7f (B)**).
 
         **Pass — physical** (dry-run: spindle off, E-stop in hand, single-block through the `G0 Z40`
         and `G54`, measure *before* letting `G0 X0 Y0` run): the tool sits **40 mm above the
@@ -279,6 +303,47 @@ tool) unless a row says otherwise.
         emits `G92 Z0.8` only (no XY word, no `G54`); RRF emits `G54` + `G10 L20 P1 Z0.8` with
         `M291 … S3` probe prompts. No jog buttons (`X1 Y1 Z1`) — this mode has no jog prompt.
         *Result:* ____
+
+  - [ ] **H7f — The "unknown Z" warning appears only when Z really is unknown.** Verifies the Info
+        comment added to `partProbe()`'s `zUnknown` branch. The comment tells the operator (and an
+        automated review) that the traverse below runs at whatever height the tool physically sits
+        at — true only when nothing has established a height first, which is what the three posts
+        below separate. *(Mechanism: plan.md, "warn in the file that the traverse Z is unknown" →
+        "As built".)*
+
+        **Common settings for all three:** GRBL, one milling op, real tool, First WCS / Part =
+        `Use Active WCS X0 Y0, Probe Z0`, Probe X/Y Offset = `0`, Comment Level = `Info` (default).
+        Change **only** the two base fields between posts.
+
+        **Do (A):** post with **Reserved WCS = `None`**.
+        **Get (A):** the warning is present, between the mode comment and the traverse:
+        ```
+        (   Use stored work origin X0 Y0; probe Z)
+        (   Ensuring that Z is safe. Unknown Z for XY move.)
+        (   Move to part origin X0 Y0, then probe Z)
+        G0 X0 Y0 F<travelXY>
+        ```
+
+        **Do (B):** same job, **Reserved WCS = `G59`**, Probe to Set Base = `Pause, Probe Z, Pause`.
+        **Get (B):** the warning is **gone** — the base establish already retracted to the Inter Part
+        Safe Z *in the base's frame*, so the height is known and the warning would be false:
+        ```
+        (   Restore operating WCS G54 after base probe)
+        G54
+        (   Use stored work origin X0 Y0; probe Z)
+        (   Move to part origin X0 Y0, then probe Z)
+        ```
+        *(This is the same post as **H7c** — do it once and use the file for both rows.)*
+
+        **Do (C):** same as (B) but **Probe to Set Base = `None`**.
+        **Get (C):** the warning is **back**. A base that is only *assumed* pre-set emits no probe
+        and no retract, so nothing established a height — reserving a base is not by itself enough.
+
+        **Pass:** the discriminator is the **suppression**, not the appearance — (A) and (C) carry
+        the line, (B) does not. Also confirm the blast radius is nil: diff (A) against `H7.gcode` and
+        the *only* difference is that one comment line; and a default-settings post (**H2** path)
+        and any added-part probe contain the line **nowhere** — it is gated by the `zUnknown`
+        parameter that only this one mode passes. *Result:* ____
 
 - [ ] **H-REG — Byte-for-byte regression (the key guarantee).** With the default reverted to
       `Set X0 Y0 to Current Pos, Probe Z0`, the **default** single-op output is again the pre-rework

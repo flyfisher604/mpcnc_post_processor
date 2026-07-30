@@ -2354,12 +2354,23 @@ var probePauseAfter = true;
 // jet tools. The attach/detach prompts follow C_Probe_Pause. The spoilboard base probe does
 // NOT use this -- it always touches off at the origin, with its own pause setting (see
 // writeBaseEstablish).
-function partProbe(atOrigin) {
+// `zUnknown` (optional, default false) = the caller emitted no absolute Z move before this probe
+// because the active frame's Z0 is stale, so the traverse below runs at whatever height the tool
+// already holds; see the warning comment inside. Only the first-part "Probe Z" mode passes true --
+// every other caller reaches here at a retracted, known height.
+function partProbe(atOrigin, zUnknown) {
   var ox = probeOffsetX();
   var oy = probeOffsetY();
   var offsetSet = (ox != 0 || oy != 0);
   if (!atOrigin || offsetSet) {
     resetAll();
+    // The rapid below is at an unknown height and, on the first-part path, is the program's first
+    // motion -- so no absolute Z move can precede it and the file must say so instead, for both the
+    // operator and an automated review. Suppressed when an established spoilboard base has already
+    // retracted us to a known height (base frame + Inter Part Safe Z), where the warning is false.
+    if (zUnknown && (getReservedBaseWcs() == 0 || getProperty(properties.B_Spoilboard_BaseEstablish) == "None")) {
+      writeComment(eComment.Info, "   Ensuring that Z is safe. Unknown Z for XY move.");
+    }
     if (offsetSet) {
       writeComment(eComment.Info, "   Move to probe point = origin + offset X" + xyzFormat.format(ox) + " Y" + xyzFormat.format(oy) + ", then probe Z");
     } else {
@@ -2403,11 +2414,12 @@ function writeWcsOnStart() {
     // "Use Active WCS X0 Y0, Probe Z0": use the WCS's stored X0 Y0 (a pre-set fixture offset)
     // and re-probe Z -- do NOT write XY. Unlike Skip, Z is stale (about to be probed), so we emit
     // no absolute Z move in this frame: the tool is at its safe job-start height (post-home /
-    // power-on / spoilboard base probe), partProbe(false) travels to the stored X0 Y0 (X/Y only)
-    // at that height, then probes Z down. XY comes from the WCS offset, not re-zeroed.
+    // power-on / spoilboard base probe), partProbe(false, true) travels to the stored X0 Y0
+    // (X/Y only) at that height -- warning in the file that the height is unknown -- then probes Z
+    // down. XY comes from the WCS offset, not re-zeroed.
     writeComment(eComment.Info, "   Use stored work origin X0 Y0; probe Z");
     if (canProbe) {
-      partProbe(false);
+      partProbe(false, true);
     } else {
       writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool) -- moving to stored X0 Y0");
       resetAll();

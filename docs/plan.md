@@ -336,8 +336,14 @@ the two driving files (this plan + the test plan). Recover the fix rationale fro
 
 *Written so a fresh session can resume with no other context. Update it when the situation moves.*
 
-**Baseline.** Branch `wcs-reworked-flow`, at commit **`25768ec`** ("Probe the spoilboard base in its
-own WCS; dump all properties in the header") — pushed. The two driving documents are this file and
+**Standing rule — every code change updates `docs/test-plan.md` in the same commit.** Add the
+Do-this→get-that row(s), mark any already-`PASS` row whose saved `.gcode` the change invalidates, and
+update that file's Results summary. The full rule is at the top of the test plan; it is a priority,
+not a courtesy — a stale PASS is worse than an unrun test.
+
+**Baseline.** Branch `wcs-reworked-flow`, at commit **`3ae1d24`** ("Add restart checkpoint to the
+plan; scope the byte-identical guarantee to motion"), on top of `25768ec` ("Probe the spoilboard base
+in its own WCS; dump all properties in the header"). The two driving documents are this file and
 `docs/test-plan.md`; the post is `MPCNC_v4.0_Beta2.cps`. Nothing is in flight: the working tree is
 clean apart from an untracked `MPCNC_v4.0_Beta1.zip` (unrelated to this work — add it or ignore it).
 
@@ -355,11 +361,12 @@ check if output looks wrong:
 per-row evidence and the standing note explaining why no H row needs a functional retest).
 
 **Next actions, in the order they'd be tackled:**
-1. **Code — the "unknown Z" Info comment** (`Ensuring that Z is safe. Unknown Z for XY move.`) on
-   `writeWcsOnStart()`'s `Probe Z` branch. Small and self-contained; fully specified under
-   *Phase 4 — selection-driven origin/probe model* → **"To do — warn in the file that the traverse Z
-   is unknown"** (that section's heading says *implemented*, but this one item inside it is not).
-2. **Code — tool-change ordering + base-relative park.** The largest remaining item; design settled —
+1. ✅ **Code — the "unknown Z" Info comment** (`Ensuring that Z is safe. Unknown Z for XY move.`) on
+   `writeWcsOnStart()`'s `Probe Z` branch — **done**, guarded so it is suppressed when an established
+   spoilboard base has already made the traverse height known. See *Phase 4 — selection-driven
+   origin/probe model* → **"As built — narrower than the spec above"**. Verification is a
+   read-the-file test (two posts of the `Probe Z` mode, base off / base established).
+2. **Code — tool-change ordering + base-relative park.** Now the top item; design settled —
    see *Phase 4 — tool-change ordering + base-relative park*, the first section under Remaining work.
    Nothing else depends on it.
 3. **Tests, no machine needed** (posting + reading the file): **D1**, **D2**, **H7d** (Guard A),
@@ -627,7 +634,7 @@ is inherently "descend until trigger", so the target is a travel limit whose mea
 dependent no matter what; worth documenting, and possibly worth a more generous target for the base
 probe specifically.
 
-**To do — warn in the file that the traverse Z is unknown.** In the `Probe Z` first-part mode the
+**DONE — warn in the file that the traverse Z is unknown.** In the `Probe Z` first-part mode the
 `G0 X0 Y0` to the stored origin is the **first motion in the program** and runs at whatever height
 the operator left the tool at — confirmed in `H7.gcode`, where that full-bed rapid is the very first
 motion and nothing in the file hints at its height. The post cannot emit a Z move here (the frame's
@@ -638,6 +645,23 @@ that actually has an unknown Z (`writeWcsOnStart()`'s `Probe Z` branch — **not
 retracts to a known height first). *Note the byte-identical constraint below: the default Comment
 Level is `Info`, so this adds a line to default output on this non-default mode's path only — the
 default `Set X0 Y0 to Current Pos, Probe Z0` path is untouched, so the H2 / H-REG anchor holds.*
+
+**As built — narrower than the spec above.** The comment is emitted **inside `partProbe()`**, in the
+reposition block immediately before the traverse rapid it warns about, gated by a new optional second
+parameter `zUnknown` (default false — so every other caller, and the whole added-part path where Z
+*is* known, is untouched and byte-identical). Only `writeWcsOnStart()`'s `Probe Z` branch passes
+true (`partProbe(false, true)`): it is the one caller that deliberately emits no absolute Z move,
+which is the fact it alone knows. Whether that stale frame *actually* leaves the height unknown is
+decided in `partProbe()` alongside the comment: `getReservedBaseWcs() == 0 ||
+B_Spoilboard_BaseEstablish == "None"`. With an **established base** the
+preceding `writeBaseEstablish()` has already retracted to the Inter Part Safe Z **in the base's
+frame**, so the traverse height is known (spoilboard + clearance) — see the *Fix — IMPLEMENTED* step 3
+above — and claiming "unknown Z" there would be a false safety comment. The tool-0 / jet-tool `else`
+branch also rapids at an unknown height; left alone deliberately, as jet tools are the deferred
+J1–J5 workstream. *Verification: `docs/test-plan.md` **H7f** — three posts of the `Probe Z`
+first-part mode (no base / base established / base assumed pre-set), a read-the-file test with no
+machine needed. Post (B) doubles as **H7c**'s file. Note H7f also records that `H7.gcode` /
+`H7a.gcode` now predate current output by this one comment line.*
 
 *Safe arrival applies to `Skip` at both stages:* first-part `Skip` (`writeWcsOnStart`) now
 retracts to the probe Safe Z (milling only) and rapids to the stored `X0 Y0` instead of emitting
