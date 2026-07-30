@@ -2697,6 +2697,47 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
   }
 }
 
+// The arc counterpart of limitFeedByXYZComponents(): cap a G2/G3 feed so no axis exceeds its
+// configured maximum. Only reduces, never raises, and returns the feed untouched when Scale
+// Feedrate is off.
+//
+// Deliberately NOT the projection limitFeedByXYZComponents() uses. That function projects the
+// straight line from the current position to the destination, which for an arc is the CHORD -- and
+// on an arc the instantaneous axis velocity is tangential, reaching the full toolpath feed wherever
+// the tangent lines up with an axis. A 90-degree arc's chord runs at 45 degrees, so a chord
+// projection would report about 0.707 * feed on each axis and pass an arc that hits the full feed on
+// X at its own quadrant point: it under-protects by up to 1/cos(45deg). The real constraint on a
+// planar arc is just the limit of the axes it sweeps.
+//
+// Consequence worth knowing: this is CONSERVATIVE for a short arc that never reaches a quadrant
+// point (a 10-degree arc around 45 degrees peaks near 0.75 * feed on each axis, so capping at the
+// axis limit reduces it more than strictly necessary). That is the right side to err on for a
+// machine that cannot hold the feed, and it keeps the rule predictable -- an arc is never faster
+// than the axis limit, full stop. It also means a fillet can post slower than the straight moves
+// either side of it, which is correct rather than a defect: a diagonal G1 is allowed to exceed the
+// per-axis limit precisely because neither axis individually does.
+function limitArcFeed(feed) {
+  if (!getProperty(properties.D_Feeds_ScaleFeedrate)) {
+    return feed;
+  }
+
+  var xyLimit = propertyMmToUnit(getProperty(properties.E_Feeds_MaxCutSpeedXY));
+  var zLimit = propertyMmToUnit(getProperty(properties.F_Feeds_MaxCutSpeedZ));
+
+  // An XY arc sweeps X and Y only. A ZX / YZ arc (GRBL only -- Marlin/RepRap linearize those, and
+  // the linearized moves go through limitFeedByXYZComponents() instead) sweeps one linear axis and
+  // Z, so it must satisfy the slower of the two.
+  var limit = (getCircularPlane() == PLANE_XY) ? xyLimit : ((xyLimit < zLimit) ? xyLimit : zLimit);
+
+  // Same final cap the linear path applies to its resolved feed.
+  var xyzLimit = propertyMmToUnit(getProperty(properties.G_Feeds_MaxCutSpeedXYZ));
+  if (limit > xyzLimit) {
+    limit = xyzLimit;
+  }
+
+  return (feed > limit) ? limit : feed;
+}
+
 // Linear movements
 function linearMovements(_x, _y, _z, _feed) {
   // Note: control-side radius compensation is rejected up front in onRadiusCompensation
@@ -2839,6 +2880,16 @@ function circular(clockwise, cx, cy, cz, x, y, z, feed) {
     linearize(tolerance);
     return;
   }
+
+  // Scale the arc's feed to the axis limits, as linearMovements() does for a G1. Arcs previously
+  // bypassed Scale Feedrate entirely: with Use Arcs on by default and the README telling hobbyists
+  // to enable scaling, a job with a tool feed above Max XY Cut Speed had every straight cut scaled
+  // down and every fillet emitted at the raw feed -- defeating the feature on exactly the curved
+  // geometry a slow machine struggles with, and invisibly unless you watched F across a G1 -> G2
+  // boundary. Applied here rather than in onCircular() so it only touches arcs the post actually
+  // emits: the linearize() paths above and in the plane switches below re-enter through onLinear(),
+  // which limits them the ordinary way. See docs/HReview.md HR-5.
+  feed = limitArcFeed(feed);
 
   var start = getCurrentPosition();
 

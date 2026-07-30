@@ -648,7 +648,7 @@ property, `G0 Z20` unchanged — is the one that proves nothing regressed for ex
 
 ---
 
-### HR-5 — `Scale Feedrate` does not apply to arcs — **Medium-High** · `READ`
+### HR-5 — `Scale Feedrate` does not apply to arcs — **Medium-High** · `READ` · **IMPLEMENTED**
 
 **Reaches it:** HP-1 exactly. `Use Arcs` defaults **on**, and the README instructs the hobbyist:
 *"Enable Scale Feedrate so cut moves are scaled to stay within those limits."*
@@ -703,11 +703,39 @@ For a planar arc the correct cap is the axis limit of the plane it lies in:
    var start = getCurrentPosition();
 ```
 
-**Verify (Do → Get).**
+#### As built
+
+`limitArcFeed()` added next to `limitFeedByXYZComponents()` ([:2700](../MPCNC_v4.0_Beta2.cps#L2700)),
+called from `circular()` ([:2919](../MPCNC_v4.0_Beta2.cps#L2919)). Implemented as proposed;
+`node --check` passes. Three points worth recording:
+
+- **Called inside `circular()`, after the `Use Arcs` check — not in `onCircular()`.** `circular()`
+  has three `linearize(tolerance)` exits (Use Arcs off, and the unsupported-plane `default:` in each
+  firmware branch). Those re-enter through `onLinear()` and are limited the ordinary way, so placing
+  the cap after the first exit keeps it to arcs the post actually emits and avoids double-limiting.
+  Mutating the local `feed` is safe for the other two exits because `linearize()` re-drives the
+  kernel's own feed, not this variable.
+- **The conservative-for-short-arcs consequence is documented in the code**, not just here — with the
+  reason a fillet may legitimately post slower than the diagonals either side of it. That asymmetry
+  will look like a bug to whoever next reads a posted file, so it needed to be answered at the site.
+- **Composes with HR-4.** The three limits go through `propertyMmToUnit()`, so on an inch job
+  `Max XY Cut Speed = 900` mm/min correctly becomes 35.433 in/min. Verified in the harness below.
+
+**No blast radius.** `Scale Feedrate` defaults **off**, and the function returns the feed untouched on
+that branch, so every existing PASS row — all posted at the default — is unaffected. Only a job that
+has *deliberately* enabled scaling changes, which is the job that asked for it. HR5 (B) is the row
+that proves it.
+
+**Harness-verified** before landing: scaling off → untouched; XY arc `1800`→`900`; under-limit and
+exactly-at-limit → untouched; `Max Toolpath Speed 500` → `500`; ZX and YZ arcs → `180` (the slower
+of the two axes they sweep); ZX where Z is the *faster* axis → the XY limit; inch job → `35.433`;
+zero feed → zero. Eleven cases, all passing.
+
+**Verify (Do → Get).** Full four-post row is **HR5** in `docs/test-plan.md`; short form:
 *Do:* HP-1 with `Scale Feedrate` on, `Max XY Cut Speed = 900`, and an operation containing a filleted
 contour whose tool feed is 1800. *Get:* the `G2`/`G3` blocks carry `F900`, matching the surrounding
-`G1` blocks. **Pass:** no `F` above 900 anywhere in the body. Second post: `Scale Feedrate` **off** →
-arcs carry `F1800` again (proves the new cap is gated by the property and the off-path is untouched).
+`G1` blocks. **Pass:** a grep for `F1800` returns nothing. The row's (B) post — `Scale Feedrate` off,
+arcs back at `F1800` — proves the cap is gated by the property and the default path is untouched.
 
 ---
 
@@ -1267,9 +1295,10 @@ are actioned.
    whether the added-part jog probe should be treated symmetrically — see its *As built* note.
    ~~**HR-3**~~ **done** — test-plan row **HR3** added plus a blast-radius banner in the runbook
    conventions. Neither fix is verified by a post yet: **HR1** and **HR3** are both unrun.
-3. ~~**HR-4**~~ **done** (uncommitted) — test-plan row **HR4** added; mm jobs unchanged, so no
-   existing PASS row is invalidated. **HR-5** still open — the other half of "the two features the
-   README tells the hobbyist to enable".
+3. ~~**HR-4**~~, ~~**HR-5**~~ **both done** — the two features the README tells the hobbyist to enable
+   are now correct. HR-4 committed; HR-5 uncommitted. Test-plan rows **HR4** and **HR5** added.
+   Neither invalidates an existing PASS row: HR-4 is the identity in mm, and HR-5's branch is gated
+   on `Scale Feedrate`, which defaults off.
 4. **HR-6**, **HR-10**, **HR-13**, **HR-14** — independent, small, each closes a silent failure.
 5. **HR-7**, **HR-9**, **HR-12** — group-07 behaviour. Consider folding into the Phase-4 tool-change
    ordering work already scoped in `docs/plan.md` rather than patching twice.

@@ -74,6 +74,7 @@ firmware-variant rows note what changes elsewhere.
 | HR2 | Canned cycles: a drill/tap operation posts at all; probing is rejected | |
 | HR3 | Manual spindle prompts to switch OFF on GRBL too — job end and tool change | |
 | HR4 | Safe-Z literal fallbacks convert mm→output unit; inch jobs stop retracting to 15 in | |
+| HR5 | `Scale Feedrate` reaches G2/G3 arcs, not just G1 cuts | |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -522,6 +523,59 @@ tool) unless a row says otherwise.
       > `0.2 / 0.5906 / 0.5906 / 0.7874 / 0.5906` — F360 level values passing through untouched, every
       > fallback converted. That covers the arithmetic; the posts above are what confirm the values
       > reach the file.
+
+      *Result:* ____
+
+- [ ] **HR5 — `Scale Feedrate` reaches arcs.** Verifies the HR-5 fix (docs/HReview.md).
+      `linearMovements()` has always run each `G1` through `limitFeedByXYZComponents()`; `circular()`
+      emitted `fOutput.format(feed)` with Fusion's raw feed on both the GRBL and Marlin branches. So
+      with **Use Arcs** on (default) and **Scale Feedrate** on (which the README tells the hobbyist to
+      enable), a job whose tool feed exceeds **Max XY Cut Speed** had every straight cut scaled and
+      every fillet emitted at full feed — defeating the feature on precisely the curved geometry a
+      slow machine struggles with. Invisible unless you watch `F` across a `G1`→`G2` boundary.
+
+      **Common settings:** GRBL, mm Setup, `Use Arcs` = on, `Scale Feedrate` = **on**,
+      `Max XY Cut Speed` = `900`, `Max Z Cut Speed` = `180`, `Max Toolpath Speed` = `1000`,
+      `Enforce Feedrate` = on (default, so every block carries `F` and no comparison depends on
+      modal state). One operation containing **filleted / arc geometry** whose tool feed is `1800`.
+
+      **Do (A) — the fix.** Post the job. **Get (A):** every `G2`/`G3` block carries `F900`, matching
+      the `G1` blocks around it:
+      ```
+      G1 X.. Y.. F900
+      G2 X.. Y.. I.. J.. F900
+      ```
+      **Pass:** no `F` above `900` anywhere in the body. Before the fix the arcs carried `F1800`, so
+      the discriminator is a *grep for `F1800`* returning nothing.
+
+      **Do (B) — the off branch.** Same job, `Scale Feedrate` = **off** (the property default).
+      **Get (B):** arcs **and** straight cuts both carry `F1800` — the raw tool feed. **Pass:** the
+      cap is gated on the property, and a default-settings job is untouched. **This is why no saved
+      reference file is invalidated by HR-5:** `Scale Feedrate` defaults off, so every existing PASS
+      row was posted on this branch.
+
+      **Do (C) — the Max Toolpath Speed cap.** Same as (A) but `Max Toolpath Speed` = `500`.
+      **Get (C):** arcs carry `F500`. **Pass:** the final cap applies to arcs as it does to lines.
+
+      **Do (D) — a ZX/YZ-plane arc, GRBL only.** An operation producing a vertical-plane arc (e.g. a
+      radius on a vertical wall). **Get (D):** the `G18`/`G19` arc carries `F180` — the **slower** of
+      the XY and Z limits, because such an arc sweeps a linear axis *and* Z. **Pass:** `F180`, not
+      `F900`. *(Marlin/RRF linearize non-XY arcs, so there this appears as `G1` moves limited the
+      ordinary way — worth confirming once if you run the firmware variant.)*
+
+      > **Not a defect — arcs can post slower than the lines either side of them.** The cap for an
+      > arc is the axis limit itself, because an arc's instantaneous axis velocity reaches the full
+      > toolpath feed wherever its tangent lines up with an axis. A diagonal `G1` is allowed to exceed
+      > `900` (a 45° move at `F1270` puts ~900 on each axis), so a fillet at `F900` between two
+      > diagonals at `F1270` is correct, not a regression. Deliberately conservative for short arcs
+      > that never reach a quadrant point.
+
+      > **Harness evidence already on record.** `limitArcFeed()` was unit-tested when the fix landed:
+      > scaling off → untouched; XY arc `1800`→`900`; feed already under the limit → untouched; feed
+      > exactly at the limit → unchanged; `Max Toolpath Speed 500` → `500`; ZX and YZ arcs → `180`;
+      > ZX where Z is the faster axis → the XY limit; an inch job → `900 mm/min` converted to
+      > `35.433 in/min`; zero feed → zero. Eleven cases, all passing. That covers the arithmetic; the
+      > posts above confirm the values reach the file.
 
       *Result:* ____
 
