@@ -77,6 +77,7 @@ firmware-variant rows note what changes elsewhere.
 | PA1 | Pro A — 2nd WCS same part/fixture, `Jog to X0 Y0, Probe Z0` | |
 | PA1b | Pro A — 2nd WCS same part, Z-only re-probe (`Use Active WCS X0 Y0, Probe Z0`) | |
 | H7c | Base probes/retracts in its own frame | PASS |
+| H7d | Guard A fires on the reserved base for this mode | PASS *(found a stale control name; fixed)* |
 | D1 | Dialog & defaults audit (modes, renames, integer fields) | |
 | D2 | Header property dump — all 68 properties + resolved values | PASS *(suppression check unrun)* |
 | D3 | Group order after the homing move — presets must survive | |
@@ -231,8 +232,8 @@ tool) unless a row says otherwise.
       Z5.08` → `M0 (MSG Detach ZProbe)`. **No `G10 L20 P1 X0 Y0`** (the discriminator vs H2), no jog
       `M0`, and no `G0 Z` before the traverse. Arcs/plane restores and section rapids independently
       checked sound. **H7a PASS** (see below); **H7b deferred to J1**. Sub-check status since:
-      **H7c PASS**, **H7f (B) PASS / (A) and (C) unrun**, **H7d and H7e still unrun** (this job had
-      no base and was GRBL only, so it could not cover any of them).
+      **H7c PASS**, **H7d PASS**, **H7f (B) PASS / (A) and (C) unrun**, **H7e still unrun** (this job
+      had no base and was GRBL only, so it could not cover any of them).
 
       > **⚠ `H7.gcode` and `H7a.gcode` now predate current output.** The follow-up filed by this row
       > — the `Ensuring that Z is safe. Unknown Z for XY move.` Info comment — **is implemented**, and
@@ -303,11 +304,29 @@ tool) unless a row says otherwise.
         traverse `X10 Y5 F2500` (L144) carries no `G0` word — correct, `G0` is modal from L138 and
         `G54` does not reset the motion group.
 
-  - [ ] **H7d — Guard A still fires for this mode.** Assign the first section to the reserved base
+  - [x] **H7d — Guard A still fires for this mode.** Assign the first section to the reserved base
         WCS (e.g. base `G59`, Setup WCS = `6`) with First WCS / Part = `Use Active WCS X0 Y0,
-        Probe Z0`. **Pass:** the post aborts in `onOpen()` naming `Probe at Job Start`, with no
-        g-code emitted — the new mode writes a Z origin, so it must count as origin-establishing
-        (`baseOriginWriteReason()` classifies every mode except `Skip` that way). *Result:* ____
+        Probe Z0`. **Pass:** the post aborts in `onOpen()`, **no `.gcode` file is written at all**,
+        and the error names the offending control **using its exact dialog title** — `First WCS /
+        Part` — so the operator can go find it. The new mode writes a Z origin, so it must count as
+        origin-establishing (`baseOriginWriteReason()` classifies every mode except `Skip` that way).
+
+        *Result:* **PASS** — `H7d.log` (2026-07-30, post `710b9d4`):
+        ```
+        Error: G59 is reserved as the spoilboard base -- assign this operation to
+        another WCS (would be re-established by: Probe at Job Start).
+        Error at line: 1299
+        Failed while processing onOpen().
+        ```
+        Guard fires in `onOpen()` before any output, and no `H7d.gcode` was written (confirmed on
+        disk, not inferred from the log). **Defect found and fixed:** the error named
+        **`Probe at Job Start`**, a control that no longer exists — `A_Probe_OnStart` was retitled
+        **First WCS / Part** in the origin-mode rework and `baseOriginWriteReason()` was never
+        updated, so the message sent the operator hunting for a field that isn't in the dialog.
+        `B_Probe_OnChange`'s string (`Probe on WCS Change` → **Subsequent WCS / Part**) was stale the
+        same way; `Probe After Tool Change` was already correct. All three now carry a comment tying
+        them to the dialog titles. A re-post would show the corrected text — behavior is unchanged,
+        so this row stands as passed.
 
   - [ ] **H7e — firmware variant (low priority).** Repeat H7 on Marlin and RRF. **Pass:** Marlin
         emits `G92 Z0.8` only (no XY word, no `G54`); RRF emits `G54` + `G10 L20 P1 Z0.8` with

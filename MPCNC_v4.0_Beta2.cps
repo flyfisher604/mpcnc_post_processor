@@ -1247,9 +1247,11 @@ function baseOriginWriteReason(base) {
     if (wo == 0) wo = 1;
     var toolNum = sec.getTool().number;
     if (i == 0) {
-      if (onStart && wo == base) return "Probe at Job Start";
+      // These strings are shown to the operator in Guard A's error so they can find the control
+      // and change it -- they must stay identical to the properties' dialog titles.
+      if (onStart && wo == base) return "First WCS / Part";
     } else {
-      if (onChange && wo != prevWo && wo == base) return "Probe on WCS Change";
+      if (onChange && wo != prevWo && wo == base) return "Subsequent WCS / Part";
     }
     var toolChanged = (i == 0) ? doFirstChange : (toolNum != prevTool);
     if (reprobe && toolChanged && wo == base) return "Probe After Tool Change";

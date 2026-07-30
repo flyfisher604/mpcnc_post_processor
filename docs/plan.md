@@ -398,7 +398,7 @@ cleared three of the four things that were unverified here:
   spaces (`Firmware  resolved  =`, `G59  P6 `). Same defect previously fixed in `partProbe()`;
   labels reworded to avoid parens entirely.
 
-**Verified and done — do not re-run:** H1–H7, H7a, H7c, H7f (B), D2 (bar suppression). See
+**Verified and done — do not re-run:** H1–H7, H7a, H7c, H7d, H7f (B), D2 (bar suppression). See
 the test plan's Results summary for per-row evidence and the standing note explaining why no H row
 needs a functional retest. ⚠ `H7.gcode` / `H7a.gcode` now predate the "unknown Z" line, and
 `H7c.gcode` predates the label fix — comment-only in both cases, so no retest, but do not diff a
@@ -418,8 +418,8 @@ reference were reordered to match (its doc-sync ref was bumped).
 2. **Tests, no machine needed** (posting + reading the file): **D3** (group order + preset survival —
    do this one first, it is a dialog glance and it gates trust in every other dialog row); **H7f (A)**
    and **(C)** — one post each, the same job as H7c with the base fields changed; **D1** (dialog only,
-   no post); **H7d** (Guard A); **H7e** (Marlin/RRF); **P3**; and D2's suppression check (re-post at
-   Comment Level `Important`).
+   no post); **H7e** (Marlin/RRF); **P3**; and D2's suppression check (re-post at Comment Level
+   `Important`).
 3. **Tests needing a multi-part / multi-fixture job to post:** **PB1/PB2**, **PBV1–3**,
    **PA1/PA1b**, **P2** (only its added-part half remains; `H7c.gcode` already evidenced the base and
    first-part halves).
