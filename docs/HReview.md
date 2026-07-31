@@ -1254,6 +1254,34 @@ Channel A On = `M8`. *Get:* `( >>> Coolant Channel A: Flood and Mist)` and `M8`.
 `No matching Coolant channel` warning. Second check: Channel A Mode = *Off* with the same tool → the
 warning fires and names `Flood and Mist` (not `FloodMist`).
 
+#### As built — no deviation from the diff above
+
+`eCoolant` now precedes `coolantLevels` at [:71](../MPCNC_v4.0_Beta2.cps#L71), and the array is built
+from it. `node --check` passes. The declaration order is load-bearing and the comment says so — the
+`const` is initialised at load time and reads `eCoolant`, so putting it back above would throw.
+
+The comment also records that the **index is Fusion's `tool.coolant` constant**, so the array must
+never be sorted or re-ordered for tidiness. That is the property the original literal depended on
+silently, and it is the one an unwary edit would break.
+
+**Harness-verified before and after, which is what makes this more than a plausible fix.** Both
+declarations were extracted from the `.cps` and evaluated, then every index `0`–`8` compared against
+the id the channel-mode property stores for the same coolant:
+
+| | index 0–6 | index 7 (`Flood and Mist`) | index 8 (`Flood and ThroughTool`) |
+|---|---|---|---|
+| Before | match | `FloodMist` ≠ `Flood and Mist` — **no match** | `FloodThroughTool` ≠ … — **no match** |
+| After | match | match | match |
+
+Also checked: `coolantLevels.indexOf()` finds every entry, so the fall-through warning names the mode
+instead of printing `unknown`; and an out-of-range `tool.coolant` still falls back to `Off`. The
+before/after contrast is the useful part — it rules out a harness that would pass either way.
+
+**No saved reference file is affected.** Coolant defaults to `Off`, indices 0–6 are unchanged, and
+the two modes that changed could not previously produce a match on any file. *Verification:
+`docs/test-plan.md` **HR14** — three posts, the second being the one that proves the fix reached the
+diagnostic and not only the comparison.*
+
 ---
 
 ### HR-15 — `safeZforSection()` mixes global `hasParameter()` with `_section.getParameter()` — **Low** · `READ`

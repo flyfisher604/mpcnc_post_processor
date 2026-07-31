@@ -77,6 +77,7 @@ firmware-variant rows note what changes elsewhere.
 | HR5 | `Scale Feedrate` reaches G2/G3 arcs, not just G1 cuts | **PASS — all four**; (D) came free from the face mill's `G18` lead-in arcs |
 | HR6 | A rotated 3-axis Setup is rejected — and an upright one still posts | PASS — (A) + (A2); guard confirmed **live** (`forward X0 Y0 Z1`), not failing open. *(B) unrun* |
 | HR11 | Marlin/RRF jobs end explicitly and restore the stepper timeout | |
+| HR14 | `Flood and Mist` matches a channel configured for it | harness PASS *(post unrun)* |
 | HR15 | `safeZforSection()` asks the passed section; output unchanged | |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
@@ -733,6 +734,38 @@ tool) unless a row says otherwise.
       evidences what Fusion reports for a *re-oriented* Setup (it could in principle re-express the
       frame rather than tilt `forward`). Its failure mode is benign — a missed rejection, not a
       blocked job.
+
+- [ ] **HR14 — a tool asking for `Flood and Mist` finds the channel configured for it.** Verifies the
+      HR-14 fix (docs/HReview.md). `coolantLevels[]` (which maps Fusion's numeric `tool.coolant`) and
+      `eCoolant` (whose values are the channel-mode property's stored ids) were independent literals
+      and had drifted apart at the last two entries: `"FloodMist"` vs `"Flood and Mist"`. `setCoolant()`
+      compares the two, so those two modes could never match a channel the operator *had* configured
+      for exactly them — and the fall-through warning named `FloodMist`, a string that appears nowhere
+      in the dialog. `coolantLevels` is now built from `eCoolant`.
+
+      **Do (A).** Set the operation's tool coolant to **Flood and Mist**; `10 - Coolant` → Channel A
+      Mode = **Flood and Mist**, Channel A On = `M8`, Channel A Off = `M9`. Post. **Get (A):**
+      `( >>> Coolant Channel A: Flood and Mist)` and `M8` at the operation, `M9` at the end.
+      **Pass:** **no** `No matching Coolant channel` warning anywhere.
+
+      **Do (B) — the warning still fires, and now names the mode the operator saw.** Same tool
+      coolant, Channel A Mode back to **Off**. **Get (B):**
+      `( >>> WARNING: No matching Coolant channel : Flood and Mist requested)`. **Pass:** the message
+      reads `Flood and Mist`, **not** `FloodMist` and not `unknown`. This is the row that proves the
+      fix reached the diagnostic and not just the match.
+
+      **Do (C) — the ordinary mode is untouched.** Tool coolant **Flood**, Channel A Mode **Flood**.
+      **Get (C):** unchanged from before the fix — `( >>> Coolant Channel A: Flood)` and `M8`.
+      **Pass:** indices 0–6 behave exactly as they always did.
+
+      > **Harness evidence already on record.** `eCoolant` and `coolantLevels` were extracted from
+      > the `.cps` and evaluated, then every index `0`–`8` compared against the id the channel-mode
+      > property stores for the same coolant. **Before the fix: 7 of 9 match, indices 7 and 8 fail.
+      > After: 9 of 9.** Also checked that `coolantLevels.indexOf()` finds every entry (so the warning
+      > names the mode rather than printing `unknown`) and that an out-of-range `tool.coolant` still
+      > falls back to `Off`. That settles the mapping; the posts above confirm it reaches the file.
+      > *(Coolant defaults to `Off` and indices 0–6 are unchanged, so no saved reference file is
+      > affected by this fix.)*
 
 - [ ] **HR11 — a Marlin/RRF job ends, and the steppers are released on a timeout.** Verifies the
       HR-11 fix (docs/HReview.md). `onClose()` emitted `M30` on GRBL and, for everything else, only

@@ -68,7 +68,6 @@ var eComment = {
     Debug: "Debug",
 };
 
-const coolantLevels = ["Off", "Flood", "Mist","ThroughTool", "Air", "AirThroughTool", "Suction", "FloodMist", "FloodThroughTool"];
 var eCoolant = {
     Off: "Off",
     Flood: "Flood",
@@ -80,6 +79,22 @@ var eCoolant = {
     FloodMist: "Flood and Mist",
     FloodThroughTool: "Flood and ThroughTool",
     };
+
+// Maps Fusion's numeric tool.coolant to the coolant name, so the index IS the F360 constant:
+// 0 COOLANT_DISABLED, 1 FLOOD, 2 MIST, 3 THROUGH_TOOL, 4 AIR, 5 AIR_THROUGH_TOOL, 6 SUCTION,
+// 7 FLOOD_MIST, 8 FLOOD_THROUGH_TOOL. Order is therefore fixed by Fusion and must not be sorted.
+//
+// Built FROM eCoolant rather than repeating its strings. The two were written as independent
+// literals and drifted apart at the last two entries -- this side said "FloodMist" where eCoolant
+// said "Flood and Mist". Since the channel-mode properties store eCoolant values as their ids and
+// setCoolant() compares the two, a tool requesting Flood and Mist or Flood and ThroughTool could
+// never match a channel the operator had configured for exactly that: it fell through to
+// ">>> WARNING: No matching Coolant channel : FloodMist requested", naming a string that appears
+// nowhere in the dialog. Deriving one from the other makes them agree by construction.
+// eCoolant must stay above this line -- the assignment runs at load time and reads it.
+const coolantLevels = [eCoolant.Off, eCoolant.Flood, eCoolant.Mist, eCoolant.ThroughTool,
+                       eCoolant.Air, eCoolant.AirThroughTool, eCoolant.Suction, eCoolant.FloodMist,
+                       eCoolant.FloodThroughTool];
 
 properties = {
   A_Job_SelectedFirmware: {
