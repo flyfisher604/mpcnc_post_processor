@@ -356,14 +356,17 @@ at `onClose`.
   verified too (H7c, D2); the **Inter Part Safe Z** and **Use Active WCS** renames still need the
   dialog pass (D1). Remaining items below.
 - **Phase 5 — not started** (likely no-op).
-- **Hobbyist review (`docs/HReview.md`) — in progress, on branch `v4.0-hreview-fixes`.** 18 findings
-  from reviewing the post against the README's hobbyist use cases and every Fusion entry point.
-  Landed: HR-1 (provisional `Z0` bounds the `G38 Target`), HR-2 (`isProbeOperation()` defined
-  locally), HR-3 (manual-spindle OFF prompt on GRBL), HR-4 (Safe-Z fallbacks convert mm→output unit),
-  HR-5 (`Scale Feedrate` reaches arcs), HR-6 (reject a section oriented off machine Z). **Verified by
-  posted files: HR-6 and HR-5 closed; HR-1 (A)(B)(C) with its scope proven; HR-3 (A)(B).** HR-2 and
-  HR-4 remain harness-only. Twelve open, four of them (HR-7/8/9/12) overlapping the tool-change
-  ordering item below. See the checkpoint for the verification plan.
+- **Hobbyist review (`docs/HReview.md`) — code work complete for this branch's scope.** 17 findings
+  (HR-1…HR-17) from reviewing the post against the README's hobbyist use cases and every Fusion entry
+  point. **Nine landed:** HR-1 (provisional `Z0` bounds the `G38 Target`), HR-2 (`isProbeOperation()`
+  defined locally), HR-3 (manual-spindle OFF prompt on GRBL), HR-4 (Safe-Z fallbacks convert
+  mm→output unit), HR-5 (`Scale Feedrate` reaches arcs), HR-6 (reject a section oriented off machine
+  Z), HR-11 (Marlin/RRF program end + stepper-timeout restore), HR-14 (coolant table derivation),
+  HR-15 (`safeZforSection()` asks the passed section). **Verified by posted files: HR-6 and HR-5
+  closed; HR-1 (A)(B)(C) with its scope proven; HR-3 (A)(B).** HR-14 is harness-proven before/after;
+  HR-2, HR-4, HR-11 and HR-15 are unposted. **Six deferred to a separate Tool Change branch**
+  (HR-7/8/9/10/12/13 — see the checkpoint). HR-16 is recorded with no fix proposed; HR-17 is
+  tidy-ups. See the checkpoint for what remains.
 
 ---
 
@@ -390,13 +393,45 @@ Do-this→get-that row(s), mark any already-`PASS` row whose saved `.gcode` the 
 update that file's Results summary. The full rule is at the top of the test plan; it is a priority,
 not a courtesy — a stale PASS is worse than an unrun test.
 
-**Baseline.** Branch **`v4.0-hreview-fixes`**, cut from `wcs-reworked-flow` at `baf37bf`. There are now
-**three** driving documents — this file, `docs/test-plan.md`, and **`docs/HReview.md`** (a
-hobbyist-perspective code review, described below); the post is `MPCNC_v4.0_Beta2.cps`. Nothing is in
-flight — the working tree is clean apart from an untracked `MPCNC_v4.0_Beta1.zip` (unrelated; add it
-or ignore it). **Nothing is half-done and nothing is known-broken.** The verification debt that
-dominated this checkpoint a session ago is **largely paid** — HR-6 and HR-5 are closed, HR-1's scope
-is proven, HR-3 is half done; only HR-2 and HR-4 have never been through Fusion. Details below.
+**Baseline.** Branch **`v4.0-hreview-fixes`**, cut from `wcs-reworked-flow` at `baf37bf`, now at
+**`7e38777`**. There are now **three** driving documents — this file, `docs/test-plan.md`, and
+**`docs/HReview.md`** (a hobbyist-perspective code review, described below); the post is
+`MPCNC_v4.0_Beta2.cps`. Nothing is in flight — the working tree is clean apart from an untracked
+`MPCNC_v4.0_Beta1.zip` (unrelated; add it or ignore it). **Nothing is half-done and nothing is
+known-broken.**
+
+**The branch's code work is done.** Every hobbyist-scoped HR finding that had a fix is landed; what
+is left on this branch is **posting**, not coding. The verification debt that once dominated this
+checkpoint is partly paid — HR-6 and HR-5 are closed, HR-1's scope is proven, HR-3 is half done — but
+three of the nine landed fixes (HR-11, HR-15, and HR-2/HR-4 from earlier) have still never been
+through Fusion. Details below.
+
+> ### Scope decision (2026-07-31) — tool changes are a professional feature
+>
+> **Tool-change work moves to a separate Tool Change branch and is out of scope here.** Fusion 360's
+> Personal licence does not support tool changes, and Manual NC is treated the same way, so neither
+> belongs in a review written from the hobbyist's chair. **Six findings deferred:**
+>
+> | | Why it is a tool-change/professional item |
+> |---|---|
+> | **HR-7** | `toolChange()`'s `onRapid()` clears `forceSectionToStartWithRapid` |
+> | **HR-8** | `setCurrentPosition*` never called — stale Z at section boundaries |
+> | **HR-9** | `Do First Change` + `Probe After Tool Change` off ⇒ Z0 probed with the wrong tool |
+> | **HR-10** | `M84 Z` emitted on GRBL, which halts the controller, inside `toolChange()` |
+> | **HR-12** | manual-spindle RPM changes silently dropped between operations |
+> | **HR-13** | `onCommand` has no `default:`; Manual NC *Optional stop* discarded |
+>
+> They land **as one unit with** *Phase 4 — tool-change ordering + base-relative park* below, rather
+> than patching the same section-boundary code twice. HR-7/8/9/12 were already grouped that way; the
+> decision adds HR-10 and HR-13.
+>
+> **Two doc corrections owed on that branch, both consequences of this decision:**
+> - `HReview.md` defines **HP-5** as *"several operations, maybe several tools — Personal licence"*
+>   ([:45](HReview.md#L45)) and its confidence statement calls HR-10 a hobbyist-reachable defect. That
+>   definition is **wrong** under this decision and it is load-bearing: HR-7/8/9/10/12 are all keyed
+>   to HP-5. Correcting it moves five findings to the professional column in one edit.
+> - This file said **18 findings**; `HReview.md` contains **17** sections, HR-1 through HR-17. One of
+>   the two is miscounted — reconcile rather than propagate.
 
 **How verification works here:** post the job from Fusion, read the g-code. Machine dry-runs and
 physical measurements are out of scope, so every test row must stand on the posted file alone.
@@ -405,12 +440,13 @@ physical measurements are out of scope, so every test row must stand on the post
 
 A review of the post from the hobbyist's chair: the README's documented hobbyist use cases (five
 configurations, **HP-1**–**HP-5**), every Fusion entry point, and every property branch a hobbyist can
-reach. It produced **18 findings, HR-1…HR-18**, each with the config that reaches it, line references,
-a proposed diff, and a Do→Get row. It also records what was checked and found *sound*, so a later
-reader can tell "looked at, fine" from "never looked at".
+reach. It produced **17 findings, HR-1…HR-17** (this file previously said 18 — see the scope-decision
+box), each with the config that reaches it, line references, a proposed diff, and a Do→Get row. It
+also records what was checked and found *sound*, so a later reader can tell "looked at, fine" from
+"never looked at".
 
-**Six fixes have landed on this branch, one commit each, subject-prefixed `HR-n:` so
-`git log --oneline --grep='^HR-'` lists the series** (a seventh `HR-6:` commit follows up with the
+**Nine fixes have landed on this branch, one commit each, subject-prefixed `HR-n:` so
+`git log --oneline --grep='^HR-'` lists the series** (a tenth `HR-6:` commit follows up with the
 guard's diagnostics):
 
 | | Fix | Commit | Blast radius | Verified |
@@ -421,16 +457,19 @@ guard's diagnostics):
 | **HR-4** | Safe-Z literal fallbacks convert mm→output unit | `439ce2d` | **Inch jobs only** — identity in mm | ✗ harness only |
 | **HR-5** | `Scale Feedrate` reaches G2/G3 arcs | `b95c954` | Only when scaling is on (defaults off) | ✅ closed |
 | **HR-6** | Rejects a 3-axis section oriented off machine Z | `684f28a` `e2b2424` | None if correct — **blocks everything if wrong** | ✅ closed, guard confirmed live |
+| **HR-15** | `safeZforSection()` asks the passed section, not the global context | `88c7817` | None — latent trap closed; no output change | ✗ unposted |
+| **HR-11** | Marlin/RRF program end (`M2`) + `M84 S60` timeout restore | `7a35f7f` | **Every Marlin/RRF job's tail.** GRBL untouched | ✗ unposted — **and `M2` support is unconfirmed** |
+| **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | harness before/after, ✗ unposted |
 
 Each commit message carries the full reasoning; each fix has an *As built* note in `HReview.md`
 recording where the implementation deviated from the proposed diff, and there were deviations in
 **every** case — the proposed diffs consistently understated the number of call sites. Read the As
 built note, not the original diff, when reasoning about what the code now does.
 
-> ### Verification debt — largely paid down (2026-07-31)
+> ### Verification debt — the only work left on this branch (2026-07-31)
 >
-> **Eight posts of the Mounting Plate hobby job cleared three of the six fixes.** All GRBL / mm, all
-> dialog variants of one CAM job:
+> **Eight posts of the Mounting Plate hobby job cleared two fixes outright.** All GRBL / mm, all
+> dialog variants of one CAM job. Three fixes landed *after* that session and have never been posted:
 >
 > | Fix | State | Evidence |
 > |---|---|---|
@@ -439,6 +478,7 @@ built note, not the original diff, when reasoning about what the code now does.
 > | **HR-1** | **scope proven** | `H2.gcode`, `HR1b.gcode`, `HR1c.gcode` — (A)(B)(C) |
 > | **HR-3** | half done | `H2.gcode`, `HR3b.gcode` — (A)(B) |
 > | **HR-2**, **HR-4** | **never through Fusion** | harness only |
+> | **HR-15**, **HR-11**, **HR-14** | **never through Fusion** | landed this session; HR-14 harness-proven before/after |
 >
 > Three results worth carrying forward rather than re-deriving:
 >
@@ -454,16 +494,27 @@ built note, not the original diff, when reasoning about what the code now does.
 > - **HR-5 (D) needed no special job.** A face mill's helical lead-in/lead-out *are* `G18` ZX-plane
 >   arcs, and they carry `F180` — the slower of the XY and Z limits — exactly as the row predicted.
 >
-> **Still owed:** HR-2 and HR-4 entirely; HR-3 (C)/(D); HR-1 (D) and its firmware half. Nothing left is
-> a dialog variant — each needs new CAM or a different firmware:
-> 1. **GRBL / mm, new CAM.** A **drill + tap** job for HR2 (A/A2) — also the first file ever able to
->    evidence **HR-17**'s parenthesis stripping in the tapping warning — and a **two-tool** job with
->    Tool Changes on for HR3 (C). HR3 (C) is the case that matters most in that row: the operator must
->    be told to switch the spindle off *before* being invited to reach into the machine.
-> 2. **GRBL / inch** — HR4 (A), (C), (D). **There is still no inch reference file anywhere in the test
+> **Still owed:** HR-2, HR-4, HR-11, HR-14 and HR-15 entirely; HR-3 (C)/(D); HR-1 (D) and its
+> firmware half. **Three posting sessions clear all of it**, and they are no longer dialog variants —
+> each needs new CAM, a different firmware, or a different unit. Ranked by value:
+> 1. **Marlin + RRF — now the highest-value session, and the one to do first.** Clears **HR-11 (A)(B)**
+>    (the tail on both firmwares), **HR-1's firmware half**, **HR-3 (D)**, HR-5's linearization note,
+>    the long-outstanding **H7e**, and re-baselines the stale `H6 - Marlin.gcode` / `H6 - RRF.gcode`.
+>    One firmware switch on an existing job, five-plus rows.
+>    ⚠ **HR-11 is the first fix on this branch that cannot be settled by reading the file.** `M2` is
+>    emitted whether or not the firmware honours it — **watch the sender's console** for
+>    `echo:Unknown command: "M2"` (Marlin) or an RRF error. See HR-11's *As built* note for why the
+>    doubt is real: `M30` is GRBL-only here precisely because Marlin reads it as "delete SD file".
+> 2. **GRBL / mm, new CAM.** A **drill + tap** job for HR2 (A/A2) — also the first file ever able to
+>    evidence **HR-17**'s parenthesis stripping in the tapping warning. *(The two-tool job for HR3 (C)
+>    moves to the Tool Change branch with the rest of the tool-change work.)* **HR-14** rides along on
+>    any GRBL job: set the tool coolant to *Flood and Mist* and Channel A Mode to match.
+> 3. **GRBL / inch** — HR4 (A), (C), (D). **There is still no inch reference file anywhere in the test
 >    plan**, so this remains a first.
-> 3. **Marlin + RRF** — HR1's firmware half, HR3 (D), HR5's linearization note. Also picks up the
->    long-outstanding **H7e**.
+>
+> **HR-15 needs no session of its own** — it is a "nothing changed" fix, cleared by any re-post of H2
+> diffed against `H2.gcode`, plus one `Retract:`-mode post to prove the guards still fire. Fold it
+> into whichever GRBL session happens first. See test-plan **HR15** for why one row is not enough.
 >
 > **Two method notes worth keeping.** HR6 (A) alone was *not* decisive, and the reason generalises: a
 > guard written to fail open produces a byte-identical file whether it read the value correctly or
@@ -473,24 +524,23 @@ built note, not the original diff, when reasoning about what the code now does.
 > **diff a variant against the nearest saved reference** instead of reading it in isolation — that is
 > what made HR-1's scope and HR-3's untouched automatic branch provable in one line each.
 
-**Twelve findings remain open**, in `HReview.md`'s suggested order: **HR-7** (`toolChange()`'s
-`onRapid()` clears `forceSectionToStartWithRapid`, defeating First-G1→G0 on every tool-change
-section), **HR-8** (`setCurrentPosition*` is never called, so rapid split-ordering, `isSafeToRapid()`
-and feed scaling can reason from a stale Z at section boundaries), **HR-9** (`Do First Change` +
-`Probe After Tool Change` off ⇒ Z0 probed with the wrong tool), **HR-10** (`M84 Z` emitted on GRBL,
-which halts the controller), **HR-11** (Marlin/RRF jobs emit no `M2`/`M30` and never undo `Start()`'s
-`M84 S0`), **HR-12** (manual-spindle RPM changes silently dropped), **HR-13** (`onCommand` has no
-`default:`; Manual NC *Optional stop* is discarded), **HR-14** (coolant `Flood and Mist` /
-`Flood and ThroughTool` can never match a channel), **HR-15**/**HR-16**/**HR-17**/**HR-18**
-(tidy-ups).
+**Eight findings remain open, and none of them is hobbyist code work on this branch.** Six —
+**HR-7**, **HR-8**, **HR-9**, **HR-10**, **HR-12**, **HR-13** — are deferred to the Tool Change
+branch by the scope decision above, to land as one unit with the tool-change ordering rework rather
+than patching the same section-boundary code twice. The remaining two are:
 
-Two of those want a decision before they can land:
-- **HR-11** — `M84` releases the motors immediately, which drops Z on an unbalanced LowRider gantry.
-  `M84 S60` (restore a timeout instead) is probably the right default for this machine family. **User's
-  call.**
-- **HR-7 / HR-8 / HR-9 / HR-12** are all group-07 / section-boundary behaviour and overlap the
-  *Phase 4 — tool-change ordering + base-relative park* item below. Consider doing them **as one unit
-  with** that rework rather than patching the same code twice.
+- **HR-16** — `onClose` traverses to `X0 Y0` before stopping the spindle, with no guaranteed safe Z.
+  **No fix proposed**; recorded so the ordering is a choice on the record rather than an accident.
+  Revisit with the jet/laser workstream, which is where the same line of code actually bites.
+- **HR-17** — tidy-ups with no behavioural effect: the `sanitizeMessageText` parenthesis stripping in
+  the tapping warning and the group-03 name, a vestigial fifth argument to `linearMovements()`, a
+  missing space in `Turn ON 18000RPM`, and `flushMotions()`'s empty GRBL block. Cheap; do them as one
+  sweep whenever convenient. The tapping-warning instance needs the drill+tap post to *evidence*, but
+  not to fix.
+
+**HR-11's `M84` vs `M84 S60` decision is closed** — `S60` was taken (restore a 60-second timeout
+rather than releasing the motors immediately, which would drop Z on an unbalanced LowRider gantry).
+Recorded in the commit and the *As built* note.
 
 **One behavior worth knowing before touching the base code:** `writeBaseEstablish()` emits **no XY
 move** — it probes whatever is under the tool at job start, so parking over the stock silently
@@ -503,7 +553,9 @@ first-part `Probe Z` path (**H7f**, all three branches); the base-frame base pro
 on the reserved base (**H7d**); the full property dump (**D2**); the property-group reorder
 (**D3** header half); and the Resolved Values Safe-Z lines resolving rather than restating.
 ⚠ **The saved `.gcode` files behind H1, H6, P1 and every pre-2026-07-31 GRBL file's tail are stale** —
-see the per-row ⚠ notes and the HR-3 blast-radius banner in the test plan. The row *assertions* still
+see the per-row ⚠ notes and the HR-3 blast-radius banner in the test plan. **H6's two files
+(`H6 - Marlin.gcode`, `H6 - RRF.gcode`) are now stale twice over**: HR-1 changed their origin write and
+HR-11 added `M84 S60` + `M2` to their tails. The row *assertions* still
 hold; the files no longer match byte-for-byte. **`H2.gcode` is no longer among them** — it was
 re-posted on 2026-07-31 and is current. The eight files from that session (`H2`, `H2 - Debug`, `HR1b`,
 `HR1c`, `HR3b`, `HR5a`, `HR5b`, `HR5c`) are the freshest references on the branch; prefer them as the
@@ -519,22 +571,24 @@ exposes, which is exactly why the verification debt above matters:
 - Parentheses in comment strings are **stripped by `sanitizeMessageText`**, leaving double spaces.
   Fixed twice; instances survive in the tapping warning and the group-03 name (now tracked as HR-17).
 
-**Next actions, in the order they'd be tackled:**
-1. **Post what's left of the landed fixes** — the three sessions above. HR-6 and HR-5 are closed;
-   HR-1 is scope-proven; HR-3 is half done. What remains needs **new CAM** (a drill+tap job for HR2,
-   a two-tool job for HR3 (C)) or a different firmware/unit, so it is no longer the cheap sitting the
-   dialog variants were. It still outranks new code, but the balance has shifted: with the two
-   riskiest fixes verified, **item 2 is now a reasonable thing to interleave.**
-2. **Decide HR-11's `M84` vs `M84 S60`**, then land the small independent HR fixes (**HR-10**,
-   **HR-13**, **HR-14**, **HR-11**).
-3. **Code — tool-change ordering + base-relative park**, *folded together with* **HR-7 / HR-8 / HR-9 /
-   HR-12**. Design settled for the ordering half; see *Phase 4 — tool-change ordering + base-relative
-   park* under Remaining work. Nothing depends on it and the base machinery underneath is verified.
+**Next actions, in the order they'd be tackled.** *There is no hobbyist code work left on this
+branch — item 1 is posting, and it is the whole remaining job here.*
+1. **Post the five unverified fixes**, in the three sessions ranked in the verification-debt box
+   above. **Start with Marlin + RRF**: it clears HR-11 (A)(B), HR-1's firmware half, HR-3 (D), H7e and
+   the stale H6 references in one firmware switch, and HR-11 carries the only open *correctness*
+   question on the branch (whether `M2` is honoured at all). Then the drill+tap GRBL job for HR-2, then
+   the inch job for HR-4. HR-14 and HR-15 ride along on any GRBL session.
+2. **Open the Tool Change branch** — tool-change ordering + base-relative park, folded together with
+   **HR-7 / HR-8 / HR-9 / HR-10 / HR-12 / HR-13**, plus the two doc corrections listed in the
+   scope-decision box. Design settled for the ordering half; see *Phase 4 — tool-change ordering +
+   base-relative park* under Remaining work. Nothing depends on it and the base machinery underneath
+   is verified.
+3. **Sweep HR-17's tidy-ups** — four cosmetic items, one commit, no decisions.
 4. **Dialog-only checks, no posting:** **D1** (labels/defaults audit) and **D3**'s dialog half — does a
    *saved preset* survive the group move? Only `group:` strings changed so it should, but a posted file
    cannot tell a surviving preset from re-entered values. D3 gates trust in every dialog row.
 5. **Single-post checks:** **D2**'s suppression check at Comment Level `Important` / `Off`; **H7e**
-   (folds into posting session 3 above).
+   (folds into the Marlin/RRF session, item 1).
 6. **Needs a multi-part / multi-fixture job to post:** **PB1/PB2**, **PBV1–3**, **PA1/PA1b**,
    **P2**/**P3** (only the added-part halves remain).
 7. **Deferred workstream:** jet tools and laser (**J1–J5**), a separate scope decision. `J5` is a
@@ -565,6 +619,17 @@ It is not a substitute for posting, but it settles arithmetic cheaply and makes 
 purely "do these values reach the file". Also: **`git commit -m` with a PowerShell here-string mangles
 messages containing double quotes** — write the message to a file and use `git commit -F`.
 
+Two additions from the HR-14 harness, both worth reusing:
+- **Run the harness against `HEAD` as well as the working tree** (`git show HEAD:MPCNC_v4.0_Beta2.cps`
+  to a temp file, and take the path as `argv[2]`). A harness that only passes on the fixed file cannot
+  tell you it would have caught anything; HR-14's showed **7 of 9 before, 9 of 9 after**, which is the
+  evidence, not the "after" alone. Same lesson as HR-6's fail-open trace, applied to harnesses.
+- **A `const` declared inside `eval()` does not leak to the caller's scope.** Extracting declarations
+  and `eval`ing them silently yields `ReferenceError` for anything `const`/`let`. Wrap them in
+  `new Function(src + 'return {a: a, b: b};')()` instead — that also lets you evaluate several
+  declarations together, in file order, which matters when one reads another (`coolantLevels` reads
+  `eCoolant`).
+
 **One doc loose end.** `README.md`'s doc-sync marker at the top still points at a pre-`25768ec` ref,
 so it understates what the README covers; the README content itself was brought current (including a
 new *What "Active WCS" means* section). Standing preference is that the README is not touched during
@@ -573,6 +638,13 @@ code changes unless asked — it was asked for last session.
 ## Remaining work (pick up here)
 
 ### Phase 4 — tool-change ordering + base-relative park *(one unit; design settled)*
+
+> **This is the Tool Change branch's work.** Per the scope decision in the checkpoint, tool changes
+> are a professional feature (Fusion Personal does not support them), so this item and the six
+> deferred findings — **HR-7**, **HR-8**, **HR-9**, **HR-10**, **HR-12**, **HR-13** — land together on
+> a separate branch rather than on `v4.0-hreview-fixes`. Read each one's entry in `HReview.md` (config
+> that reaches it, line references, proposed diff, Do→Get row) before starting; HR-10 and HR-13 have
+> complete diffs ready and are independent of the reorder, so they can go in first as warm-up commits.
 
 Root cause: in `onSection()`, `toolChange()` runs **before** `writeWCS(currentSection)` for
 non-first sections, so a boundary that is both a tool change and a WCS change:
