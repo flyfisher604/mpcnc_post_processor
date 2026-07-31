@@ -1638,6 +1638,73 @@ function retractThroughBaseClearance() {
   flushMotions();
 }
 
+// A 3-axis section can still be ORIENTED off machine +Z -- a Setup built on a model face rather
+// than on the stock top, which is an easy accident in Fusion. isMultiAxis() does not catch it:
+// Fusion emits ordinary X/Y/Z words for such a section, so with no guard the post emits them as
+// though the frame were upright, the part is cut in the wrong plane, and nothing in the file says
+// so. Every reference 3-axis post rejects this. See docs/HReview.md HR-6.
+//
+// Returns true when the section may proceed; returns false AFTER raising the error when the
+// section's Z axis is readable and unambiguously not the machine Z.
+//
+// Written to FAIL OPEN, deliberately. A false positive here would abort EVERY job -- far worse
+// than the rare misconfiguration it catches -- and this is the post's first use of
+// Section.workPlane, so the shape of that object is not yet evidenced by a posted file. The
+// check therefore errors only when the orientation is readable AND unambiguously not +Z;
+// anything unreadable (no workPlane, no forward vector, non-numeric components) is treated as
+// upright and posts exactly as before. Nothing in here may throw -- that is the one hard
+// requirement, and it is why every branch concatenates rather than computes.
+//
+// Compared component-wise rather than with the kernel's isSameDirection(): that would add a
+// second unverified global to a guard whose one hard requirement is that it must not throw, and
+// the comparison costs a line either way. The tolerance is about 0.006 degrees of tilt -- orders
+// of magnitude beyond any float noise in a rotation matrix, and far below any orientation a user
+// would pick on purpose (the near-miss case posts, and cuts correctly).
+//
+// The Debug trace is emitted on EVERY path, not just the rejection. Because the guard fails open,
+// "read +Z and allowed it" and "read nothing and gave up" otherwise produce byte-identical files,
+// and the second means this guard is dead code. One Debug-level post now evidences which happened,
+// and names the reason when the orientation could not be read.
+function isSectionOrientationSupported() {
+  var toolPlane = currentSection.workPlane;
+  var toolAxis = (toolPlane == undefined) ? undefined : toolPlane.forward;
+
+  if (toolAxis == undefined) {
+    writeComment(eComment.Debug, " onSection orientation: workPlane "
+      + ((toolPlane == undefined) ? "missing" : "present") + ", forward missing"
+      + " -> UNREADABLE, check skipped, section allowed");
+    return true;
+  }
+
+  var axisText = "X" + toolAxis.x + " Y" + toolAxis.y + " Z" + toolAxis.z;
+
+  if ((typeof toolAxis.x != "number") || (typeof toolAxis.y != "number") || (typeof toolAxis.z != "number")) {
+    writeComment(eComment.Debug, " onSection orientation: forward " + axisText
+      + " types " + (typeof toolAxis.x) + "/" + (typeof toolAxis.y) + "/" + (typeof toolAxis.z)
+      + " -> UNREADABLE, check skipped, section allowed");
+    return true;
+  }
+
+  var offAxis = (Math.abs(toolAxis.x) > 1e-4) || (Math.abs(toolAxis.y) > 1e-4) || (toolAxis.z < (1 - 1e-4));
+
+  // Tilt from machine +Z, for the trace only. Clamped because a non-unit or noisy vector can push
+  // the value outside acos()'s domain; NaN components fall through as "NaN", which is itself the
+  // diagnosis (they are a fail-open case -- typeof NaN is "number", but no comparison above matches).
+  var tilt = Math.acos(Math.max(-1, Math.min(1, toolAxis.z))) * 180 / Math.PI;
+
+  writeComment(eComment.Debug, " onSection orientation: forward " + axisText
+    + ", tilt from machine Z " + roundTo(tilt, 4) + " deg -> "
+    + (offAxis ? "OFF-AXIS, section REJECTED" : "upright, section allowed"));
+
+  if (offAxis) {
+    error(localize("Tool orientation is not supported: this operation's Z axis is not the machine Z. "
+      + "Rebuild the Setup with its Z axis along the machine Z -- normally the stock top."));
+    return false;
+  }
+
+  return true;
+}
+
 function onSection() {
   // Multi-axis toolpaths aren't supported (only 3-axis / 2D-jet). Fail at the start of
   // the offending operation with a clear message, rather than partway through its motion
@@ -1647,32 +1714,9 @@ function onSection() {
     return;
   }
 
-  // A 3-axis section can still be ORIENTED off machine +Z -- a Setup built on a model face rather
-  // than on the stock top, which is an easy accident in Fusion. isMultiAxis() above does not catch
-  // it: Fusion emits ordinary X/Y/Z words for such a section, so with no guard the post emits them
-  // as though the frame were upright, the part is cut in the wrong plane, and nothing in the file
-  // says so. Every reference 3-axis post rejects this. See docs/HReview.md HR-6.
-  //
-  // Written to FAIL OPEN, deliberately. A false positive here would abort EVERY job -- far worse
-  // than the rare misconfiguration it catches -- and this is the post's first use of
-  // Section.workPlane, so the shape of that object is not yet evidenced by a posted file. The
-  // condition therefore errors only when the orientation is readable AND unambiguously not +Z;
-  // anything unreadable (no workPlane, no forward vector, non-numeric components) is treated as
-  // upright and posts exactly as before.
-  //
-  // Compared component-wise rather than with the kernel's isSameDirection(): that would add a
-  // second unverified global to a guard whose one hard requirement is that it must not throw, and
-  // the comparison costs a line either way. The tolerance is about 0.006 degrees of tilt -- orders
-  // of magnitude beyond any float noise in a rotation matrix, and far below any orientation a user
-  // would pick on purpose (the near-miss case posts, and cuts correctly).
-  var toolPlane = currentSection.workPlane;
-  var toolAxis = (toolPlane == undefined) ? undefined : toolPlane.forward;
-  if (toolAxis != undefined
-      && (typeof toolAxis.x == "number") && (typeof toolAxis.y == "number") && (typeof toolAxis.z == "number")
-      && ((Math.abs(toolAxis.x) > 1e-4) || (Math.abs(toolAxis.y) > 1e-4) || (toolAxis.z < (1 - 1e-4)))) {
-    writeComment(eComment.Debug, " onSection: tool axis X" + toolAxis.x + " Y" + toolAxis.y + " Z" + toolAxis.z);
-    error(localize("Tool orientation is not supported: this operation's Z axis is not the machine Z. "
-      + "Rebuild the Setup with its Z axis along the machine Z -- normally the stock top."));
+  // A 3-axis section can still be oriented off machine +Z; the check and its Debug trace live in
+  // isSectionOrientationSupported(). It has already raised the error when it returns false.
+  if (!isSectionOrientationSupported()) {
     return;
   }
 

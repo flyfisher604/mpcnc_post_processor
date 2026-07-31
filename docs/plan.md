@@ -358,11 +358,12 @@ at `onClose`.
 - **Phase 5 — not started** (likely no-op).
 - **Hobbyist review (`docs/HReview.md`) — in progress, on branch `v4.0-hreview-fixes`.** 18 findings
   from reviewing the post against the README's hobbyist use cases and every Fusion entry point.
-  Landed, **all unverified by a posted file**: HR-1 (provisional `Z0` bounds the `G38 Target`), HR-2
-  (`isProbeOperation()` defined locally), HR-3 (manual-spindle OFF prompt on GRBL), HR-4 (Safe-Z
-  fallbacks convert mm→output unit), HR-5 (`Scale Feedrate` reaches arcs), HR-6 (reject a section
-  oriented off machine Z). Twelve open, four of them (HR-7/8/9/12) overlapping the tool-change
-  ordering item below. See the checkpoint for the verification plan.
+  Landed: HR-1 (provisional `Z0` bounds the `G38 Target`), HR-2 (`isProbeOperation()` defined
+  locally), HR-3 (manual-spindle OFF prompt on GRBL), HR-4 (Safe-Z fallbacks convert mm→output unit),
+  HR-5 (`Scale Feedrate` reaches arcs), HR-6 (reject a section oriented off machine Z). **Verified by
+  a posted file: HR-6 in full, plus the (A) half of HR-1 and HR-3** — HR-2, HR-4 and HR-5 remain
+  harness-only. Twelve open, four of them (HR-7/8/9/12) overlapping the tool-change ordering item
+  below. See the checkpoint for the verification plan.
 
 ---
 
@@ -427,13 +428,21 @@ built note, not the original diff, when reasoning about what the code now does.
 
 > ### ⚠ Verification debt — the most important thing on this branch
 >
-> **All six fixes are unverified by a posted file.** Rows **HR1**–**HR6** are in the test plan and
-> unrun. Harness evidence (extracted functions + stubbed kernel globals, run in node) covers the
-> *arithmetic* for HR-2, HR-4, HR-5 and HR-6, but nothing has been through Fusion. Three of the six
-> changed emitted output on paths every hobbyist uses.
+> **Partly paid down (2026-07-31).** Two posts of the default hobby job — `H2.gcode` at Comment Level
+> `Info` and `H2 - Debug.gcode` at `Debug` — cleared **HR6 in full** and the **(A) half of HR1 and
+> HR3**. The headline result is that **HR-6's guard is live, not failing open**: the Debug trace reads
+> `forward X0 Y0 Z1, tilt from machine Z 0 deg -> upright, section allowed`, so Fusion does populate
+> `Section.workPlane.forward` with real numbers and the predicate is evaluating a real vector on every
+> section. That was the branch's single worst risk (a false positive blocks all posting; a fail-open
+> read makes the guard dead code) and it is now closed.
 >
-> **Post before writing more fixes.** The further this runs unverified, the harder it becomes to
-> attribute a surprise in the g-code to one change. Three sessions cover it:
+> **Still unverified: HR2, HR4, HR5 entirely, and the HR1/HR3 sub-cases** — HR1 (B)/(C)/(D) and its
+> firmware half, HR3 (B)/(C)/(D). HR1 (C) is the one that proves the fix is *scoped* rather than
+> applied everywhere, so HR1 is not closed by (A) alone. Harness evidence still covers the
+> *arithmetic* for HR-2, HR-4 and HR-5, but none of them has been through Fusion.
+>
+> **Keep posting before writing more fixes.** The further this runs unverified, the harder it becomes
+> to attribute a surprise in the g-code to one change. Three sessions cover the rest:
 > 1. **GRBL / mm** — one job with a **drill + tap** (HR2 A/A2, and the first file ever to evidence
 >    HR-17's parenthesis stripping), then HR1 (A)–(D), HR3 (A)–(C) and HR5 (A)–(D) as dialog variants
 >    of the hobby job. HR1 (D) needs a jet/tool-0 job; HR3 (C) needs two tools.
@@ -441,9 +450,15 @@ built note, not the original diff, when reasoning about what the code now does.
 >    today**, so this is a first.
 > 3. **Marlin + RRF** — HR1's firmware half, HR3 (D). Also picks up the long-outstanding **H7e**.
 >
-> **Run HR6 (A) before any of it.** It is a plain re-post of the H2 job, and it is the one check whose
-> failure means "revert immediately": a false positive in the orientation guard blocks all posting.
-> HR-6 is written to fail open specifically so that outcome is unlikely, but it is unproven.
+> ~~**Run HR6 (A) before any of it.**~~ **Done.** It was the one check whose failure meant "revert
+> immediately". Sessions 1–3 above are no longer gated on anything. Session 1 shrinks to HR2 (A/A2),
+> HR1 (B)/(C), HR5 (A)–(D) and HR3 (B)/(C); HR1 (A) and HR3 (A) are already banked.
+>
+> **A method note worth keeping.** HR6 (A) alone was *not* decisive, and the reason generalises: a
+> guard written to fail open produces a byte-identical file whether it read the value correctly or
+> read nothing at all. Making its diagnostic unconditional — rather than only on the rejection path —
+> turned one ordinary post into proof the guard was wired up. Apply the same test to any future
+> fail-open check before trusting a passing post.
 
 **Twelve findings remain open**, in `HReview.md`'s suggested order: **HR-7** (`toolChange()`'s
 `onRapid()` clears `forceSectionToStartWithRapid`, defeating First-G1→G0 on every tool-change
@@ -489,7 +504,8 @@ exposes, which is exactly why the verification debt above matters:
   Fixed twice; instances survive in the tapping warning and the group-03 name (now tracked as HR-17).
 
 **Next actions, in the order they'd be tackled:**
-1. **Post the six landed fixes** — the three sessions above, HR6 (A) first. This outranks new code.
+1. **Post the remaining landed fixes** — the three sessions above. HR6 is done; HR1 (A) and HR3 (A)
+   are banked. This still outranks new code.
 2. **Decide HR-11's `M84` vs `M84 S60`**, then land the small independent HR fixes (**HR-10**,
    **HR-13**, **HR-14**, **HR-11**).
 3. **Code — tool-change ordering + base-relative park**, *folded together with* **HR-7 / HR-8 / HR-9 /

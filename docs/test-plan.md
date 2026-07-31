@@ -70,12 +70,12 @@ firmware-variant rows note what changes elsewhere.
 | H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | PASS (Marlin + RRF) ⚠ *(superseded by HR1)* |
 | H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7e unrun; H7b → J1)* |
 | H7f | "Unknown Z" warning — present without a base, suppressed with one | PASS *(all three)* |
-| HR1 | Provisional Z0 bounds the `G38 Target` on the two just-positioned probe modes | |
+| HR1 | Provisional Z0 bounds the `G38 Target` on the two just-positioned probe modes | (A) PASS *(B/C/D + firmware unrun; C proves the scope)* |
 | HR2 | Canned cycles: a drill/tap operation posts at all; probing is rejected | |
-| HR3 | Manual spindle prompts to switch OFF on GRBL too — job end and tool change | |
+| HR3 | Manual spindle prompts to switch OFF on GRBL too — job end and tool change | (A) PASS *(B/C/D unrun)* |
 | HR4 | Safe-Z literal fallbacks convert mm→output unit; inch jobs stop retracting to 15 in | |
 | HR5 | `Scale Feedrate` reaches G2/G3 arcs, not just G1 cuts | |
-| HR6 | A rotated 3-axis Setup is rejected — and an upright one still posts | |
+| HR6 | A rotated 3-axis Setup is rejected — and an upright one still posts | PASS — (A) + (A2); guard confirmed **live** (`forward X0 Y0 Z1`), not failing open. *(B) unrun* |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -382,7 +382,12 @@ tool) unless a row says otherwise.
 
       **Firmware half:** repeat (A) on Marlin → `G92 X0 Y0 Z0`; on RRF → `G54` + `G10 L20 P1 X0 Y0
       Z0` with `M291 … S3` prompts. Supersedes the saved `H6 - Marlin.gcode` / `H6 - RRF.gcode`.
-      *Result:* ____
+      *Result:* **(A) PASS** — `H2.gcode` (2026-07-31), token for token:
+      `(   Set current X,Y position to 0,0)` → `(   Provisional Z0 at the current height so the probe
+      target is a relative limit)` → `G10 L20 P1 X0 Y0 Z0` → `M0 (MSG Attach ZProbe)` →
+      `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8` → `G0 Z5.08 F300`. The provisional `Z0` is overwritten by
+      the probe before the cut, as designed. **(B), (C), (D) and the firmware half unrun** — (C) is
+      the one that proves the scope, so the row is not closed.
 
 - [ ] **HR2 — A canned-cycle operation posts at all; probing is still rejected.** Verifies the HR-2
       fix (docs/HReview.md). `onCyclePoint()` calls `isProbeOperation()`, which had **no definition
@@ -475,7 +480,16 @@ tool) unless a row says otherwise.
       the saved `H6` behaviour — `M300 S300 P3000` beep then the turn-off prompt (`M0 …` on Marlin,
       `M291 … S3` on RRF). **Pass:** the Marlin/RRF path is byte-identical to before; only GRBL moved.
 
-      *Result:* ____
+      > **Expected-block correction for (A): the `G0` is modal.** The block above writes
+      > `G0 X0 Y0 F<travelXY>`, but the last motion word before the stop block is the section's final
+      > `G0 Z…` retract, so `gMotionModal` suppresses the word and the file emits a bare
+      > `X0 Y0 F<travelXY>` — still a rapid, and correct. Assert the coordinates and their position in
+      > the stop block, not the literal `G0`.
+
+      *Result:* **(A) PASS** — `H2.gcode` (2026-07-31): `( *** STOP begin ***)` →
+      `( COMMAND_COOLANT_OFF)` → `X0 Y0 F2500` (modal `G0`, see above) → `( COMMAND_STOP_SPINDLE)` →
+      `M0 (MSG Turn OFF spindle)` → `M30`, with **no `M5` and no `M300` anywhere in the file** — the
+      discriminating pair of absences. **(B), (C), (D) unrun**; (C) is the case that matters most.
 
 - [ ] **HR4 — Safe-Z literal fallbacks are in mm, like every other dialog dimension.** Verifies the
       HR-4 fix (docs/HReview.md). Both Safe-Z properties accept `Feed:`/`Retract:`/`Clearance:<n>` or
@@ -591,11 +605,41 @@ tool) unless a row says otherwise.
       *every* job, which is far worse than the misconfiguration it catches — so the regression half
       is the real test and the rejection half is the bonus.
 
+      > **The guard is isolated in `isSectionOrientationSupported()`, and it traces on every path.**
+      > The check was lifted out of `onSection()` (which now reads
+      > `if (!isSectionOrientationSupported()) { return; }`) and its `eComment.Debug` trace moved
+      > *outside* the rejection branch. This matters for reading (A): the guard **fails open**, so
+      > before the trace was unconditional, "read `+Z` and correctly allowed it" and "read nothing and
+      > gave up" produced **byte-identical files** — meaning a passing (A) could not tell a working
+      > guard from dead code. (A) is now decisive on its own. Three trace shapes exist:
+      > ```
+      > ( onSection orientation: forward X0 Y0 Z1, tilt from machine Z 0 deg -> upright, section allowed)
+      > ( onSection orientation: forward X1 Y0 Z0, tilt from machine Z 90 deg -> OFF-AXIS, section REJECTED)
+      > ( onSection orientation: workPlane missing, forward missing -> UNREADABLE, check skipped, section allowed)
+      > ```
+      > The UNREADABLE variant also covers "workPlane present, forward missing" and a
+      > `types string/string/string` suffix for non-numeric components. **Seeing UNREADABLE on a normal
+      > Setup means HR-6 is a no-op** and needs a different predicate — the post would still post
+      > everything, but the guard would catch nothing, and (B) would pass for the wrong reason.
+
       **Do (A) — the regression, i.e. nothing moved.** Re-post **any** previously-passing job
       unchanged — H2's default hobby job is the cheapest. **Get (A):** a complete file, identical to
       current output, with **no error and no `Tool orientation` message**. **Pass:** the job posts.
       A failure here means the guard misreads a normal Setup and must be reverted immediately — it
       would block all posting, so do not proceed to (B) until (A) passes.
+
+      **Do (A2) — the same post at Comment Level = `Debug`.** **Get (A2):** one
+      `onSection orientation:` line per section, reading **`forward X0 Y0 Z1, tilt from machine Z
+      0 deg -> upright, section allowed`**. **Pass:** the components are real numbers and the verdict
+      is `upright` — that is the evidence that Fusion populates `Section.workPlane.forward` and the
+      guard is live rather than failing open.
+
+      > **Where the line lands — before the whole header, not near the section.** On the first section
+      > it appears immediately after the last `param:` line and **before `( Ranges Table:)`**, because
+      > `onSection()` runs the guard ahead of `writeFirstSection()`, and `writeFirstSection()` is what
+      > emits the Ranges/Tools/Properties/Resolved-Values header. In `H2 - Debug.gcode` that is line
+      > 359, with the header starting at 361 and `G54` not until 474. Don't look for it in the
+      > `SECTION begin` block.
 
       **Do (B) — the rejection.** Duplicate the hobby Setup and re-orient it: in the Setup dialog set
       the Z axis along the model's **X** (or pick a vertical face for the orientation). Keep one
@@ -604,10 +648,10 @@ tool) unless a row says otherwise.
       Tool orientation is not supported: this operation's Z axis is not the machine Z.
       Rebuild the Setup with its Z axis along the machine Z -- normally the stock top.
       ```
-      **Pass:** the post errors and names the fix. Set Comment Level = `Debug` and re-post to see
-      ` onSection: tool axis X1 Y0 Z0` immediately before the error, which evidences *what* the guard
-      read — useful if (B) unexpectedly passes, since it distinguishes "guard is broken" from "Fusion
-      reported the section as upright".
+      **Pass:** the post errors and names the fix. At Comment Level = `Debug` the
+      `-> OFF-AXIS, section REJECTED` trace precedes the error and shows the vector actually read —
+      which, with (A2) in hand, distinguishes "guard is broken" from "Fusion reported the section as
+      upright".
 
       > **Expect a truncated `.gcode` from (B), unlike Guard A/B/C.** This guard fires in
       > `onSection()`, by which point the header is already written, so Fusion may leave a partial
@@ -620,10 +664,25 @@ tool) unless a row says otherwise.
       > every shape `workPlane` might take: exact `+Z`, float noise, and a 0.001° tilt all **post**;
       > Z-along-X, Z-along-−Y, a 30° tilt and an inverted Z-down frame are all **rejected**; and a
       > missing `workPlane`, a missing `forward`, non-numeric components and `NaN` components all
-      > **post** — the fail-open cases. Eleven cases, all passing. What the harness cannot tell you is
-      > what Fusion actually puts in `workPlane`, which is exactly what (A) and (B) settle.
+      > **post** — the fail-open cases. Eleven cases, all passing. **Re-run unchanged after the
+      > extraction into `isSectionOrientationSupported()`** — same eleven verdicts, no throws, and each
+      > case now also emits its trace, which is how the three shapes quoted above were captured. What
+      > the harness cannot tell you is what Fusion actually puts in `workPlane`, which is exactly what
+      > (A2) and (B) settle.
 
-      *Result:* ____
+      *Result:* **PASS — (A) and (A2).**
+      **(A)** `H2.gcode` (2026-07-31): posts complete, no error, `Tool orientation` absent — nothing
+      is blocked. **(A2)** `H2 - Debug.gcode` (2026-07-31), line 359:
+      `( onSection orientation: forward X0 Y0 Z1, tilt from machine Z 0 deg -> upright, section
+      allowed)` — one line, one section, and the file completes normally (570 lines, `M30`, `%`).
+      **This is the finding that matters: the guard is live, not failing open.** Fusion does populate
+      `Section.workPlane.forward`, its components are real numbers, and the value on an ordinary
+      stock-top Setup is an exact `+Z` — so the predicate is evaluating a real vector on every
+      section, and the eleven harness verdicts apply to what Fusion actually supplies.
+      **(B) unrun** and still worth running: it is now the only untested link, since nothing here
+      evidences what Fusion reports for a *re-oriented* Setup (it could in principle re-express the
+      frame rather than tilt `forward`). Its failure mode is benign — a missed rejection, not a
+      blocked job.
 
 - [ ] **H-REG — Byte-for-byte regression (the key guarantee).** With the default reverted to
       `Set X0 Y0 to Current Pos, Probe Z0`, the **default** single-op output is again the pre-rework
