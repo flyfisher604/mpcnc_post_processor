@@ -139,6 +139,7 @@ notes that used to live in this file are gone.
 | **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + the `M2` split | **Every Marlin/RRF job's tail.** GRBL untouched | **unposted**; `M2` support now confirmed from firmware source |
 | **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | harness before/after — **unposted** |
 | **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | **unposted** |
+| **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | the sweep commit | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | harness before/after — **unposted** |
 
 Open with no code change: **HR-16** (recorded, no fix proposed), **HR-17** (tidy-ups). Moved to
 `docs/PReview.md`: **HR-7**, **HR-8**, **HR-9**, **HR-10**, **HR-12**, **HR-13**.
@@ -338,11 +339,12 @@ is untested.*
 
 **Do (A2) — a tap, same post if convenient.** Add a **Tapping** operation. **Get (A2):** the cycle
 expands the same way and each affected move carries
-`( >>> WARNING: Speed-feed synchronization  rigid tapping  is not supported; a floating/tension tap holder is required)`.
+`( >>> WARNING: Speed-feed synchronization rigid tapping is not supported; a floating/tension tap holder is required)`.
 **Pass:** the warning is present on every activate/deactivate occurrence without corrupting the
-surrounding g-code. Note the **double spaces** where `(rigid tapping)` was — that is HR-17's
-parenthesis-stripping defect, and this is the first file able to evidence it. Do not "fix" the
-expectation.
+surrounding g-code, and it is **single-spaced** where `(rigid tapping)` was. *(This row previously
+pinned **doubled** spaces there and told the reader not to "fix" them — that was HR-17's
+parenthesis-stripping defect, since swept. This post is still the first file able to evidence the
+text either way, so it now carries HR-17 (C) as well.)*
 
 **(B) — probing must still be refused: not applicable on this licence.** Fusion's probing /
 Inspection strategies need the Machining Extension, so a Personal-licence hobbyist cannot create one —
@@ -362,7 +364,8 @@ reads it as unrun.
 **Reached by:** HP-1 exactly as documented. GRBL is the default firmware, `Manual Spindle On/Off`
 defaults **true**, and the README tells the hobbyist to leave it on.
 
-`spindleOn()` honoured the manual setting on every firmware — it prompts `M0 (MSG Turn ON 18000RPM)`.
+`spindleOn()` honoured the manual setting on every firmware — it prompts `M0 (MSG Turn ON 18000 RPM)`
+(the space arrived with HR-17; the saved files predating it read `18000RPM`).
 `spindleOff()` branched on **firmware first** and emitted a bare `M5` on GRBL regardless, which does
 nothing to a hand-switched router: the file asked the operator to switch the router on and never asked
 them to switch it off, so the job finished with the router still spinning. Marlin and RepRap users got
@@ -592,6 +595,61 @@ taken. *(A) alone is insufficient: a fix that broke all three guards to `false` 
 byte-identically on a `Const:` job, which consults no level at all — the same fail-open lesson HR-6
 taught.*
 
+---
+
+#### HR-17 — four tidy-ups, swept in one commit — **Cosmetic**, but two of them change emitted text
+
+Three were pure reader-facing cleanups; the fourth (`sanitizeMessageText`) and the group rename that
+rode with it **do** change bytes in every file, which is why this is here rather than in §4.3.
+
+**As built.**
+
+| Item | Resolution |
+|---|---|
+| `sanitizeMessageText` left doubled spaces | A stripped character standing beside a space it did not consume contributed a second blank — `synchronization (rigid tapping) is` → `synchronization  rigid tapping  is`. A second pass squeezes **interior** runs only (`(\S) {2,}(?=\S)`), so the leading/trailing whitespace the function's contract promises callers is untouched |
+| Group name `"03 - Map G1s to Rapids (disable when using full license)"` | Renamed to `"03 - Map G1s to Rapids - disable when using full license"` — parens removed at the source rather than laundered by the sanitizer. **This alters a visible dialog label** (decision taken 2026-07-31). The `03 - ` prefix is kept, so the lexicographic sort that reproduces dialog order is unaffected |
+| `linearMovements(x, y, z, feed, true)` — 5 args to a 4-parameter function | Vestigial `true` dropped. No behaviour change: the parameter never existed |
+| `flushMotions()`'s empty `if (fw == eFirmware.GRBL) {}` | Early `return` carrying the reason — GRBL has no wait-for-moves code and `M400` would be an unknown command there |
+| `"Turn ON " + …format(rpm) + "RPM"` | Now `" RPM"` — the prompt reads `Turn ON 18000 RPM` |
+
+**Harness-verified before *and* after**, both implementations against the same inputs: the tapping
+warning, the old and new group names, a `();`-bearing operation name with an embedded newline, and
+indented text. Every interior double gap present in the old output is gone in the new one; leading and
+trailing whitespace is byte-identical on every case that carries any. The three inputs whose leading
+or trailing space *does* move are those that begin or end with an unsafe character — the old code
+turned that character into a space too, so the behaviour is unchanged there.
+
+**Blast radius — two of these reach every saved `.gcode`.** No row's assertions move, but a diff will
+show differences that are not regressions:
+
+- the property dump's heading for group 03 now reads
+  `03 - Map G1s to Rapids - disable when using full license` where it read
+  `03 - Map G1s to Rapids  disable when using full license ` (parens stripped to doubled blanks, note
+  the trailing one). **Every** saved file carries the property dump;
+- every manual-spindle job's start prompt gains a space: `M0 (MSG Turn ON 18000 RPM)`. HR-3's verified
+  (A)(B) assert the *OFF* prompt and are unaffected; `PReview.md` HR-12's expected tokens were updated
+  with this commit;
+- the dialog label change gives **`PReview.md` D3 a real change to test** rather than a hypothetical —
+  a saved preset now has a renamed `group:` string to survive.
+
+**Do (A) — the header, any GRBL post.** **Get (A):**
+`Properties -- 03 - Map G1s to Rapids - disable when using full license:`. **Pass:** single spaces
+throughout and no parentheses — the discriminator is the **absence of the doubled blank** before
+`disable`.
+
+**Do (B) — the prompt.** Same post, `Manual Spindle On/Off` on (default). **Get (B):**
+`M0 (MSG Turn ON 18000 RPM)`. **Pass:** a space before `RPM`.
+
+**Do (C) — the tapping warning.** Folds into session 2; this is the row HR-2 (A2) now carries. **Get
+(C):** `( >>> WARNING: Speed-feed synchronization rigid tapping is not supported; a floating/tension
+tap holder is required)` — single-spaced.
+
+**Do (D) — the regression, and the only evidence the other two items are inert.** Diff a fresh GRBL/mm
+post against `H2.gcode`. **Get (D):** the property heading, the ON prompt and the timestamp differ, and
+**nothing else does** — no motion, no feed, no comment reordering. **Pass:** exactly that set. *(The
+5-arg call and the `flushMotions()` early return cannot be seen in a posted file at all; (D) is what
+shows they changed nothing.)*
+
 ### 4.3 Open — no code change
 
 **HR-16 — `onClose` traverses to `X0 Y0` before stopping the spindle, with no guaranteed safe Z.**
@@ -604,15 +662,7 @@ retract, the traverse runs at cut height. **No fix proposed**, recorded so the o
 the record rather than an accident. Revisit with the jet/laser workstream (`PReview.md` §5), which is
 where this same line of code actually bites.
 
-**HR-17 — tidy-ups, no behavioural effect.** Cheap; do them as one sweep. The tapping-warning instance
-needs the drill+tap post to *evidence*, but not to fix.
-
-| Item | Where | Note |
-|---|---|---|
-| `sanitizeMessageText` strips parentheses, leaving double spaces | the tapping warning; the group name `"03 - Map G1s to Rapids (disable when using full license)"` | The group name reaches the file through `writeAllProperties()`'s `Properties -- <group>:` heading. Fixing the group name alters a visible dialog label — decide, don't assume |
-| `linearMovements(x, y, z, feed, true)` passes 5 args to a 4-parameter function | `onLinear`'s converted-rapid path | Vestigial `true`; harmless, misleading to a reader |
-| `"Turn ON " + …format(rpm) + "RPM"` → `Turn ON 18000RPM` | `spindleOn()` | Missing space |
-| `flushMotions()` has an empty `if (fw == eFirmware.GRBL) {}` block | `flushMotions()` | Intentional (GRBL has no `M400`); an early `return` with the reason in a comment reads better |
+*(HR-17's tidy-ups are no longer open — they landed as one sweep; see §4.2.)*
 
 ---
 
@@ -649,7 +699,11 @@ since the spoilboard base is a professional feature.
 
 ## 6. Other hobbyist work owed before a public release
 
-- [ ] **HR-17 sweep** — four cosmetic items, one commit, no decisions.
+- [x] **HR-17 sweep** — done 2026-07-31, one commit; the group rename was taken as a deliberate
+      dialog-label change. Rows (A)–(D) in §4.2 are unposted and fold into any GRBL session.
+      ⚠ **`README.md` §`03 - Map G1s to Rapids (disable when using full license)` still carries the old
+      label** — left alone per the standing "no README edits during code changes" rule; fold it into the
+      next doc-sync pass.
 - [ ] **`isSafeToRapid()`'s true branches have never been exercised.** The prior full-licence run
       (`2D Contour1.gcode`) stayed at Z ≤ 1 mm, below the 5 mm safe height, so every call returned
       `false` and only the conservative refusal ran — the `zConstant` / `zUp` /

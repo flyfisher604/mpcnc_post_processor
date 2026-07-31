@@ -52,10 +52,13 @@ physical measurement are out of scope, so every row must stand on the posted fil
 
 1. **Post the five unverified fixes** — the three sessions in `HReview.md` §3 (Marlin+RRF → drill+tap
    GRBL → GRBL inch). This is the whole remaining job on this branch.
-2. **Sweep HR-17's tidy-ups** — four cosmetic items, one commit, no decisions (`HReview.md` §4.3).
+2. ~~Sweep HR-17's tidy-ups~~ — **done 2026-07-31** (`HReview.md` §4.2). Two of the four change
+   emitted text, so every saved `.gcode` differs at the group-03 property heading and the
+   manual-spindle prompt; rows (A)–(D) are unposted and fold into any GRBL session.
 3. **Dialog-only checks, no posting** — **D1** and **D3**'s dialog half (`PReview.md` §3.3). D3 gates
-   trust in every dialog row: only `group:` strings changed, so a saved preset should survive, but a
-   posted file cannot tell a surviving preset from re-entered values.
+   trust in every dialog row: a saved preset should survive, but a posted file cannot tell a surviving
+   preset from re-entered values. HR-17 renamed group 03's label, so D3 now has a real string change
+   on that group to survive, not just the reorder.
 4. **Open the Tool Change branch** — *Phase 4 — tool-change ordering + base-relative park* below,
    folded together with **HR-7/8/9/10/12/13** (`PReview.md` §2). Design settled for the ordering half;
    nothing depends on it and the base machinery underneath is verified.

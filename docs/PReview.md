@@ -205,19 +205,23 @@ Fusion computed the feeds against: a burnt cutter or a poor finish, silently.
    if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
      if (!spindleEnabled) {
        writeComment(eComment.Important, " >>> Spindle Speed: Manual");
-       askUser("Turn ON " + speedFormat.format(_spindleSpeed) + "RPM", "Spindle", false);
+       askUser("Turn ON " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
 +    } else {
 +      // The caller only reaches here when the requested RPM actually changed.
 +      writeComment(eComment.Important, " >>> Spindle Speed: Manual change");
-+      askUser("Set spindle to " + speedFormat.format(_spindleSpeed) + "RPM", "Spindle", false);
++      askUser("Set spindle to " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
      }
    } else {
 ```
 
 **Verify (Do → Get).** *Do:* two operations, same tool, spindle speeds 18000 and 12000, `Manual
-Spindle On/Off` on. *Get:* `M0 (MSG Turn ON 18000RPM)` before section 1 and `M0 (MSG Set spindle to
-12000RPM)` before section 2. **Pass:** two prompts. Third check: two operations at the *same* RPM →
+Spindle On/Off` on. *Get:* `M0 (MSG Turn ON 18000 RPM)` before section 1 and `M0 (MSG Set spindle to
+12000 RPM)` before section 2. **Pass:** two prompts. Third check: two operations at the *same* RPM →
 one prompt only (`setSpindeSpeed` short-circuits, so no new stop on the common case).
+
+> The space before `RPM` arrived with **HR-17** (`HReview.md` §4.2) after this diff was written; the
+> context line and both new prompts above were updated to match, so the proposal still applies
+> cleanly. Files posted before that sweep read `18000RPM`.
 
 ---
 
@@ -406,9 +410,12 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       `Set … to Current Pos` modes; **Probe X/Y Offset**, group-05 **Inter Part Safe Z** and group-06
       **Safe Z** accept only whole numbers (reject `2.5`) and read as whole mm. Confirm no group shows
       two fields both titled "Safe Z".
-- [ ] **D3 — a saved preset survives the group reorder.** Open the dialog with a **previously
-      customised preset** loaded. *Get:* groups read `01 - Job`, `02 - Feeds and Speeds`,
-      `03 - Map G1s to Rapids …`, `04 - Establish Machine Coordinates`,
+- [ ] **D3 — a saved preset survives the group reorder *and* the group-03 rename.** Open the dialog
+      with a **previously customised preset** loaded. *Get:* groups read `01 - Job`,
+      `02 - Feeds and Speeds`,
+      `03 - Map G1s to Rapids - disable when using full license` (**renamed** by `HReview.md` HR-17 —
+      the parenthesised form is gone, so this row now tests a real string change on that group rather
+      than a hypothetical one), `04 - Establish Machine Coordinates`,
       `05 - Establish Spoilboard Reference`, `06 - On WCS / Part / Fixture Changes`,
       `07 - Tool Changes`, `08 - External Include Files`, `09 - Laser`, `10 - Coolant`, `11 - Duet`,
       with **9 / 7 / 4 / 2 / 4 / 10 / 8 / 5 / 7 / 10 / 2** properties (68 total).

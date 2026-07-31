@@ -263,7 +263,7 @@ properties = {
   A_MapRapids_RestoreFirstRapids: {
     title      : "First G1 -> G0 Rapid",
     description: "Enable to ensure that the first move of a cut starts with a G0 Rapid.",
-    group      : "03 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids - disable when using full license",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -271,7 +271,7 @@ properties = {
   B_MapRapids_RestoreRapids: {
     title      : "Map: G1s -> G0 Rapids",
     description: "Enable to convert G1s to G0s Rapids when safe.",
-    group      : "03 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids - disable when using full license",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -279,7 +279,7 @@ properties = {
   C_MapRapids_SafeZ: {
     title      : "Map: Safe Z to Rapid",
     description: "Z must be above or equal to this value to be mapped G1s --> G0s; Uses Retract level if defined or 15.",
-    group      : "03 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids - disable when using full license",
     type       : "string",
     value      : "Retract:15",
     scope      : "post"
@@ -287,7 +287,7 @@ properties = {
   D_MapRapids_AllowRapidZ: {
     title      : "Map: Allow Rapid Z",
     description: "Enable to include vertical G1 retracts and safe descents as rapids.",
-    group      : "03 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids - disable when using full license",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -831,13 +831,13 @@ function writeBlock() {
 }
 
 function flushMotions() {
+  // GRBL has no "wait for moves to finish" code: the planner drains on its own and M400 would be
+  // an unknown command, so there is deliberately nothing to emit here.
   if (fw == eFirmware.GRBL) {
+    return;
   }
 
-  // Default
-  else {
-    writeBlock(mFormat.format(400));
-  }
+  writeBlock(mFormat.format(400));
 }
 
 //---------------- Safe Rapids ----------------
@@ -1946,7 +1946,7 @@ function onLinear(x, y, z, feed) {
     onRapid(x, y, z);
   }
   else {
-    linearMovements(x, y, z, feed, true);
+    linearMovements(x, y, z, feed);
   }
 }
 
@@ -2950,7 +2950,7 @@ function spindleOn(_spindleSpeed, _clockwise) {
     // For manual any positive input speed assumed as enabled. so it's just a flag
     if (!spindleEnabled) {
       writeComment(eComment.Important, " >>> Spindle Speed: Manual");
-      askUser("Turn ON " + speedFormat.format(_spindleSpeed) + "RPM", "Spindle", false);
+      askUser("Turn ON " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
     }
   } else {
     writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed));
@@ -2987,8 +2987,15 @@ function spindleOff() {
 // (tool comments, operation names) embedded in a G-code message or comment can't break
 // line syntax, comment syntax, or quoted parameters. Runs of collapsed characters become a
 // single space; leading/trailing whitespace is preserved so callers keep their own indentation.
+//
+// The second pass squeezes the blanks the first pass creates. A stripped character standing next
+// to a space it did not consume -- "synchronization (rigid tapping) is" -- leaves a space of its
+// own beside the original, so the text arrived in the file with visible double gaps. Only interior
+// runs are squeezed (both neighbours must be non-blank), which is what keeps the leading and
+// trailing whitespace the contract above promises callers.
 function sanitizeMessageText(text, unsafeChars) {
-  return String(text).replace(new RegExp("[\\r\\n" + unsafeChars + "]+", "g"), " ");
+  var sanitized = String(text).replace(new RegExp("[\\r\\n" + unsafeChars + "]+", "g"), " ");
+  return sanitized.replace(/(\S) {2,}(?=\S)/g, "$1 ");
 }
 
 function display_text(txt) {
