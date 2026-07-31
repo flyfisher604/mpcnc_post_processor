@@ -76,6 +76,7 @@ firmware-variant rows note what changes elsewhere.
 | HR4 | Safe-Z literal fallbacks convert mm→output unit; inch jobs stop retracting to 15 in | |
 | HR5 | `Scale Feedrate` reaches G2/G3 arcs, not just G1 cuts | **PASS — all four**; (D) came free from the face mill's `G18` lead-in arcs |
 | HR6 | A rotated 3-axis Setup is rejected — and an upright one still posts | PASS — (A) + (A2); guard confirmed **live** (`forward X0 Y0 Z1`), not failing open. *(B) unrun* |
+| HR11 | Marlin/RRF jobs end explicitly and restore the stepper timeout | |
 | HR15 | `safeZforSection()` asks the passed section; output unchanged | |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
@@ -193,6 +194,11 @@ tool) unless a row says otherwise.
       > and RRF's `G10 L20 P1 X0 Y0 Z0`. Both saved files predate it. **HR1**'s firmware half
       > re-covers this; the row's own assertions (comment style, `G92`-vs-`G10`, no spurious
       > multi-WCS warning) are unaffected.
+
+      > **⚠ Also stale at the tail (HR-11).** Both saved files end `M117 Job end` with nothing after
+      > it; current output adds `M84 S60` and `M2`. The row asserts nothing about the tail, so its
+      > verdict stands — but neither file matches byte-for-byte any more. **HR11** carries the new
+      > tokens and is the row to run on these two firmwares.
 
 - [ ] **H7 — `Use Active WCS X0 Y0, Probe Z0` (new mode: stored XY, re-probe Z).** The sixth
       First WCS / Part mode, added in `01c69a3` — the no-prompt first-part path for a pre-set
@@ -727,6 +733,46 @@ tool) unless a row says otherwise.
       evidences what Fusion reports for a *re-oriented* Setup (it could in principle re-express the
       frame rather than tilt `forward`). Its failure mode is benign — a missed rejection, not a
       blocked job.
+
+- [ ] **HR11 — a Marlin/RRF job ends, and the steppers are released on a timeout.** Verifies the
+      HR-11 fix (docs/HReview.md). `onClose()` emitted `M30` on GRBL and, for everything else, only
+      `M117 Job end` — no program end at all. Worse, `Start()` emits `M84 S0` on Marlin/RepRap to
+      **disable** the idle timeout for the duration of the job (so the machine cannot lose position
+      mid-run) and nothing ever restored it, leaving every axis energised indefinitely after the job
+      finished. The fix adds `M84 S60` + `M2` to the non-GRBL branch only.
+
+      **`S60`, not a bare `M84` — the decision this row also records.** A bare `M84` releases the
+      motors the instant it executes, and an unbalanced LowRider gantry with no brake sinks in Z when
+      it does. A 60-second timeout holds the axes while the operator retrieves the part and then
+      releases without anyone remembering to.
+
+      **Do (A) — Marlin.** HP-4: the hobby job, one op, `CNC Firmware = Marlin`. **Get (A):** the
+      file's last three blocks are `M117 Job end`, `M84 S60`, `M2`. **Pass:** an explicit program end
+      is present *and* the `S` value is `60`, not `0` — an `M84 S0` at the tail would re-disable the
+      timeout and be worse than emitting nothing.
+
+      > **⚠ (A) also settles whether `M2` is supported at all — treat that as the open question.**
+      > `M30` is GRBL-only in this post *because Marlin reads `M30` as "delete SD file"*, so this
+      > firmware family's M-code semantics are already known to diverge and `M2` may be unrecognised
+      > too. **Watch the sender's console, not just the file:** an `echo:Unknown command: "M2"` (Marlin)
+      > or an RRF error means the block posts but does nothing, and the "no program end" half of HR-11
+      > is still open — the `M84 S60` half stands either way. Nothing moves on this path (motion is
+      > flushed and the spindle is off before it), so an unsupported `M2` is a log line, not a hazard.
+      > If it is unsupported, the follow-up is to drop `M2` and record that Marlin/RRF end-of-file
+      > *is* the program end.
+
+      **Do (B) — RepRap/Duet.** The same job with `CNC Firmware = RepRap`. **Get (B):** identical
+      tail. **Pass:** same as (A). RRF's `M84 S<seconds>` is the same idle-timeout form.
+
+      **Do (C) — the GRBL regression.** Re-post H2 unchanged. **Get (C):** still ends `M30` then `%`,
+      with **no `M84` and no `M2` anywhere**. **Pass:** the GRBL tail is byte-identical to
+      `H2.gcode` (2026-07-31) apart from the timestamp. The fix is inside the non-GRBL branch, so
+      this is the row that proves it stayed there.
+
+      **Do (D) — the custom stop file bypass.** Set `08 - External Include Files` → `Stop File` to any
+      file and post on Marlin. **Get (D):** the included file's contents, and **no `M84 S60`/`M2`** —
+      the same treatment `M30` already gets on GRBL. **Pass:** the new blocks are absent. This is
+      deliberate: a stop file replaces the whole stop sequence, program end included.
 
 - [ ] **HR15 — `safeZforSection()` asks the passed section, and nothing moves.** Verifies the HR-15
       fix (docs/HReview.md). Each of the three F360-level branches (`Feed:` / `Retract:` / `Clearance:`)

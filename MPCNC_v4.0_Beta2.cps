@@ -1435,8 +1435,30 @@ function onClose() {
     // Default
     else {
       display_text("Job end");
+
+      // Marlin/RepRap emitted no program end at all, and nothing ever undid Start()'s M84 S0 --
+      // which disables the idle timeout for the whole job so the machine cannot lose position
+      // mid-run. With nothing restoring it, every axis stayed energised indefinitely after the job
+      // finished: motors and drivers heating for a job that is over. GRBL has neither problem
+      // (M30 resets modal state, and there is no equivalent timeout to disable), which is why this
+      // reads as a gap in the Marlin branch rather than a design choice.
+      //
+      // S60 restores a 60 second timeout rather than releasing the motors now. A bare M84 releases
+      // immediately, and an unbalanced LowRider gantry with no brake sinks in Z the moment it does;
+      // a timeout lets the operator retrieve the part with the axes still held, then releases on
+      // its own without anyone having to remember.
+      writeComment(eComment.Info, "   Restore stepper timeout");
+      writeBlock(mFormat.format(84), sFormat.format(60));
+
+      // M2 ends the program. NOT yet confirmed against these firmwares: M30 is deliberately
+      // GRBL-only above because Marlin reads M30 as "delete SD file", so this family's M-code
+      // semantics are known to diverge from GRBL's and M2 may simply be unrecognised here. The
+      // cost if it is: an unknown-command echo in the sender's log. All motion is flushed and the
+      // spindle is off by this point, so nothing moves either way. Settled by the Marlin/RRF post
+      // rather than by reading -- see docs/test-plan.md HR11.
+      writeBlock(mFormat.format(2));
     }
-    
+
     writeComment(eComment.Important, " *** STOP end ***");
   } else {
     loadFile(getProperty(properties.B_Include_StopFile));

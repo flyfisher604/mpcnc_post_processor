@@ -1077,6 +1077,38 @@ probably the right default for this machine family. Worth the user's call.
 **Pass:** an explicit program end is present. Second post on GRBL: still ends `M30` then `%`, with no
 `M84`/`M2` — the GRBL path is unchanged.
 
+#### As built — `M84 S60` chosen; `M2` emitted but flagged as unconfirmed
+
+Implemented at [:1436](../MPCNC_v4.0_Beta2.cps#L1436), in `onClose()`'s non-GRBL branch.
+`node --check` passes.
+
+1. **`M84 S60`, per the decision above.** A bare `M84` releases the motors the instant it runs, and
+   an unbalanced LowRider gantry with no brake sinks in Z when it does; the timeout holds the axes
+   while the operator retrieves the part and then releases without anyone remembering to. Emitted
+   with an `   Restore stepper timeout` Info comment, mirroring `Start()`'s `   Disable stepper
+   timeout` so the pair reads as one bracket around the job.
+
+2. **`M2` is emitted, but the diff above overstated the confidence in it.** This post confines `M30`
+   to GRBL *because Marlin reads `M30` as "delete SD file"* — so it is already established that this
+   firmware family's M-code semantics diverge from GRBL's, and `M2` may be unrecognised here too.
+   That possibility deserves stating rather than assuming, and it also means the existing absence of
+   a program end may have been an informed choice rather than the oversight this finding assumed.
+   Emitted anyway, because the cost of being wrong is bounded: motion is flushed and the spindle is
+   off before this point, so an unsupported `M2` produces an unknown-command echo and nothing else.
+   The call site says so, and **test-plan HR11 (A) is written to settle it from the sender's console**,
+   not from the file — the block appears in the file whether or not the firmware honours it. If it
+   turns out unsupported, the follow-up is to drop `M2` and record that end-of-file *is* the program
+   end on Marlin/RRF; the `M84 S60` half stands either way.
+
+3. **The `Stop File` branch is deliberately untouched.** `onClose()` bypasses the whole stop block
+   when `B_Include_StopFile` is set, and `M30` is already inside the bypassed region — so a custom
+   stop file owns the entire stop sequence, program end included. The new blocks went beside `M30`
+   rather than after the branch, keeping that contract rather than half-breaking it. Covered by
+   test-plan **HR11 (D)**.
+
+4. **Stale reference files.** `H6 - Marlin.gcode` and `H6 - RRF.gcode` end `M117 Job end` with
+   nothing after; both now differ at the tail. Flagged on the H6 row — its assertions are unaffected.
+
 ---
 
 ### HR-12 — a manual spindle is never told about an RPM change between operations — **Medium** · `READ`
