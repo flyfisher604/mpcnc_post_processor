@@ -19,14 +19,22 @@ and findings live in the two review files:
 
 *Written so a fresh session can resume with no other context. Update it when the situation moves.*
 
-**Baseline.** Branch **`v4.0-hreview-fixes`**, cut from `wcs-reworked-flow` at `baf37bf`. Working tree
-clean apart from an untracked `MPCNC_v4.0_Beta1.zip` (unrelated; add it or ignore it). **Nothing is
-half-done and nothing is known-broken.**
+**Baseline.** Branch **`v4.0-hreview-fixes`**, cut from `wcs-reworked-flow` at `baf37bf`, now at
+**`4db467b`**. Working tree clean apart from an untracked `MPCNC_v4.0_Beta1.zip` (unrelated; add it or
+ignore it). **Nothing is half-done and nothing is known-broken.**
 
 **The branch's code work is done.** Every hobbyist-scoped finding that had a fix is landed; what is
 left on this branch is **posting**, not coding — three sessions, ranked and specified in
 `HReview.md` §3. Start with **Marlin + RRF**: it clears the most rows in one firmware switch and
 carries the branch's only open correctness question (whether `M2` is honoured at all).
+
+**The docs were reorganized at `4db467b`** (2026-07-31), which is why nothing here reads like the
+per-row tracking it replaced. Three files now, split along the hobbyist/professional line the work had
+already taken; `docs/test-plan.md` was dissolved into the two review files and deleted (recover it with
+`git log --follow -- docs/test-plan.md`). Pruning rule applied throughout, and worth keeping to:
+**verified + committed → one paragraph; committed but unposted → the finding plus its Do→Get row and
+any as-built decision the code does not already state; unimplemented → keep the proposed diff.** A
+restated diff of committed code is noise — read the code and the commit message instead.
 
 **Standing rule — a code change is not done until its review file is updated**, in the same commit:
 hobbyist behaviour → `HReview.md`, professional behaviour → `PReview.md`. Add the Do→Get row, name the
