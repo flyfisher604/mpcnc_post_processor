@@ -1,7 +1,7 @@
-<!-- doc-sync: MPCNC_v4.0_Beta2.cps @ 710b9d4
+<!-- doc-sync: MPCNC_v4.0_Beta2.cps @ 924d1f6
      This README documents the post as of the commit above. It is NOT kept in sync
      automatically. To refresh it, review only what changed in the post since that ref:
-       git diff db7644b..HEAD -- MPCNC_v4.0_Beta2.cps
+       git diff 924d1f6..HEAD -- MPCNC_v4.0_Beta2.cps
      Then bump the ref to the new HEAD. -->
 Fusion 360 CAM Post Processor for MPCNC / LowRider
 ====
@@ -377,6 +377,15 @@ safe height is meaningful across all of a job's parts. It is:
 - **Work-Z probing only.** `G38.2` down to a touch plate (thickness compensated via
   **Plate Thickness**), with attach/remove pauses governed by **Probe Pause**. There is no
   tool-length system, and X/Y is never probed (jog manually).
+- **G38 Target is a travel limit, not a destination — on the modes where the post can make it
+  one.** `G38 Target` is emitted as a `Z` word, so it means "descend to this height in the
+  current work frame". On the two modes where you have *just* placed the tool — **Set X0 Y0 to
+  Current Pos, Probe Z0** and **Jog to X0 Y0, Probe Z0** — the post writes a provisional `Z0` at
+  the current height before probing, so the default `-10` really is "descend at most 10 mm" and
+  the probe overwrites it moments later. On the **Use Active WCS …** and added-part modes it
+  cannot: the tool arrives from a retracted clearance, so the target stays relative to the
+  *stored* zero. Size it against that stored zero on those modes, or the probe can run long or
+  never contact at all.
 - **Probe Pause** (default `Before & After`) controls the operator prompts around each
   *part* probe — attach before, detach after; set `No` for a fixed/permanent probe. It
   does not affect the spoilboard base probe (see **Probe to Set Base**).
@@ -402,6 +411,10 @@ before emitting bad g-code:
   is meaningless across un-probed offsets). Single-WCS jobs are exempt.
 - **Marlin is single-frame** — a Marlin job that uses more than one distinct work offset
   is a hard error (`G92` can't fake multiple WCS).
+- **The tool axis must be machine +Z** — a 3-axis Setup built off a model face rather than the
+  stock top posts geometry the machine would cut in the wrong plane, so an off-axis section is
+  rejected with the tilt named. Re-orient the Setup's Z. Unlike the guards above this one fires
+  once output has started, so it leaves a truncated file on disk; discard it.
 
 ## G1 → G0 rapid mapping (hobby-license workaround)
 
@@ -434,6 +447,12 @@ down proportionally, and the result is capped at **Max Toolpath Speed**. Scaling
 ever *reduces* a feed. (Because scaling is 3-dimensional, a resulting toolpath feed can
 look higher than a single axis limit while each axis is still within its own limit.)
 
+`G2`/`G3` arcs are scaled too, against the limits of the **plane the arc lies in** — an XY arc
+against **Max XY Cut Speed**, a ZX or YZ arc against the slower of the two axes it sweeps. An arc
+can therefore post *slower* than the straight moves either side of it and still be right: a
+diagonal `G1` splits its feed across two axes, while an arc reaches the full feed on one axis at
+each quadrant, so the post holds it to the axis limit.
+
 ---
 
 # Property reference
@@ -444,7 +463,7 @@ Groups appear in the Fusion dialog in the order below.
 |Title|Description|Default|
 |---|---|---|
 |CNC Firmware|Dialect of g-code to create (GRBL / Marlin / RepRap).|**GRBL**|
-|Manual Spindle On/Off|Issue pauses to manually turn the spindle on/off.|**true**|
+|Manual Spindle On/Off|Issue pauses to manually turn the spindle on/off — a prompt to switch **on** at the start and to switch **off** at each tool change and at the end, on every firmware. No `M3`/`M5` is emitted on this path; the post asks rather than commands.|**true**|
 |Comment Level|Verbosity: Off, Important, Info, Debug.|**Info**|
 |Use Arcs|Use G2/G3 for circular moves.|**true**|
 |Enable Line #s|Emit sequence numbers.|**false**|
@@ -464,7 +483,7 @@ Groups appear in the Fusion dialog in the order below.
 |Max Z Cut Speed|Max Z cut speed (mm/min).|**180**|
 |Max Toolpath Speed|Cap for the scaled toolpath feed (mm/min).|**1000**|
 
-## 03 - Map G1s to Rapids (disable when using full license)
+## 03 - Map G1s to Rapids - disable when using full license
 |Title|Description|Default|
 |---|---|---|
 |First G1 → G0 Rapid|Convert the first `G1` of a toolpath to a rapid.|**false**|
@@ -493,7 +512,7 @@ Groups appear in the Fusion dialog in the order below.
 |Subsequent WCS / Part|Multi-part only — what to do at each added part's WCS: **Use Active WCS X0 Y0, Probe Z0** / **Use Active WCS X0 Y0 Z0** / **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**. Not supported on Marlin.|**Use Active WCS X0 Y0, Probe Z0**|
 |Probe Pause|Operator prompts around each part probe: **No** / **Before** / **Before & After**.|**Before & After**|
 |Probe with G38.2|Probe with `G38.2` (On) or `G28` (Off). GRBL always `G38.2`.|**On**|
-|G38 Target|Furthest Z the probe move travels to.|**-10**|
+|G38 Target|Furthest Z the probe move travels to. A true relative limit on the two just-positioned modes; relative to the *stored* zero on the **Use Active WCS …** modes — see *Probing and tool changes*.|**-10**|
 |G38 Speed|Probe feedrate (mm/min).|**30**|
 |Safe Z|Retract height after probing; also the no-base added-part re-probe retract. A number or a Fusion height (e.g. `Retract:15`).|**Retract:15**|
 |Plate Thickness|Touch-plate thickness (compensated into Z).|**0.8**|
@@ -561,6 +580,13 @@ pick to match your wiring. Set a channel to **Use custom** to use the custom str
   arcs.
 - Canned cycles (drill/peck/bore/tap) are expanded into plain G0/G1 moves.
 - Manual NC **Pass through** commands are emitted verbatim.
+- **End of program differs by firmware.** GRBL ends with `M30`. Marlin and RepRap get
+  `M84 S60` first, restoring the 60-second idle timeout the post disables for the duration of
+  the job (a bare `M84` would drop an unbalanced gantry in Z). RepRap then gets `M2`, which it
+  has supported since RRF 3.5.1 and which runs your `stop.g` — if that macro disables the
+  steppers, it overrides the timeout just set. Marlin gets no program-end code because it has
+  never implemented one: `M2` is unknown there and `M30` means "delete SD file", so on Marlin
+  the end of the file *is* the end of the program.
 - GRBL laser jobs likely need laser mode enabled
   ([`$32=1`](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Laser-Mode)).
 - Built-in tool change with LCD/SD: printing from SD and using the LCD to restart is
