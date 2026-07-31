@@ -5,11 +5,11 @@ The review of the post from the hobbyist's chair, and the verification record fo
 point, and every property branch a hobbyist can reach. **Findings:** 19 (`HR-1`…`HR-19`); ten fixed
 on branch `v4.0-hreview-fixes`; six reclassified as professional and moved to `docs/PReview.md`.
 
-**Six findings are closed with posted evidence** (HR-1, HR-3, HR-5, HR-6, HR-11, HR-15). Four landed
-fixes still owe a post: **HR-2** and **HR-17 (C)** need a drill + tap job, **HR-4** needs an inch
-Setup, **HR-14** needs a coolant channel — see [§3 Status](#3-status). Two findings opened on
-2026-07-31 during session 1 and carry no fix yet: **HR-18** (`loadFile()` newline, a real corruption
-path) and **HR-19** (cosmetic).
+**Six findings are closed with posted evidence** (HR-1, HR-3, HR-5, HR-6, HR-11, HR-15), and **HR-4**
+is closed on **(A)(B)(D)** — only the mapper half of its (C) is outstanding. Two landed fixes still
+owe a post in full: **HR-2** and **HR-17 (C)** need a drill + tap job, **HR-14** needs a coolant
+channel — see [§3 Status](#3-status). Two findings opened on 2026-07-31 during session 1 and carry no
+fix yet: **HR-18** (`loadFile()` newline, a real corruption path) and **HR-19** (cosmetic).
 
 > **Standing rule — a code change is not done until this file is updated.** Every change to
 > `MPCNC_v4.0_Beta2.cps` that touches hobbyist behaviour updates this file **in the same commit**:
@@ -138,7 +138,7 @@ notes that used to live in this file are gone.
 | **HR-1** | Provisional `Z0` bounds the `G38 Target` on the two just-positioned probe modes | `8d61790` | **Default path.** Breaks the old byte anchor | ✅ **closed** — (A)(B)(C) + both firmwares |
 | **HR-3** | Manual spindle prompts to switch OFF on GRBL too | `43d09aa` | **Every GRBL job's tail** | ✅ **closed** — (A)(B)(D) |
 | **HR-2** | `isProbeOperation()` defined locally so canned cycles can post at all | `9c87fb0` | Drilling path only | harness only — **unposted** |
-| **HR-4** | Safe-Z literal fallbacks convert mm→output unit | `439ce2d` | **Inch jobs only** — identity in mm | harness only — **unposted** |
+| **HR-4** | Safe-Z literal fallbacks convert mm→output unit | `439ce2d` | **Inch jobs only** — identity in mm | ✅ **(A)(B)(D) closed**; (C)'s mapper half owed |
 | **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + `8054b6e` | **Every Marlin/RRF job's tail.** GRBL untouched | ✅ **closed** — (A)(B)(C)(D) all posted |
 | **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | harness before/after — **unposted** |
 | **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | ✅ **closed** — (A)(B) on `H15a - GRBL.gcode` |
@@ -148,7 +148,7 @@ Open with no code change: **HR-16** (recorded, no fix proposed), **HR-18** (`loa
 a Do→Get row, deliberately unfixed), **HR-19** (cosmetic, fold into the next sweep). Moved to
 `docs/PReview.md`: **HR-7**, **HR-8**, **HR-9**, **HR-10**, **HR-12**, **HR-13**.
 
-### Verification owed — session 1 is done; two sessions remain
+### Verification owed — sessions 1 and 2 are done; one session remains
 
 **Session 1 ran on 2026-07-31** and closed **HR-1**, **HR-3**, **HR-5**, **HR-11** and **HR-15**,
 and evidenced **HR-17 (A)(B)(D)**. Eight files:
@@ -170,14 +170,30 @@ and evidenced **HR-17 (A)(B)(D)**. Eight files:
 > And enabling the mapping group changed **no motion** on this job, so `isSafeToRapid()`'s conversion
 > branches are still untested — see §6.
 
+**Session 2 — the inch session — ran on 2026-07-31** and closed **HR-4 (A)(B)(D)**. Four files, the
+project's first inch output of any kind:
+
+| File | Config (delta from defaults) | Serves |
+|---|---|---|
+| `H4base - GRBL Inch.gcode` | inch, **all defaults** | HR-4 (D) — **the inch reference** |
+| `H4a - GRBL Inch.gcode` | inch, `06` Safe Z = `20` | HR-4 (A) |
+| `H4b - GRBL.gcode` | mm, `06` Safe Z = `20` | HR-4 (B) — the mm regression |
+| `H4c - GRBL Inch.gcode` | inch, group 03 all on, Map: Safe Z to Rapid = `20` | HR-4 (C), half only |
+
+> **The inch files are worth more than the row that motivated them.** No inch job had ever been
+> posted, so every other `propertyMmToUnit()` call site on the probe path was equally unevidenced;
+> `H4a` shows all of them at once. And `H4c` re-confirmed, in a second unit, that this CAM cannot
+> exercise `isSafeToRapid()` — see §6.
+
 Remaining, ranked by value:
 
 1. **GRBL / mm, new CAM: a drill + tap job.** Clears **HR-2 (A)(A2)** and **HR-17 (C)** — the tapping
-   warning is the last piece of the sanitizer fix without evidence. **HR-14** rides along on any GRBL
-   job (set the tool coolant to *Flood and Mist* and Channel A Mode to match). Turn group 03 **on** and
-   **HR-15 (A)(B)** plus the `isSafeToRapid()` branches come with it.
-2. **GRBL / inch.** Clears **HR-4 (A)(C)(D)**. There is still **no inch reference file anywhere**, so
-   this is a first in its own right.
+   warning is the last piece of the sanitizer fix without evidence. **HR-14 (A)(B)(C)** rides along on
+   any GRBL job with a coolant channel configured (the existing face-mill tool already requests
+   *Flood*, so (C) needs no CAM edit at all).
+2. **A linking toolpath, either unit, new CAM.** Clears **HR-4 (C)**'s mapper half and the
+   `isSafeToRapid()` conversion branches in §6 in one post — the same job serves both, and nothing
+   else can reach either.
 
 Three results worth carrying forward rather than re-deriving:
 
@@ -472,25 +488,55 @@ is the one fix on the branch with no blast radius — every saved reference is a
 `0.2` (level passes through untouched); relative level → `15` / `0.5906`; absent → `15` / `0.5906`;
 bare `20` → `20` / `0.7874`; malformed `Retract:` → `15` / `0.5906`.
 
-**Do (A) — inch job, bare-number probe Safe Z.** An **inch** Setup, one milling op with a probe,
-group-06 `Safe Z` = `20`. **Get (A):** `(   Retract the tool to 0.7874015748031497)` →
-`G0 Z0.7874 F<travelZ>`, and Resolved Values reads `Probe SafeZ = Const = 0.7874`. **Pass:**
-`Z0.7874`, **not** `Z20`. *(The unformatted number in the comment is pre-existing — `probeTool()`
-prints `retractZ` raw rather than through `zFormat`. Cosmetic; don't chase it here.)*
+**Verified (A)(B)(D) — session 2, 2026-07-31.** **(A)** `H4a - GRBL Inch.gcode`, `Safe Z` = `20`:
+`(   Probe SafeZ = Const = 0.7874 -- a fixed height, no F360 level consulted)` →
+`(   Retract the tool to 0.7874015748031497)` → `G0 Z0.7874 F11.81`. `Z0.7874`, **not** `Z20`.
+*(The unformatted number in the comment is pre-existing — `probeTool()` prints `retractZ` raw rather
+than through `zFormat`. Cosmetic; don't chase it.)* **(B)** `H4b - GRBL.gcode` is the same property
+value in **mm** and differs from `H11c - GRBL.gcode` in **five lines only**: timestamp, the
+`I_Probe_SafeZ` value, the Resolved Values line, the retract comment, and `G0 Z5.08 F300` →
+`G0 Z20 F300`. No motion, feed or ordering moved. **(D)** `H4base - GRBL Inch.gcode`, both Safe-Z
+properties at their `Retract:15` default, reads `fallback 0.5906, resolves to 0.2` on **both** lines
+with `Inter Part Safe Z in output units = 1.5748` beside them — no line in the block mixes units.
 
-**Do (B) — mm regression.** Same job in **mm**, `Safe Z` = `20`. **Get (B):** `G0 Z20` and
-`Probe SafeZ = Const = 20.000`, exactly as before. **Pass:** byte-identical to a pre-fix post. This is
-the row that proves no existing mm PASS row is invalidated.
+**The 2×2 is what makes it decisive** — the same property value resolving by unit, and the identity
+in mm that leaves every saved reference intact:
 
-**Do (C) — the mapper, inch job.** Inch Setup, all four `03 - Map G1s to Rapids` on,
-`Map: Safe Z to Rapid` = `20`. **Get (C):** the per-section comment reads
-`( SafeZ using const: 0.7874015748031497)` — it was `( SafeZ using const: 20)` — and at least one
-`( Safe G1 --> G0)` conversion appears where a pre-fix post of the same job had none. **Pass:** both.
-*(That comment is `Important` level, so it survives at Comment Level `Important`.)*
+| `Safe Z` property | mm | inch |
+|---|---|---|
+| `Retract:15` (default) | `Z5.08` | `Z0.2` |
+| `20` | `Z20` | `Z0.7874` |
 
-**Do (D) — header coherence.** Any inch job with `Retract:15` on both Safe-Z properties. **Get (D):**
-`Map SafeZ = Retract level, fallback 0.5906, resolves to <n>` — fallback and resolved value in the
-**same** unit. **Pass:** no line mixes mm and inch.
+**The pre-fix half came free.** `H7c.gcode` / `H7c-a.gcode` were posted 2026-07-30 14:59, before
+`439ce2d` landed at 16:51, and read `(   Retract the tool to 5.08)` — identical to `H11c`'s, so the mm
+path demonstrably did not move. **(B)'s original pass criterion was wrong and is corrected here:** it
+asked for a *byte-identical* pre-fix post, which HR-4 itself made impossible by rewriting
+`describeSafeZ()` — `H7c-a` reads `(   Map SafeZ mode = Retract : default = 15)` where the current
+build reads `(   Map SafeZ = Retract level, fallback 15, resolves to 5.08)`. The criterion is
+**motion-identical with the same resolved retract**.
+
+**Every other conversion on the probe path is evidenced too**, for the first time — no inch job had
+ever been posted, so none of these call sites had any posted evidence either:
+`(   Set Z to probe thickness: Z0.0315)` (0.8 mm), `G38.2 F1.18 Z-0.3937` (G38 Speed 30, Target -10),
+`F11.81` / `F98.43` (Travel Z 300, Travel XY 2500). Fusion's own cut feeds map 1:1 onto `H11c`'s —
+`F105`/`F52.5`/`F40`/`F13.33` against `F2667`/`F1334`/`F1016`/`F339` — so it is the same geometry and
+nothing is converted twice.
+
+**(C) — half evidenced, half blocked on CAM.** `H4c - GRBL Inch.gcode` (inch, all three group-03
+booleans on, `Map: Safe Z to Rapid` = `20`) carries the decisive comment
+`( SafeZ using const: 0.7874015748031497)`; pre-fix that line read `( SafeZ using const: 20)`, a
+threshold of twenty **inches** that no toolpath can reach, which is the whole defect. But **no
+conversion fired** — zero `Safe G1 --> G0`, zero `First G1 --> G0`, and diffed against `H4base` that
+comment is the only added line. The job cannot exercise it: a 20 mm / 0.7874 in threshold sits *above*
+the 5.08 mm that already defeated `H15a - GRBL.gcode` in mm, while the job's highest Z is `Z0.6`
+(15.24 mm). The threshold conversion is proven; that the mapper then converts anything is not.
+
+**Do (C) — re-post on a linking toolpath.** An inch Setup on a job with a **horizontal link move at or
+above safe Z** (several contours linking at retract height), group 03 all on, and
+`Map: Safe Z to Rapid` set **below** the link height. **Get (C):** the converted `SafeZ using const:`
+comment as above, plus at least one `( Safe G1 --> G0)`. **Pass:** both. One re-post closes this and
+the `isSafeToRapid()` gap in §6 together. *(That comment is `Important` level, so it survives at
+Comment Level `Important`.)*
 
 ---
 
@@ -731,7 +777,7 @@ made with different *Subsequent WCS / Part* settings — inert on a single-secti
 feed, no comment reordering**, which is what shows the vestigial-argument and `flushMotions()` items
 changed nothing.
 
-**Do (C) — the tapping warning.** Folds into session 2; this is the row HR-2 (A2) now carries. **Get
+**Do (C) — the tapping warning.** Folds into session 3; this is the row HR-2 (A2) now carries. **Get
 (C):** `( >>> WARNING: Speed-feed synchronization rigid tapping is not supported; a floating/tension
 tap holder is required)` — single-spaced.
 
@@ -838,6 +884,9 @@ since the spoilboard base is a professional feature.
       `forceSectionToStartWithRapid` never meets a `G1`), and every cut move sits below the 5.08 mm
       safe height. **So this needs CAM, not a dialog change** — a toolpath with a horizontal link move
       at or above safe Z. It is the last untested code path a hobbyist is told to enable.
+      ⚠ **Confirmed a second time, in inch, by `H4c - GRBL Inch.gcode`** — same zero conversions with
+      the threshold raised to 0.7874 in, which only put it further out of reach. **HR-4 (C) and this
+      row are now the same missing job** and close together on one post; specify it from HR-4 (C).
 - [ ] **An HP-5 row: two operations, one tool, one WCS, no base.** Every PASS row above is a
       **single-section** job, so every section-boundary behaviour — the
       `forceSectionToStartWithRapid` lifecycle, position tracking across injected motion, spindle-speed
@@ -863,9 +912,9 @@ reading: preamble ordering, WCS selection before any origin write, units and abs
 probe, comment syntax per firmware, arc and cycle handling, guard placement, and the origin/probe
 dispatch for all six First WCS / Part modes. What reading could not establish — HR-2's kernel
 dependency and HR-6's `workPlane` behaviour — HR-6 has since settled by posting; HR-2's drilling half
-is session 2. **To claim "high confidence that the post outputs correctly formatted, structurally
-sound g-code for a hobbyist from every F360 entry point"**, the three posting sessions in §3 plus the
-HP-5 row above are what stand between here and that claim.
+is session 3. **To claim "high confidence that the post outputs correctly formatted, structurally
+sound g-code for a hobbyist from every F360 entry point"**, the two remaining posting sessions in §3
+plus the HP-5 row above are what stand between here and that claim.
 
 ---
 

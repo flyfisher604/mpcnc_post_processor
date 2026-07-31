@@ -29,9 +29,15 @@ session-1 results commit. Working tree clean apart from an untracked `MPCNC_v4.0
 mapping-on one. **`H2.gcode` is retired as a comparison baseline** (it predates HR-17); keep it only
 as HR-17's "before".
 
-**What is left is four landed fixes that each need a job this CAM cannot provide** — `HR-2` +
-`HR-17 (C)` a drill + tap, `HR-4` an inch Setup, `HR-14` a coolant channel — plus one code decision
-(`HR-18`) and a CAM-dependent gap (`isSafeToRapid()`). Ranked and specified in `HReview.md` §3.
+**Session 2 — the inch session — is also done (2026-07-31).** Four files closed **HR-4 (A)(B)(D)** and
+gave the project its first inch output of any kind: `H4base - GRBL Inch.gcode` is the inch reference.
+`HR-4 (C)`'s mapper half did not run, for the same reason `H15a` did not — the job has no move at or
+above safe Z — so **`HR-4 (C)` and the `isSafeToRapid()` gap collapsed into one missing job** and now
+close on a single post.
+
+**What is left is three landed fixes that each need a job this CAM cannot provide** — `HR-2` +
+`HR-17 (C)` a drill + tap, `HR-14` a coolant channel, `HR-4 (C)` + `isSafeToRapid()` a linking
+toolpath — plus one code decision (`HR-18`). Ranked and specified in `HReview.md` §3.
 
 **Two operational lessons from session 1, both cheap to forget and expensive to repeat.**
 **(1) Fusion posts with its own copy** of the `.cps` at
@@ -66,20 +72,21 @@ physical measurement are out of scope, so every row must stand on the posted fil
 **Next actions, in order.**
 
 1. ~~Session 1 — Marlin + RRF~~ — **done 2026-07-31**, six findings closed. See above.
-2. **Session 2 — GRBL/mm, drill + tap CAM.** Clears **HR-2 (A)(A2)** and **HR-17 (C)**, the last
+2. ~~Session 2 — GRBL/inch~~ — **done 2026-07-31**, **HR-4 (A)(B)(D)** closed. See above.
+3. **Session 3 — GRBL/mm, drill + tap CAM.** Clears **HR-2 (A)(A2)** and **HR-17 (C)**, the last
    piece of the sanitizer fix without evidence. **HR-14 (A)(B)(C)** rides along on any GRBL job with a
    coolant channel configured. Per-post parameters are in `HReview.md` §3.
-3. **Session 3 — GRBL/inch.** Clears **HR-4 (A)(B)(C)(D)**. There is still no inch file anywhere.
 4. **Decide HR-18** — `loadFile()` adds no newline after an included file, so with `Info` comments
    suppressed the next block merges onto the include's last line (`M5M400`). Found in session 1,
    deliberately unfixed: the one-line guard sits in the `loadFile()` every include branch shares, and
    none of those branches has a test row. Diagnostic post specified in `HReview.md` §4.3.
    **HR-19** (doubled space in `M291`) waits for the next tidy-up sweep.
-5. **CAM-dependent gap: `isSafeToRapid()`.** Its conversion branches have never run.
-   `H15a - GRBL.gcode` has the mapping group on and still fired nothing — the job's sections already
-   begin with real `G0` rapids and every cut sits below safe Z. Needs a toolpath with a horizontal
-   link move at or above safe Z, not a dialog change. Last untested path the README tells a hobbyist
-   to enable.
+5. **CAM-dependent gap: `isSafeToRapid()`, now joined to `HR-4 (C)`.** Its conversion branches have
+   never run. `H15a - GRBL.gcode` (mm) and `H4c - GRBL Inch.gcode` (inch) both have the mapping group
+   on and fired nothing — the job's sections already begin with real `G0` rapids and every cut sits
+   below safe Z, in either unit. Needs a toolpath with a horizontal link move at or above safe Z, not
+   a dialog change. Last untested path the README tells a hobbyist to enable; specified as
+   `HReview.md` → HR-4 **Do (C)**.
 6. **Dialog-only checks, no posting** — **D1** and **D3**'s dialog half (`PReview.md` §3.3). D3 gates
    trust in every dialog row: a saved preset should survive, but a posted file cannot tell a surviving
    preset from re-entered values. HR-17 renamed group 03's label, so D3 now has a real string change
