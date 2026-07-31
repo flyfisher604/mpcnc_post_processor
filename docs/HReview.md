@@ -739,7 +739,7 @@ arcs back at `F1800` — proves the cap is gated by the property and the default
 
 ---
 
-### HR-6 — no tool-orientation guard: a rotated 3-axis Setup posts silently wrong g-code — **Medium** · `POST`
+### HR-6 — no tool-orientation guard: a rotated 3-axis Setup posts silently wrong g-code — **Medium** · `POST` · **IMPLEMENTED**
 
 **Reaches it:** any hobbyist who builds a Setup off a model face rather than the stock top — a
 routine accident in Fusion, and the symptom is a part cut in the wrong plane rather than an error.
@@ -774,11 +774,55 @@ correctly built Setup:
 +
 ```
 
-**Verify (Do → Get).**
-*Do:* duplicate the hobby Setup, re-orient its Z along the model's X, post. *Get:* the post aborts
-naming the operation, and **no `.gcode` is written** (same shape as H7d). **Pass:** the abort. Then
-re-post the normal HP-1 job unchanged to prove the guard does not fire on an upright Setup — that
-second half is the one that matters, since a false positive here would block every job.
+#### As built — deliberately not the idiomatic form
+
+Added in `onSection()` at [:1650](../MPCNC_v4.0_Beta2.cps#L1650), immediately after its multi-axis
+sibling. `node --check` passes. Two decisions, both driven by the fact that **this guard's failure
+mode is asymmetric**: it catches a rare misconfiguration, but a false positive aborts *every* job.
+
+1. **Component-wise comparison, not `isSameDirection()`.** The reference form uses the kernel's
+   `isSameDirection(workPlane.forward, new Vector(0,0,1))`. I checked what this post already depends
+   on — `new Vector`, `localize`, `clamp`, `spatial`, `toRad`, `linearize`, `getCircularPlane`,
+   `isMultiAxis`, `is3D`, `getGlobalRange` are all in use, but **`isSameDirection` and
+   `Section.workPlane` are both new dependencies**, neither evidenced by any posted file. HR-2 is the
+   cautionary case: an unverified kernel global inside a guard is how you turn a missing feature into
+   a dead post. Comparing `forward`'s components costs the same line and removes one of the two
+   unknowns.
+2. **The condition fails open.** It errors only when the orientation is readable *and* unambiguously
+   not `+Z`. A missing `workPlane`, a missing `forward`, non-numeric or `NaN` components all fall
+   through and post exactly as before. So if `Section.workPlane` turns out not to be the shape assumed
+   here, the outcome is "the guard silently does nothing" — the status quo — rather than "no job can
+   be posted". The tolerance is ~0.006° of tilt: orders of magnitude beyond float noise in a rotation
+   matrix, far below any orientation chosen on purpose, and a near-miss posts and cuts correctly.
+
+A `Debug`-level comment reports the tool axis it read, so a surprising result can be diagnosed from a
+posted file rather than by guesswork.
+
+**`setRotation()` deliberately omitted.** The reference snippet calls `setRotation(remaining)` after
+the check. Here the check *errors* on anything non-upright, so `setRotation()` could only ever be
+called with an identity plane — a no-op transform, but one whose effect on the kernel's coordinate
+delivery I cannot verify without posting. Adding it would risk changing output on every job for no
+benefit.
+
+**Harness-verified** over every shape `workPlane` might take: exact `+Z`, float noise and a 0.001°
+tilt → post; Z-along-X, Z-along-−Y, a 30° tilt, an inverted Z-down frame → rejected; missing
+`workPlane`, missing `forward`, non-numeric components, `NaN` → post (the fail-open cases). Eleven
+cases, all passing. What no harness can settle is what Fusion actually puts in `workPlane` — hence
+the row below.
+
+**Follow-up worth doing separately: promote both geometry guards into `validateJob()`.** This guard
+and the multi-axis check both fire in `onSection()`, after the header is written, so Fusion can leave
+a **truncated `.gcode` on disk** — a partial file someone could run. Guards A/B/C run in `onOpen()`
+and write nothing at all (H7d confirmed). Both geometry checks could iterate `getSection(i)` in
+`validateJob()` and fail before any output, which is strictly safer. Not done here: it changes the
+multi-axis guard's long-standing behaviour too, and that deserves its own decision rather than
+riding along with this one.
+
+**Verify (Do → Get).** Full row is **HR6** in `docs/test-plan.md`. **Run the regression half first
+and treat it as the real test:** re-post any previously-passing job (H2's is cheapest) and confirm it
+still posts with no `Tool orientation` message. If that fails, the guard misreads a normal Setup and
+must be reverted at once, because it would block all posting. Only then post a deliberately
+re-oriented Setup and confirm the error names the fix.
 
 ---
 
@@ -1299,7 +1343,9 @@ are actioned.
    are now correct. HR-4 committed; HR-5 uncommitted. Test-plan rows **HR4** and **HR5** added.
    Neither invalidates an existing PASS row: HR-4 is the identity in mm, and HR-5's branch is gated
    on `Scale Feedrate`, which defaults off.
-4. **HR-6**, **HR-10**, **HR-13**, **HR-14** — independent, small, each closes a silent failure.
+4. ~~**HR-6**~~ **done** (uncommitted) — test-plan row **HR6** added; run its regression half before
+   anything else, since a false positive would block all posting. **HR-10**, **HR-13**, **HR-14**
+   still open — independent, small, each closes a silent failure.
 5. **HR-7**, **HR-9**, **HR-12** — group-07 behaviour. Consider folding into the Phase-4 tool-change
    ordering work already scoped in `docs/plan.md` rather than patching twice.
 6. **HR-8** — do last, behind a motion-only diff of H2/H5/H7/H7c, and prefer the narrow variant if

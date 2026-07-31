@@ -75,6 +75,7 @@ firmware-variant rows note what changes elsewhere.
 | HR3 | Manual spindle prompts to switch OFF on GRBL too — job end and tool change | |
 | HR4 | Safe-Z literal fallbacks convert mm→output unit; inch jobs stop retracting to 15 in | |
 | HR5 | `Scale Feedrate` reaches G2/G3 arcs, not just G1 cuts | |
+| HR6 | A rotated 3-axis Setup is rejected — and an upright one still posts | |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -576,6 +577,51 @@ tool) unless a row says otherwise.
       > ZX where Z is the faster axis → the XY limit; an inch job → `900 mm/min` converted to
       > `35.433 in/min`; zero feed → zero. Eleven cases, all passing. That covers the arithmetic; the
       > posts above confirm the values reach the file.
+
+      *Result:* ____
+
+- [ ] **HR6 — A rotated 3-axis Setup is rejected; an upright one is untouched.** Verifies the HR-6
+      fix (docs/HReview.md). `onSection()` rejected multi-axis toolpaths but never checked a 3-axis
+      section's **orientation**. A Setup built on a model face rather than the stock top has its Z
+      along some other direction; Fusion emits ordinary X/Y/Z words for it, so the post emitted them
+      as though the frame were upright — the part cut in the wrong plane, with nothing in the file to
+      say so. This is the accident of picking the wrong face when creating a Setup.
+
+      **Run (A) first, and treat it as the row that matters.** A false positive in this guard aborts
+      *every* job, which is far worse than the misconfiguration it catches — so the regression half
+      is the real test and the rejection half is the bonus.
+
+      **Do (A) — the regression, i.e. nothing moved.** Re-post **any** previously-passing job
+      unchanged — H2's default hobby job is the cheapest. **Get (A):** a complete file, identical to
+      current output, with **no error and no `Tool orientation` message**. **Pass:** the job posts.
+      A failure here means the guard misreads a normal Setup and must be reverted immediately — it
+      would block all posting, so do not proceed to (B) until (A) passes.
+
+      **Do (B) — the rejection.** Duplicate the hobby Setup and re-orient it: in the Setup dialog set
+      the Z axis along the model's **X** (or pick a vertical face for the orientation). Keep one
+      ordinary 3-axis milling operation in it. Post. **Get (B):** Fusion reports
+      ```
+      Tool orientation is not supported: this operation's Z axis is not the machine Z.
+      Rebuild the Setup with its Z axis along the machine Z -- normally the stock top.
+      ```
+      **Pass:** the post errors and names the fix. Set Comment Level = `Debug` and re-post to see
+      ` onSection: tool axis X1 Y0 Z0` immediately before the error, which evidences *what* the guard
+      read — useful if (B) unexpectedly passes, since it distinguishes "guard is broken" from "Fusion
+      reported the section as upright".
+
+      > **Expect a truncated `.gcode` from (B), unlike Guard A/B/C.** This guard fires in
+      > `onSection()`, by which point the header is already written, so Fusion may leave a partial
+      > file on disk — whereas Guards A/B/C run in `onOpen()` and write nothing at all (H7d confirmed
+      > that). Note whether a file appears and how much of it. Both geometry guards (multi-axis and
+      > orientation) could be promoted into `validateJob()` so neither leaves a partial file; that is
+      > recorded as a follow-up in docs/HReview.md rather than done here.
+
+      > **Harness evidence already on record.** The guard predicate was extracted and exercised over
+      > every shape `workPlane` might take: exact `+Z`, float noise, and a 0.001° tilt all **post**;
+      > Z-along-X, Z-along-−Y, a 30° tilt and an inverted Z-down frame are all **rejected**; and a
+      > missing `workPlane`, a missing `forward`, non-numeric components and `NaN` components all
+      > **post** — the fail-open cases. Eleven cases, all passing. What the harness cannot tell you is
+      > what Fusion actually puts in `workPlane`, which is exactly what (A) and (B) settle.
 
       *Result:* ____
 

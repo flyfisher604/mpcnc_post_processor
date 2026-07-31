@@ -1647,6 +1647,35 @@ function onSection() {
     return;
   }
 
+  // A 3-axis section can still be ORIENTED off machine +Z -- a Setup built on a model face rather
+  // than on the stock top, which is an easy accident in Fusion. isMultiAxis() above does not catch
+  // it: Fusion emits ordinary X/Y/Z words for such a section, so with no guard the post emits them
+  // as though the frame were upright, the part is cut in the wrong plane, and nothing in the file
+  // says so. Every reference 3-axis post rejects this. See docs/HReview.md HR-6.
+  //
+  // Written to FAIL OPEN, deliberately. A false positive here would abort EVERY job -- far worse
+  // than the rare misconfiguration it catches -- and this is the post's first use of
+  // Section.workPlane, so the shape of that object is not yet evidenced by a posted file. The
+  // condition therefore errors only when the orientation is readable AND unambiguously not +Z;
+  // anything unreadable (no workPlane, no forward vector, non-numeric components) is treated as
+  // upright and posts exactly as before.
+  //
+  // Compared component-wise rather than with the kernel's isSameDirection(): that would add a
+  // second unverified global to a guard whose one hard requirement is that it must not throw, and
+  // the comparison costs a line either way. The tolerance is about 0.006 degrees of tilt -- orders
+  // of magnitude beyond any float noise in a rotation matrix, and far below any orientation a user
+  // would pick on purpose (the near-miss case posts, and cuts correctly).
+  var toolPlane = currentSection.workPlane;
+  var toolAxis = (toolPlane == undefined) ? undefined : toolPlane.forward;
+  if (toolAxis != undefined
+      && (typeof toolAxis.x == "number") && (typeof toolAxis.y == "number") && (typeof toolAxis.z == "number")
+      && ((Math.abs(toolAxis.x) > 1e-4) || (Math.abs(toolAxis.y) > 1e-4) || (toolAxis.z < (1 - 1e-4)))) {
+    writeComment(eComment.Debug, " onSection: tool axis X" + toolAxis.x + " Y" + toolAxis.y + " Z" + toolAxis.z);
+    error(localize("Tool orientation is not supported: this operation's Z axis is not the machine Z. "
+      + "Rebuild the Setup with its Z axis along the machine Z -- normally the stock top."));
+    return;
+  }
+
   // Every section needs to start with a Rapid to get to the initial location.
   // In the hobby version Rapids have been elliminated and the first command is
   // a onLinear not a onRapid command. This results in not current position being
