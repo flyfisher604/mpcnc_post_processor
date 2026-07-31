@@ -10,7 +10,7 @@ and findings live in the two review files:
 | File | Owns |
 |---|---|
 | `docs/HReview.md` | The hobbyist review, its nine landed fixes, and the hobbyist verification record |
-| `docs/PReview.md` | The professional side: six deferred findings, every multi-WCS / base / tool-change / dialog test row, and the jet/laser workstream. **The professional review itself has not been done** |
+| `docs/PReview.md` | The professional side: five deferred findings plus HR-20, every multi-WCS / base / tool-change / dialog test row, and the jet/laser workstream. **The professional review itself has not been done** |
 | this file | Design record, remaining work, resolved decisions |
 
 ---
@@ -43,11 +43,20 @@ call graph. Closed instead with `Personal.cps`, an uncommitted scratch copy that
 into `onLinear()`: 74 conversions at a 5.08 threshold, 2 at 15, zero unjustified, zero eligible-but-
 refused, and all 17,779 cut moves untouched. Full result and the method note in `HReview.md` §6 / §8.
 
-**`HReview.md` now opens with §0, a single 59-row register of every test and its state** — 40 pass,
-0 fail, 13 unrun, 6 n/a. That table is the authoritative status; nothing else in that file records a
-pass. **What is left reduces to four pieces of work:** a drill + tap CAM (`HR-2`, `HR-17 (C)`), a
-coolant channel (`HR-14`), four cheap posts on existing CAM (`HW-2`…`HW-5`), and three one-offs
-(`HR-6 (B)`, `HR-18 (A)`, `HW-6`). Ranked in `HReview.md` §3.
+**Session 4 — the drill + tap session — is also done (2026-07-31).** One file, `Drill_Tap.gcode`,
+closed **HR-2 (A)(A2)** and **HR-17 (C)**: the peck drill expands to plain `G0`/`G1` with no `G8x` and
+reaches STOP end, and the tapping warning is present eight times, single-spaced. It also exposed
+`spindleOn()`'s manual branch discarding every change after the first prompt, in two forms. **Scope
+call taken: drilling must work, tapping may error or warn, and a fuller tapping implementation is
+professional-review work.** So the RPM half is `HReview.md` HR-12 — **moved back out of `PReview.md`,
+because its mechanism involves no tool change and two operations on one tool at different RPMs is HP-5
+exactly** — and the spindle-reversal half is `PReview.md` **HR-20**, professional by that decision.
+
+**`HReview.md` now opens with §0, a single 61-row register of every test and its state** — 43 pass,
+0 fail, 11 unrun, 7 n/a. That table is the authoritative status; nothing else in that file records a
+pass. **What is left reduces to four pieces of work:** a coolant channel (`HR-14`), four cheap posts on
+existing CAM (`HW-2`…`HW-5`), three one-offs (`HR-6 (B)`, `HR-18 (A)`, `HW-6`), and one fix not yet
+written (`HR-12`). Ranked in `HReview.md` §3.
 
 **Two operational lessons from session 1, both cheap to forget and expensive to repeat.**
 **(1) Fusion posts with its own copy** of the `.cps` at
@@ -84,9 +93,9 @@ physical measurement are out of scope, so every row must stand on the posted fil
 1. ~~Session 1 — Marlin + RRF~~ — **done 2026-07-31**, six findings closed. See above.
 2. ~~Session 2 — GRBL/inch~~ — **done 2026-07-31**, **HR-4** closed. ~~Session 3 — the mapper~~ —
    **done 2026-07-31**, **HW-1** closed by harness. Both above.
-3. **Session 4 — GRBL/mm, drill + tap CAM.** Clears **HR-2 (A)(A2)** and **HR-17 (C)**, the last
-   piece of the sanitizer fix without evidence. **HR-14 (A)(B)(C)** rides along on any GRBL job with a
-   coolant channel configured. Per-post parameters are in `HReview.md` §3.
+3. ~~Session 4 — GRBL/mm, drill + tap CAM~~ — **done 2026-07-31**, **HR-2** and **HR-17** closed. Next
+   posting job is **HR-14 (A)(B)(C)**, which needs no new CAM — a coolant channel configured on any
+   GRBL job. Per-post parameters are in `HReview.md` §3.
 4. **Decide HR-18** — `loadFile()` adds no newline after an included file, so with `Info` comments
    suppressed the next block merges onto the include's last line (`M5M400`). Found in session 1,
    deliberately unfixed: the one-line guard sits in the `loadFile()` every include branch shares, and
@@ -101,7 +110,7 @@ physical measurement are out of scope, so every row must stand on the posted fil
    preset from re-entered values. HR-17 renamed group 03's label, so D3 now has a real string change
    on that group to survive, not just the reorder.
 7. **Open the Tool Change branch** — *Phase 4 — tool-change ordering + base-relative park* below,
-   folded together with **HR-7/8/9/10/12/13** (`PReview.md` §2). Design settled for the ordering half;
+   folded together with **HR-7/8/9/10/13** (`PReview.md` §2). Design settled for the ordering half;
    nothing depends on it and the base machinery underneath is verified.
 8. **The professional review proper** — the pass that produces `PReview.md`'s real content, using the
    method `HReview.md` used. Needs a multi-part / multi-fixture job to post against.
@@ -460,7 +469,7 @@ safety comment. *(Verified all three branches — `PReview.md` §4.)*
   offset**'s added-part halves (`PReview.md` P2/P3) and the multi-part rows generally. **Remaining to
   build:** tool-change ordering + base-relative park (below).
 - **Phase 5 — not started** (likely no-op).
-- **Hobbyist review — code complete for this branch's scope.** 17 findings; nine landed, six moved to
+- **Hobbyist review — code complete for this branch's scope.** 17 findings; nine landed, five moved to
   `PReview.md`, HR-16 recorded with no fix, HR-17 tidy-ups pending. Verification status in
   `HReview.md` §3.
 - **Professional review — not started.** `PReview.md` is a parking lot until it runs.
@@ -484,8 +493,10 @@ git if needed:
 ### Phase 4 — tool-change ordering + base-relative park *(one unit; design settled)*
 
 > **This is the Tool Change branch's work.** Tool changes are a professional feature (Fusion Personal
-> does not support them), so this item and the six deferred findings — **HR-7**, **HR-8**, **HR-9**,
-> **HR-10**, **HR-12**, **HR-13** — land together on a separate branch. Read each one's entry in
+> does not support them), so this item and the five deferred findings — **HR-7**, **HR-8**, **HR-9**,
+> **HR-10**, **HR-13** — land together on a separate branch. *(**HR-12** moved back to `HReview.md` on
+> 2026-07-31 — no tool change is involved. **HR-20**, tapping, is in `PReview.md` but is not part of
+> this unit and does not wait for it.)* Read each one's entry in
 > `PReview.md` §2 first; HR-10 and HR-13 have complete diffs and are independent of the reorder, so
 > they can go in first as warm-up commits.
 

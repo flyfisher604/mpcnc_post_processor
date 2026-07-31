@@ -39,7 +39,7 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**59 tests — ✅ 40 PASS · ❌ 0 FAIL · ⬜ 13 UNRUN · ➖ 6 n/a or moved to `PReview.md`.**
+**61 tests — ✅ 43 PASS · ❌ 0 FAIL · ⬜ 11 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
 
 **Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
 post and is the only method that proves what a hobbyist receives. `harness` is a node run against
@@ -61,8 +61,8 @@ for.
 | **HR-1 (C)** | **Absent** on `Use Active WCS` — the scope claim | posted | `HR1c.gcode` vs `H7c-a.gcode` | ✅ |
 | **HR-1 (D)** | Jet / tool-0 absence | — | → `PReview.md` **J1** | ➖ |
 | **HR-1 (E)** | Present on both firmwares, both origin modes | posted | `H11a`, `H11b - RRF`, both `H6` | ✅ |
-| **HR-2 (A)** | A drill posts at all — no `ReferenceError` abort | — | **needs a drill CAM** | ⬜ |
-| **HR-2 (A2)** | Tapping warning emitted per occurrence | — | **needs a tap CAM** | ⬜ |
+| **HR-2 (A)** | A drill posts at all — no `ReferenceError` abort, no `G8x` | posted | `Drill_Tap.gcode` | ✅ |
+| **HR-2 (A2)** | Tapping warning emitted per occurrence | posted | `Drill_Tap.gcode` | ✅ |
 | **HR-2 (B)** | Probing cycles still refused | — | licence cannot create one | ➖ |
 | **HR-2 (U)** | `isProbeOperation()` over 8 strategy/cycle inputs | harness | node | ✅ |
 | **HR-3 (A)** | GRBL prompts spindle OFF; no `M5`, no `M300` | posted | `H2.gcode` | ✅ |
@@ -87,6 +87,7 @@ for.
 | **HR-11 (C)** | GRBL tail untouched | posted | `H11c - GRBL.gcode` | ✅ |
 | **HR-11 (D)** | Stop file bypasses the whole stop block | posted | `H11d - Marlin.gcode` | ✅ |
 | **HR-11 (S)** | Whether Marlin / RRF honour `M2` | source | `gcode.cpp`, `GCodes2.cpp`, RRF changelog | ✅ |
+| **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | — | **no fix yet** — observed in `Drill_Tap.gcode` | ⬜ |
 | **HR-14 (A)** | `Flood and Mist` matches a channel | — | **needs a coolant channel** | ⬜ |
 | **HR-14 (B)** | Warning names the mode the operator saw | — | **needs a coolant channel** | ⬜ |
 | **HR-14 (C)** | Ordinary `Flood` unchanged | — | **needs a coolant channel** | ⬜ |
@@ -96,11 +97,12 @@ for.
 | **HR-16** | `onClose` traverse ordering — recorded, no fix | — | no test proposed | ➖ |
 | **HR-17 (A)** | Property heading no longer double-spaced | posted | six session-1 files vs `H2.gcode` | ✅ |
 | **HR-17 (B)** | Spindle prompt reads `… RPM` | posted | same | ✅ |
-| **HR-17 (C)** | Tapping warning single-spaced | — | **needs a tap CAM** (rides HR-2 (A2)) | ⬜ |
+| **HR-17 (C)** | Tapping warning single-spaced | posted | `Drill_Tap.gcode` | ✅ |
 | **HR-17 (D)** | The two inert tidy-ups changed nothing | posted | `H11c - GRBL.gcode` vs `H2.gcode` | ✅ |
 | **HR-17 (U)** | Sanitizer before/after over 4 input shapes | harness | node | ✅ |
 | **HR-18 (A)** | `loadFile()` newline — diagnostic, fix undecided | — | needs a stop file with no trailing newline | ⬜ |
-| **HR-19** | `M291` doubled space — cosmetic, no fix | — | no test proposed | ➖ |
+| **HR-19** | `M291` doubled space, and `()` vs `( )` — cosmetic, no fix | — | no test proposed | ➖ |
+| **HR-20** | Tapping needs a spindle reversal the post never commands | — | → `PReview.md` (professional, by decision) | ➖ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
 | **HW-2** | HP-5: two operations, one tool, one WCS | — | candidate: `Link.gcode`, unread | ⬜ |
 | **HW-3** | `Probe Pause = No` — neither prompt | — | cheap; folds into any GRBL session | ⬜ |
@@ -109,10 +111,10 @@ for.
 | **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 13 ⬜ rows are waiting on — four things, not thirteen.** A **drill + tap CAM** (HR-2 (A),
-(A2), HR-17 (C)); a **coolant channel** (HR-14 (A)(B)(C)); **four cheap posts on CAM that already
-exists** (HW-2, HW-3, HW-4, HW-5); and **three one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a stop
-file, HW-6 the final sweep). Ranked with per-post parameters in [§3](#3-status).
+**What the 11 ⬜ rows are waiting on — four things, not eleven.** A **coolant channel**
+(HR-14 (A)(B)(C)); **four cheap posts on CAM that already exists** (HW-2, HW-3, HW-4, HW-5); **three
+one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a stop file, HW-6 the final sweep); and **one fix that
+is not written yet** (HR-12 (A) — a finding, not a job). Ranked in [§3](#3-status).
 
 **The one honest gap inside a ✅.** HR-4 (C2) and HW-1 are the only rows carried by `harness` alone.
 They prove `isSafeToRapid()`'s logic is right; they do **not** prove a real post ever reaches it,
@@ -144,7 +146,9 @@ requiring the operator to know an undocumented precondition is a finding. Severi
 > tools … optionally group 07 enabled"*. Fusion's Personal licence does not support tool changes, and
 > Manual NC is treated the same way, so **group 07 and Manual NC are out of scope here** — the five
 > findings that were keyed to the old HP-5 (HR-7, HR-8, HR-9, HR-10, HR-12) plus HR-13 moved to
-> `docs/PReview.md`. HP-5 as redefined still matters: it is the only hobbyist persona with a
+> `docs/PReview.md`. **HR-12 came back on 2026-07-31** — that sweep was right for the other five and
+> wrong for it, because its mechanism involves no tool change: two operations on one tool at different
+> RPMs is HP-5 exactly. See §4.3. HP-5 as redefined still matters: it is the only hobbyist persona with a
 > **section boundary**, and no posted file has ever exercised one (see §6).
 
 **What a hobbyist does not change, and why it matters.** Group `04` = `None`, group `05` = `None`,
@@ -241,7 +245,8 @@ the last column says only whether the fix's rows are all in.
 
 Open with no code change: **HR-16** (recorded, no fix proposed), **HR-18** (`loadFile()` newline — has
 a Do→Get row, deliberately unfixed), **HR-19** (cosmetic, fold into the next sweep). Moved to
-`docs/PReview.md`: **HR-7**, **HR-8**, **HR-9**, **HR-10**, **HR-12**, **HR-13**.
+`docs/PReview.md`: **HR-7**, **HR-8**, **HR-9**, **HR-10**, **HR-13** — and **HR-20**, opened there by
+decision. **HR-12 was moved back here** (§4.3).
 
 ### Verification owed — sessions 1 and 2 are done; one session remains
 
@@ -289,12 +294,25 @@ files from `Personal.cps`, the harness post described in §8, on a two-operation
 | `Link-5-GRBL.gcode` | `Personal.cps`, group 03 all on, Map Safe Z = `Retract:15` → 5.08 | HW-1, HR-4 (C2) |
 | `Link-15-GRBL.gcode` | `Personal.cps`, group 03 all on, Map Safe Z = `15` | HW-1 — the threshold discriminator |
 
+**Session 4 — the drill + tap session — ran on 2026-07-31** and closed **HR-2 (A)(A2)** and
+**HR-17 (C)** from one file:
+
+| File | Config (delta from defaults) | Serves |
+|---|---|---|
+| `Drill_Tap.gcode` | GRBL/mm, **all defaults**; CAM = Peck Drill + 9/16-12 Tap, two tools | HR-2 (A)(A2), HR-17 (C) |
+
+> **It also opened two findings and settled a scope question.** `spindleOn()`'s manual branch drops
+> *both* the RPM change between the two operations and the direction reversal each tap withdrawal
+> asks for. The RPM half is **HR-12**, moved back here (§4.3); the direction half is **HR-20** in
+> `PReview.md`, professional by decision: **drilling must work, tapping may error or warn, and a
+> fuller tapping implementation belongs to the professional review.** Neither blocks the three rows
+> above, which assert cycle expansion and warning text only.
+
 Remaining, ranked by value:
 
-1. **GRBL / mm, new CAM: a drill + tap job.** Clears **HR-2 (A)(A2)** and **HR-17 (C)** — the tapping
-   warning is the last piece of the sanitizer fix without evidence. **HR-14 (A)(B)(C)** rides along on
-   any GRBL job with a coolant channel configured (the existing face-mill tool already requests
-   *Flood*, so (C) needs no CAM edit at all). Parameters per finding in §4.2.
+1. **GRBL / mm: any job with a coolant channel.** Clears **HR-14 (A)(B)(C)**. Needs no new CAM — the
+   existing face-mill tool already requests *Flood*, so (C) is a dialog change alone. Parameters in
+   §4.2.
 2. **Four cheap posts on CAM that already exists** — **HW-3** and **HW-4** (`Probe Pause` = `No`, then
    `Before`) on the face-mill job, **HW-5** (the HP-1 baseline in one file) on the same, and **HW-2**
    which may need no post at all: `Link.gcode` is already a two-operation, one-tool, one-WCS job and
@@ -482,29 +500,43 @@ the extra breadth or trim to the strict reference form (a two-line edit).*
 `probing-xy-outer-corner` / `probing-z` → true; `drilling` / `tapping` / `boring` → false; no strategy
 parameter → false; `cycleType` absent → false. Eight cases, all passing.
 
-**Do (A) — a plain drill.** GRBL, hobby defaults, one **Drill** operation (several holes, any depth).
-**Get (A):** each hole expands into ordinary moves — no `G81`/`G82`/`G83` anywhere:
-```
-( MOVEMENT_RAPID)
-G0 X<hole> Y<hole> F<travelXY>
-( MOVEMENT_PLUNGE)
-G1 Z<depth> F<plunge>
-( MOVEMENT_RAPID)
-G0 Z<retract> F<travelZ>
-```
-and the file runs through to `( *** STOP end ***)`. **Pass — the discriminator is that a file exists
-and reaches STOP end.** An abort with no `.gcode` written is the failure. *No existing row exercises
-`onCyclePoint` at all — every other row is contour/pocket/face milling, so until this posts, drilling
-is untested.*
+**Verified (A)(A2) — HR-2 closes. `Drill_Tap.gcode`, 2026-07-31**, GRBL/mm at factory defaults: a
+`Peck Drill` (tool 6) and a `9/16-12 Tap` (tool 8).
 
-**Do (A2) — a tap, same post if convenient.** Add a **Tapping** operation. **Get (A2):** the cycle
-expands the same way and each affected move carries
-`( >>> WARNING: Speed-feed synchronization rigid tapping is not supported; a floating/tension tap holder is required)`.
-**Pass:** the warning is present on every activate/deactivate occurrence without corrupting the
-surrounding g-code, and it is **single-spaced** where `(rigid tapping)` was. *(This row previously
-pinned **doubled** spaces there and told the reader not to "fix" them — that was HR-17's
-parenthesis-stripping defect, since swept. This post is still the first file able to evidence the
-text either way, so it now carries HR-17 (C) as well.)*
+**(A)** Each hole expands into ordinary moves and **no `G81`/`G82`/`G83`/`G73` appears anywhere** — the
+peck pattern is emitted as alternating cut and retract:
+
+```
+Z-12.7 F300
+G1 Z-21.054 F737
+G0 Z-20.792 F300
+G1 Z-24.328 F737
+```
+
+and the file runs through to `( *** STOP end ***)` then `%`. **The discriminator is that a file exists
+and reaches STOP end** — an abort with no `.gcode` was the failure mode, and it did not happen.
+`onCyclePoint` had never been exercised by any row before this: every other file in the record is
+contour, pocket or face milling.
+
+**(A2)** The tapping warning appears on **every** activate and deactivate occurrence — eight for four
+holes — without disturbing the surrounding blocks, and it is **single-spaced**, which is
+**HR-17 (C)**: no match anywhere for `synchronization  rigid`, `tapping  is` or `WARNING:  `.
+
+```
+( >>> WARNING: Speed-feed synchronization rigid tapping is not supported; a floating/tension tap holder is required)
+```
+
+*(This row previously pinned **doubled** spaces there and told the reader not to "fix" them — that was
+HR-17's parenthesis-stripping defect, since swept.)*
+
+> **What this file also exposed, and the scope decision taken on it (2026-07-31).** Each hole's
+> withdrawal emits `( COMMAND_SPINDLE_COUNTERCLOCKWISE)` → `Z-12.7 F1058` →
+> `( COMMAND_SPINDLE_CLOCKWISE)`: Fusion asks for a reversal, the post comments it and emits no
+> command, so a right-hand tap is driven back out still turning forward. **Decision: drilling must
+> work; tapping is allowed to error or warn, and a fuller tapping implementation belongs to the
+> professional review.** Filed as **HR-20** in `PReview.md` — it is not a bar to closing (A2), which
+> only ever asserted the warning text. *The RPM half of the same `spindleOn()` weakness is a separate
+> and hobbyist-reachable defect — see **HR-12** in §4.3.*
 
 **(B) — probing must still be refused: not applicable on this licence.** Fusion's probing /
 Inspection strategies need the Machining Extension, so a Personal-licence hobbyist cannot create one —
@@ -853,8 +885,8 @@ show differences that are not regressions:
   `03 - Map G1s to Rapids  disable when using full license ` (parens stripped to doubled blanks, note
   the trailing one). **Every** saved file carries the property dump;
 - every manual-spindle job's start prompt gains a space: `M0 (MSG Turn ON 18000 RPM)`. HR-3's verified
-  (A)(B) assert the *OFF* prompt and are unaffected; `PReview.md` HR-12's expected tokens were updated
-  with this commit;
+  (A)(B) assert the *OFF* prompt and are unaffected; HR-12's expected tokens (§4.3) were updated with
+  this commit;
 - the dialog label change gives **`PReview.md` D3 a real change to test** rather than a hypothetical —
   a saved preset now has a renamed `group:` string to survive.
 
@@ -876,9 +908,11 @@ made with different *Subsequent WCS / Part* settings — inert on a single-secti
 feed, no comment reordering**, which is what shows the vestigial-argument and `flushMotions()` items
 changed nothing.
 
-**Do (C) — the tapping warning.** Folds into session 3; this is the row HR-2 (A2) now carries. **Get
-(C):** `( >>> WARNING: Speed-feed synchronization rigid tapping is not supported; a floating/tension
-tap holder is required)` — single-spaced.
+**Verified (C) — HR-17 closes.** `Drill_Tap.gcode` (2026-07-31) carries the tapping warning eight
+times, single-spaced throughout:
+`( >>> WARNING: Speed-feed synchronization rigid tapping is not supported; a floating/tension tap
+holder is required)`. Evidence and the surrounding scope decision are under **HR-2 (A2)**, which this
+row rode along on.
 
 ### 4.3 Open — no code change
 
@@ -923,6 +957,52 @@ separator too: `M291  P"Attach ZProbe" R"Probe" S3`. Legal — RRF tolerates the
 RRF prompts in session 1 are well formed — but it is the same class of defect HR-17 swept, in the one
 place HR-17 did not look. Fold into the next tidy-up pass; do not fix it alone, since every RRF file
 would need re-baselining for one blank.
+
+> **A second item for the same sweep**, found in `Drill_Tap.gcode`: empty comments emit as `()` on the
+> two `onSectionEnd()` lines and as `( )` on the other sixteen, because one call site passes `""` and
+> the rest pass `" "`. Pick one and use it everywhere.
+
+**HR-12 — a manual spindle is never told about an RPM change between operations.** *(Medium; **moved
+back from `PReview.md` on 2026-07-31** — see the box below.)*
+
+`spindleOn()` guards its prompt on `!spindleEnabled`, and `spindleEnabled` is cleared only in
+`spindleOff()`, which within a job runs at a tool change or at close. `setSpindeSpeed()` correctly
+detects the change — its condition tests both speed and direction — and then `spindleOn()`'s manual
+branch throws the answer away. So section 2 asking for 12000 RPM after section 1 ran at 18000 reaches
+the guard, the prompt is blocked, and **nothing in the file mentions the change** — while
+`currentSpindleSpeed` is updated regardless, so the post believes it happened. For a hand-set router
+that is the gap between the operator's dial and the speed Fusion computed the feeds against: a burnt
+cutter or a poor finish, silently. The automatic branch re-emits `M3 S<speed>` every time, so this is
+manual-only — and manual is the default the README tells a hobbyist to leave on.
+
+```diff
+   if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
+     if (!spindleEnabled) {
+       writeComment(eComment.Important, " >>> Spindle Speed: Manual");
+       askUser("Turn ON " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
++    } else {
++      // The caller only reaches here when the requested RPM actually changed.
++      writeComment(eComment.Important, " >>> Spindle Speed: Manual change");
++      askUser("Set spindle to " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
+     }
+   } else {
+```
+
+**Do (A).** Two operations, **same tool**, spindle speeds 18000 and 12000, `Manual Spindle On/Off` on.
+**Get (A):** `M0 (MSG Turn ON 18000 RPM)` before section 1 and `M0 (MSG Set spindle to 12000 RPM)`
+before section 2. **Pass:** two prompts — plus a third check, two operations at the *same* RPM giving
+**one** prompt only, since `setSpindeSpeed()` short-circuits and the common case must not gain a stop.
+
+> **Why it came back.** HR-12 was one of the six findings swept into `PReview.md` when HP-5 was
+> redefined, on the reasoning that Fusion Personal has no tool changes. That was right for the other
+> five and **wrong for this one: the mechanism involves no tool change at all.** Two operations on one
+> tool at different RPMs is HP-5 exactly, and a hobbyist can build it on Personal. `Drill_Tap.gcode` is
+> the first posted evidence of it firing — the tap section emits `( COMMAND_START_SPINDLE)` and
+> `( COMMAND_SPINDLE_CLOCKWISE)` and **no prompt**, and the tap's own RPM appears nowhere in the file;
+> the only prompt is the drill's `M0 (MSG Turn ON 2220 RPM)`. It was found by reading and is now
+> observed. Leaving it in a file labelled *parking lot, professional, not started* would have kept a
+> hobbyist-reachable defect out of the pre-release set. **The direction half of the same weakness stays
+> professional** — `PReview.md` **HR-20**.
 
 ---
 

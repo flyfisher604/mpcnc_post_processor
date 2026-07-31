@@ -45,9 +45,17 @@ everything the README puts outside the hobbyist's reach:
 
 ## 2. Findings deferred from the hobbyist review
 
-All six land **as one unit** with *Phase 4 — tool-change ordering + base-relative park*
+All five land **as one unit** with *Phase 4 — tool-change ordering + base-relative park*
 (`docs/plan.md`), rather than patching the same section-boundary code twice. **HR-10** and **HR-13**
 are independent of the reorder and have complete diffs, so they can go in first as warm-up commits.
+
+> **HR-12 left this file on 2026-07-31** and is now `HReview.md` §4.3. It was swept in here with the
+> other five when HP-5 was redefined, on the reasoning that Personal has no tool changes — true of
+> them, false of it: two operations on **one** tool at different RPMs needs no tool change and is HP-5
+> exactly. `Drill_Tap.gcode` then observed it firing. Do not re-file it here.
+
+**HR-20 is different from the other five** — it is not tool-change work and does not wait for Phase 4.
+It is here because tapping was *decided* to be professional, not because it shares their code.
 
 ---
 
@@ -189,42 +197,6 @@ present, no warning — proving the Marlin path is untouched.
 
 ---
 
-### HR-12 — a manual spindle is never told about an RPM change between operations — **Medium** · `READ`
-
-**Reaches it:** several operations at different spindle speeds with `Manual Spindle On/Off` on (the
-default).
-
-`spindleOn()` guards its prompt on `!spindleEnabled`, and `spindleEnabled` is only cleared in
-`spindleOff()`, which within a job runs only at a tool change or at close. So section 2 asking for
-12000 RPM after section 1 ran at 18000 reaches the guard, the prompt is blocked, and nothing in the
-file mentions the change — while `currentSpindleSpeed` is updated regardless, so the post believes it
-happened. For a hand-set router that is the difference between the operator's dial and the speed
-Fusion computed the feeds against: a burnt cutter or a poor finish, silently.
-
-```diff
-   if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
-     if (!spindleEnabled) {
-       writeComment(eComment.Important, " >>> Spindle Speed: Manual");
-       askUser("Turn ON " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
-+    } else {
-+      // The caller only reaches here when the requested RPM actually changed.
-+      writeComment(eComment.Important, " >>> Spindle Speed: Manual change");
-+      askUser("Set spindle to " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
-     }
-   } else {
-```
-
-**Verify (Do → Get).** *Do:* two operations, same tool, spindle speeds 18000 and 12000, `Manual
-Spindle On/Off` on. *Get:* `M0 (MSG Turn ON 18000 RPM)` before section 1 and `M0 (MSG Set spindle to
-12000 RPM)` before section 2. **Pass:** two prompts. Third check: two operations at the *same* RPM →
-one prompt only (`setSpindeSpeed` short-circuits, so no new stop on the common case).
-
-> The space before `RPM` arrived with **HR-17** (`HReview.md` §4.2) after this diff was written; the
-> context line and both new prompts above were updated to match, so the proposal still applies
-> cleanly. Files posted before that sweep read `18000RPM`.
-
----
-
 ### HR-13 — `onCommand` silently discards every command it does not name — **Low-Medium** · `READ`
 
 **Reaches it:** Manual NC *Optional stop*, *Display message*, or *Orientate spindle*.
@@ -254,6 +226,56 @@ reason to drop it; and an explicit `default:` turns every future gap into a visi
 **Verify (Do → Get).** *Do:* add Manual NC *Optional stop* to an operation and post. *Get:* `M1` at
 the Manual NC's position. **Pass:** `M1` present. Second check: Manual NC *Orientate spindle* → a
 `>>> WARNING: command COMMAND_ORIENTATE_SPINDLE …` comment appears instead of silence.
+
+---
+
+### HR-20 — a tapping operation is withdrawn without the spindle reversal Fusion asks for — **High where it fires** · `OBSERVED`
+
+**Reaches it:** any **Tapping** operation. Not a tool-change path and **not gated on Phase 4** — this
+sits here by the scope decision below, not because it shares the others' code.
+
+**Observed, not merely read** — `Drill_Tap.gcode` (2026-07-31, GRBL/mm, factory defaults). Each of the
+four holes emits:
+
+```
+( COMMAND_SPINDLE_COUNTERCLOCKWISE)
+( MOVEMENT_LEAD_OUT)
+Z-12.7 F1058
+( COMMAND_SPINDLE_CLOCKWISE)
+```
+
+Fusion is saying *reverse, back the tap out, resume forward*. The post comments all three and emits
+**no command for any of them**, so a right-hand tap is driven out of the hole still turning forward —
+it strips the thread or snaps. `setSpindeSpeed()` does detect the direction change (its condition
+tests `currentSpindleClockwise != _clockwise`); `spindleOn()`'s manual branch then discards it, the
+same weakness as the RPM half now filed as `HReview.md` HR-12. On the **automatic** branch
+`M3`/`M4 S<speed>` would be emitted correctly, so this is manual-spindle only — which is the default.
+
+**No fix proposed, and the reason is not laziness.** Prompting the operator to reverse is theatre: a
+hand-switched trim router, the machine this whole manual path exists for, has no reverse. The real
+options are (a) refuse a tapping operation outright when `Manual Spindle On/Off` is on, (b) warn that
+tapping needs an automatic spindle, or (c) implement tapping properly against `M3`/`M4`. That is a
+design decision, and it interacts with whether these machines should be tapping at all.
+
+**The existing warning does not cover this.** `COMMAND_ACTIVATE_SPEED_FEED_SYNCHRONIZATION` already
+emits *"Speed-feed synchronization rigid tapping is not supported; a floating/tension tap holder is
+required"* — that is about **feed sync**, and a tension holder does nothing about spindle direction. A
+reader could easily take the existing warning as covering the whole hazard. It does not.
+
+> **Scope decision (2026-07-31): drilling must work; tapping is allowed to error or warn.** That is
+> what puts this row in this file. Drilling is hobbyist-reachable and is now verified —
+> `HReview.md` HR-2 (A) closed on the same file. Tapping stays reachable but unsupported, and a
+> **fuller tapping implementation is professional-review work**, to be designed alongside (a)/(b)/(c)
+> above rather than patched now. `HReview.md` HR-2 (A2) and HR-17 (C) close regardless: both assert
+> the warning's text, not that tapping works.
+
+**Verify (Do → Get), once a direction is chosen.** *Do:* one Tapping operation, `Manual Spindle
+On/Off` **on**. *Get:* under (a) the post errors and writes no file; under (b) a
+`>>> WARNING` naming spindle direction, distinct from the feed-sync warning, at least once per
+operation; under (c) `M4` before the lead-out and `M3` after. **Pass:** whichever was chosen, and in
+every case the file must no longer show a bare `( COMMAND_SPINDLE_COUNTERCLOCKWISE)` comment as its
+only trace. Second check: a **Drill** operation in the same post is unaffected and still expands to
+plain `G0`/`G1`.
 
 ---
 
