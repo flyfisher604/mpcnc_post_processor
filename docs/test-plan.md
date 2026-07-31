@@ -70,11 +70,11 @@ firmware-variant rows note what changes elsewhere.
 | H6 | Hobbyist — firmware variant (Marlin/RRF), `Jog to X0 Y0, Probe Z0` | PASS (Marlin + RRF) ⚠ *(superseded by HR1)* |
 | H7 | Hobbyist — single op, `Use Active WCS X0 Y0, Probe Z0` (new mode) | PASS — incl. H7a *(H7e unrun; H7b → J1)* |
 | H7f | "Unknown Z" warning — present without a base, suppressed with one | PASS *(all three)* |
-| HR1 | Provisional Z0 bounds the `G38 Target` on the two just-positioned probe modes | (A) PASS *(B/C/D + firmware unrun; C proves the scope)* |
+| HR1 | Provisional Z0 bounds the `G38 Target` on the two just-positioned probe modes | PASS — (A)(B)(C); **scope proven by (C)**. *(D)→J1, firmware half unrun* |
 | HR2 | Canned cycles: a drill/tap operation posts at all; probing is rejected | |
-| HR3 | Manual spindle prompts to switch OFF on GRBL too — job end and tool change | (A) PASS *(B/C/D unrun)* |
+| HR3 | Manual spindle prompts to switch OFF on GRBL too — job end and tool change | PASS — (A)(B). *(C) two-tool and (D) firmware unrun; (C) matters most* |
 | HR4 | Safe-Z literal fallbacks convert mm→output unit; inch jobs stop retracting to 15 in | |
-| HR5 | `Scale Feedrate` reaches G2/G3 arcs, not just G1 cuts | |
+| HR5 | `Scale Feedrate` reaches G2/G3 arcs, not just G1 cuts | **PASS — all four**; (D) came free from the face mill's `G18` lead-in arcs |
 | HR6 | A rotated 3-axis Setup is rejected — and an upright one still posts | PASS — (A) + (A2); guard confirmed **live** (`forward X0 Y0 Z1`), not failing open. *(B) unrun* |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
@@ -382,12 +382,22 @@ tool) unless a row says otherwise.
 
       **Firmware half:** repeat (A) on Marlin → `G92 X0 Y0 Z0`; on RRF → `G54` + `G10 L20 P1 X0 Y0
       Z0` with `M291 … S3` prompts. Supersedes the saved `H6 - Marlin.gcode` / `H6 - RRF.gcode`.
-      *Result:* **(A) PASS** — `H2.gcode` (2026-07-31), token for token:
-      `(   Set current X,Y position to 0,0)` → `(   Provisional Z0 at the current height so the probe
-      target is a relative limit)` → `G10 L20 P1 X0 Y0 Z0` → `M0 (MSG Attach ZProbe)` →
-      `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8` → `G0 Z5.08 F300`. The provisional `Z0` is overwritten by
-      the probe before the cut, as designed. **(B), (C), (D) and the firmware half unrun** — (C) is
-      the one that proves the scope, so the row is not closed.
+      *Result:* **PASS — (A), (B) and (C); the scope is proven.**
+      **(A)** `H2.gcode` (2026-07-31), token for token: `(   Set current X,Y position to 0,0)` →
+      `(   Provisional Z0 at the current height so the probe target is a relative limit)` →
+      `G10 L20 P1 X0 Y0 Z0` → `M0 (MSG Attach ZProbe)` → `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8` →
+      `G0 Z5.08 F300`. The provisional `Z0` is overwritten by the probe before the cut, as designed.
+      **(B)** `HR1b.gcode`: identical, with `M0 (MSG Jog to X0 Y0 above Z0, probe)` immediately ahead
+      of the `Set current X,Y position` comment — the shared code path carries the provisional `Z0`
+      onto the jog mode too.
+      **(C)** `HR1c.gcode` — the discriminator, and it holds: **no `G10 L20 P1 X0 Y0 Z0` and no
+      provisional-Z0 comment.** The only `G10 L20 P1` in the file is the probe's own `Z0.8`. Diffed
+      against `H7c-a.gcode`, the pre-HR-1 reference for this mode, the **motion is byte-identical** —
+      the three differences are the timestamp, the Resolved-Values rewording, and HR-3's
+      `M5` → `M0 (MSG Turn OFF spindle)`. So HR-1 did not leak onto the mode where a provisional zero
+      would make `Z-10` too tight and turn a working probe into a "did not contact" alarm.
+      **(D) folded into J1** (needs a jet tool / tool 0) and **the firmware half is unrun** — both are
+      remaining coverage, but the pair-of-absences test the row exists for is satisfied by (C).
 
 - [ ] **HR2 — A canned-cycle operation posts at all; probing is still rejected.** Verifies the HR-2
       fix (docs/HReview.md). `onCyclePoint()` calls `isProbeOperation()`, which had **no definition
@@ -486,10 +496,19 @@ tool) unless a row says otherwise.
       > `X0 Y0 F<travelXY>` — still a rapid, and correct. Assert the coordinates and their position in
       > the stop block, not the literal `G0`.
 
-      *Result:* **(A) PASS** — `H2.gcode` (2026-07-31): `( *** STOP begin ***)` →
-      `( COMMAND_COOLANT_OFF)` → `X0 Y0 F2500` (modal `G0`, see above) → `( COMMAND_STOP_SPINDLE)` →
-      `M0 (MSG Turn OFF spindle)` → `M30`, with **no `M5` and no `M300` anywhere in the file** — the
-      discriminating pair of absences. **(B), (C), (D) unrun**; (C) is the case that matters most.
+      *Result:* **PASS — (A) and (B).**
+      **(A)** `H2.gcode` (2026-07-31): `( *** STOP begin ***)` → `( COMMAND_COOLANT_OFF)` →
+      `X0 Y0 F2500` (modal `G0`, see above) → `( COMMAND_STOP_SPINDLE)` → `M0 (MSG Turn OFF spindle)`
+      → `M30`, with **no `M5` and no `M300` anywhere in the file** — the discriminating pair of
+      absences.
+      **(B)** `HR3b.gcode`: `( >>> Spindle Speed 7000)` → `M3 S7000` at the start, `M5` in the stop
+      block, and **no `Turn ON` / `Turn OFF` prompt anywhere**. Diffed against `H2.gcode`, the only
+      functional differences in the whole file are those two spindle lines — so the automatic branch
+      is exactly where it was and HR-3 moved only the manual one.
+      *(The diff also shows `B_Probe_OnChange` differing between the two posts. It is inert here:
+      a single-section job has no WCS change, and no output differs because of it.)*
+      **(C) and (D) unrun**; (C) is the case that matters most — it is the one where the operator is
+      told to switch the spindle off *before* being invited to reach into the machine.
 
 - [ ] **HR4 — Safe-Z literal fallbacks are in mm, like every other dialog dimension.** Verifies the
       HR-4 fix (docs/HReview.md). Both Safe-Z properties accept `Feed:`/`Retract:`/`Clearance:<n>` or
@@ -592,7 +611,31 @@ tool) unless a row says otherwise.
       > `35.433 in/min`; zero feed → zero. Eleven cases, all passing. That covers the arithmetic; the
       > posts above confirm the values reach the file.
 
-      *Result:* ____
+      > **Ran on the stock `F2667` job, not a re-fed `F1800` one.** The Do rows above were written
+      > around a tool feed of `1800`, so `F1800` disappearing from the arcs would be the tell. The
+      > posts kept the Mounting Plate job's own feeds (`F2667` cutting, `F1334` finish, `F1016`
+      > lead-in), which is **strictly more informative** — three distinct raw feeds all collapse to the
+      > cap instead of one. Read the assertions as "no raw feed survives on an arc", not as the literal
+      > `F1800`.
+
+      *Result:* **PASS — (A), (B), (C) and (D).** All from the Mounting Plate face-mill job on GRBL.
+      **(B)** `HR5b.gcode` (scaling off): arcs carry Fusion's raw feed — `G17 G2 … F2667` sitting
+      between `G1 … F2667` cuts, and `G18 G3 … F1016` lead-ins. The unscaled baseline, and the reason
+      no saved reference file is invalidated by HR-5.
+      **(A)** `HR5a.gcode` (scaling on, XY `900` / Z `180` / toolpath `1000`): every `G17` arc drops to
+      **`F900`**, matching the `G1` blocks either side — `G17 G2 Y60.598 J21.279 F900` between
+      `G1 X0 F900` and `G1 X177.8 F900`. No cut feed above `900` survives anywhere. *(The `F2500` and
+      `F300` still present are the XY and Z **travel** feeds on rapids, which the cut limiter does not
+      and should not touch — don't read them as escapees.)*
+      **(C)** `HR5c.gcode` (`Max Toolpath Speed` = `500`): the same arcs and lines all read **`F500`**.
+      The final cap reaches arcs exactly as it reaches lines.
+      **(D) — satisfied by `HR5a.gcode` without a purpose-built job.** The face mill's helical lead-in
+      and lead-out *are* ZX-plane arcs, and they carry **`F180`** in both (A) and (C) —
+      `G18 G3 X205.286 Z-4.826 I-4.997 F180`, scaled down from the `F1016` they show in (B). That is
+      the slower of the XY and Z limits, as the row predicts, and `F180` in (C) too because the Z limit
+      binds below the `500` cap. **No separate vertical-wall-radius operation is needed**; only the
+      `G19` (YZ) variant is unexercised, and the row accepts either plane. *(The Marlin/RRF
+      linearization note remains unconfirmed — it needs the firmware variant.)*
 
 - [ ] **HR6 — A rotated 3-axis Setup is rejected; an upright one is untouched.** Verifies the HR-6
       fix (docs/HReview.md). `onSection()` rejected multi-axis toolpaths but never checked a 3-axis
