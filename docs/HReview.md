@@ -136,7 +136,7 @@ notes that used to live in this file are gone.
 | **HR-3** | Manual spindle prompts to switch OFF on GRBL too | `43d09aa` | **Every GRBL job's tail** | (A)(B) pass; (D) owed |
 | **HR-2** | `isProbeOperation()` defined locally so canned cycles can post at all | `9c87fb0` | Drilling path only | harness only — **unposted** |
 | **HR-4** | Safe-Z literal fallbacks convert mm→output unit | `439ce2d` | **Inch jobs only** — identity in mm | harness only — **unposted** |
-| **HR-11** | Marlin/RRF program end (`M2`) + `M84 S60` timeout restore | `7a35f7f` | **Every Marlin/RRF job's tail.** GRBL untouched | **unposted**, and `M2` support unconfirmed |
+| **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + the `M2` split | **Every Marlin/RRF job's tail.** GRBL untouched | **unposted**; `M2` support now confirmed from firmware source |
 | **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | harness before/after — **unposted** |
 | **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | **unposted** |
 
@@ -152,8 +152,8 @@ value:
 1. **Marlin + RRF — do this first.** Clears **HR-11 (A)(B)** (the tail on both firmwares), **HR-1's
    firmware half**, **HR-3 (D)**, HR-5's linearization note, and re-baselines the stale
    `H6 - Marlin.gcode` / `H6 - RRF.gcode`. One firmware switch on an existing job, five-plus rows.
-   ⚠ **HR-11 carries the only open correctness question on the branch, and it cannot be settled by
-   reading the file** — see HR-11 below.
+   **Every row here now stands on the posted file alone** — HR-11's `M2` question was the one item on
+   the branch that needed a controller, and it was closed from firmware source instead (see HR-11).
 2. **GRBL / mm, new CAM: a drill + tap job.** Clears **HR-2 (A)(A2)** and is the first file ever able
    to evidence **HR-17**'s parenthesis stripping. **HR-14** rides along on any GRBL job (set the tool
    coolant to *Flood and Mist* and Channel A Mode to match).
@@ -463,34 +463,48 @@ position mid-job, and nothing ever restored it — so after the job the machine 
 energised indefinitely, motors and drivers heating, for a job that had finished. The GRBL path has
 neither problem, which is why this reads as a gap in the Marlin branch rather than a design choice.
 
-**As built:** `M84 S60` then `M2` in the non-GRBL branch. `S60` rather than a bare `M84` because a
+**As built:** `M84 S60` on both, then `M2` **on RepRap only**. `S60` rather than a bare `M84` because a
 bare one releases the motors the instant it runs and an unbalanced LowRider gantry with no brake sinks
 in Z; a 60-second timeout holds the axes while the operator retrieves the part, then releases without
 anyone remembering to. **The `Stop File` branch is deliberately untouched** — `onClose()` bypasses the
 whole stop block when `B_Include_StopFile` is set, and `M30` was already inside the bypassed region, so
 a custom stop file owns the entire stop sequence, program end included.
 
-> ### ⚠ `M2` support is unconfirmed — the only open correctness question on the branch
-> This post confines `M30` to GRBL **because Marlin reads `M30` as "delete SD file"**, so it is
-> already established that this firmware family's M-code semantics diverge, and `M2` may be
-> unrecognised too. That also means the existing absence of a program end may have been an informed
-> choice rather than the oversight this finding assumed. It is emitted anyway because the cost of
-> being wrong is bounded: motion is flushed and the spindle is off before this point, so an
-> unsupported `M2` produces an unknown-command echo and nothing else.
+> ### `M2` — settled from firmware source, not from a controller (2026-07-31)
+> This was the branch's only open correctness question, and the only fix that could not be settled by
+> reading the posted file. It was closed by reading the **firmware** instead — no Marlin or Duet
+> hardware was needed, and none is needed to verify the rows below.
 >
-> **This is the first fix on the branch that cannot be settled by reading the file** — the block
-> appears whether or not the firmware honours it. **Watch the sender's console:**
-> `echo:Unknown command: "M2"` (Marlin) or an RRF error means the "no program end" half is still
-> open. If unsupported, drop `M2` and record that end-of-file *is* the program end on Marlin/RRF; the
-> `M84 S60` half stands either way.
+> **Marlin has never implemented `M2`.** `gcode.h`'s supported-code list jumps **M1 → M3** in both
+> `2.0.x` and `bugfix-2.1.x`, and `gcode.cpp`'s M-code switch has **no `case 2:`** (0, 1, 3, 4, 5, 7,
+> 8, 9, 10), so `M2` falls to `default:` → `parser.unknown_command_warning()` → `echo:Unknown command:
+> "M2"`. Harmless — motion is flushed and the spindle is off — but a spurious error line in the
+> console of *every* Marlin job. Corroborated in the wild: LightBurn emitted `M2` at end of job and
+> Marlin users saw exactly that echo; it was removed for cleanliness.
+>
+> **RRF gained `M2` in 3.5.1** — changelog: *"M2 (end job) command is now supported. It behaves the
+> same as M0."* Source agrees: `3.5-dev/src/GCodes/GCodes2.cpp` has `case 0:` / `case 1:` / `case 2:`
+> sharing one block that calls `StopPrint(&gb, StopPrintReason::normalCompletion)` for a file channel.
+> `3.4-dev` has no `case 2:` — it tries a `/sys/M2.g` macro, then reports `Bad command: M2` and
+> continues. That bounded cost is why the emit is **not** gated on a firmware version.
+>
+> So the original finding was half right: the missing program end was a real gap on RRF and a
+> non-thing on Marlin, where **end of file *is* the program end**. The branch now splits on firmware.
+>
+> **Carried consequence, unique to RRF:** `M2` is not inert — being the `M0` path, it runs the
+> operator's `stop.g`, *after* the `M84 S60` above. A `stop.g` containing a bare `M84`/`M18` releases
+> the steppers immediately and defeats the timeout. Not a reason to drop `M2`; a reason the two lines
+> must stay in this order, and worth a README note if RRF users appear.
 
-**Do (A) — Marlin.** HP-4, one op, `CNC Firmware = Marlin`. **Get (A):** the file's last three blocks
-are `M117 Job end`, `M84 S60`, `M2`. **Pass:** an explicit program end is present *and* the `S` value
-is `60`, not `0` — an `M84 S0` at the tail would re-disable the timeout and be worse than emitting
-nothing. Plus the console check above.
+**Do (A) — Marlin.** HP-4, one op, `CNC Firmware = Marlin`. **Get (A):** the file's last two blocks are
+`M117 Job end` then `M84 S60`, and there is **no `M2` anywhere in the file**. **Pass:** both — the `S`
+value is `60`, not `0` (an `M84 S0` at the tail would re-disable the timeout and be worse than emitting
+nothing), *and* the absence of `M2` is the discriminator that proves the firmware split is live.
 
-**Do (B) — RepRap/Duet.** Same job, `CNC Firmware = RepRap`. **Get (B):** identical tail; RRF's
-`M84 S<seconds>` is the same idle-timeout form.
+**Do (B) — RepRap/Duet.** Same job, `CNC Firmware = RepRap`. **Get (B):** the last three blocks are
+`M117 Job end`, `M84 S60`, `M2`. **Pass:** `M2` is **present** here and absent in (A) — the pair is
+what verifies the split; either row alone would also pass against a branch that emitted `M2` for
+everything, or for nothing. RRF's `M84 S<seconds>` is the same idle-timeout form as Marlin's.
 
 **Do (C) — the GRBL regression.** Re-post the default hobby job unchanged. **Get (C):** still ends
 `M30` then `%`, with **no `M84` and no `M2` anywhere**. **Pass:** the GRBL tail is byte-identical to
@@ -694,6 +708,7 @@ Recording the negative results, because "we looked" is part of the confidence cl
 | **`Include Whitespace = false`** | `G0X10Y5F2500`, `G10L20P1X0Y0`, `M84Z` are all legal — these parsers are word-based. The prompt helpers re-insert a leading space where the message needs separating |
 | **Property dump** | Iterating `properties` rather than listing keys means it cannot drift; the zero-padded group strings make a lexicographic sort reproduce dialog order; enum values print as stored `id`s so relabelling does not break a saved review. **The single most valuable thing in the file for reviewability** — every finding above was easier to reason about because of it |
 | **Probe pause threading** | `probePauseBefore`/`probePauseAfter` set by the caller and reset by `probeTool()` is fragile-looking but correct: every caller sets both immediately before invoking, and the reset keeps the tool-change re-probe prompting |
+| **`M0` prompts on Marlin** | Marlin compiles `M0`/`M1` only under `HAS_RESUME_CONTINUE` — an LCD controller **or** `EMERGENCY_PARSER` (`M0_M1.cpp` is wrapped in that guard; `gcode.h` says *"Only if ULTRA_LCD is enabled"*). On a headless build with neither, every `M0 (MSG …)` this post emits would echo as unknown and **not pause**, including the probe-attach prompt on the default path. **Scope decision (2026-07-31): out of scope — no machine used with this post is headless, and `M0` is assumed to work.** Recorded because the failure would be silent and the fix (`M0` is unconditional in the post) is not local |
 
 ---
 
@@ -711,6 +726,12 @@ Recording the negative results, because "we looked" is part of the confidence cl
   that contrast is the evidence, not the "after" alone. Same lesson as the fail-open trace, applied to
   harnesses. *(Mechanics — extracting functions from the `.cps` and `eval`ing them against stubbed
   kernel globals — are in `plan.md` → Workflow notes.)*
+- **When a question is "does the controller honour this?", read the controller's source, not a
+  posted file.** HR-11's `M2` was written off as unanswerable without Marlin and Duet hardware, and it
+  was answered in one sitting from `gcode.h` / `gcode.cpp` / `GCodes2.cpp` plus the RRF changelog —
+  with a sharper result than a dry-run would have given, because it also dated the RRF support
+  (3.5.1) and turned up the `stop.g` interaction. Firmware sources are public and searchable; check
+  them **before** filing a row as needing a machine. The same read settled Marlin's `M0` guard (§7).
 - **Every one of the nine fixes deviated from its proposed diff**, always in the same direction: the
   proposal understated the number of call sites (HR-4's "two" was four; its "five" assignments were
   eight). Count the call sites in the code before believing a diff is complete.

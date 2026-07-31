@@ -1465,13 +1465,25 @@ function onClose() {
       writeComment(eComment.Info, "   Restore stepper timeout");
       writeBlock(mFormat.format(84), sFormat.format(60));
 
-      // M2 ends the program. NOT yet confirmed against these firmwares: M30 is deliberately
-      // GRBL-only above because Marlin reads M30 as "delete SD file", so this family's M-code
-      // semantics are known to diverge from GRBL's and M2 may simply be unrecognised here. The
-      // cost if it is: an unknown-command echo in the sender's log. All motion is flushed and the
-      // spindle is off by this point, so nothing moves either way. Settled by the Marlin/RRF post
-      // rather than by reading -- see docs/HReview.md HR-11.
-      writeBlock(mFormat.format(2));
+      // M2 ends the program on RepRapFirmware only. Confirmed from firmware source, not by posting:
+      //
+      // Marlin has never implemented M2. gcode.h's supported-code list jumps M1 -> M3 in both 2.0.x
+      // and 2.1.x, and gcode.cpp's M switch has no case 2, so M2 reaches unknown_command_warning()
+      // and echoes: echo:Unknown command: "M2". Harmless -- motion is flushed and the spindle is off
+      // by this point -- but a spurious error line in the console of every Marlin job. Marlin has no
+      // program-end code at all (M30 is "delete SD file" there, which is why it is GRBL-only above),
+      // so nothing replaces M2 here: end of file IS the program end on Marlin.
+      //
+      // RRF gained M2 in 3.5.1 -- "behaves the same as M0". Read from a file it calls
+      // StopPrint(normalCompletion), which ends the job and runs the operator's stop.g. On 3.4.x and
+      // earlier there is no case 2: RRF tries a /sys/M2.g macro, then reports "Bad command: M2" and
+      // carries on -- the same bounded cost as Marlin's echo, so this is not gated on a version.
+      //
+      // NOTE: stop.g runs AFTER the M84 S60 above, so a stop.g holding a bare M84/M18 releases the
+      // steppers at once and defeats the timeout restored here. See docs/HReview.md HR-11.
+      if (fw == eFirmware.REPRAP) {
+        writeBlock(mFormat.format(2));
+      }
     }
 
     writeComment(eComment.Important, " *** STOP end ***");

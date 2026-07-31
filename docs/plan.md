@@ -25,8 +25,12 @@ ignore it). **Nothing is half-done and nothing is known-broken.**
 
 **The branch's code work is done.** Every hobbyist-scoped finding that had a fix is landed; what is
 left on this branch is **posting**, not coding — three sessions, ranked and specified in
-`HReview.md` §3. Start with **Marlin + RRF**: it clears the most rows in one firmware switch and
-carries the branch's only open correctness question (whether `M2` is honoured at all).
+`HReview.md` §3. Start with **Marlin + RRF**: it clears the most rows in one firmware switch.
+
+**Every remaining row can be verified by reading a posted file.** The one exception — whether
+Marlin/RRF honour `M2` (HR-11) — was closed on 2026-07-31 by reading the *firmware* source rather
+than running a controller: Marlin has never implemented `M2`, RRF gained it in 3.5.1, so the post now
+emits it on RepRap only. Full evidence in `HReview.md` → HR-11; the reusable lesson is in §8.
 
 **The docs were reorganized at `4db467b`** (2026-07-31), which is why nothing here reads like the
 per-row tracking it replaced. Three files now, split along the hobbyist/professional line the work had
