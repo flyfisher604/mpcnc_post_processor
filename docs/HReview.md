@@ -1240,6 +1240,23 @@ on the wrong section and hands back the fallback. Three one-word changes (`hasPa
 
 **Verify:** no output change is expected; a re-post of H2 must be byte-identical. That *is* the test.
 
+#### As built — no deviation from the three changes above
+
+All three guards now read `_section.hasParameter(...)` ([:912](../MPCNC_v4.0_Beta2.cps#L912),
+[:932](../MPCNC_v4.0_Beta2.cps#L932), [:952](../MPCNC_v4.0_Beta2.cps#L952)). `node --check` passes.
+
+One addition beyond the three words: a comment above the `switch` stating the rule once for all three
+branches and pointing at `resolveSafeZHeight()`, where the same mismatch was a live defect rather than
+a latent one. The point of the fix is that the next reader adding a fourth `eSafeZ` mode copies the
+`_section.` form — a silent convention would not survive that, which is how the original three came to
+disagree with their own `getParameter()` calls.
+
+**Verification is two rows, not one** (`docs/test-plan.md` **HR15**). The proposed "a re-post must be
+byte-identical" is necessary but not sufficient: a fix that broke all three guards to `false` would
+*also* post byte-identically on a `Const:` job, since that mode consults no level at all. So (A) is
+the identical re-post and (B) posts a `Retract:`-mode job and asserts the ` SafeZ retract level: <n>`
+comment appears instead of ` SafeZ: retract level not defined`. Same fail-open lesson HR-6 (A) taught.
+
 ---
 
 ### HR-16 — `onClose` traverses to X0 Y0 before stopping the spindle, with no guaranteed safe Z — **Low** · `READ`

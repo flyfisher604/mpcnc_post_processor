@@ -76,6 +76,7 @@ firmware-variant rows note what changes elsewhere.
 | HR4 | Safe-Z literal fallbacks convert mm→output unit; inch jobs stop retracting to 15 in | |
 | HR5 | `Scale Feedrate` reaches G2/G3 arcs, not just G1 cuts | **PASS — all four**; (D) came free from the face mill's `G18` lead-in arcs |
 | HR6 | A rotated 3-axis Setup is rejected — and an upright one still posts | PASS — (A) + (A2); guard confirmed **live** (`forward X0 Y0 Z1`), not failing open. *(B) unrun* |
+| HR15 | `safeZforSection()` asks the passed section; output unchanged | |
 | H-REG | Hobbyist — byte-for-byte regression via the H2 path | OMITTED (see row) |
 | PB1 | Pro B — 2 copies, base, re-probe per copy (`Use Active WCS X0 Y0, Probe Z0`) | |
 | PB2 | Pro B — 2 copies, base, `Skip` (trust stored) | |
@@ -726,6 +727,36 @@ tool) unless a row says otherwise.
       evidences what Fusion reports for a *re-oriented* Setup (it could in principle re-express the
       frame rather than tilt `forward`). Its failure mode is benign — a missed rejection, not a
       blocked job.
+
+- [ ] **HR15 — `safeZforSection()` asks the passed section, and nothing moves.** Verifies the HR-15
+      fix (docs/HReview.md). Each of the three F360-level branches (`Feed:` / `Retract:` / `Clearance:`)
+      tested the **global** `hasParameter()` and then read the value from the **passed** `_section` —
+      the same mismatch already fixed in `resolveSafeZHeight()`, where it was not hypothetical (it made
+      `writeResolvedValues()` print the fallback for every operation). Harmless today because the sole
+      caller passes `currentSection` from inside `onSection()`, so the two are the same section. The
+      fix is the guards only; no value, unit or branch outcome changes.
+
+      **This row asserts an absence, so it needs the diff, not a read.** A fix whose whole claim is
+      "nothing changed" cannot be verified by reading the file for something — the evidence is that a
+      re-post is identical to a saved reference.
+
+      **Do (A).** Re-post **H2**'s default hobby job unchanged (GRBL / mm), with `02 - Feeds and
+      Speeds` → `Restore Rapids` **on** so `safeZforSection()` actually runs, and diff against
+      `H2.gcode` (2026-07-31 — current, and the freshest GRBL/mm reference on the branch).
+      **Get (A):** the only differences are the timestamp line. **Pass:** no `SafeZ …` comment changes
+      its wording or its number, and no motion differs.
+
+      **Do (B) — the branch that would expose a wrong-section read.** Post any job whose Safe-Z
+      property names an F360 level (`Retract:15`) at Comment Level `Info`. **Get (B):**
+      ` SafeZ retract level: <n>` — the *resolved* level, **not** ` SafeZ: retract level not defined`.
+      **Pass:** the level branch is taken. A global/passed mismatch that ever went wrong would surface
+      exactly here, as the `not defined` fallback on a section that plainly defines the level.
+
+      > **Why (B) is worth running even though (A) is the real test.** (A) proves nothing changed; it
+      > cannot prove the guards still *work*, because a fix that broke all three into `false` would
+      > also produce a byte-identical file on a job whose Safe-Z is `Const:` (no level consulted).
+      > (B) picks a mode that must consult a level, so the two rows together cover both directions.
+      > Same fail-open lesson as HR6 (A) — see the method note in the plan's checkpoint.
 
 - [ ] **H-REG — Byte-for-byte regression (the key guarantee).** With the default reverted to
       `Set X0 Y0 to Current Pos, Probe Z0`, the **default** single-op output is again the pre-rework

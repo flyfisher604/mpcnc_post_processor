@@ -897,6 +897,12 @@ function safeZforSection(_section)
     // Fusion already reports those in the output unit. Getting this wrong on an inch job made the
     // whole G1 -> G0 mapper silently inert: every Z was compared against a threshold of "15 inch",
     // which no toolpath ever reaches, so no move was ever converted and nothing said so.
+    // Every level test below asks the PASSED section, never the global hasParameter(). The global
+    // form reports on whatever section is current, which is the same thing only while this is called
+    // from inside that section -- true of the sole caller today, but the _section parameter is an
+    // open invitation to call it with another one, and the first caller to do so would get the guard
+    // answering about the wrong section and the fallback handed back silently. resolveSafeZHeight()
+    // had this exact defect and it was not hypothetical there; see its comment.
     var dfltInUnit = propertyMmToUnit(safeZHeightDefault);
     switch (safeZMode) {
       case eSafeZ.CONST:
@@ -905,7 +911,7 @@ function safeZforSection(_section)
         break;
 
       case eSafeZ.FEED:
-        if (hasParameter("operation:feedHeight_value") && hasParameter("operation:feedHeight_absolute")) {
+        if (_section.hasParameter("operation:feedHeight_value") && _section.hasParameter("operation:feedHeight_absolute")) {
           let feed = _section.getParameter("operation:feedHeight_value");
           let abs = _section.getParameter("operation:feedHeight_absolute");
 
@@ -925,7 +931,7 @@ function safeZforSection(_section)
         break;
 
       case eSafeZ.RETRACT:
-        if (hasParameter("operation:retractHeight_value") && hasParameter("operation:retractHeight_absolute")) {
+        if (_section.hasParameter("operation:retractHeight_value") && _section.hasParameter("operation:retractHeight_absolute")) {
           let retract = _section.getParameter("operation:retractHeight_value");
           let abs = _section.getParameter("operation:retractHeight_absolute");
 
@@ -945,7 +951,7 @@ function safeZforSection(_section)
         break;
 
       case eSafeZ.CLEARANCE:
-        if (hasParameter("operation:clearanceHeight_value") && hasParameter("operation:clearanceHeight_absolute")) {
+        if (_section.hasParameter("operation:clearanceHeight_value") && _section.hasParameter("operation:clearanceHeight_absolute")) {
           let clearance = _section.getParameter("operation:clearanceHeight_value");
           let abs = _section.getParameter("operation:clearanceHeight_absolute");
 
