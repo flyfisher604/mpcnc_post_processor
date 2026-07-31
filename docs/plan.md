@@ -19,13 +19,28 @@ and findings live in the two review files:
 
 *Written so a fresh session can resume with no other context. Update it when the situation moves.*
 
-**Baseline.** Branch **`v4.0-hreview-fixes`**, cut from `wcs-reworked-flow` at `baf37bf`, now at
-**`4db467b`**. Working tree clean apart from an untracked `MPCNC_v4.0_Beta1.zip` (unrelated; add it or
-ignore it). **Nothing is half-done and nothing is known-broken.**
+**Baseline.** Branch **`v4.0-hreview-fixes`**, cut from `wcs-reworked-flow` at `baf37bf`, now at the
+session-1 results commit. Working tree clean apart from an untracked `MPCNC_v4.0_Beta1.zip`
+(unrelated; add it or ignore it). **Nothing is half-done and nothing is known-broken.**
 
-**The branch's code work is done.** Every hobbyist-scoped finding that had a fix is landed; what is
-left on this branch is **posting**, not coding — three sessions, ranked and specified in
-`HReview.md` §3. Start with **Marlin + RRF**: it clears the most rows in one firmware switch.
+**Session 1 is done (2026-07-31).** Eight posted files closed **six** findings with evidence —
+**HR-1, HR-3, HR-5, HR-6, HR-11, HR-15** — and evidenced **HR-17 (A)(B)(D)**. The file table is in
+`HReview.md` §3; `H11c - GRBL.gcode` is the current GRBL/mm reference and `H15a - GRBL.gcode` the
+mapping-on one. **`H2.gcode` is retired as a comparison baseline** (it predates HR-17); keep it only
+as HR-17's "before".
+
+**What is left is four landed fixes that each need a job this CAM cannot provide** — `HR-2` +
+`HR-17 (C)` a drill + tap, `HR-4` an inch Setup, `HR-14` a coolant channel — plus one code decision
+(`HR-18`) and a CAM-dependent gap (`isSafeToRapid()`). Ranked and specified in `HReview.md` §3.
+
+**Two operational lessons from session 1, both cheap to forget and expensive to repeat.**
+**(1) Fusion posts with its own copy** of the `.cps` at
+`%APPDATA%\Autodesk\Fusion 360 CAM\Posts\` — session 1 was posted twice because the first run used a
+copy three hours stale, and **HR-11 (C) and (D) would have been recorded as false PASSes**, since both
+assert an absence that a build lacking the feature satisfies trivially. **Copy the post, then date the
+output** against a token the newest commit changed. **(2) Read the posted file's own property dump
+before believing a row ran** — session 1's first six files had the whole `03` group `false`, which is
+what left HR-15 unrun rather than passed.
 
 **Every remaining row can be verified by reading a posted file.** The one exception — whether
 Marlin/RRF honour `M2` (HR-11) — was closed on 2026-07-31 by reading the *firmware* source rather
@@ -50,21 +65,31 @@ physical measurement are out of scope, so every row must stand on the posted fil
 
 **Next actions, in order.**
 
-1. **Post the five unverified fixes** — the three sessions in `HReview.md` §3 (Marlin+RRF → drill+tap
-   GRBL → GRBL inch). This is the whole remaining job on this branch.
-2. ~~Sweep HR-17's tidy-ups~~ — **done 2026-07-31** (`HReview.md` §4.2). Two of the four change
-   emitted text, so every saved `.gcode` differs at the group-03 property heading and the
-   manual-spindle prompt; rows (A)–(D) are unposted and fold into any GRBL session.
-3. **Dialog-only checks, no posting** — **D1** and **D3**'s dialog half (`PReview.md` §3.3). D3 gates
+1. ~~Session 1 — Marlin + RRF~~ — **done 2026-07-31**, six findings closed. See above.
+2. **Session 2 — GRBL/mm, drill + tap CAM.** Clears **HR-2 (A)(A2)** and **HR-17 (C)**, the last
+   piece of the sanitizer fix without evidence. **HR-14 (A)(B)(C)** rides along on any GRBL job with a
+   coolant channel configured. Per-post parameters are in `HReview.md` §3.
+3. **Session 3 — GRBL/inch.** Clears **HR-4 (A)(B)(C)(D)**. There is still no inch file anywhere.
+4. **Decide HR-18** — `loadFile()` adds no newline after an included file, so with `Info` comments
+   suppressed the next block merges onto the include's last line (`M5M400`). Found in session 1,
+   deliberately unfixed: the one-line guard sits in the `loadFile()` every include branch shares, and
+   none of those branches has a test row. Diagnostic post specified in `HReview.md` §4.3.
+   **HR-19** (doubled space in `M291`) waits for the next tidy-up sweep.
+5. **CAM-dependent gap: `isSafeToRapid()`.** Its conversion branches have never run.
+   `H15a - GRBL.gcode` has the mapping group on and still fired nothing — the job's sections already
+   begin with real `G0` rapids and every cut sits below safe Z. Needs a toolpath with a horizontal
+   link move at or above safe Z, not a dialog change. Last untested path the README tells a hobbyist
+   to enable.
+6. **Dialog-only checks, no posting** — **D1** and **D3**'s dialog half (`PReview.md` §3.3). D3 gates
    trust in every dialog row: a saved preset should survive, but a posted file cannot tell a surviving
    preset from re-entered values. HR-17 renamed group 03's label, so D3 now has a real string change
    on that group to survive, not just the reorder.
-4. **Open the Tool Change branch** — *Phase 4 — tool-change ordering + base-relative park* below,
+7. **Open the Tool Change branch** — *Phase 4 — tool-change ordering + base-relative park* below,
    folded together with **HR-7/8/9/10/12/13** (`PReview.md` §2). Design settled for the ordering half;
    nothing depends on it and the base machinery underneath is verified.
-5. **The professional review proper** — the pass that produces `PReview.md`'s real content, using the
+8. **The professional review proper** — the pass that produces `PReview.md`'s real content, using the
    method `HReview.md` used. Needs a multi-part / multi-fixture job to post against.
-6. **Jet / laser workstream** (`PReview.md` §5) — J5 is a design question before it is a test.
+9. **Jet / laser workstream** (`PReview.md` §5) — J5 is a design question before it is a test.
 
 **Open decisions carried forward.** Each is written up where it lives:
 
@@ -82,9 +107,12 @@ physical measurement are out of scope, so every row must stand on the posted fil
 HR-1 closed it there. It remains open for the `Use Active WCS`, added-part and base probes, which
 descend from a retracted clearance and would be made **worse**, not better, by the same fix.*
 
-**One doc loose end.** `README.md`'s doc-sync marker at the top points at a pre-`25768ec` ref, so it
-understates what the README already covers. Standing preference: the README is not touched during code
-changes unless asked.
+**The README was synced on request (2026-07-25 … 2026-07-31)** and its doc-sync marker now points at
+`924d1f6`, covering the probe-target asymmetry, the orientation guard, arc feed scaling, the manual
+spindle prompts and the per-firmware program end. Standing preference is unchanged: **the README is
+not touched during code changes unless asked.** One item is known missing — group 08's include files
+make Fusion raise *"This post processor might be unsafe"* on first use, and a hobbyist who answers No
+gets an aborted post that reads like a missing file. Add it on the next sync.
 
 ---
 
