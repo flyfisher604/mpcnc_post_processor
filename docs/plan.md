@@ -356,6 +356,13 @@ at `onClose`.
   verified too (H7c, D2); the **Inter Part Safe Z** and **Use Active WCS** renames still need the
   dialog pass (D1). Remaining items below.
 - **Phase 5 — not started** (likely no-op).
+- **Hobbyist review (`docs/HReview.md`) — in progress, on branch `v4.0-hreview-fixes`.** 18 findings
+  from reviewing the post against the README's hobbyist use cases and every Fusion entry point.
+  Landed, **all unverified by a posted file**: HR-1 (provisional `Z0` bounds the `G38 Target`), HR-2
+  (`isProbeOperation()` defined locally), HR-3 (manual-spindle OFF prompt on GRBL), HR-4 (Safe-Z
+  fallbacks convert mm→output unit), HR-5 (`Scale Feedrate` reaches arcs), HR-6 (reject a section
+  oriented off machine Z). Twelve open, four of them (HR-7/8/9/12) overlapping the tool-change
+  ordering item below. See the checkpoint for the verification plan.
 
 ---
 
@@ -382,29 +389,80 @@ Do-this→get-that row(s), mark any already-`PASS` row whose saved `.gcode` the 
 update that file's Results summary. The full rule is at the top of the test plan; it is a priority,
 not a courtesy — a stale PASS is worse than an unrun test.
 
-**Baseline.** Branch `wcs-reworked-flow`. The two driving documents are this file and
-`docs/test-plan.md`; the post is `MPCNC_v4.0_Beta2.cps`. Nothing is in flight — the working tree is
-clean apart from an untracked `MPCNC_v4.0_Beta1.zip` (unrelated; add it or ignore it). **Nothing is
-known-broken and nothing is half-done.**
+**Baseline.** Branch **`v4.0-hreview-fixes`**, cut from `wcs-reworked-flow` at `baf37bf`. There are now
+**three** driving documents — this file, `docs/test-plan.md`, and **`docs/HReview.md`** (a
+hobbyist-perspective code review, described below); the post is `MPCNC_v4.0_Beta2.cps`. Nothing is in
+flight — the working tree is clean apart from an untracked `MPCNC_v4.0_Beta1.zip` (unrelated; add it
+or ignore it). **Nothing is half-done. Nothing is known-broken, but see the verification debt
+below — six fixes have landed unverified, which is a different and newer risk than this checkpoint
+has carried before.**
 
 **How verification works here:** post the job from Fusion, read the g-code. Machine dry-runs and
 physical measurements are out of scope, so every test row must stand on the posted file alone.
 
-**Everything landed since the last checkpoint is verified.** In order: the "unknown Z" warning on
-the first-part `Probe Z` path (**H7f**, all three branches); the base-frame base probe (**H7c**);
-Guard A on the reserved base (**H7d**); the full property dump (**D2**); the property-group reorder
-that moved homing next to the spoilboard (**D3** header half); and the Resolved Values Safe-Z lines
-now reporting what the expression actually resolves to rather than restating the property.
+### The hobbyist review (`docs/HReview.md`) — the current workstream
 
-**Three defects were found by those runs and fixed** — each is the kind that only a real posted file
-exposes, which is worth remembering when tempted to skip the posting step:
-- Guard A named **pre-rework dialog titles** (`Probe at Job Start`), sending the operator hunting for
-  a field that no longer exists.
-- The Resolved Values block **restated the property instead of resolving it** — `Retract : default =
-  15` on a job emitting `G0 Z5.08`. Fixing it also required correcting `resolveSafeZHeight()`, which
-  queried the global context while reading from the passed section.
-- Parentheses in comment strings are **stripped by `sanitizeMessageText`**, leaving double spaces.
-  Fixed twice now; a third instance survives in the tapping warning and in the group-03 name.
+A review of the post from the hobbyist's chair: the README's documented hobbyist use cases (five
+configurations, **HP-1**–**HP-5**), every Fusion entry point, and every property branch a hobbyist can
+reach. It produced **18 findings, HR-1…HR-18**, each with the config that reaches it, line references,
+a proposed diff, and a Do→Get row. It also records what was checked and found *sound*, so a later
+reader can tell "looked at, fine" from "never looked at".
+
+**Six fixes have landed on this branch, one commit each, subject-prefixed `HR-n:` so
+`git log --oneline --grep='^HR-'` lists the series:**
+
+| | Fix | Commit | Blast radius |
+|---|---|---|---|
+| **HR-1** | Provisional `Z0` bounds the `G38 Target` on the two just-positioned probe modes | `8d61790` | **Default path.** Breaks the H2 byte anchor |
+| **HR-3** | Manual spindle prompts to switch OFF on GRBL too (job end + tool change) | `43d09aa` | **Every GRBL job's tail** |
+| **HR-2** | `isProbeOperation()` defined locally so canned cycles can post at all | `9c87fb0` | Drilling path only |
+| **HR-4** | Safe-Z literal fallbacks convert mm→output unit | `439ce2d` | **Inch jobs only** — identity in mm |
+| **HR-5** | `Scale Feedrate` reaches G2/G3 arcs | `b95c954` | Only when scaling is on (defaults off) |
+| **HR-6** | Rejects a 3-axis section oriented off machine Z | `684f28a` | None if correct — **blocks everything if wrong** |
+
+Each commit message carries the full reasoning; each fix has an *As built* note in `HReview.md`
+recording where the implementation deviated from the proposed diff, and there were deviations in
+**every** case — the proposed diffs consistently understated the number of call sites. Read the As
+built note, not the original diff, when reasoning about what the code now does.
+
+> ### ⚠ Verification debt — the most important thing on this branch
+>
+> **All six fixes are unverified by a posted file.** Rows **HR1**–**HR6** are in the test plan and
+> unrun. Harness evidence (extracted functions + stubbed kernel globals, run in node) covers the
+> *arithmetic* for HR-2, HR-4, HR-5 and HR-6, but nothing has been through Fusion. Three of the six
+> changed emitted output on paths every hobbyist uses.
+>
+> **Post before writing more fixes.** The further this runs unverified, the harder it becomes to
+> attribute a surprise in the g-code to one change. Three sessions cover it:
+> 1. **GRBL / mm** — one job with a **drill + tap** (HR2 A/A2, and the first file ever to evidence
+>    HR-17's parenthesis stripping), then HR1 (A)–(D), HR3 (A)–(C) and HR5 (A)–(D) as dialog variants
+>    of the hobby job. HR1 (D) needs a jet/tool-0 job; HR3 (C) needs two tools.
+> 2. **GRBL / inch** — HR4 (A), (C), (D). **There is no inch reference file anywhere in the test plan
+>    today**, so this is a first.
+> 3. **Marlin + RRF** — HR1's firmware half, HR3 (D). Also picks up the long-outstanding **H7e**.
+>
+> **Run HR6 (A) before any of it.** It is a plain re-post of the H2 job, and it is the one check whose
+> failure means "revert immediately": a false positive in the orientation guard blocks all posting.
+> HR-6 is written to fail open specifically so that outcome is unlikely, but it is unproven.
+
+**Twelve findings remain open**, in `HReview.md`'s suggested order: **HR-7** (`toolChange()`'s
+`onRapid()` clears `forceSectionToStartWithRapid`, defeating First-G1→G0 on every tool-change
+section), **HR-8** (`setCurrentPosition*` is never called, so rapid split-ordering, `isSafeToRapid()`
+and feed scaling can reason from a stale Z at section boundaries), **HR-9** (`Do First Change` +
+`Probe After Tool Change` off ⇒ Z0 probed with the wrong tool), **HR-10** (`M84 Z` emitted on GRBL,
+which halts the controller), **HR-11** (Marlin/RRF jobs emit no `M2`/`M30` and never undo `Start()`'s
+`M84 S0`), **HR-12** (manual-spindle RPM changes silently dropped), **HR-13** (`onCommand` has no
+`default:`; Manual NC *Optional stop* is discarded), **HR-14** (coolant `Flood and Mist` /
+`Flood and ThroughTool` can never match a channel), **HR-15**/**HR-16**/**HR-17**/**HR-18**
+(tidy-ups).
+
+Two of those want a decision before they can land:
+- **HR-11** — `M84` releases the motors immediately, which drops Z on an unbalanced LowRider gantry.
+  `M84 S60` (restore a timeout instead) is probably the right default for this machine family. **User's
+  call.**
+- **HR-7 / HR-8 / HR-9 / HR-12** are all group-07 / section-boundary behaviour and overlap the
+  *Phase 4 — tool-change ordering + base-relative park* item below. Consider doing them **as one unit
+  with** that rework rather than patching the same code twice.
 
 **One behavior worth knowing before touching the base code:** `writeBaseEstablish()` emits **no XY
 move** — it probes whatever is under the tool at job start, so parking over the stock silently
@@ -412,33 +470,65 @@ records the stock top as "the spoilboard". Deliberate (no trustworthy frame exis
 documented as an operator precondition in the code, this file and the README. The durable fix is
 sketched under *Future work — a machine-coordinate base probe point (`G53`)*.
 
-**Next actions, in the order they'd be tackled:**
-1. **Code — tool-change ordering + base-relative park.** The last substantial code item; design
-   settled, see *Phase 4 — tool-change ordering + base-relative park* under Remaining work. Nothing
-   depends on it, and the base machinery underneath it is now verified.
-2. **Dialog-only checks, no posting:** **D1** (labels/defaults audit) and **D3**'s dialog half — does
-   a *saved preset* survive the group move? Only `group:` strings changed so it should, but a posted
-   file cannot tell a surviving preset from re-entered values. D3 gates trust in every dialog row.
-3. **Single-post checks:** **D2**'s suppression check at Comment Level `Important` / `Off`;
-   **H7e** (H7 on Marlin and RRF).
-4. **Needs a multi-part / multi-fixture job to post:** **PB1/PB2**, **PBV1–3**, **PA1/PA1b**,
-   **P2**/**P3** (only the added-part halves remain).
-5. **Deferred workstream:** jet tools and laser (**J1–J5**), a separate scope decision. `J5` is a
-   design question before it is a test.
+**What was verified before the review started** (all still standing): the "unknown Z" warning on the
+first-part `Probe Z` path (**H7f**, all three branches); the base-frame base probe (**H7c**); Guard A
+on the reserved base (**H7d**); the full property dump (**D2**); the property-group reorder
+(**D3** header half); and the Resolved Values Safe-Z lines resolving rather than restating.
+⚠ **The saved `.gcode` files behind H1, H2, H6, P1 and every GRBL file's tail are now stale** — see
+the per-row ⚠ notes and the HR-3 blast-radius banner in the test plan. The row *assertions* still
+hold; the files no longer match byte-for-byte.
 
-**Open decisions carried forward** (each written up in full below): whether first-part `Skip` should
-hold the base clearance instead of descending to the probe Safe Z when a base is reserved; the
-frame-dependence of the `G38.2` probe target; `wcsDefinitions` offset-`0` handling; and whether the
-spoilboard base should gain an explicit probe-point XY rather than relying on the park precondition
-(written up as *Future work — a machine-coordinate base probe point (`G53`)*, which also carries the
-"homing makes the WCS trustworthy, it doesn't change it" analysis and the standing `G53` conflict).
+**Three defects were found by those earlier runs and fixed** — each is the kind only a real posted file
+exposes, which is exactly why the verification debt above matters:
+- Guard A named **pre-rework dialog titles** (`Probe at Job Start`), sending the operator hunting for
+  a field that no longer exists.
+- The Resolved Values block **restated the property instead of resolving it** — `Retract : default =
+  15` on a job emitting `G0 Z5.08`. Fixing it also required correcting `resolveSafeZHeight()`, which
+  queried the global context while reading from the passed section.
+- Parentheses in comment strings are **stripped by `sanitizeMessageText`**, leaving double spaces.
+  Fixed twice; instances survive in the tapping warning and the group-03 name (now tracked as HR-17).
+
+**Next actions, in the order they'd be tackled:**
+1. **Post the six landed fixes** — the three sessions above, HR6 (A) first. This outranks new code.
+2. **Decide HR-11's `M84` vs `M84 S60`**, then land the small independent HR fixes (**HR-10**,
+   **HR-13**, **HR-14**, **HR-11**).
+3. **Code — tool-change ordering + base-relative park**, *folded together with* **HR-7 / HR-8 / HR-9 /
+   HR-12**. Design settled for the ordering half; see *Phase 4 — tool-change ordering + base-relative
+   park* under Remaining work. Nothing depends on it and the base machinery underneath is verified.
+4. **Dialog-only checks, no posting:** **D1** (labels/defaults audit) and **D3**'s dialog half — does a
+   *saved preset* survive the group move? Only `group:` strings changed so it should, but a posted file
+   cannot tell a surviving preset from re-entered values. D3 gates trust in every dialog row.
+5. **Single-post checks:** **D2**'s suppression check at Comment Level `Important` / `Off`; **H7e**
+   (folds into posting session 3 above).
+6. **Needs a multi-part / multi-fixture job to post:** **PB1/PB2**, **PBV1–3**, **PA1/PA1b**,
+   **P2**/**P3** (only the added-part halves remain).
+7. **Deferred workstream:** jet tools and laser (**J1–J5**), a separate scope decision. `J5` is a
+   design question before it is a test. HR1 (D)'s jet/tool-0 check folds in here if convenient.
+
+**Open decisions carried forward** (each written up in full in this file or `HReview.md`): whether
+first-part `Skip` should hold the base clearance instead of descending to the probe Safe Z when a base
+is reserved; `wcsDefinitions` offset-`0` handling; whether the spoilboard base should gain an explicit
+probe-point XY rather than relying on the park precondition (*Future work — a machine-coordinate base
+probe point (`G53`)*, which also carries the "homing makes the WCS trustworthy, it doesn't change it"
+analysis and the standing `G53` conflict); plus two raised by the review — whether the **added-part
+`Jog to X0 Y0, Probe Z0`** should get HR-1's provisional `Z0` for symmetry (deferred to the PA1/M4
+run, since it arrives from a retracted clearance where the Z is less predictable), and whether
+**HR-2's two-signal guard** keeps its extra breadth or trims to the strict reference form.
+*The frame-dependence of the `G38.2` probe target is no longer open on the first-part probe modes —
+HR-1 closed it there. It remains open for the `Use Active WCS`, added-part and base probes, which
+descend from a retracted clearance and would be made worse, not better, by the same fix.*
 
 **Workflow notes that saved time.** `node --check MPCNC_v4.0_Beta2.cps` is a valid syntax gate for
-this post — worth running after every edit. The `properties` literal can also be brace-matched out of
-the file and `eval`'d in node (with the `e*` enum declarations pulled from the file head) to test
-logic that iterates it — that is how the property dump's grouping/ordering was verified without
-Fusion. Also: **`git commit -m` with a PowerShell here-string mangles messages containing double
-quotes** — write the message to a file and use `git commit -F`.
+this post — worth running after every edit. Beyond that, **individual functions can be extracted from
+the `.cps` with a regex and `eval`'d in node against stubbed kernel globals** — that is how HR-2,
+HR-4, HR-5 and HR-6 were checked without Fusion (`propertyMmToUnit`, `getProperty`, `getCircularPlane`,
+`hasParameter`, `cycleType`, `unit` and a fake section are all easy to fake, and a fixture table of
+inputs → expected outputs catches unit and plane errors that reading cannot). The `properties` literal
+can be brace-matched out and `eval`'d the same way (with the `e*` enum declarations from the file
+head) to test logic that iterates it — that is how the property dump's grouping/ordering was verified.
+It is not a substitute for posting, but it settles arithmetic cheaply and makes the posted file's job
+purely "do these values reach the file". Also: **`git commit -m` with a PowerShell here-string mangles
+messages containing double quotes** — write the message to a file and use `git commit -F`.
 
 **One doc loose end.** `README.md`'s doc-sync marker at the top still points at a pre-`25768ec` ref,
 so it understates what the README covers; the README content itself was brought current (including a
