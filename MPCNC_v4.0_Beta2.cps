@@ -1470,7 +1470,7 @@ function onClose() {
       // semantics are known to diverge from GRBL's and M2 may simply be unrecognised here. The
       // cost if it is: an unknown-command echo in the sender's log. All motion is flushed and the
       // spindle is off by this point, so nothing moves either way. Settled by the Marlin/RRF post
-      // rather than by reading -- see docs/test-plan.md HR11.
+      // rather than by reading -- see docs/HReview.md HR-11.
       writeBlock(mFormat.format(2));
     }
 
