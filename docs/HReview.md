@@ -5,11 +5,13 @@ The review of the post from the hobbyist's chair, and the verification record fo
 point, and every property branch a hobbyist can reach. **Findings:** 19 (`HR-1`…`HR-19`); ten fixed
 on branch `v4.0-hreview-fixes`; six reclassified as professional and moved to `docs/PReview.md`.
 
-**Six findings are closed with posted evidence** (HR-1, HR-3, HR-5, HR-6, HR-11, HR-15), and **HR-4**
-is closed on **(A)(B)(D)** — only the mapper half of its (C) is outstanding. Two landed fixes still
-owe a post in full: **HR-2** and **HR-17 (C)** need a drill + tap job, **HR-14** needs a coolant
-channel — see [§3 Status](#3-status). Two findings opened on 2026-07-31 during session 1 and carry no
-fix yet: **HR-18** (`loadFile()` newline, a real corruption path) and **HR-19** (cosmetic).
+**Seven findings are closed** — HR-1, HR-3, HR-4, HR-5, HR-6, HR-11, HR-15. Two landed fixes still owe
+a post: **HR-2** and **HR-17 (C)** need a drill + tap job, **HR-14** needs a coolant channel. Two
+findings opened on 2026-07-31 during session 1 and carry no fix yet: **HR-18** (`loadFile()` newline,
+a real corruption path) and **HR-19** (cosmetic).
+
+**Every test and its state is in [§0 Test register](#0-test-register--every-test-and-its-state)** —
+one table, 59 rows, and the only place a pass or fail is recorded.
 
 > **Standing rule — a code change is not done until this file is updated.** Every change to
 > `MPCNC_v4.0_Beta2.cps` that touches hobbyist behaviour updates this file **in the same commit**:
@@ -27,6 +29,95 @@ must stand on the posted file alone. Posted files go to Fusion's NC output folde
 **Conventions.** Comments are `( … )` on GRBL and `; …` on Marlin/RRF — otherwise the tokens are
 identical. `G10 L20 P<n>` is GRBL/RepRap; Marlin uses `G92`. Default probe target / speed / thickness
 = `Z-10` / `F30` / `Z0.8`. Do everything on **GRBL** first (the default firmware).
+
+---
+
+## 0. Test register — every test and its state
+
+**This table is the authoritative state of every hobbyist test.** Nothing else in this file records
+pass/fail; the sections below carry the *reasoning*, the expected tokens and the Do→Get instructions
+for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
+whose state lives in two places will rot in one of them.
+
+**59 tests — ✅ 40 PASS · ❌ 0 FAIL · ⬜ 13 UNRUN · ➖ 6 n/a or moved to `PReview.md`.**
+
+**Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
+post and is the only method that proves what a hobbyist receives. `harness` is a node run against
+functions extracted from the `.cps`, or a post from `Personal.cps` (§8) — it proves *logic*, not
+output. `source` is a reading of firmware source. A ⬜ row's Method column names what it is waiting
+for.
+
+| Test | What it proves | Method | Evidence / blocker | State |
+|---|---|---|---|---|
+| **H1** | `Jog to X0 Y0, Probe Z0` origin mode | posted | `H1.gcode` | ✅ |
+| **H2** | `Set X0 Y0 to Current Pos, Probe Z0` — the default path | posted | `H2.gcode` | ✅ |
+| **H3** | `Jog to X0 Y0 Z0` — no `G38.2` | posted | `H3.gcode` | ✅ |
+| **H4** | `Set X0 Y0 Z0 to Current Pos` — no prompt, no probe | posted | `H4.gcode` | ✅ |
+| **H5** | `Use Active WCS X0 Y0 Z0` — no origin write | posted | `H5.gcode` | ✅ |
+| **H6** | Marlin + RRF variants of H1 | posted | `H6 - Marlin.gcode`, `H6 - RRF.gcode` | ✅ |
+| **H7** | `Use Active WCS X0 Y0, Probe Z0` — absence of the XY origin write | posted | `H7.gcode`, `H7a.gcode` | ✅ |
+| **HR-1 (A)** | Provisional `Z0` on the default probe mode | posted | `H2.gcode` | ✅ |
+| **HR-1 (B)** | Same on the jog mode | posted | `HR1b.gcode` | ✅ |
+| **HR-1 (C)** | **Absent** on `Use Active WCS` — the scope claim | posted | `HR1c.gcode` vs `H7c-a.gcode` | ✅ |
+| **HR-1 (D)** | Jet / tool-0 absence | — | → `PReview.md` **J1** | ➖ |
+| **HR-1 (E)** | Present on both firmwares, both origin modes | posted | `H11a`, `H11b - RRF`, both `H6` | ✅ |
+| **HR-2 (A)** | A drill posts at all — no `ReferenceError` abort | — | **needs a drill CAM** | ⬜ |
+| **HR-2 (A2)** | Tapping warning emitted per occurrence | — | **needs a tap CAM** | ⬜ |
+| **HR-2 (B)** | Probing cycles still refused | — | licence cannot create one | ➖ |
+| **HR-2 (U)** | `isProbeOperation()` over 8 strategy/cycle inputs | harness | node | ✅ |
+| **HR-3 (A)** | GRBL prompts spindle OFF; no `M5`, no `M300` | posted | `H2.gcode` | ✅ |
+| **HR-3 (B)** | Automatic branch untouched | posted | `HR3b.gcode` | ✅ |
+| **HR-3 (C)** | Tool-change half | — | → `PReview.md` §3.4 | ➖ |
+| **HR-3 (D)** | Marlin/RRF unchanged; only GRBL moved | posted | six session-1 files | ✅ |
+| **HR-4 (A)** | Inch: bare-number probe Safe Z converts | posted | `H4a - GRBL Inch.gcode` | ✅ |
+| **HR-4 (B)** | mm: identity, no saved reference invalidated | posted | `H4b - GRBL.gcode`, `H7c-a.gcode` | ✅ |
+| **HR-4 (C1)** | Inch: the mapper's threshold converts | posted | `H4c - GRBL Inch.gcode` | ✅ |
+| **HR-4 (C2)** | The mapper then actually converts moves | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
+| **HR-4 (D)** | Header never mixes mm and inch | posted | `H4base - GRBL Inch.gcode` | ✅ |
+| **HR-4 (U)** | Five expression forms across both units | harness | node | ✅ |
+| **HR-5 (A)** | Arcs capped at the plane's axis limits | posted | `HR5a.gcode` | ✅ |
+| **HR-5 (B)** | Unscaled baseline — arcs at Fusion's raw feed | posted | `HR5b.gcode` | ✅ |
+| **HR-5 (C)** | `Max Toolpath Speed` caps arcs too | posted | `HR5c.gcode` | ✅ |
+| **HR-5 (D)** | Non-XY (`G18`) arc limited by the slower axis | posted | `HR5a.gcode`, `H11c - GRBL.gcode` | ✅ |
+| **HR-5 (E)** | Marlin: linearized segments limited like any `G1` | posted | `H5d - Marlin.gcode` vs `H11a.gcode` | ✅ |
+| **HR-6 (A)** | Orientation guard is live, not failing open | posted | `H2 - Debug.gcode` | ✅ |
+| **HR-6 (B)** | An off-axis section is actually rejected | — | needs a rotated Setup; optional | ⬜ |
+| **HR-11 (A)** | Marlin: `M84 S60`, no `M2` | posted | `H11a.gcode` | ✅ |
+| **HR-11 (B)** | RepRap: `M2` after `M84 S60` | posted | `H11b - RRF.gcode` | ✅ |
+| **HR-11 (C)** | GRBL tail untouched | posted | `H11c - GRBL.gcode` | ✅ |
+| **HR-11 (D)** | Stop file bypasses the whole stop block | posted | `H11d - Marlin.gcode` | ✅ |
+| **HR-11 (S)** | Whether Marlin / RRF honour `M2` | source | `gcode.cpp`, `GCodes2.cpp`, RRF changelog | ✅ |
+| **HR-14 (A)** | `Flood and Mist` matches a channel | — | **needs a coolant channel** | ⬜ |
+| **HR-14 (B)** | Warning names the mode the operator saw | — | **needs a coolant channel** | ⬜ |
+| **HR-14 (C)** | Ordinary `Flood` unchanged | — | **needs a coolant channel** | ⬜ |
+| **HR-14 (U)** | All 9 indices, before and after — 7/9 → 9/9 | harness | node | ✅ |
+| **HR-15 (A)** | Mapping-on post changes nothing but one comment | posted | `H15a - GRBL.gcode` | ✅ |
+| **HR-15 (B)** | The level branch is taken, not the fallback | posted | `H15a - GRBL.gcode` | ✅ |
+| **HR-16** | `onClose` traverse ordering — recorded, no fix | — | no test proposed | ➖ |
+| **HR-17 (A)** | Property heading no longer double-spaced | posted | six session-1 files vs `H2.gcode` | ✅ |
+| **HR-17 (B)** | Spindle prompt reads `… RPM` | posted | same | ✅ |
+| **HR-17 (C)** | Tapping warning single-spaced | — | **needs a tap CAM** (rides HR-2 (A2)) | ⬜ |
+| **HR-17 (D)** | The two inert tidy-ups changed nothing | posted | `H11c - GRBL.gcode` vs `H2.gcode` | ✅ |
+| **HR-17 (U)** | Sanitizer before/after over 4 input shapes | harness | node | ✅ |
+| **HR-18 (A)** | `loadFile()` newline — diagnostic, fix undecided | — | needs a stop file with no trailing newline | ⬜ |
+| **HR-19** | `M291` doubled space — cosmetic, no fix | — | no test proposed | ➖ |
+| **HW-1** | `isSafeToRapid()`'s three conversion branches | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
+| **HW-2** | HP-5: two operations, one tool, one WCS | — | candidate: `Link.gcode`, unread | ⬜ |
+| **HW-3** | `Probe Pause = No` — neither prompt | — | cheap; folds into any GRBL session | ⬜ |
+| **HW-4** | `Probe Pause = Before` — attach only | — | cheap; folds into any GRBL session | ⬜ |
+| **HW-5** | The documented HP-1 baseline in one file | — | no file has ever had all of it at once | ⬜ |
+| **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
+| **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
+
+**What the 13 ⬜ rows are waiting on — four things, not thirteen.** A **drill + tap CAM** (HR-2 (A),
+(A2), HR-17 (C)); a **coolant channel** (HR-14 (A)(B)(C)); **four cheap posts on CAM that already
+exists** (HW-2, HW-3, HW-4, HW-5); and **three one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a stop
+file, HW-6 the final sweep). Ranked with per-post parameters in [§3](#3-status).
+
+**The one honest gap inside a ✅.** HR-4 (C2) and HW-1 are the only rows carried by `harness` alone.
+They prove `isSafeToRapid()`'s logic is right; they do **not** prove a real post ever reaches it,
+because on a paid Fusion licence it cannot — see §6. That premise is documented in the code and is not
+in doubt, but it is untested and probably untestable here.
 
 ---
 
@@ -131,18 +222,22 @@ series. Each commit message carries the full reasoning; the code carries the *wh
 site. **Read the code and the commit, not a restated diff** — that is why the diffs and as-built
 notes that used to live in this file are gone.
 
-| | Fix | Commit | Blast radius | State |
+This table is about the **fixes** — what landed, where, and how far the blast radius reaches. Per-test
+state is [§0](#0-test-register--every-test-and-its-state)'s job and is deliberately not repeated here;
+the last column says only whether the fix's rows are all in.
+
+| | Fix | Commit | Blast radius | Rows |
 |---|---|---|---|---|
-| **HR-5** | `Scale Feedrate` reaches G2/G3 arcs | `b95c954` | Only when scaling is on (defaults off) | ✅ **closed** |
-| **HR-6** | Rejects a 3-axis section oriented off machine Z | `684f28a` `e2b2424` | None if correct — blocks everything if wrong | ✅ **closed**, guard confirmed live |
-| **HR-1** | Provisional `Z0` bounds the `G38 Target` on the two just-positioned probe modes | `8d61790` | **Default path.** Breaks the old byte anchor | ✅ **closed** — (A)(B)(C) + both firmwares |
-| **HR-3** | Manual spindle prompts to switch OFF on GRBL too | `43d09aa` | **Every GRBL job's tail** | ✅ **closed** — (A)(B)(D) |
-| **HR-2** | `isProbeOperation()` defined locally so canned cycles can post at all | `9c87fb0` | Drilling path only | harness only — **unposted** |
-| **HR-4** | Safe-Z literal fallbacks convert mm→output unit | `439ce2d` | **Inch jobs only** — identity in mm | ✅ **(A)(B)(D) closed**; (C)'s mapper half owed |
-| **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + `8054b6e` | **Every Marlin/RRF job's tail.** GRBL untouched | ✅ **closed** — (A)(B)(C)(D) all posted |
-| **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | harness before/after — **unposted** |
-| **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | ✅ **closed** — (A)(B) on `H15a - GRBL.gcode` |
-| **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | `924d1f6` | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | (A)(B)(D) pass; (C) owed with the tap |
+| **HR-5** | `Scale Feedrate` reaches G2/G3 arcs | `b95c954` | Only when scaling is on (defaults off) | all in |
+| **HR-6** | Rejects a 3-axis section oriented off machine Z | `684f28a` `e2b2424` | None if correct — blocks everything if wrong | (B) optional, owed |
+| **HR-1** | Provisional `Z0` bounds the `G38 Target` on the two just-positioned probe modes | `8d61790` | **Default path.** Breaks the old byte anchor | all in |
+| **HR-3** | Manual spindle prompts to switch OFF on GRBL too | `43d09aa` | **Every GRBL job's tail** | all in |
+| **HR-2** | `isProbeOperation()` defined locally so canned cycles can post at all | `9c87fb0` | Drilling path only | (A)(A2) owed |
+| **HR-4** | Safe-Z literal fallbacks convert mm→output unit | `439ce2d` | **Inch jobs only** — identity in mm | all in |
+| **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + `8054b6e` | **Every Marlin/RRF job's tail.** GRBL untouched | all in |
+| **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | (A)(B)(C) owed |
+| **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | all in |
+| **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | `924d1f6` | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | (C) owed with the tap |
 
 Open with no code change: **HR-16** (recorded, no fix proposed), **HR-18** (`loadFile()` newline — has
 a Do→Get row, deliberately unfixed), **HR-19** (cosmetic, fold into the next sweep). Moved to
@@ -185,15 +280,27 @@ project's first inch output of any kind:
 > `H4a` shows all of them at once. And `H4c` re-confirmed, in a second unit, that this CAM cannot
 > exercise `isSafeToRapid()` — see §6.
 
+**Session 3 — the mapper session — ran on 2026-07-31** and closed **HR-4 (C2)** and **HW-1**. Two
+files from `Personal.cps`, the harness post described in §8, on a two-operation adaptive job:
+
+| File | Config (delta from defaults) | Serves |
+|---|---|---|
+| `Link.gcode` | mm, all defaults — the unmodified post | baseline; **HW-2** candidate |
+| `Link-5-GRBL.gcode` | `Personal.cps`, group 03 all on, Map Safe Z = `Retract:15` → 5.08 | HW-1, HR-4 (C2) |
+| `Link-15-GRBL.gcode` | `Personal.cps`, group 03 all on, Map Safe Z = `15` | HW-1 — the threshold discriminator |
+
 Remaining, ranked by value:
 
 1. **GRBL / mm, new CAM: a drill + tap job.** Clears **HR-2 (A)(A2)** and **HR-17 (C)** — the tapping
    warning is the last piece of the sanitizer fix without evidence. **HR-14 (A)(B)(C)** rides along on
    any GRBL job with a coolant channel configured (the existing face-mill tool already requests
-   *Flood*, so (C) needs no CAM edit at all).
-2. **A linking toolpath, either unit, new CAM.** Clears **HR-4 (C)**'s mapper half and the
-   `isSafeToRapid()` conversion branches in §6 in one post — the same job serves both, and nothing
-   else can reach either.
+   *Flood*, so (C) needs no CAM edit at all). Parameters per finding in §4.2.
+2. **Four cheap posts on CAM that already exists** — **HW-3** and **HW-4** (`Probe Pause` = `No`, then
+   `Before`) on the face-mill job, **HW-5** (the HP-1 baseline in one file) on the same, and **HW-2**
+   which may need no post at all: `Link.gcode` is already a two-operation, one-tool, one-WCS job and
+   only needs reading.
+3. **Three one-offs, in no particular order** — **HR-6 (B)** a rotated Setup, **HR-18 (A)** a stop file
+   with no trailing newline, and **HW-6** the regression sweep, which goes last by definition.
 
 Three results worth carrying forward rather than re-deriving:
 
@@ -224,7 +331,7 @@ the axis limits of the **plane it lies in** (deliberately not the chord projecti
 under-protects by up to 1/cos 45° because an arc's instantaneous axis speed reaches the full feed at
 each quadrant).
 
-*Verified — all four halves, from the Mounting Plate face-mill job on GRBL:* `HR5b.gcode` (scaling
+*Verified (A)(B)(C)(D) — all four halves, from the Mounting Plate face-mill job on GRBL:* `HR5b.gcode` (scaling
 off) is the unscaled baseline, arcs at Fusion's raw `F2667`/`F1016`; `HR5a.gcode` (XY 900 / Z 180 /
 toolpath 1000) drops every `G17` arc to **`F900`**, matching the `G1` blocks either side, no cut feed
 above 900 surviving anywhere; `HR5c.gcode` (`Max Toolpath Speed` = 500) reads **`F500`** on the same
@@ -265,7 +372,7 @@ is ~0.006° of tilt. `setRotation()` deliberely omitted: the check errors on any
 it could only ever be called with an identity plane, and its effect on the kernel's coordinate
 delivery cannot be verified without posting.
 
-*Verified:* `H2.gcode` posts complete with no `Tool orientation` message — nothing is blocked, which
+**Verified (A).** `H2.gcode` posts complete with no `Tool orientation` message — nothing is blocked, which
 was the regression that mattered. `H2 - Debug.gcode` line 359 reads
 `( onSection orientation: forward X0 Y0 Z1, tilt from machine Z 0 deg -> upright, section allowed)`.
 Making that trace **unconditional rather than rejection-only** is what made one ordinary post decisive
@@ -273,7 +380,7 @@ Making that trace **unconditional rather than rejection-only** is what made one 
 `-> UNREADABLE, check skipped, section allowed`; **seeing UNREADABLE on a normal Setup would mean the
 guard is a no-op.**
 
-> **Remaining, benign and optional:** the rejection half. Duplicate the hobby Setup with its Z along
+> **(B) — remaining, benign and optional:** the rejection half. Duplicate the hobby Setup with its Z along
 > the model's X and post — expect the error naming the fix, and a **truncated `.gcode` on disk**
 > (this guard fires in `onSection()`, after the header is written, unlike Guards A/B/C which write
 > nothing at all). Nothing here evidences what Fusion reports for a *re-oriented* Setup — it could in
@@ -326,7 +433,7 @@ probe)` ahead of it — the shared code path carries the provisional `Z0` onto t
 provisional `Z0` and no comment**, the only `G10 L20 P1` being the probe's own `Z0.8`, and the motion
 is byte-identical to `H7c-a.gcode`.
 
-**Verified (firmware half) — HR-1 closes.** Session 1, all four probe-mode files, comments in `; …`
+**Verified (E) — the firmware half; HR-1 closes.** Session 1, all four probe-mode files, comments in `; …`
 form throughout. **Marlin** (`H11a.gcode` default, `H6 - Marlin.gcode` jog):
 `;   Set current X,Y position to 0,0` → `;   Provisional Z0 at the current height so the probe target
 is a relative limit` → **`G92 X0 Y0 Z0`** → `M0 Attach ZProbe` → `G38.2 F30 Z-10` → `G92 Z0.8` →
@@ -370,7 +477,7 @@ behaviour change worth naming:** a job containing a probing cycle whose strategy
 previously posted (silently, as non-probing motion) and now errors. *Open, low-stakes: whether to keep
 the extra breadth or trim to the strict reference form (a two-line edit).*
 
-**Unit-checked at the JS level** — the helper run against stubbed
+**Verified (U) — unit-checked at the JS level.** The helper run against stubbed
 `hasParameter`/`getParameter`/`cycleType`: strategy `probe` → true; `probing-x` /
 `probing-xy-outer-corner` / `probing-z` → true; `drilling` / `tapping` / `boring` → false; no strategy
 parameter → false; `cycleType` absent → false. Eight cases, all passing.
@@ -484,7 +591,7 @@ reports those in output units.
 **mm jobs are bit-for-bit unchanged** (`propertyMmToUnit()` is the identity in mm), which is why this
 is the one fix on the branch with no blast radius — every saved reference is a mm job.
 
-**Harness-verified across both units** before landing: `Retract:15` with an absolute level → `5` /
+**Verified (U) — harness, across both units** before landing: `Retract:15` with an absolute level → `5` /
 `0.2` (level passes through untouched); relative level → `15` / `0.5906`; absent → `15` / `0.5906`;
 bare `20` → `20` / `0.7874`; malformed `Retract:` → `15` / `0.5906`.
 
@@ -522,21 +629,23 @@ ever been posted, so none of these call sites had any posted evidence either:
 `F105`/`F52.5`/`F40`/`F13.33` against `F2667`/`F1334`/`F1016`/`F339` — so it is the same geometry and
 nothing is converted twice.
 
-**(C) — half evidenced, half blocked on CAM.** `H4c - GRBL Inch.gcode` (inch, all three group-03
-booleans on, `Map: Safe Z to Rapid` = `20`) carries the decisive comment
+**Verified (C1) — the threshold converts.** `H4c - GRBL Inch.gcode` (inch, all three group-03 booleans
+on, `Map: Safe Z to Rapid` = `20`) carries the decisive comment
 `( SafeZ using const: 0.7874015748031497)`; pre-fix that line read `( SafeZ using const: 20)`, a
-threshold of twenty **inches** that no toolpath can reach, which is the whole defect. But **no
-conversion fired** — zero `Safe G1 --> G0`, zero `First G1 --> G0`, and diffed against `H4base` that
-comment is the only added line. The job cannot exercise it: a 20 mm / 0.7874 in threshold sits *above*
-the 5.08 mm that already defeated `H15a - GRBL.gcode` in mm, while the job's highest Z is `Z0.6`
-(15.24 mm). The threshold conversion is proven; that the mapper then converts anything is not.
+threshold of twenty **inches** that no toolpath can reach, which is the whole defect. **No conversion
+fired in that file** — a 20 mm / 0.7874 in threshold sits *above* the 5.08 mm that already defeated
+`H15a - GRBL.gcode` in mm, while the job's highest Z is `Z0.6` (15.24 mm). Not a failure of the fix;
+the job cannot reach any threshold, in either unit.
 
-**Do (C) — re-post on a linking toolpath.** An inch Setup on a job with a **horizontal link move at or
-above safe Z** (several contours linking at retract height), group 03 all on, and
-`Map: Safe Z to Rapid` set **below** the link height. **Get (C):** the converted `SafeZ using const:`
-comment as above, plus at least one `( Safe G1 --> G0)`. **Pass:** both. One re-post closes this and
-the `isSafeToRapid()` gap in §6 together. *(That comment is `Important` level, so it survives at
-Comment Level `Important`.)*
+**Verified (C2) — the mapper then converts, via the `Personal.cps` harness.** Splitting (C) in two is
+the honest bookkeeping: (C1) is the part HR-4 changed, and it is posted; (C2) is "does the mapper do
+anything once the threshold is right", which is `isSafeToRapid()`'s own coverage and is **HW-1**. It
+closed on `Link-5-GRBL.gcode` / `Link-15-GRBL.gcode` — see §6.
+
+> **What (C1)+(C2) do not amount to.** No **inch** file has ever shown an actual conversion: (C1) is
+> inch and (C2) is mm. Nothing in `isSafeToRapid()` is unit-specific once the threshold is converted —
+> it compares two numbers already in output units — so a third post was judged not worth it. Recorded
+> so the seam is visible rather than glossed.
 
 ---
 
@@ -558,7 +667,7 @@ anyone remembering to. **The `Stop File` branch is deliberately untouched** — 
 whole stop block when `B_Include_StopFile` is set, and `M30` was already inside the bypassed region, so
 a custom stop file owns the entire stop sequence, program end included.
 
-> ### `M2` — settled from firmware source, not from a controller (2026-07-31)
+> ### (S) `M2` — settled from firmware source, not from a controller (2026-07-31)
 > This was the branch's only open correctness question, and the only fix that could not be settled by
 > reading the posted file. It was closed by reading the **firmware** instead — no Marlin or Duet
 > hardware was needed, and none is needed to verify the rows below.
@@ -619,16 +728,6 @@ which is exactly what the first, stale-build attempt at this session did. See §
 > `Can't open file` branch and `error()` aborts the post. A declined prompt **invalidates** the row
 > rather than failing it.
 
-**Do (C) — the GRBL regression.** Re-post the default hobby job unchanged. **Get (C):** still ends
-`M30` then `%`, with **no `M84` and no `M2` anywhere**. **Pass:** the GRBL tail is byte-identical to
-`H2.gcode` apart from the timestamp — HR-17's two text changes are both above the stop block, so the
-tail itself is still a clean comparison. The fix is inside the non-GRBL branch; this proves it stayed
-there.
-
-**Do (D) — the stop-file bypass.** Set `08 - External Include Files` → `Stop File` to any file and
-post on Marlin. **Get (D):** the included file's contents and **no `M84 S60`/`M2`**. **Pass:** the new
-blocks are absent — the same treatment `M30` already gets.
-
 > **`H6 - Marlin.gcode` and `H6 - RRF.gcode` were re-baselined by session 1** and now carry the
 > current tail and origin write. They were stale twice over — no program end, no provisional `Z0`.
 
@@ -652,7 +751,7 @@ comment also records that the **index is Fusion's `tool.coolant` constant**, so 
 be re-ordered for tidiness. That is the property the original literal depended on silently, and the
 one an unwary edit would break.
 
-**Harness-verified before *and* after**, which is what makes it more than a plausible fix: every
+**Verified (U) — harness, before *and* after**, which is what makes it more than a plausible fix: every
 index `0`–`8` compared against the id the channel-mode property stores for the same coolant —
 **7 of 9 matching before, 9 of 9 after**. Also checked that `coolantLevels.indexOf()` finds every
 entry (so the warning names the mode rather than printing `unknown`) and that an out-of-range
@@ -739,7 +838,7 @@ rode with it **do** change bytes in every file, which is why this is here rather
 | `flushMotions()`'s empty `if (fw == eFirmware.GRBL) {}` | Early `return` carrying the reason — GRBL has no wait-for-moves code and `M400` would be an unknown command there |
 | `"Turn ON " + …format(rpm) + "RPM"` | Now `" RPM"` — the prompt reads `Turn ON 18000 RPM` |
 
-**Harness-verified before *and* after**, both implementations against the same inputs: the tapping
+**Verified (U) — harness, before *and* after**, both implementations against the same inputs: the tapping
 warning, the old and new group names, a `();`-bearing operation name with an embedded newline, and
 indented text. Every interior double gap present in the old output is gone in the new one; leading and
 trailing whitespace is byte-identical on every case that carries any. The three inputs whose leading
@@ -780,12 +879,6 @@ changed nothing.
 **Do (C) — the tapping warning.** Folds into session 3; this is the row HR-2 (A2) now carries. **Get
 (C):** `( >>> WARNING: Speed-feed synchronization rigid tapping is not supported; a floating/tension
 tap holder is required)` — single-spaced.
-
-**Do (D) — the regression, and the only evidence the other two items are inert.** Diff a fresh GRBL/mm
-post against `H2.gcode`. **Get (D):** the property heading, the ON prompt and the timestamp differ, and
-**nothing else does** — no motion, no feed, no comment reordering. **Pass:** exactly that set. *(The
-5-arg call and the `flushMotions()` early return cannot be seen in a posted file at all; (D) is what
-shows they changed nothing.)*
 
 ### 4.3 Open — no code change
 
@@ -838,17 +931,18 @@ would need re-baselining for one blank.
 The six `First WCS / Part` modes on a single milling operation, GRBL, real tool (≠ 0, not a jet). A
 single-op job has no WCS change, so this is the only origin control exercised. These rows predate the
 review and are kept as the coverage record; the HR rows above carry the current tokens where a fix
-moved them.
+moved them. **State and evidence files are in [§0](#0-test-register--every-test-and-its-state)** — what
+follows is what each row *means*.
 
-| Row | Mode | Result |
+| Row | Mode | Notes |
 |---|---|---|
-| **H1** | `Jog to X0 Y0, Probe Z0` — jog prompt, XY zeroed at the jogged position, Z probed into `P1` | PASS (`H1.gcode`) ⚠ tokens now per **HR-1** (B) |
-| **H2** | `Set X0 Y0 to Current Pos, Probe Z0` (**default**) — no jog prompt, XY zeroed at the parked position | PASS (`H2.gcode`, re-posted 2026-07-31 — current) ⚠ tokens now per **HR-1** (A) |
-| **H3** | `Jog to X0 Y0 Z0` — jog all three axes, `G10 L20 P1 X0 Y0 Z0`, **no `G38.2`** | PASS (`H3.gcode`) |
-| **H4** | `Set X0 Y0 Z0 to Current Pos` — fully manual, no prompt, no probe | PASS (`H4.gcode`); jet/tool-0 half → **J1** |
-| **H5** | `Use Active WCS X0 Y0 Z0` — trust the stored origin: `G0 Z<probeSafeZ>` then `G0 X0 Y0`, no origin write, no probe | PASS (`H5.gcode`) |
-| **H6** | Firmware variant of H1 on **Marlin** and **RRF** — comments switch to `; …`, Marlin emits `G92`, RRF emits `G54` + `G10 L20 P1 …` with `M291 … S3` dialogs; no spurious multi-WCS warning on a single-op Marlin job | PASS both, **re-baselined 2026-07-31** (`H6 - Marlin.gcode`, `H6 - RRF.gcode`). Re-confirmed on the current build: the only warning in either file is `No matching Coolant channel : Flood requested`, which is the tool asking for Flood with no channel configured — **not** a WCS warning |
-| **H7** | `Use Active WCS X0 Y0, Probe Z0` — stored XY, re-probe Z. Discriminator is the **absence** of `G10 L20 P1 X0 Y0` | PASS (`H7.gcode`); `H7a` nonzero-offset PASS; `H7b` → **J1**; `H7e` firmware → `PReview.md` |
+| **H1** | `Jog to X0 Y0, Probe Z0` — jog prompt, XY zeroed at the jogged position, Z probed into `P1` | ⚠ tokens now per **HR-1 (B)** |
+| **H2** | `Set X0 Y0 to Current Pos, Probe Z0` (**default**) — no jog prompt, XY zeroed at the parked position | re-posted 2026-07-31; ⚠ tokens now per **HR-1 (A)** |
+| **H3** | `Jog to X0 Y0 Z0` — jog all three axes, `G10 L20 P1 X0 Y0 Z0`, **no `G38.2`** | |
+| **H4** | `Set X0 Y0 Z0 to Current Pos` — fully manual, no prompt, no probe | jet/tool-0 half → **J1** |
+| **H5** | `Use Active WCS X0 Y0 Z0` — trust the stored origin: `G0 Z<probeSafeZ>` then `G0 X0 Y0`, no origin write, no probe | |
+| **H6** | Firmware variant of H1 on **Marlin** and **RRF** — comments switch to `; …`, Marlin emits `G92`, RRF emits `G54` + `G10 L20 P1 …` with `M291 … S3` dialogs; no spurious multi-WCS warning on a single-op Marlin job | **re-baselined 2026-07-31.** The only warning in either file is `No matching Coolant channel : Flood requested` — the tool asking for Flood with no channel configured, **not** a WCS warning |
+| **H7** | `Use Active WCS X0 Y0, Probe Z0` — stored XY, re-probe Z. Discriminator is the **absence** of `G10 L20 P1 X0 Y0` | `H7a` nonzero-offset also passed; `H7b` → **J1**; `H7e` firmware → `PReview.md` |
 
 The base-reserved sub-checks that ran on the H7 path — **H7c** (base probes and retracts in its own
 frame), **H7d** (Guard A fires, no file written), **H7f** (the "unknown Z" warning appears only when Z
@@ -864,57 +958,95 @@ since the spoilboard base is a professional feature.
 
 ---
 
-## 6. Other hobbyist work owed before a public release
+## 6. Hobbyist work owed before a public release — the `HW` rows
 
-- [x] **HR-17 sweep** — done 2026-07-31, one commit; the group rename was taken as a deliberate
-      dialog-label change. Rows (A)–(D) in §4.2 are unposted and fold into any GRBL session.
-      ⚠ **`README.md` §`03 - Map G1s to Rapids (disable when using full license)` still carries the old
-      label** — left alone per the standing "no README edits during code changes" rule; fold it into the
-      next doc-sync pass.
-- [ ] **`isSafeToRapid()`'s true branches have never been exercised.** The prior full-licence run
-      (`2D Contour1.gcode`) stayed at Z ≤ 1 mm, below the 5 mm safe height, so every call returned
-      `false` and only the conservative refusal ran — the `zConstant` / `zUp` /
-      `zDown-with-curZSafe` conversion branches are **untested**. Generate a toolpath with a
-      horizontal link move at or above safe Z (e.g. multiple contours linking at retract height).
-      This is the group the README tells the hobbyist to enable, so it matters for HP-1.
-      *(Ties to `plan.md` → Phase 5 — G0/G1 rapid-mapping review.)*
-      ⚠ **`H15a - GRBL.gcode` now has the mapping group on and still did not exercise it** — not one
-      `First G1 --> G0` or `Safe G1 --> G0` fired. Two independent reasons, both properties of the
-      job rather than the post: its sections already start with real `G0` rapids (so
-      `forceSectionToStartWithRapid` never meets a `G1`), and every cut move sits below the 5.08 mm
-      safe height. **So this needs CAM, not a dialog change** — a toolpath with a horizontal link move
-      at or above safe Z. It is the last untested code path a hobbyist is told to enable.
-      ⚠ **Confirmed a second time, in inch, by `H4c - GRBL Inch.gcode`** — same zero conversions with
-      the threshold raised to 0.7874 in, which only put it further out of reach. **HR-4 (C) and this
-      row are now the same missing job** and close together on one post; specify it from HR-4 (C).
-- [ ] **An HP-5 row: two operations, one tool, one WCS, no base.** Every PASS row above is a
-      **single-section** job, so every section-boundary behaviour — the
-      `forceSectionToStartWithRapid` lifecycle, position tracking across injected motion, spindle-speed
-      changes, WCS re-selection suppression — is unverified for this persona. The professional rows
-      would cover some of it but change the WCS at the same boundary, which confounds the variables. A
-      plain two-op single-WCS post isolates them and is cheap.
-- [ ] **`Probe Pause` — the `No` and `Before` branches have never been posted.** Only the default
-      `Before & After` (both prompts) is verified, on every H row above. *Do:* the default hobby job
-      with `Probe Pause = No`, then `= Before`. *Get:* `No` → the `G38.2` block with **neither**
-      `Attach ZProbe` nor `Detach ZProbe` prompt; `Before` → attach only, no detach. **Pass:** the
-      prompt count changes and **nothing else does** — same origin write, same probe, same retract, so
-      diff each against `H2.gcode` and expect only the `M0` lines to differ. *(Cheap; folds into any
-      GRBL session.)*
-- [ ] **Full regression pass.** Re-run the sample jobs and confirm no output differences beyond the
-      intended Beta-2 changes — in particular that single-WCS, no-base jobs are byte-for-byte
-      unaffected (comment lines stripped, or diffed against a current-post reference).
-- [ ] **Dialog audit** — **D1** (labels/defaults) and **D3**'s dialog half (does a saved preset
-      survive the group reorder?) are release-relevant but cover all eleven groups, so they live in
-      `PReview.md` §3.3. Neither needs a post; both need the dialog.
+The tests that belong to no single finding. **State is in
+[§0](#0-test-register--every-test-and-its-state)**; this section is what each row is *for* and how to
+run it.
+
+**HW-1 — `isSafeToRapid()`'s three conversion branches. ✅ closed 2026-07-31, and the reason it took
+three attempts is the durable lesson.** The branches had never run. Three files failed to reach them
+before anyone questioned the premise: `2D Contour1.gcode` (a full-licence run that stayed at Z ≤ 1 mm),
+then `H15a - GRBL.gcode` with the mapping group deliberately on, then `H4c - GRBL Inch.gcode` in a
+second unit. Each failure was written off as the wrong CAM.
+
+> **It was never CAM.** `isSafeToRapid()` is called from **one place**, `onLinear()`, and
+> `onRapid()` never consults it. On a **paid** Fusion licence every link, lift and traverse arrives as
+> a rapid, so the whole `03 - Map G1s to Rapids` group is **structurally unreachable no matter what the
+> toolpath or the dialog does**. The group exists to recover rapids that Fusion **Personal** downgrades
+> to feed moves — the comment above the call site says exactly that, and three posted files were spent
+> before anyone read it. *The earlier claim in this section and in `plan.md` that this "needs CAM, not
+> a dialog change" was wrong.*
+>
+> `Link.gcode` is what made it visible: it **has** the geometry — 35 flat traverses at the 5.08 mm
+> retract level and 3 at the 15.24 mm clearance — and every one of them is a `G0`.
+
+Closed with `Personal.cps` (§8), which reroutes `onRapid()` into `onLinear()` so the real function
+sees the real geometry. Two posts, differing only in the threshold:
+
+| File | `Map: Safe Z to Rapid` | `First G1 --> G0` | `Safe G1 --> G0` | case 1 / 2 / 3 |
+|---|---|---|---|---|
+| `Link-5-GRBL.gcode` | `Retract:15` → **5.08** | 2 | **74** | 35 / 37 / 2 |
+| `Link-15-GRBL.gcode` | `15` | 2 | **2** | 0 / 2 / 0 |
+
+Every conversion in both files satisfies one of the three documented cases, and **no move that
+qualified was refused** — checked by replaying all 17,955 blocks against the function's own rules, not
+by counting comments. All three branches fire at 5.08. The canonical shape appears verbatim:
+
+```
+( Safe G1 --> G0)
+G0 Z5.08 F300          <- case 2: lift, XY constant
+( Safe G1 --> G0)
+X-7.297 Y87.309 F2500  <- case 1: traverse at retract height, G0 suppressed as modal
+G1 Z-52.705 F2500      <- refused: plunge below safe Z
+```
+
+**Three things stop this from being over-claimed.** *The guard half is the stronger result:* all
+17,779 genuine cut moves stayed `G1`, the lowest converted Z is 5.08 — exactly the threshold — and the
+one diagonal move (XY *and* Z changing, so no case applies) was never converted. *The threshold gates:*
+74 → 2 on identical geometry. *And the limit:* this is harness evidence about the **logic**. It does
+not show a real post reaching the code, because on this licence none can. That premise is documented
+and not in doubt, but it is untested and probably untestable here. **Two counting traps** for whoever
+re-checks: `grep -c '^G0'` under-counts badly (modal suppression), and refused *vertical* moves carry
+the XY travel feed, a `Personal.cps` artifact — see its banner.
+
+**HW-2 — two operations, one tool, one WCS, no base.** Every H row is a **single-section** job, so
+every section-boundary behaviour — the `forceSectionToStartWithRapid` lifecycle, position tracking
+across injected motion, spindle-speed changes, WCS re-selection suppression — is unverified for HP-5.
+The professional rows would cover some of it but change the WCS at the same boundary, confounding the
+variables. **`Link.gcode` may already be this row:** two adaptive operations, one tool, `G54` emitted
+once with no re-selection at the boundary, one spindle prompt. It needs *reading*, not posting.
+
+**HW-3 / HW-4 — `Probe Pause` = `No`, then `Before`.** Only the default `Before & After` is verified,
+on every H row. *Get:* `No` → the `G38.2` block with **neither** `Attach ZProbe` nor `Detach ZProbe`;
+`Before` → attach only. **Pass:** the prompt count changes and **nothing else does** — diff each
+against `H2.gcode` and expect only the `M0` lines to differ.
+
+**HW-5 — the documented HP-1 baseline in one file.** Scaling on, all four group-03 booleans on,
+machine-real travel and max speeds. No file has ever carried all of it at once: `H15a` and `H5d` cover
+one half each, and every other session-1 file was posted at factory defaults.
+
+**HW-6 — full regression sweep.** Last, by definition. Re-run the sample jobs and confirm no output
+differences beyond the intended Beta-2 changes — in particular that single-WCS, no-base jobs are
+unaffected, diffed against a current-post reference rather than a pre-rework one.
+
+**HW-7 — dialog audit.** **D1** (labels/defaults) and **D3**'s dialog half (does a saved preset survive
+the group reorder?) are release-relevant but cover all eleven groups, so they live in `PReview.md`
+§3.3. Neither needs a post; both need the dialog.
+
+> ⚠ **`README.md` still carries the old group-03 label**
+> (`03 - Map G1s to Rapids (disable when using full license)`) — left alone per the standing "no README
+> edits during code changes" rule. Fold it into the next doc-sync pass.
 
 **Confidence statement.** For HP-1 through HP-5 the *structure* of the emitted file is established by
 reading: preamble ordering, WCS selection before any origin write, units and absolute mode before any
 probe, comment syntax per firmware, arc and cycle handling, guard placement, and the origin/probe
 dispatch for all six First WCS / Part modes. What reading could not establish — HR-2's kernel
 dependency and HR-6's `workPlane` behaviour — HR-6 has since settled by posting; HR-2's drilling half
-is session 3. **To claim "high confidence that the post outputs correctly formatted, structurally
-sound g-code for a hobbyist from every F360 entry point"**, the two remaining posting sessions in §3
-plus the HP-5 row above are what stand between here and that claim.
+is still owed. **To claim "high confidence that the post outputs correctly formatted, structurally
+sound g-code for a hobbyist from every F360 entry point"**, the **13 ⬜ rows** in
+[§0](#0-test-register--every-test-and-its-state) are what stand between here and that claim — and they
+reduce to four pieces of work, listed under §3.
 
 ---
 
@@ -973,6 +1105,20 @@ Recording the negative results, because "we looked" is part of the confidence cl
   that contrast is the evidence, not the "after" alone. Same lesson as the fail-open trace, applied to
   harnesses. *(Mechanics — extracting functions from the `.cps` and `eval`ing them against stubbed
   kernel globals — are in `plan.md` → Workflow notes.)*
+- **When a code path cannot be reached, question the premise before blaming the CAM.** HW-1 cost three
+  posted files to a diagnosis nobody had checked — "the toolpath is wrong" — when the call graph said
+  the path was unreachable on this licence at all. `isSafeToRapid()` has **one** caller; two minutes in
+  the source would have saved all three. **Before specifying a job to exercise a branch, find every
+  caller of that branch and confirm one of them can fire under the conditions you are about to set up.**
+- **A one-file scratch copy of the post is a legitimate harness, and cheaper than the job you cannot
+  build.** `Personal.cps` (repo root, excluded via `.git/info/exclude`, never committed) is the real
+  post with `onRapid()` rerouted into `onLinear()` — four marked edits — so the real function sees real
+  Fusion geometry and real dialog values. It closed HW-1 and HR-4 (C2) in two posts after three
+  ordinary files had failed. Rules that keep it honest: **banner it** as not-a-post, **change
+  `description`** so it cannot be picked by accident in Fusion, **re-create it** from the current
+  `.cps` rather than maintaining it, and **never verify a row against its output** that is really a
+  claim about what the post emits — its evidence is about *logic*, and the register's Method column
+  says so.
 - **When a question is "does the controller honour this?", read the controller's source, not a
   posted file.** HR-11's `M2` was written off as unanswerable without Marlin and Duet hardware, and it
   was answered in one sitting from `gcode.h` / `gcode.cpp` / `GCodes2.cpp` plus the RRF changelog —
