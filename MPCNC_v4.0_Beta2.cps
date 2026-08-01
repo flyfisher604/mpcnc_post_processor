@@ -2945,13 +2945,56 @@ function Start() {
 
 var spindleEnabled = false;
 
+// Manual path only: the state the operator was last ASKED for. The speed is held as the formatted
+// string that reached the file, because two speeds that format identically are the same speed to the
+// operator -- prompting them to change a dial to the number it already reads is worse than saying
+// nothing. Same reasoning isSafeToRapid() uses when it rounds positions to output precision before
+// comparing them. Direction is tracked beside it so a reversal at an unchanged speed is not mistaken
+// for "nothing happened".
+var lastPromptedSpeed = "";
+var lastPromptedClockwise = true;
+
 function spindleOn(_spindleSpeed, _clockwise) {
   if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
+    var rpm = speedFormat.format(_spindleSpeed);
+
     // For manual any positive input speed assumed as enabled. so it's just a flag
     if (!spindleEnabled) {
       writeComment(eComment.Important, " >>> Spindle Speed: Manual");
-      askUser("Turn ON " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
+      // Direction is named here ONLY when counterclockwise. Clockwise is the universal default for
+      // every tool this post's machines hold, so naming it would add a word to the start prompt of
+      // every job ever posted and tell the operator nothing. Counterclockwise is always exceptional
+      // and always worth saying.
+      askUser("Turn ON " + rpm + " RPM" + (_clockwise ? "" : " counterclockwise"), "Spindle", false);
     }
+
+    // Both halves of the state are compared, because setSpindeSpeed() reaches us for either.
+    //
+    // SPEED: a second operation asking for a different speed used to be dropped here --
+    // setSpindeSpeed() had detected the change and updated currentSpindleSpeed, so the post believed
+    // it had happened while nothing in the file mentioned it. On a hand-set router that is the gap
+    // between the operator's dial and the speed Fusion computed the feeds against. HReview HR-12,
+    // witnessed by Link.gcode (12000 then 10000, one prompt) against Speed Change.gcode (the same job
+    // on the automatic branch, M3 S12000 then M3 S10000).
+    //
+    // DIRECTION: a tapping reversal changes direction at an unchanged speed, twice per hole -- seven
+    // times in Drill_Tap.gcode -- and was silent for the same reason. The tap was driven back out of
+    // the hole still turning forward, with nothing in the file to say otherwise. Prompting cannot make
+    // a hand-switched router reverse, but it stops the machine and tells the operator what the job
+    // requires, which is strictly better than stripping the thread quietly. Whether tapping should be
+    // refused outright under manual control is still open: PReview HR-20.
+    else if (rpm != lastPromptedSpeed || _clockwise != lastPromptedClockwise) {
+      writeComment(eComment.Important, " >>> Spindle Speed: Manual change");
+      // Direction IS always named here, even when only the speed moved. A change prompt asks the
+      // operator to alter the machine, so it must state the whole target state rather than a delta
+      // they have to remember: "Set spindle to 1200 RPM" arriving after a reversal would leave which
+      // way ambiguous, and that ambiguity is the hazard this branch exists to remove.
+      askUser("Set spindle to " + rpm + " RPM " + (_clockwise ? "clockwise" : "counterclockwise"),
+        "Spindle", false);
+    }
+
+    lastPromptedSpeed = rpm;
+    lastPromptedClockwise = _clockwise;
   } else {
     writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed));
     writeBlock(mFormat.format(_clockwise ? 3 : 4), sOutput.format(_spindleSpeed));

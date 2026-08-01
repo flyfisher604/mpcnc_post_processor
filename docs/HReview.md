@@ -5,8 +5,8 @@ The review of the post from the hobbyist's chair, and the verification record fo
 point, and every property branch a hobbyist can reach. **Findings:** 19 (`HR-1`…`HR-19`); ten fixed
 on branch `v4.0-hreview-fixes`; six reclassified as professional and moved to `docs/PReview.md`.
 
-**Every landed fix is now closed with posted evidence** — HR-1, HR-2, HR-3, HR-4, HR-5, HR-6, HR-11,
-HR-14, HR-15, HR-17. **No unrun row needs new CAM.** What remains carries no fix yet: **HR-12** (the
+**Ten of the eleven landed fixes are closed with posted evidence** — HR-1, HR-2, HR-3, HR-4, HR-5,
+HR-6, HR-11, HR-14, HR-15, HR-17. **HR-12** landed on 2026-07-31 and owes its four rows. **No unrun row needs new CAM.** What remains carries no fix yet: **HR-12** (the
 manual spindle is never told about an RPM change — moved back from `PReview.md`), **HR-18**
 (`loadFile()` newline, a real corruption path), **HR-16** and **HR-19** (recorded, cosmetic or no fix
 proposed), plus the `HW` rows in §6.
@@ -40,7 +40,7 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**65 tests — ✅ 49 PASS · ❌ 0 FAIL · ⬜ 9 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
+**66 tests — ✅ 49 PASS · ❌ 0 FAIL · ⬜ 10 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
 
 **Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
 post and is the only method that proves what a hobbyist receives. `harness` is a node run against
@@ -88,9 +88,10 @@ for.
 | **HR-11 (C)** | GRBL tail untouched | posted | `H11c - GRBL.gcode` | ✅ |
 | **HR-11 (D)** | Stop file bypasses the whole stop block | posted | `H11d - Marlin.gcode` | ✅ |
 | **HR-11 (S)** | Whether Marlin / RRF honour `M2` | source | `gcode.cpp`, `GCodes2.cpp`, RRF changelog | ✅ |
-| **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | — | needs the fix; defect witnessed by `Link.gcode` vs `Speed Change.gcode` | ⬜ |
+| **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | — | fix landed; re-post `Link.gcode`'s CAM | ⬜ |
 | **HR-12 (A2)** | Two operations at the *same* RPM still give one prompt | — | needs the fix | ⬜ |
-| **HR-12 (A3)** | A tapping reversal adds **no** prompt — the 7 direction-only calls stay silent | — | needs the fix; re-post `Drill_Tap.gcode` | ⬜ |
+| **HR-12 (A3)** | Every tapping reversal is announced — 8 prompts, alternating | — | re-post `Drill_Tap.gcode` | ⬜ |
+| **HR-12 (A4)** | A counterclockwise start names the direction; clockwise does not | — | any CCW-first job | ⬜ |
 | **HR-14 (A)** | `Flood and Mist` matches a channel | posted | `Drill Flood Mist.gcode` | ✅ |
 | **HR-14 (B)** | Warning names the mode the operator saw | posted | `Drill Flood Mist (No).gcode` | ✅ |
 | **HR-14 (C)** | Ordinary `Flood` unchanged | posted | `Drill Flood.gcode` | ✅ |
@@ -106,7 +107,7 @@ for.
 | **HR-17 (U)** | Sanitizer before/after over 4 input shapes | harness | node | ✅ |
 | **HR-18 (A)** | `loadFile()` newline — diagnostic, fix undecided | — | needs a stop file with no trailing newline | ⬜ |
 | **HR-19** | `M291` doubled space, and `()` vs `( )` — cosmetic, no fix | — | no test proposed | ➖ |
-| **HR-20** | Tapping needs a spindle reversal the post never commands | — | → `PReview.md` (professional, by decision) | ➖ |
+| **HR-20** | A fuller tapping implementation | — | → `PReview.md`; the manual path now prompts (HR-12), the automatic path always emitted `M4` | ➖ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
 | **HW-2 (A)** | HP-5 boundary: WCS suppression, rapid lifecycle, position tracking | posted | `Link.gcode` | ✅ |
 | **HW-2 (B)** | HP-5 boundary: a spindle-speed change between operations | posted | `Speed Change.gcode` | ✅ |
@@ -116,10 +117,9 @@ for.
 | **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 9 ⬜ rows are waiting on — three things, not nine.** **Three cheap posts on CAM that
-already exists** (HW-3, HW-4, HW-5); **three one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a stop
-file, HW-6 the final sweep); and **one fix, whose three rows all verify the same change**
-(HR-12 (A)(A2)(A3) — the code is the work, the posts are cheap and use CAM that exists).
+**What the 10 ⬜ rows are waiting on — three things, not ten.** **HR-12's four rows**, which all verify
+one landed change on CAM that already exists; **three cheap posts** (HW-3, HW-4, HW-5); and **three
+one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a stop file, HW-6 the final sweep).
 **No unrun row needs new CAM.** Ranked in [§3](#3-status).
 
 **The one honest gap inside a ✅.** HR-4 (C2) and HW-1 are the only rows carried by `harness` alone.
@@ -227,7 +227,7 @@ right: XY (and optionally Z) recorded at a position the operator physically chos
 
 ## 3. Status
 
-Ten fixes landed, one commit each, subject-prefixed so `git log --oneline --grep='^HR-'` lists the
+Eleven fixes landed, one commit each, subject-prefixed so `git log --oneline --grep='^HR-'` lists the
 series. Each commit message carries the full reasoning; the code carries the *why* at every call
 site. **Read the code and the commit, not a restated diff** — that is why the diffs and as-built
 notes that used to live in this file are gone.
@@ -247,6 +247,7 @@ the last column says only whether the fix's rows are all in.
 | **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + `8054b6e` | **Every Marlin/RRF job's tail.** GRBL untouched | all in |
 | **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | all in |
 | **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | all in |
+| **HR-12** | Manual spindle prompts on a speed **or** direction change | `f3f23a2` | Manual-spindle jobs with >1 speed or a reversal; clockwise start prompts byte-identical | (A)–(A4) owed |
 | **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | `924d1f6` | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | (C) owed with the tap |
 
 Open with no code change: **HR-16** (recorded, no fix proposed), **HR-18** (`loadFile()` newline — has
@@ -957,6 +958,127 @@ times, single-spaced throughout:
 holder is required)`. Evidence and the surrounding scope decision are under **HR-2 (A2)**, which this
 row rode along on.
 
+#### HR-12 — a manual spindle is never told about an RPM change between operations — **Medium**
+
+*Moved back from `PReview.md` on 2026-07-31 — see the box below — and fixed the same day.*
+
+**Reached by:** HP-5, on the default `Manual Spindle On/Off` setting, whenever two operations ask for
+different spindle speeds. No tool change is involved.
+
+`spindleOn()` guards its prompt on `!spindleEnabled`, and `spindleEnabled` is cleared only in
+`spindleOff()`, which within a job runs at a tool change or at close. `setSpindeSpeed()` correctly
+detects the change — its condition tests both speed and direction — and then `spindleOn()`'s manual
+branch throws the answer away. So section 2 asking for 12000 RPM after section 1 ran at 18000 reaches
+the guard, the prompt is blocked, and **nothing in the file mentions the change** — while
+`currentSpindleSpeed` is updated regardless, so the post believes it happened. For a hand-set router
+that is the gap between the operator's dial and the speed Fusion computed the feeds against: a burnt
+cutter or a poor finish, silently. The automatic branch re-emits `M3 S<speed>` every time, so this is
+manual-only — and manual is the default the README tells a hobbyist to leave on.
+
+> **⚠ The diff first filed here was wrong, and `Drill_Tap.gcode` is what caught it.** It added a bare
+> `else` on the reasoning that *"the caller only reaches here when the requested RPM actually
+> changed"*. It does not. `setSpindeSpeed()` fires on **speed OR direction** —
+> `(currentSpindleSpeed != _spindleSpeed) || (_spindleSpeed > 0 && currentSpindleClockwise != _clockwise)`
+> — and a tapping reversal changes direction at the *same* speed, twice per hole. Replaying that
+> condition over `Drill_Tap.gcode` gives **seven direction-only calls** in the tap section (lines 253,
+> 256, 267, 270, 281, 284, 295). The bare `else` would turn every one into
+> `M0 (MSG Set spindle to 1200 RPM)`: seven job-stopping pauses, each naming a speed that is not
+> changing and none mentioning the reversal that is. **It would make the tap job materially worse.**
+> The diff was written before HR-20 existed; gating on the speed itself keeps the two apart.
+
+**As built (landed with this commit) — gate on the whole state, and say the whole state.** The code
+carries the reasoning at the call site; what follows is the two decisions it embeds and the rows that
+verify them. Read `spindleOn()` and the commit, not a restated diff.
+
+**Decision 1 — compare the formatted speed, not the raw number.** Two speeds that print the same are
+the same speed to the operator, and prompting them to set a dial to the number it already reads is
+worse than saying nothing. The precedent is `isSafeToRapid()`, which rounds positions to output
+precision before comparing them.
+
+**Decision 2 — direction is named only when counterclockwise on the FIRST prompt, and always on a
+CHANGE prompt.** Clockwise is the universal default for every tool these machines hold, so naming it at
+job start would add a word to the start prompt of every job ever posted and tell the operator nothing;
+**every clockwise job's `Turn ON <n> RPM` is byte-identical to before.** Counterclockwise at job start
+is always exceptional and always worth saying. On a *change*, direction is named unconditionally: the
+prompt is asking the operator to alter the machine, so it must state the whole target state rather than
+a delta they have to remember — `Set spindle to 1200 RPM` arriving after a reversal would leave which
+way ambiguous, and that ambiguity is the hazard the branch exists to remove.
+
+**`spindleOff()` is deliberately untouched.** It clears `spindleEnabled`, so the next `spindleOn()`
+takes the first branch and overwrites both tracked values — a reset there would be dead code.
+
+**Blast radius.** Only jobs that actually change speed or direction gain anything; every saved
+single-operation reference is unaffected. **`Drill_Tap.gcode` will differ on a re-post**, gaining eight
+prompts in its tap section. **No row's assertions move** — HR-2 (A) asserts no `G8x` and reaching STOP
+end, HR-2 (A2) and HR-17 (C) assert the tapping warning text, and all three survive — but a diff will
+show a difference that is not a regression.
+
+**Do (A) — the speed change is announced.** Re-post `Link.gcode`'s CAM (two operations, one tool, 12000
+then 10000), `Manual Spindle On/Off` on. **Get (A):** `M0 (MSG Turn ON 12000 RPM)` before section 1,
+then `( >>> Spindle Speed: Manual change)` → **`M0 (MSG Set spindle to 10000 RPM clockwise)`** before
+section 2. **Pass:** two prompts; the second names 10000 **and** the direction.
+
+**Do (A2) — the common case gains no stop.** Two operations at the **same** RPM and direction.
+**Get (A2):** one prompt. **Pass:** exactly one — `setSpindeSpeed()` short-circuits before `spindleOn()`
+is reached, and if it ever stopped doing so this row would catch it.
+
+**Do (A3) — every reversal is announced.** Re-post `Drill_Tap.gcode` unchanged. **Get (A3):** the drill's
+`M0 (MSG Turn ON 2220 RPM)`, then in the tap section **eight** further prompts — one for the speed
+change into the tap, then **seven alternating**
+`M0 (MSG Set spindle to <n> RPM counterclockwise)` / `... clockwise`, one for each of the seven
+direction-only calls at lines 253, 256, 267, 270, 281, 284 and 295. **Pass:** eight, alternating, and
+**no reversal left silent**. *(This row previously demanded **zero** prompts here. That was correct for
+the speed-only fix and is exactly backwards now — see the box below.)*
+
+**Do (A4) — a counterclockwise start.** Any job whose first tool runs counterclockwise. **Get (A4):**
+`M0 (MSG Turn ON <n> RPM counterclockwise)`. **Pass:** the word is present. Second check, and the one
+that protects every saved file: a **clockwise** job's start prompt still reads `Turn ON <n> RPM` with
+**no** direction word.
+
+> **Harness-verified before and after** (`node`, `spindleOn()` extracted by brace-matching so it is the
+> shipped code, not a hand-copy). Against `HEAD` the pre-fix function gives **one** prompt for (A) and
+> **one** for (A3); after, (A) gives two, (A2) still one, (A3) nine in total, (A4) names the direction.
+> The contrast is the evidence, not the "after" column.
+
+> **Why (A3) inverted, recorded because the reversal looks like a mistake.** The first landed intent was
+> speed-only, with direction left silent because a hand-switched router cannot reverse and prompting for
+> it looked like theatre. **Decision taken 2026-07-31: prompt anyway.** Prompting cannot make the router
+> reverse, but it *stops the machine* and tells the operator what the job requires, which is strictly
+> better than driving a tap back out of the hole still turning forward with nothing in the file to say
+> so. Nine pauses in a four-hole tap job is the honest cost, and it makes tapping-on-a-router visibly
+> impractical rather than quietly wrong. **Refusing tapping outright was considered and rejected** —
+> someone will make that path work, and the post should not stand in their way. `PReview.md` **HR-20**
+> keeps the remaining design work.
+
+**Witnessed on a posted pair, 2026-07-31 — one tool, one WCS, no tool change.** The two files are the
+**same CAM one property apart**, and the diff is the finding:
+
+| | `Link.gcode` (manual, the default) | `Speed Change.gcode` (automatic) |
+|---|---|---|
+| section 1 | `M0 (MSG Turn ON 12000 RPM)` | `M3 S12000` |
+| section 2 | *— nothing —* | `M3 S10000` |
+| tail | `M0 (MSG Turn OFF spindle)` | `M5` |
+
+`diff` reports section 2's pair as a pure **addition** (`2315a2316,2317`): the manual file has no
+counterpart at all. **The operations genuinely differ, 12000 → 10000**, so a hobbyist running
+`Link.gcode` cuts the second adaptive operation at 12000 with feeds Fusion computed for 10000 — 20%
+over, silently, on a two-operation job with **one tool and no tool change**. That is HP-5 exactly.
+
+> **Why it came back.** HR-12 was one of the six findings swept into `PReview.md` when HP-5 was
+> redefined, on the reasoning that Fusion Personal has no tool changes. That was right for the other
+> five and **wrong for this one: the mechanism involves no tool change at all.** `Drill_Tap.gcode` was
+> the first sighting, but it used two tools and someone could fairly have answered *"you turned tool
+> changes off"*. The `Link` / `Speed Change` pair removes that objection: one tool, no tool change, two
+> ordinary adaptive operations. Found by reading, now witnessed twice. Leaving it in a file labelled
+> *parking lot, professional, not started* would have kept a hobbyist-reachable defect out of the
+> pre-release set. **The direction half of the same weakness stays professional** — `PReview.md`
+> **HR-20**.
+>
+> **Severity is unchanged at Medium** — the cost is a burnt cutter or a poor finish, not a crash — but
+> its *reachability* is no longer an argument. Re-rate if that changes the release calculus.
+
+---
+
 ### 4.3 Open — no code change
 
 **HR-16 — `onClose` traverses to `X0 Y0` before stopping the spindle, with no guaranteed safe Z.**
@@ -1004,110 +1126,6 @@ would need re-baselining for one blank.
 > **A second item for the same sweep**, found in `Drill_Tap.gcode`: empty comments emit as `()` on the
 > two `onSectionEnd()` lines and as `( )` on the other sixteen, because one call site passes `""` and
 > the rest pass `" "`. Pick one and use it everywhere.
-
-**HR-12 — a manual spindle is never told about an RPM change between operations.** *(Medium; **moved
-back from `PReview.md` on 2026-07-31** — see the box below.)*
-
-`spindleOn()` guards its prompt on `!spindleEnabled`, and `spindleEnabled` is cleared only in
-`spindleOff()`, which within a job runs at a tool change or at close. `setSpindeSpeed()` correctly
-detects the change — its condition tests both speed and direction — and then `spindleOn()`'s manual
-branch throws the answer away. So section 2 asking for 12000 RPM after section 1 ran at 18000 reaches
-the guard, the prompt is blocked, and **nothing in the file mentions the change** — while
-`currentSpindleSpeed` is updated regardless, so the post believes it happened. For a hand-set router
-that is the gap between the operator's dial and the speed Fusion computed the feeds against: a burnt
-cutter or a poor finish, silently. The automatic branch re-emits `M3 S<speed>` every time, so this is
-manual-only — and manual is the default the README tells a hobbyist to leave on.
-
-> **⚠ The diff first filed here was wrong, and `Drill_Tap.gcode` is what caught it.** It added a bare
-> `else` on the reasoning that *"the caller only reaches here when the requested RPM actually
-> changed"*. It does not. `setSpindeSpeed()` fires on **speed OR direction** —
-> `(currentSpindleSpeed != _spindleSpeed) || (_spindleSpeed > 0 && currentSpindleClockwise != _clockwise)`
-> — and a tapping reversal changes direction at the *same* speed, twice per hole. Replaying that
-> condition over `Drill_Tap.gcode` gives **seven direction-only calls** in the tap section (lines 253,
-> 256, 267, 270, 281, 284, 295). The bare `else` would turn every one into
-> `M0 (MSG Set spindle to 1200 RPM)`: seven job-stopping pauses, each naming a speed that is not
-> changing and none mentioning the reversal that is. **It would make the tap job materially worse.**
-> The diff was written before HR-20 existed; gating on the speed itself keeps the two apart.
-
-**As proposed — gate on the speed, not on the `else`.**
-
-```diff
- var spindleEnabled = false;
-+// Manual path only: the RPM the operator was last ASKED for, as the formatted string that
-+// reached the file. Compared as text because two speeds that format identically are the same
-+// speed to the operator -- the same reasoning isSafeToRapid() uses for positions.
-+var lastPromptedSpeed = "";
- 
- function spindleOn(_spindleSpeed, _clockwise) {
-   if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
-+    var rpm = speedFormat.format(_spindleSpeed);
-     // For manual any positive input speed assumed as enabled. so it's just a flag
-     if (!spindleEnabled) {
-       writeComment(eComment.Important, " >>> Spindle Speed: Manual");
--      askUser("Turn ON " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
-+      askUser("Turn ON " + rpm + " RPM", "Spindle", false);
-+      lastPromptedSpeed = rpm;
-     }
-+    // setSpindeSpeed() also reaches us when only the DIRECTION changed at the same speed -- a
-+    // tapping reversal does it twice per hole, seven times in Drill_Tap.gcode. Prompting
-+    // "Set spindle to <the same number>" there would be a spurious stop naming the wrong thing,
-+    // so gate on the speed itself. Direction under manual control is unsolved and deliberately
-+    // still silent -- see PReview.md HR-20.
-+    else if (rpm != lastPromptedSpeed) {
-+      writeComment(eComment.Important, " >>> Spindle Speed: Manual change");
-+      askUser("Set spindle to " + rpm + " RPM", "Spindle", false);
-+      lastPromptedSpeed = rpm;
-+    }
-   } else {
-```
-
-Two choices worth naming. **The comparison is on formatted text, not raw numbers** — two speeds that
-print the same are the same speed to the operator, and prompting for an invisible change is worse than
-not prompting; that is the precedent `isSafeToRapid()` set for positions. And **`spindleOff()` is left
-alone**: it clears `spindleEnabled`, so the next `spindleOn()` takes the first branch and overwrites
-`lastPromptedSpeed` anyway — a reset there would be dead code.
-
-**Do (A) — the fix does something.** Re-post `Link.gcode`'s CAM (two operations, one tool, 12000 then
-10000), `Manual Spindle On/Off` on. **Get (A):** `M0 (MSG Turn ON 12000 RPM)` before section 1 and
-`( >>> Spindle Speed: Manual change)` → **`M0 (MSG Set spindle to 10000 RPM)`** before section 2.
-**Pass:** two prompts, and the second names 10000.
-
-**Do (A2) — the common case gains no stop.** Two operations at the **same** RPM. **Get (A2):** one
-prompt. **Pass:** exactly one — `setSpindeSpeed()` short-circuits before `spindleOn()` is reached, and
-if it ever stopped doing so this row would catch it.
-
-**Do (A3) — the regression the refinement exists for.** Re-post `Drill_Tap.gcode` unchanged.
-**Get (A3):** the tap section gains **zero** prompts; the only spindle prompt in the file is still the
-drill's `M0 (MSG Turn ON 2220 RPM)`. **Pass:** zero. Seven would mean the bare-`else` form shipped.
-*(`Speed Change.gcode` is the automatic-branch control: nothing outside the manual branch is touched,
-so a re-post must differ from it by its timestamp alone.)*
-
-**Witnessed on a posted pair, 2026-07-31 — one tool, one WCS, no tool change.** The two files are the
-**same CAM one property apart**, and the diff is the finding:
-
-| | `Link.gcode` (manual, the default) | `Speed Change.gcode` (automatic) |
-|---|---|---|
-| section 1 | `M0 (MSG Turn ON 12000 RPM)` | `M3 S12000` |
-| section 2 | *— nothing —* | `M3 S10000` |
-| tail | `M0 (MSG Turn OFF spindle)` | `M5` |
-
-`diff` reports section 2's pair as a pure **addition** (`2315a2316,2317`): the manual file has no
-counterpart at all. **The operations genuinely differ, 12000 → 10000**, so a hobbyist running
-`Link.gcode` cuts the second adaptive operation at 12000 with feeds Fusion computed for 10000 — 20%
-over, silently, on a two-operation job with **one tool and no tool change**. That is HP-5 exactly.
-
-> **Why it came back.** HR-12 was one of the six findings swept into `PReview.md` when HP-5 was
-> redefined, on the reasoning that Fusion Personal has no tool changes. That was right for the other
-> five and **wrong for this one: the mechanism involves no tool change at all.** `Drill_Tap.gcode` was
-> the first sighting, but it used two tools and someone could fairly have answered *"you turned tool
-> changes off"*. The `Link` / `Speed Change` pair removes that objection: one tool, no tool change, two
-> ordinary adaptive operations. Found by reading, now witnessed twice. Leaving it in a file labelled
-> *parking lot, professional, not started* would have kept a hobbyist-reachable defect out of the
-> pre-release set. **The direction half of the same weakness stays professional** — `PReview.md`
-> **HR-20**.
->
-> **Severity is unchanged at Medium** — the cost is a burnt cutter or a poor finish, not a crash — but
-> its *reachability* is no longer an argument. Re-rate if that changes the release calculus.
 
 ---
 
@@ -1218,7 +1236,7 @@ without a new post.
   change), so there is no post-generated motion for the tracking to lose. The strong version is
   **HR-8**, professional, and needs exactly the injected motion this job lacks.
 
-**(B) ⬜ — and it cannot be verified in this configuration, which is HR-12's signature.** Section 1
+**(B) — why it could not be verified where it was asked, which is HR-12's signature.** Section 1
 prompts `M0 (MSG Turn ON 12000 RPM)`; section 2 emits `( COMMAND_START_SPINDLE)` and
 `( COMMAND_SPINDLE_CLOCKWISE)` and no prompt. **That output is identical whether the behaviour is
 correct or defective** — same RPM means `setSpindeSpeed()` short-circuits and one prompt is right;
@@ -1233,7 +1251,7 @@ automatic branch re-emits at the boundary: `( >>> Spindle Speed 12000)` → `M3 
 untouched" now also holds across a section boundary, not just a single-section job.
 
 **And it settled the other question, badly.** The two operations *do* run at different RPMs, so
-`Link.gcode` is a **genuine HR-12 witness** rather than merely consistent with one. See §4.3.
+`Link.gcode` is a **genuine HR-12 witness** rather than merely consistent with one. See §4.2.
 
 > **`Face1 (auto).gcode` (2026-07-31) does not serve (B)** — it is `Manual Spindle On/Off` = false on
 > the **single-section** face-mill job, and one section cannot show a change *between* sections. What

@@ -7,8 +7,9 @@
 > the professional's chair, walking every multi-WCS / multi-fixture / tool-change path — is still
 > owed, and will add findings this file does not have.
 >
-> **Nothing here is committed code.** Every finding below is unimplemented; the diffs are proposals,
-> not records.
+> **Almost nothing here is committed code.** Every finding below is unimplemented and its diffs are
+> proposals rather than records — with one exception, **HR-20**, whose manual-spindle half was
+> part-fixed on 2026-07-31 alongside `HReview.md` HR-12.
 
 **Standing rule.** A change to `MPCNC_v4.0_Beta2.cps` that touches professional behaviour updates
 this file **in the same commit**: add the Do→Get row that verifies it (exact settings, exact
@@ -37,9 +38,12 @@ everything the README puts outside the hobbyist's reach:
 
 > **Scope decision (2026-07-31) — tool changes are a professional feature.** Fusion's Personal
 > licence does not support tool changes, and Manual NC is treated the same way, so neither belongs
-> in a review written from the hobbyist's chair. This is why six findings below carry `HR-` ids: they
+> in a review written from the hobbyist's chair. This is why the findings below carry `HR-` ids: they
 > were found by the hobbyist pass and reclassified, and the ids are **kept deliberately** so the
 > commit history, `HReview.md` and this file all still refer to the same defect by the same name.
+> **Tapping was added to this scope on the same day** — drilling must work, tapping may error or warn,
+> and a fuller tapping implementation is professional-review work (HR-20). Refusing tapping outright
+> was rejected: someone will make that path work.
 
 ---
 
@@ -49,10 +53,11 @@ All five land **as one unit** with *Phase 4 — tool-change ordering + base-rela
 (`docs/plan.md`), rather than patching the same section-boundary code twice. **HR-10** and **HR-13**
 are independent of the reorder and have complete diffs, so they can go in first as warm-up commits.
 
-> **HR-12 left this file on 2026-07-31** and is now `HReview.md` §4.3. It was swept in here with the
+> **HR-12 left this file on 2026-07-31** and is now `HReview.md` §4.2, where it has since been fixed. It was swept in here with the
 > other five when HP-5 was redefined, on the reasoning that Personal has no tool changes — true of
 > them, false of it: two operations on **one** tool at different RPMs needs no tool change and is HP-5
-> exactly. `Drill_Tap.gcode` then observed it firing. Do not re-file it here.
+> exactly. `Drill_Tap.gcode` then observed it firing, and the `Link.gcode` / `Speed Change.gcode` pair
+> witnessed it on a one-tool job. Do not re-file it here.
 
 **HR-20 is different from the other five** — it is not tool-change work and does not wait for Phase 4.
 It is here because tapping was *decided* to be professional, not because it shares their code.
@@ -229,13 +234,12 @@ the Manual NC's position. **Pass:** `M1` present. Second check: Manual NC *Orien
 
 ---
 
-### HR-20 — a tapping operation is withdrawn without the spindle reversal Fusion asks for — **High where it fires** · `OBSERVED`
+### HR-20 — tapping is not really implemented; the manual path now warns, nothing more — **Medium** · `PART-FIXED`
 
-**Reaches it:** any **Tapping** operation. Not a tool-change path and **not gated on Phase 4** — this
-sits here by the scope decision below, not because it shares the others' code.
+**Reaches it:** any **Tapping** operation. Not a tool-change path and **not gated on Phase 4** — it sits
+here by the scope decision below, not because it shares the others' code.
 
-**Observed, not merely read** — `Drill_Tap.gcode` (2026-07-31, GRBL/mm, factory defaults). Each of the
-four holes emits:
+**Observed** in `Drill_Tap.gcode` (2026-07-31, GRBL/mm, factory defaults). Each of the four holes emits:
 
 ```
 ( COMMAND_SPINDLE_COUNTERCLOCKWISE)
@@ -244,38 +248,46 @@ Z-12.7 F1058
 ( COMMAND_SPINDLE_CLOCKWISE)
 ```
 
-Fusion is saying *reverse, back the tap out, resume forward*. The post comments all three and emits
-**no command for any of them**, so a right-hand tap is driven out of the hole still turning forward —
-it strips the thread or snaps. `setSpindeSpeed()` does detect the direction change (its condition
-tests `currentSpindleClockwise != _clockwise`); `spindleOn()`'s manual branch then discards it, the
-same weakness as the RPM half now filed as `HReview.md` HR-12. On the **automatic** branch
-`M3`/`M4 S<speed>` would be emitted correctly, so this is manual-spindle only — which is the default.
+Fusion is saying *reverse, back the tap out, resume forward*. As posted, the post commented all three
+and emitted **no command for any of them**, so a right-hand tap was driven out of the hole still
+turning forward — stripping the thread or snapping.
 
-**No fix proposed, and the reason is not laziness.** Prompting the operator to reverse is theatre: a
-hand-switched trim router, the machine this whole manual path exists for, has no reverse. The real
-options are (a) refuse a tapping operation outright when `Manual Spindle On/Off` is on, (b) warn that
-tapping needs an automatic spindle, or (c) implement tapping properly against `M3`/`M4`. That is a
-design decision, and it interacts with whether these machines should be tapping at all.
+**What the original write-up got wrong.** It read as though the post never commands a reversal at all.
+It does: the **automatic** branch has always emitted `M3`/`M4` correctly —
+`mFormat.format(_clockwise ? 3 : 4)`. The gap was **manual-path only**, and it was the same weakness as
+`HReview.md` **HR-12**: `setSpindeSpeed()` detected the direction change and `spindleOn()`'s manual
+branch discarded it.
 
-**The existing warning does not cover this.** `COMMAND_ACTIVATE_SPEED_FEED_SYNCHRONIZATION` already
-emits *"Speed-feed synchronization rigid tapping is not supported; a floating/tension tap holder is
-required"* — that is about **feed sync**, and a tension holder does nothing about spindle direction. A
-reader could easily take the existing warning as covering the whole hazard. It does not.
+**Part-fixed 2026-07-31 with HR-12.** The manual branch now prompts on a direction change as well as a
+speed change — `M0 (MSG Set spindle to 1200 RPM counterclockwise)` — which is option (b) from this
+finding's own list, *warn that tapping needs an automatic spindle*, and is what the scope decision
+allowed. Prompting cannot make a hand-switched router reverse, but it **stops the machine** and states
+what the job requires, which is strictly better than silence. Nine pauses in a four-hole tap job is the
+honest cost, and it makes tapping-on-a-router visibly impractical rather than quietly wrong.
+Verification is `HReview.md` HR-12 **(A3)**.
 
-> **Scope decision (2026-07-31): drilling must work; tapping is allowed to error or warn.** That is
-> what puts this row in this file. Drilling is hobbyist-reachable and is now verified —
-> `HReview.md` HR-2 (A) closed on the same file. Tapping stays reachable but unsupported, and a
-> **fuller tapping implementation is professional-review work**, to be designed alongside (a)/(b)/(c)
-> above rather than patched now. `HReview.md` HR-2 (A2) and HR-17 (C) close regardless: both assert
-> the warning's text, not that tapping works.
+> **Refusing tapping under manual control was considered and rejected (2026-07-31).** It was option (a)
+> here. **Someone will make this path work** — a spindle with a VFD and a reversing input is an ordinary
+> upgrade on these machines — and the post should not stand in their way. The automatic branch already
+> serves that operator correctly today.
 
-**Verify (Do → Get), once a direction is chosen.** *Do:* one Tapping operation, `Manual Spindle
-On/Off` **on**. *Get:* under (a) the post errors and writes no file; under (b) a
-`>>> WARNING` naming spindle direction, distinct from the feed-sync warning, at least once per
-operation; under (c) `M4` before the lead-out and `M3` after. **Pass:** whichever was chosen, and in
-every case the file must no longer show a bare `( COMMAND_SPINDLE_COUNTERCLOCKWISE)` comment as its
-only trace. Second check: a **Drill** operation in the same post is unaffected and still expands to
-plain `G0`/`G1`.
+**What is still owed — the fuller implementation, and it is professional-review work.** The prompt is a
+warning, not tapping support. Open questions, none of them settled:
+
+- **Feed synchronisation.** `COMMAND_ACTIVATE_SPEED_FEED_SYNCHRONIZATION` still only warns. Real tapping
+  wants the feed locked to the spindle, which none of these firmwares does (no `G33`), so a
+  floating/tension holder stays a precondition rather than a nicety. Note the existing warning covers
+  **feed sync only** and says nothing about direction — do not read it as covering the whole hazard.
+- **Whether the reversal prompts should be suppressible** for an operator whose spindle *can* reverse
+  but who is running the manual branch for other reasons. Probably a property, probably in group 07.
+- **Rigid vs. floating behaviour on the automatic branch**, which has never been posted at all: no file
+  in the record exercises `M4` from a real tapping operation.
+
+**Verify (Do → Get), for the fuller implementation when it is built.** *Do:* one Tapping operation on
+each spindle mode. *Get:* manual → the alternating reversal prompts per `HReview.md` HR-12 (A3);
+automatic → `M4` before the lead-out and `M3` after, with no prompts. **Pass:** both, and in neither
+case a bare `( COMMAND_SPINDLE_COUNTERCLOCKWISE)` comment as the only trace. Second check: a **Drill**
+operation in the same post is unaffected and still expands to plain `G0`/`G1`.
 
 ---
 
