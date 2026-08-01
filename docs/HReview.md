@@ -5,10 +5,11 @@ The review of the post from the hobbyist's chair, and the verification record fo
 point, and every property branch a hobbyist can reach. **Findings:** 19 (`HR-1`…`HR-19`); ten fixed
 on branch `v4.0-hreview-fixes`; six reclassified as professional and moved to `docs/PReview.md`.
 
-**Seven findings are closed** — HR-1, HR-3, HR-4, HR-5, HR-6, HR-11, HR-15. Two landed fixes still owe
-a post: **HR-2** and **HR-17 (C)** need a drill + tap job, **HR-14** needs a coolant channel. Two
-findings opened on 2026-07-31 during session 1 and carry no fix yet: **HR-18** (`loadFile()` newline,
-a real corruption path) and **HR-19** (cosmetic).
+**Every landed fix is now closed with posted evidence** — HR-1, HR-2, HR-3, HR-4, HR-5, HR-6, HR-11,
+HR-14, HR-15, HR-17. **No unrun row needs new CAM.** What remains carries no fix yet: **HR-12** (the
+manual spindle is never told about an RPM change — moved back from `PReview.md`), **HR-18**
+(`loadFile()` newline, a real corruption path), **HR-16** and **HR-19** (recorded, cosmetic or no fix
+proposed), plus the `HW` rows in §6.
 
 **Every test and its state is in [§0 Test register](#0-test-register--every-test-and-its-state)** —
 one table, 59 rows, and the only place a pass or fail is recorded.
@@ -39,7 +40,7 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**61 tests — ✅ 43 PASS · ❌ 0 FAIL · ⬜ 11 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
+**62 tests — ✅ 47 PASS · ❌ 0 FAIL · ⬜ 8 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
 
 **Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
 post and is the only method that proves what a hobbyist receives. `harness` is a node run against
@@ -88,9 +89,10 @@ for.
 | **HR-11 (D)** | Stop file bypasses the whole stop block | posted | `H11d - Marlin.gcode` | ✅ |
 | **HR-11 (S)** | Whether Marlin / RRF honour `M2` | source | `gcode.cpp`, `GCodes2.cpp`, RRF changelog | ✅ |
 | **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | — | **no fix yet** — observed in `Drill_Tap.gcode` | ⬜ |
-| **HR-14 (A)** | `Flood and Mist` matches a channel | — | **needs a coolant channel** | ⬜ |
-| **HR-14 (B)** | Warning names the mode the operator saw | — | **needs a coolant channel** | ⬜ |
-| **HR-14 (C)** | Ordinary `Flood` unchanged | — | **needs a coolant channel** | ⬜ |
+| **HR-14 (A)** | `Flood and Mist` matches a channel | posted | `Drill Flood Mist.gcode` | ✅ |
+| **HR-14 (B)** | Warning names the mode the operator saw | posted | `Drill Flood Mist (No).gcode` | ✅ |
+| **HR-14 (C)** | Ordinary `Flood` unchanged | posted | `Drill Flood.gcode` | ✅ |
+| **HR-14 (D)** | Channel B path, and selection is per-channel | posted | `Drill Mist.gcode`, `Drill Mist (no Mist).gcode` | ✅ |
 | **HR-14 (U)** | All 9 indices, before and after — 7/9 → 9/9 | harness | node | ✅ |
 | **HR-15 (A)** | Mapping-on post changes nothing but one comment | posted | `H15a - GRBL.gcode` | ✅ |
 | **HR-15 (B)** | The level branch is taken, not the fallback | posted | `H15a - GRBL.gcode` | ✅ |
@@ -111,10 +113,10 @@ for.
 | **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 11 ⬜ rows are waiting on — four things, not eleven.** A **coolant channel**
-(HR-14 (A)(B)(C)); **four cheap posts on CAM that already exists** (HW-2, HW-3, HW-4, HW-5); **three
-one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a stop file, HW-6 the final sweep); and **one fix that
-is not written yet** (HR-12 (A) — a finding, not a job). Ranked in [§3](#3-status).
+**What the 8 ⬜ rows are waiting on — three things, not eight.** **Four cheap posts on CAM that
+already exists** (HW-2, HW-3, HW-4, HW-5); **three one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a
+stop file, HW-6 the final sweep); and **one fix that is not written yet** (HR-12 (A) — a finding, not
+a job). **No unrun row needs new CAM.** Ranked in [§3](#3-status).
 
 **The one honest gap inside a ✅.** HR-4 (C2) and HW-1 are the only rows carried by `harness` alone.
 They prove `isSafeToRapid()`'s logic is right; they do **not** prove a real post ever reaches it,
@@ -239,7 +241,7 @@ the last column says only whether the fix's rows are all in.
 | **HR-2** | `isProbeOperation()` defined locally so canned cycles can post at all | `9c87fb0` | Drilling path only | (A)(A2) owed |
 | **HR-4** | Safe-Z literal fallbacks convert mm→output unit | `439ce2d` | **Inch jobs only** — identity in mm | all in |
 | **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + `8054b6e` | **Every Marlin/RRF job's tail.** GRBL untouched | all in |
-| **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | (A)(B)(C) owed |
+| **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | all in |
 | **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | all in |
 | **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | `924d1f6` | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | (C) owed with the tap |
 
@@ -308,17 +310,31 @@ files from `Personal.cps`, the harness post described in §8, on a two-operation
 > fuller tapping implementation belongs to the professional review.** Neither blocks the three rows
 > above, which assert cycle expansion and warning text only.
 
-Remaining, ranked by value:
+**Session 5 — the coolant session — ran on 2026-07-31** and closed **HR-14**, the last landed fix
+owing a post. Five files on the drill CAM, differing only in group 10 and the operation's coolant:
 
-1. **GRBL / mm: any job with a coolant channel.** Clears **HR-14 (A)(B)(C)**. Needs no new CAM — the
-   existing face-mill tool already requests *Flood*, so (C) is a dialog change alone. Parameters in
-   §4.2.
-2. **Four cheap posts on CAM that already exists** — **HW-3** and **HW-4** (`Probe Pause` = `No`, then
+| File | Tool coolant | Channel A / B Mode | Serves |
+|---|---|---|---|
+| `Drill Flood.gcode` | Flood | Flood / Off | HR-14 (C) |
+| `Drill Mist (no Mist).gcode` | Mist | Flood / **Off** | HR-14 (D) |
+| `Drill Mist.gcode` | Mist | Flood / **Mist** | HR-14 (D) |
+| `Drill Flood Mist.gcode` | **Flood and mist** | **Flood and Mist** / Mist | HR-14 (A) |
+| `Drill Flood Mist (No).gcode` | **Flood and mist** | **Off** / Mist | HR-14 (B) |
+
+> **The last two are the pair that matters** — one property apart, presence against absence from the
+> same build. Neither would mean much alone: (A) alone cannot rule out a build that never warns, and
+> (B) alone cannot rule out one that never matches.
+
+Remaining, ranked by value — **none of it needs new CAM**:
+
+1. **Four cheap posts on CAM that already exists** — **HW-3** and **HW-4** (`Probe Pause` = `No`, then
    `Before`) on the face-mill job, **HW-5** (the HP-1 baseline in one file) on the same, and **HW-2**
    which may need no post at all: `Link.gcode` is already a two-operation, one-tool, one-WCS job and
    only needs reading.
-3. **Three one-offs, in no particular order** — **HR-6 (B)** a rotated Setup, **HR-18 (A)** a stop file
+2. **Three one-offs, in no particular order** — **HR-6 (B)** a rotated Setup, **HR-18 (A)** a stop file
    with no trailing newline, and **HW-6** the regression sweep, which goes last by definition.
+3. **Two decisions, not posts** — **HR-12** (write the fix, then its Do (A) row verifies it) and
+   **HR-18** (decide the `loadFile()` guard). Both are in §4.3 with diffs or diagnostics ready.
 
 Three results worth carrying forward rather than re-deriving:
 
@@ -790,19 +806,44 @@ entry (so the warning names the mode rather than printing `unknown`) and that an
 `tool.coolant` still falls back to `Off`. No saved reference file is affected: coolant defaults to
 `Off`, indices 0–6 are unchanged, and the two changed modes could not previously match on any file.
 
-**Do (A).** Tool coolant = **Flood and Mist**; `10 - Coolant` → Channel A Mode = **Flood and Mist**,
-Channel A On = `M8`, Off = `M9`. **Get (A):** `( >>> Coolant Channel A: Flood and Mist)` and `M8` at
-the operation, `M9` at the end. **Pass:** **no** `No matching Coolant channel` warning anywhere.
+**Verified (A)(B)(C)(D) — HR-14 closes. Five files, 2026-07-31**, all GRBL/mm on one Peck Drill, all
+at factory defaults but the group-10 rows named. **(A) and (B) are one property apart**, which is what
+makes the absence in (A) mean anything.
 
-**Do (B) — the warning still fires, and now names what the operator saw.** Same tool coolant, Channel
-A Mode back to **Off**. **Get (B):**
-`( >>> WARNING: No matching Coolant channel : Flood and Mist requested)`. **Pass:** it reads
-`Flood and Mist`, **not** `FloodMist` and not `unknown`. This is the row that proves the fix reached
-the diagnostic and not only the comparison.
+**(A) `Drill Flood Mist.gcode`** — tool coolant **Flood and mist**, Channel A Mode
+**Flood and Mist**: `( >>> Coolant Channel A: Flood and Mist)` → `M7`, and
+`( >>> Coolant Channel A: Off)` → `M9` in the stop block, with **no warning anywhere in the file**.
+Index 7 is one of the two the old literal got wrong, so on a pre-fix build this exact dialog could not
+match — it would have warned and emitted no `M7`.
 
-**Do (C) — the ordinary mode is untouched.** Tool coolant **Flood**, Channel A Mode **Flood**.
-**Get (C):** `( >>> Coolant Channel A: Flood)` and `M8`, unchanged. **Pass:** indices 0–6 behave
-exactly as they always did.
+**(B) `Drill Flood Mist (No).gcode`** — the same file with **Channel A Mode = `Off`**, nothing else
+touched. `( >>> WARNING: No matching Coolant channel : Flood and Mist requested)`. It reads
+**`Flood and Mist`**, not `FloodMist` and not `unknown` — the discriminator, and the proof the fix
+reached the *diagnostic* and not only the comparison. The two expressions are different
+(`getProperty(...) == coolant` versus `coolantLevels.indexOf(coolant)`), so (A) passing does not imply
+(B).
+
+**(C) `Drill Flood.gcode`** — tool coolant **Flood**, Channel A Mode **Flood**:
+`( >>> Coolant Channel A: Flood)` → `M7`, `M9` at the end, no warning. Indices 0–6 behave exactly as
+they always did; diffed against `Drill_Tap.gcode` (same CAM, channel `Off`) the warning line is
+replaced by the match plus its code, and nothing else moves.
+
+**(D) Channel B, and channel selection is per-channel — new coverage, not part of the original
+finding.** `Drill Mist.gcode` / `Drill Mist (no Mist).gcode`, tool coolant **Mist**: with Channel B
+Mode = `Mist` the file emits `( >>> Coolant Channel B: Mist)` → `M8` → `M9`; with it `Off`, the
+warning. **No posted file had ever exercised Channel B at all** — `CoolantB()` and the `E_`/`F_`
+properties were unevidenced. And in both files Channel A is set to `Flood` while the tool asks for
+something else: **A stays silent, no `M7`**, so each `if` really is testing its own channel's mode.
+*(Index 2 matched before the fix too, so (D) discriminates nothing about HR-14 itself — it is
+coverage, not evidence for the fix.)*
+
+> **How to run a compound mode on two channels — the sentence that would have saved a detour.**
+> `setCoolant()` compares each channel's mode against the tool's request with **exact string
+> equality**, so a `Flood and Mist` request does **not** light up a `Flood` channel plus a `Mist`
+> channel: `Drill Flood Mist.gcode` has Channel B on `Mist` and it correctly stays off. To run both
+> outputs on a compound request, set **both** channels to `Flood and Mist`. The property means *"enable
+> this channel when the tool asks for this coolant"*, not *"this channel is the flood channel"* — its
+> tooltip says so, but the other reading is the natural one and was tried first.
 
 ---
 

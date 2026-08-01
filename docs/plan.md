@@ -52,11 +52,16 @@ professional-review work.** So the RPM half is `HReview.md` HR-12 — **moved ba
 because its mechanism involves no tool change and two operations on one tool at different RPMs is HP-5
 exactly** — and the spindle-reversal half is `PReview.md` **HR-20**, professional by that decision.
 
-**`HReview.md` now opens with §0, a single 61-row register of every test and its state** — 43 pass,
-0 fail, 11 unrun, 7 n/a. That table is the authoritative status; nothing else in that file records a
-pass. **What is left reduces to four pieces of work:** a coolant channel (`HR-14`), four cheap posts on
-existing CAM (`HW-2`…`HW-5`), three one-offs (`HR-6 (B)`, `HR-18 (A)`, `HW-6`), and one fix not yet
-written (`HR-12`). Ranked in `HReview.md` §3.
+**Session 5 — the coolant session — is also done (2026-07-31).** Five files on the drill CAM closed
+**HR-14**, the last landed fix that owed a post. `Drill Flood Mist.gcode` and
+`Drill Flood Mist (No).gcode` are the decisive pair — one property apart, match against warning — and
+the run added first-ever Channel B coverage as a new row, HR-14 (D).
+
+**Every landed fix is now closed with posted evidence, and no unrun row needs new CAM.**
+`HReview.md` §0 is the authoritative register: **62 rows — 47 pass, 0 fail, 8 unrun, 7 n/a.** What is
+left is four cheap posts on existing CAM (`HW-2`…`HW-5`), three one-offs (`HR-6 (B)`, `HR-18 (A)`,
+`HW-6` the final sweep), and two decisions that need code rather than posting (`HR-12`, `HR-18`).
+Ranked in `HReview.md` §3.
 
 **Two operational lessons from session 1, both cheap to forget and expensive to repeat.**
 **(1) Fusion posts with its own copy** of the `.cps` at
@@ -93,9 +98,9 @@ physical measurement are out of scope, so every row must stand on the posted fil
 1. ~~Session 1 — Marlin + RRF~~ — **done 2026-07-31**, six findings closed. See above.
 2. ~~Session 2 — GRBL/inch~~ — **done 2026-07-31**, **HR-4** closed. ~~Session 3 — the mapper~~ —
    **done 2026-07-31**, **HW-1** closed by harness. Both above.
-3. ~~Session 4 — GRBL/mm, drill + tap CAM~~ — **done 2026-07-31**, **HR-2** and **HR-17** closed. Next
-   posting job is **HR-14 (A)(B)(C)**, which needs no new CAM — a coolant channel configured on any
-   GRBL job. Per-post parameters are in `HReview.md` §3.
+3. ~~Session 4 — drill + tap~~ — **done 2026-07-31**, **HR-2** and **HR-17** closed. ~~Session 5 —
+   coolant~~ — **done 2026-07-31**, **HR-14** closed. **No posting session remains**: the eight unrun
+   rows are four cheap posts on existing CAM, three one-offs, and two code decisions. `HReview.md` §3.
 4. **Decide HR-18** — `loadFile()` adds no newline after an included file, so with `Info` comments
    suppressed the next block merges onto the include's last line (`M5M400`). Found in session 1,
    deliberately unfixed: the one-line guard sits in the `loadFile()` every include branch shares, and
