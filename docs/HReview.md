@@ -40,7 +40,7 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**63 tests — ✅ 49 PASS · ❌ 0 FAIL · ⬜ 7 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
+**65 tests — ✅ 49 PASS · ❌ 0 FAIL · ⬜ 9 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
 
 **Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
 post and is the only method that proves what a hobbyist receives. `harness` is a node run against
@@ -88,7 +88,9 @@ for.
 | **HR-11 (C)** | GRBL tail untouched | posted | `H11c - GRBL.gcode` | ✅ |
 | **HR-11 (D)** | Stop file bypasses the whole stop block | posted | `H11d - Marlin.gcode` | ✅ |
 | **HR-11 (S)** | Whether Marlin / RRF honour `M2` | source | `gcode.cpp`, `GCodes2.cpp`, RRF changelog | ✅ |
-| **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | — | **no fix yet** — defect witnessed by `Link.gcode` vs `Speed Change.gcode` | ⬜ |
+| **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | — | needs the fix; defect witnessed by `Link.gcode` vs `Speed Change.gcode` | ⬜ |
+| **HR-12 (A2)** | Two operations at the *same* RPM still give one prompt | — | needs the fix | ⬜ |
+| **HR-12 (A3)** | A tapping reversal adds **no** prompt — the 7 direction-only calls stay silent | — | needs the fix; re-post `Drill_Tap.gcode` | ⬜ |
 | **HR-14 (A)** | `Flood and Mist` matches a channel | posted | `Drill Flood Mist.gcode` | ✅ |
 | **HR-14 (B)** | Warning names the mode the operator saw | posted | `Drill Flood Mist (No).gcode` | ✅ |
 | **HR-14 (C)** | Ordinary `Flood` unchanged | posted | `Drill Flood.gcode` | ✅ |
@@ -114,10 +116,11 @@ for.
 | **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 7 ⬜ rows are waiting on — three things, not seven.** **Three cheap posts on CAM that
+**What the 9 ⬜ rows are waiting on — three things, not nine.** **Three cheap posts on CAM that
 already exists** (HW-3, HW-4, HW-5); **three one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a stop
-file, HW-6 the final sweep); and **one fix that is not written yet** (HR-12 (A) — a finding, not a
-job). **No unrun row needs new CAM.** Ranked in [§3](#3-status).
+file, HW-6 the final sweep); and **one fix, whose three rows all verify the same change**
+(HR-12 (A)(A2)(A3) — the code is the work, the posts are cheap and use CAM that exists).
+**No unrun row needs new CAM.** Ranked in [§3](#3-status).
 
 **The one honest gap inside a ✅.** HR-4 (C2) and HW-1 are the only rows carried by `harness` alone.
 They prove `isSafeToRapid()`'s logic is right; they do **not** prove a real post ever reaches it,
@@ -1015,23 +1018,69 @@ that is the gap between the operator's dial and the speed Fusion computed the fe
 cutter or a poor finish, silently. The automatic branch re-emits `M3 S<speed>` every time, so this is
 manual-only — and manual is the default the README tells a hobbyist to leave on.
 
+> **⚠ The diff first filed here was wrong, and `Drill_Tap.gcode` is what caught it.** It added a bare
+> `else` on the reasoning that *"the caller only reaches here when the requested RPM actually
+> changed"*. It does not. `setSpindeSpeed()` fires on **speed OR direction** —
+> `(currentSpindleSpeed != _spindleSpeed) || (_spindleSpeed > 0 && currentSpindleClockwise != _clockwise)`
+> — and a tapping reversal changes direction at the *same* speed, twice per hole. Replaying that
+> condition over `Drill_Tap.gcode` gives **seven direction-only calls** in the tap section (lines 253,
+> 256, 267, 270, 281, 284, 295). The bare `else` would turn every one into
+> `M0 (MSG Set spindle to 1200 RPM)`: seven job-stopping pauses, each naming a speed that is not
+> changing and none mentioning the reversal that is. **It would make the tap job materially worse.**
+> The diff was written before HR-20 existed; gating on the speed itself keeps the two apart.
+
+**As proposed — gate on the speed, not on the `else`.**
+
 ```diff
+ var spindleEnabled = false;
++// Manual path only: the RPM the operator was last ASKED for, as the formatted string that
++// reached the file. Compared as text because two speeds that format identically are the same
++// speed to the operator -- the same reasoning isSafeToRapid() uses for positions.
++var lastPromptedSpeed = "";
+ 
+ function spindleOn(_spindleSpeed, _clockwise) {
    if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
++    var rpm = speedFormat.format(_spindleSpeed);
+     // For manual any positive input speed assumed as enabled. so it's just a flag
      if (!spindleEnabled) {
        writeComment(eComment.Important, " >>> Spindle Speed: Manual");
-       askUser("Turn ON " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
-+    } else {
-+      // The caller only reaches here when the requested RPM actually changed.
-+      writeComment(eComment.Important, " >>> Spindle Speed: Manual change");
-+      askUser("Set spindle to " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
+-      askUser("Turn ON " + speedFormat.format(_spindleSpeed) + " RPM", "Spindle", false);
++      askUser("Turn ON " + rpm + " RPM", "Spindle", false);
++      lastPromptedSpeed = rpm;
      }
++    // setSpindeSpeed() also reaches us when only the DIRECTION changed at the same speed -- a
++    // tapping reversal does it twice per hole, seven times in Drill_Tap.gcode. Prompting
++    // "Set spindle to <the same number>" there would be a spurious stop naming the wrong thing,
++    // so gate on the speed itself. Direction under manual control is unsolved and deliberately
++    // still silent -- see PReview.md HR-20.
++    else if (rpm != lastPromptedSpeed) {
++      writeComment(eComment.Important, " >>> Spindle Speed: Manual change");
++      askUser("Set spindle to " + rpm + " RPM", "Spindle", false);
++      lastPromptedSpeed = rpm;
++    }
    } else {
 ```
 
-**Do (A).** Two operations, **same tool**, spindle speeds 18000 and 12000, `Manual Spindle On/Off` on.
-**Get (A):** `M0 (MSG Turn ON 18000 RPM)` before section 1 and `M0 (MSG Set spindle to 12000 RPM)`
-before section 2. **Pass:** two prompts — plus a third check, two operations at the *same* RPM giving
-**one** prompt only, since `setSpindeSpeed()` short-circuits and the common case must not gain a stop.
+Two choices worth naming. **The comparison is on formatted text, not raw numbers** — two speeds that
+print the same are the same speed to the operator, and prompting for an invisible change is worse than
+not prompting; that is the precedent `isSafeToRapid()` set for positions. And **`spindleOff()` is left
+alone**: it clears `spindleEnabled`, so the next `spindleOn()` takes the first branch and overwrites
+`lastPromptedSpeed` anyway — a reset there would be dead code.
+
+**Do (A) — the fix does something.** Re-post `Link.gcode`'s CAM (two operations, one tool, 12000 then
+10000), `Manual Spindle On/Off` on. **Get (A):** `M0 (MSG Turn ON 12000 RPM)` before section 1 and
+`( >>> Spindle Speed: Manual change)` → **`M0 (MSG Set spindle to 10000 RPM)`** before section 2.
+**Pass:** two prompts, and the second names 10000.
+
+**Do (A2) — the common case gains no stop.** Two operations at the **same** RPM. **Get (A2):** one
+prompt. **Pass:** exactly one — `setSpindeSpeed()` short-circuits before `spindleOn()` is reached, and
+if it ever stopped doing so this row would catch it.
+
+**Do (A3) — the regression the refinement exists for.** Re-post `Drill_Tap.gcode` unchanged.
+**Get (A3):** the tap section gains **zero** prompts; the only spindle prompt in the file is still the
+drill's `M0 (MSG Turn ON 2220 RPM)`. **Pass:** zero. Seven would mean the bare-`else` form shipped.
+*(`Speed Change.gcode` is the automatic-branch control: nothing outside the manual branch is touched,
+so a re-post must differ from it by its timestamp alone.)*
 
 **Witnessed on a posted pair, 2026-07-31 — one tool, one WCS, no tool change.** The two files are the
 **same CAM one property apart**, and the diff is the finding:

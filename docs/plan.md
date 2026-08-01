@@ -66,8 +66,11 @@ defect**: the two operations run at 12000 and 10000 RPM, and on the default manu
 change is never announced. One tool, no tool change — HP-5 exactly.
 
 **Every landed fix is now closed with posted evidence, and no unrun row needs new CAM.**
-`HReview.md` §0 is the authoritative register: **63 rows — 49 pass, 0 fail, 7 unrun, 7 n/a.** The
-largest single item left is **HR-12**, which needs the fix written, not a post. What is
+`HReview.md` §0 is the authoritative register: **65 rows — 49 pass, 0 fail, 9 unrun, 7 n/a.** The
+largest single item left is **HR-12**, which needs the fix written, not a post — and its filed diff
+turned out to be wrong: a bare `else` would have added seven spurious pauses to a tapping job, because
+`setSpindeSpeed()` fires on direction as well as speed. The corrected proposal gates on the speed
+itself, keeping HR-12 and `PReview.md` HR-20 apart. What is
 left is four cheap posts on existing CAM (`HW-2`…`HW-5`), three one-offs (`HR-6 (B)`, `HR-18 (A)`,
 `HW-6` the final sweep), and two decisions that need code rather than posting (`HR-12`, `HR-18`).
 Ranked in `HReview.md` §3.
