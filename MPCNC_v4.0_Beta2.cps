@@ -68,7 +68,6 @@ var eComment = {
     Debug: "Debug",
 };
 
-const coolantLevels = ["Off", "Flood", "Mist","ThroughTool", "Air", "AirThroughTool", "Suction", "FloodMist", "FloodThroughTool"];
 var eCoolant = {
     Off: "Off",
     Flood: "Flood",
@@ -80,6 +79,22 @@ var eCoolant = {
     FloodMist: "Flood and Mist",
     FloodThroughTool: "Flood and ThroughTool",
     };
+
+// Maps Fusion's numeric tool.coolant to the coolant name, so the index IS the F360 constant:
+// 0 COOLANT_DISABLED, 1 FLOOD, 2 MIST, 3 THROUGH_TOOL, 4 AIR, 5 AIR_THROUGH_TOOL, 6 SUCTION,
+// 7 FLOOD_MIST, 8 FLOOD_THROUGH_TOOL. Order is therefore fixed by Fusion and must not be sorted.
+//
+// Built FROM eCoolant rather than repeating its strings. The two were written as independent
+// literals and drifted apart at the last two entries -- this side said "FloodMist" where eCoolant
+// said "Flood and Mist". Since the channel-mode properties store eCoolant values as their ids and
+// setCoolant() compares the two, a tool requesting Flood and Mist or Flood and ThroughTool could
+// never match a channel the operator had configured for exactly that: it fell through to
+// ">>> WARNING: No matching Coolant channel : FloodMist requested", naming a string that appears
+// nowhere in the dialog. Deriving one from the other makes them agree by construction.
+// eCoolant must stay above this line -- the assignment runs at load time and reads it.
+const coolantLevels = [eCoolant.Off, eCoolant.Flood, eCoolant.Mist, eCoolant.ThroughTool,
+                       eCoolant.Air, eCoolant.AirThroughTool, eCoolant.Suction, eCoolant.FloodMist,
+                       eCoolant.FloodThroughTool];
 
 properties = {
   A_Job_SelectedFirmware: {
@@ -166,28 +181,6 @@ properties = {
     scope      : "post"
   },
 
-  A_Machine_HomeBeforeStart: {
-    title      : "Home Before Start",
-    description: "Home the machine at job start to establish a repeatable machine frame (MCS). None (default): emit no homing -- accept the current position (already homed at the controller, or a power-on 0,0,0). XY: home X and Y (the usual case -- gives XY repeatability and gantry squaring; Z stays on the work-Z probe touch-off). XYZ: also home Z, only if the machine is actually wired to home Z (LowRider switches, or the Marlin movable-plate trick). Per firmware: on GRBL/FluidNC one $H homes every configured axis, so XY and XYZ emit the same $H (the choice just documents intent); on Marlin/RepRap each axis is homed independently (G28 X / G28 Y / G28 Z). Homing gives X/Y repeatability only -- the everyday Z cutting reference is always the work-Z touch-off (see First WCS / Part), never this.",
-    group      : "04 - Establish Machine Coordinates",
-    type       : "enum",
-    values: [
-      { title: "None", id: "None" },
-      { title: "XY", id: "XY" },
-      { title: "XYZ", id: "XYZ" }
-    ],
-    value: "None",
-    scope: "post"
-  },
-  B_Machine_PromptBeforeHome: {
-    title      : "Prompt Before Home",
-    description: "Pause once before any homing motion so the operator can prepare the machine (e.g. place a movable Z-homing plate, or clear the bed). Fires whenever Home Before Start runs homing (any firmware, any axes) -- so it never needs revisiting when the machine changes. No effect when Home Before Start is None.",
-    group      : "04 - Establish Machine Coordinates",
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
-  },
-
   A_Feeds_TravelSpeedXY: {
     title      : "Travel Speed X/Y",
     description: "High speed for Rapid movements X & Y (mm/min).",
@@ -248,7 +241,7 @@ properties = {
   A_MapRapids_RestoreFirstRapids: {
     title      : "First G1 -> G0 Rapid",
     description: "Enable to ensure that the first move of a cut starts with a G0 Rapid.",
-    group      : "03 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids - disable when using full license",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -256,7 +249,7 @@ properties = {
   B_MapRapids_RestoreRapids: {
     title      : "Map: G1s -> G0 Rapids",
     description: "Enable to convert G1s to G0s Rapids when safe.",
-    group      : "03 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids - disable when using full license",
     type       : "boolean",
     value      : false,
     scope      : "post"
@@ -264,7 +257,7 @@ properties = {
   C_MapRapids_SafeZ: {
     title      : "Map: Safe Z to Rapid",
     description: "Z must be above or equal to this value to be mapped G1s --> G0s; Uses Retract level if defined or 15.",
-    group      : "03 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids - disable when using full license",
     type       : "string",
     value      : "Retract:15",
     scope      : "post"
@@ -272,9 +265,180 @@ properties = {
   D_MapRapids_AllowRapidZ: {
     title      : "Map: Allow Rapid Z",
     description: "Enable to include vertical G1 retracts and safe descents as rapids.",
-    group      : "03 - Map G1s to Rapids (disable when using full license)",
+    group      : "03 - Map G1s to Rapids - disable when using full license",
     type       : "boolean",
     value      : false,
+    scope      : "post"
+  },
+
+  A_Machine_HomeBeforeStart: {
+    title      : "Home Before Start",
+    description: "Home the machine at job start to establish a repeatable machine frame (MCS). None (default): emit no homing -- accept the current position (already homed at the controller, or a power-on 0,0,0). XY: home X and Y (the usual case -- gives XY repeatability and gantry squaring; Z stays on the work-Z probe touch-off). XYZ: also home Z, only if the machine is actually wired to home Z (LowRider switches, or the Marlin movable-plate trick). Per firmware: on GRBL/FluidNC one $H homes every configured axis, so XY and XYZ emit the same $H (the choice just documents intent); on Marlin/RepRap each axis is homed independently (G28 X / G28 Y / G28 Z). Homing gives X/Y repeatability only -- the everyday Z cutting reference is always the work-Z touch-off (see First WCS / Part), never this.",
+    group      : "04 - Establish Machine Coordinates",
+    type       : "enum",
+    values: [
+      { title: "None", id: "None" },
+      { title: "XY", id: "XY" },
+      { title: "XYZ", id: "XYZ" }
+    ],
+    value: "None",
+    scope: "post"
+  },
+  B_Machine_PromptBeforeHome: {
+    title      : "Prompt Before Home",
+    description: "Pause once before any homing motion so the operator can prepare the machine (e.g. place a movable Z-homing plate, or clear the bed). Fires whenever Home Before Start runs homing (any firmware, any axes) -- so it never needs revisiting when the machine changes. No effect when Home Before Start is None.",
+    group      : "04 - Establish Machine Coordinates",
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
+  },
+
+  A_Spoilboard_BaseReserve: {
+    title      : "Reserved WCS",
+    description: "Reserve one WCS as a fixed spoilboard base (a stable Z reference for multi-fixture jobs). None (default): feature off, nothing emitted. Otherwise the selected WCS is reserved as the base and no operation may re-establish its origin (see Probe to Set Base). G59.1-G59.3 require RepRap. GRBL/RepRap only -- Marlin has no per-WCS registers, so a base is ignored there.",
+    group      : "05 - Establish Spoilboard Reference",
+    type       : "enum",
+    values: [
+      { title: "None", id: "None" },
+      { title: "G54", id: "1" },
+      { title: "G55", id: "2" },
+      { title: "G56", id: "3" },
+      { title: "G57", id: "4" },
+      { title: "G58", id: "5" },
+      { title: "G59 ( -- recommended --)", id: "6" },
+      { title: "G59.1 (RepRap)", id: "7" },
+      { title: "G59.2 (RepRap)", id: "8" },
+      { title: "G59.3 (RepRap)", id: "9" }
+    ],
+    value: "None",
+    scope: "post"
+  },
+  B_Spoilboard_BaseEstablish: {
+    title      : "Probe to Set Base",
+    description: "How to establish the reserved spoilboard base's Z at job start. None: skip -- assume the base was set in a previous job (probe-once / run-many), emitting an Info comment. Probe Z: probe the spoilboard into the base WCS (G10 L20 P<n>) with no operator prompt (a fixed/known probe point). Pause, Probe Z, Pause (default): prompt the operator to attach the probe, probe, then prompt to detach -- the manual touch-off. No effect when Reserved WCS is None; ignored on Marlin (no per-WCS registers). Always probed at the current position (0,0 / the job's XY origin) -- the Probe X/Y Offset never applies here.",
+    group      : "05 - Establish Spoilboard Reference",
+    type       : "enum",
+    values: [
+      { title: "None", id: "None" },
+      { title: "Probe Z", id: "Probe Z" },
+      { title: "Pause, Probe Z, Pause", id: "Pause & Probe Z" }
+    ],
+    value: "Pause & Probe Z",
+    scope: "post"
+  },
+  C_Spoilboard_SafeZAcrossWcs: {
+    title      : "Retract Across Parts",
+    description: "Multi-fixture safety. On (default): before traversing between operations that use different WCS, the tool retracts to the Safe Z below so it clears fixtures/clamps/other parts, and the job is validated (Guard B) to reject a multi-WCS job that reserves no spoilboard base -- a clearance height is meaningless across WCS whose offsets are only known after probing at runtime. Single-WCS jobs (including a single operation) are unaffected: no extra retract is emitted and the guard does not apply. Off: no cross-WCS retract and no guard. GRBL/RepRap only (Marlin is single-frame; see Guard C).",
+    group      : "05 - Establish Spoilboard Reference",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
+  },
+  D_Spoilboard_SafeZClearance: {
+    title      : "Inter Part Safe Z",
+    description: "Absolute work-Z height in whole mm, measured above the reserved spoilboard base, that the tool retracts to whenever it must clear everything on the bed. Set it high enough to clear the tallest fixture, clamp, or part in the job. Used at two points: (1) immediately after the spoilboard base is probed at job start -- that retract is made in the base's own frame, so this is the height the tool holds while it travels to the first part's X0 Y0; and (2) before each traverse between parts (a different WCS), when Retract Across Parts is on. Because it is measured above the spoilboard rather than the stock, it is the one clearance that stays valid across parts of differing thickness. Requires a Reserved WCS -- ignored when none is reserved, and on Marlin (no per-WCS registers).",
+    group      : "05 - Establish Spoilboard Reference",
+    type       : "integer",
+    value      : 40,
+    scope      : "post"
+  },
+  A_Probe_OnStart: {
+    title      : "First WCS / Part",
+    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 at the current position, then probe the stock-top Z -- pre-jog the tool to the part's X0 Y0 before starting (no prompt). Set X0 Y0 Z0 to Current Pos: record the tool's CURRENT position as X0 Y0 Z0 with no probe and no prompt -- pre-jog to the part origin before starting (a manual touch-off, or a jet/laser where Z is set by hand; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Use Active WCS X0 Y0, Probe Z0: use the X0 Y0 already stored in the active WCS's register (a pre-set fixture offset) -- rapid there and probe the stock-top Z, writing Z into that WCS; XY is not re-zeroed. Use Active WCS X0 Y0 Z0: use the full origin already stored in the active WCS -- no re-zero and no probe; the tool moves Z to the Safe Z set below and then rapids to the stored X0 Y0. Note that is a MOVE to Safe Z, not necessarily a retract: Safe Z is an absolute height in the stored frame, so if the tool is parked above it the job starts by descending to it. IMPORTANT -- \"active WCS\" means the register this operation's Fusion Setup designates (its Work Offset: WCS 1 / G54 unless you changed it), which the post SELECTS at job start before doing anything else. It is NOT whatever WCS your sender or controller happened to have active -- the post overwrites that. What the register holds, however, is runtime state left by a prior job or a manual touch-off, and the post cannot read it back to check: the two Use Active WCS modes TRUST those stored values. Jog to X0 Y0, Probe Z0: pause (M0) so you jog the tool to the origin during the run, record X0 Y0, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to the origin during the run, then record X0 Y0 Z0 there, no probe. (Jogging at the pause needs sender/firmware support -- see the README.) On GRBL/RepRap the origin writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent WCS / Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
+    group      : "06 - On WCS / Part / Fixture Changes",
+    type       : "enum",
+    values: [
+      { title: "Set X0 Y0 to Current Pos, Probe Z0", id: "Current XY & Probe Z" },
+      { title: "Set X0 Y0 Z0 to Current Pos", id: "Current XYZ" },
+      { title: "Use Active WCS X0 Y0, Probe Z0", id: "Probe Z" },
+      { title: "Use Active WCS X0 Y0 Z0", id: "Skip" },
+      { title: "Jog to X0 Y0, Probe Z0", id: "Jog XY & Probe Z" },
+      { title: "Jog to X0 Y0 Z0", id: "Jog XYZ" }
+    ],
+    value: "Current XY & Probe Z",
+    scope: "post"
+  },
+  B_Probe_OnChange: {
+    title      : "Subsequent WCS / Part",
+    description: "Multi-part jobs -- milling several parts/copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...) -- \"active WCS\" below means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS (G10 L20 P<n>); XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X and Z already in its own WCS, from a prior job or set manually). JOG (operator jogs to each part; jogging at the pause needs sender/firmware support) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0 (no probe). The attach/detach prompts around any probe follow Probe Pause. The safe-Z retract on the traverse is separate (see Retract Across Parts). Not supported on Marlin (single G92 origin -- use separate jobs). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
+    group      : "06 - On WCS / Part / Fixture Changes",
+    type       : "enum",
+    values: [
+      { title: "Use Active WCS X0 Y0, Probe Z0", id: "Probe Z" },
+      { title: "Use Active WCS X0 Y0 Z0", id: "Skip" },
+      { title: "Jog to X0 Y0, Probe Z0", id: "Jog XY & Probe Z" },
+      { title: "Jog to X0 Y0 Z0", id: "Jog XYZ" }
+    ],
+    value: "Probe Z",
+    scope: "post"
+  },
+  C_Probe_Pause: {
+    title      : "Probe Pause",
+    description: "Operator pauses around each part probe (the first part and each added part) -- the prompts to attach the Z probe (before) and detach it (after). No: no prompts (a fixed/permanent probe). Before: prompt to attach only. Before & After (default): prompt to attach before probing and to detach after -- the manual touch-off. Applies to the part probes in this group only, not the spoilboard base probe (see Probe to Set Base) or the tool-change re-probe.",
+    group      : "06 - On WCS / Part / Fixture Changes",
+    type       : "enum",
+    values: [
+      { title: "No", id: "No" },
+      { title: "Before", id: "Before" },
+      { title: "Before & After", id: "Before & After" }
+    ],
+    value: "Before & After",
+    scope: "post"
+  },
+  D_Probe_OffsetX: {
+    title      : "Probe X Offset",
+    description: "X distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Subsequent WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin. Does NOT affect the spoilboard base probe (Probe to Set Base), which always touches off at the origin (0,0).",
+    group      : "06 - On WCS / Part / Fixture Changes",
+    type       : "integer",
+    value      : 0,
+    scope      : "post"
+  },
+  E_Probe_OffsetY: {
+    title      : "Probe Y Offset",
+    description: "Y distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Subsequent WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin. Does NOT affect the spoilboard base probe (Probe to Set Base), which always touches off at the origin (0,0).",
+    group      : "06 - On WCS / Part / Fixture Changes",
+    type       : "integer",
+    value      : 0,
+    scope      : "post"
+  },
+  F_Probe_G382orG28: {
+    title      : "Probe with G38.2",
+    description: "Probe using G38.2 (On) or G28 (Off). GRBL always uses G38.2 regardless of this setting; RepRap fully supports G38.2 too, so this should be left On there as well. Off (G28) is intended for Marlin builds with no dedicated probe, using the Z homing switch as a substitute reference.",
+    group      : "06 - On WCS / Part / Fixture Changes",
+    type       : "boolean",
+    value      : true,
+    scope      : "post"
+  },
+  G_Probe_G38Target: {
+    title      : "G38 Target",
+    description: "G38 probing's furthest Z position.",
+    group      : "06 - On WCS / Part / Fixture Changes",
+    type       : "integer",
+    value      : -10,
+    scope      : "post"
+  },
+  H_Probe_G38Speed: {
+    title      : "G38 Speed",
+    description: "G38 probing's speed (mm/min).",
+    group      : "06 - On WCS / Part / Fixture Changes",
+    type       : "integer",
+    value      : 30,
+    scope      : "post"
+  },
+  I_Probe_SafeZ: {
+    title      : "Safe Z",
+    description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when no spoilboard base is reserved; with a base reserved, the Establish Spoilboard Reference group's Safe Z is used instead). Same syntax as \"Map: Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
+    group      : "06 - On WCS / Part / Fixture Changes",
+    type       : "string",
+    value      : "Retract:15",
+    scope      : "post"
+  },
+  J_Probe_Thickness: {
+    title      : "Plate Thickness",
+    description: "Thickness of the probe touchplate.",
+    group      : "06 - On WCS / Part / Fixture Changes",
+    type       : "number",
+    value      : 0.8,
     scope      : "post"
   },
 
@@ -343,155 +507,6 @@ properties = {
     scope      : "post"
   },
 
-  A_Spoilboard_BaseReserve: {
-    title      : "Reserved WCS",
-    description: "Reserve one WCS as a fixed spoilboard base (a stable Z reference for multi-fixture jobs). None (default): feature off, nothing emitted. Otherwise the selected WCS is reserved as the base and no operation may re-establish its origin (see Probe to Set Base). G59.1-G59.3 require RepRap. GRBL/RepRap only -- Marlin has no per-WCS registers, so a base is ignored there.",
-    group      : "05 - Establish Spoilboard Reference",
-    type       : "enum",
-    values: [
-      { title: "None", id: "None" },
-      { title: "G54", id: "1" },
-      { title: "G55", id: "2" },
-      { title: "G56", id: "3" },
-      { title: "G57", id: "4" },
-      { title: "G58", id: "5" },
-      { title: "G59 ( -- recommended --)", id: "6" },
-      { title: "G59.1 (RepRap)", id: "7" },
-      { title: "G59.2 (RepRap)", id: "8" },
-      { title: "G59.3 (RepRap)", id: "9" }
-    ],
-    value: "None",
-    scope: "post"
-  },
-  B_Spoilboard_BaseEstablish: {
-    title      : "Probe to Set Base",
-    description: "How to establish the reserved spoilboard base's Z at job start. None: skip -- assume the base was set in a previous job (probe-once / run-many), emitting an Info comment. Probe Z: probe the spoilboard into the base WCS (G10 L20 P<n>) with no operator prompt (a fixed/known probe point). Pause, Probe Z, Pause (default): prompt the operator to attach the probe, probe, then prompt to detach -- the manual touch-off. No effect when Reserved WCS is None; ignored on Marlin (no per-WCS registers). Always probed at the current position (0,0 / the job's XY origin) -- the Probe X/Y Offset never applies here.",
-    group      : "05 - Establish Spoilboard Reference",
-    type       : "enum",
-    values: [
-      { title: "None", id: "None" },
-      { title: "Probe Z", id: "Probe Z" },
-      { title: "Pause, Probe Z, Pause", id: "Pause & Probe Z" }
-    ],
-    value: "Pause & Probe Z",
-    scope: "post"
-  },
-  A_Probe_OnStart: {
-    title      : "First WCS / Part",
-    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 at the current position, then probe the stock-top Z -- pre-jog the tool to the part's X0 Y0 before starting (no prompt). Set X0 Y0 Z0 to Current Pos: record the tool's CURRENT position as X0 Y0 Z0 with no probe and no prompt -- pre-jog to the part origin before starting (a manual touch-off, or a jet/laser where Z is set by hand; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Use Active WCS X0 Y0, Probe Z0: use the X0 Y0 already stored in the active WCS's register (a pre-set fixture offset) -- rapid there and probe the stock-top Z, writing Z into that WCS; XY is not re-zeroed. Use Active WCS X0 Y0 Z0: use the full origin already stored in the active WCS -- no re-zero and no probe; the tool retracts and rapids to the stored X0 Y0. IMPORTANT -- \"active WCS\" means the register this operation's Fusion Setup designates (its Work Offset: WCS 1 / G54 unless you changed it), which the post SELECTS at job start before doing anything else. It is NOT whatever WCS your sender or controller happened to have active -- the post overwrites that. What the register holds, however, is runtime state left by a prior job or a manual touch-off, and the post cannot read it back to check: the two Use Active WCS modes TRUST those stored values. Jog to X0 Y0, Probe Z0: pause (M0) so you jog the tool to the origin during the run, record X0 Y0, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to the origin during the run, then record X0 Y0 Z0 there, no probe. (Jogging at the pause needs sender/firmware support -- see the README.) On GRBL/RepRap the origin writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent WCS / Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
-    group      : "06 - On WCS / Part / Fixture Changes",
-    type       : "enum",
-    values: [
-      { title: "Set X0 Y0 to Current Pos, Probe Z0", id: "Current XY & Probe Z" },
-      { title: "Set X0 Y0 Z0 to Current Pos", id: "Current XYZ" },
-      { title: "Use Active WCS X0 Y0, Probe Z0", id: "Probe Z" },
-      { title: "Use Active WCS X0 Y0 Z0", id: "Skip" },
-      { title: "Jog to X0 Y0, Probe Z0", id: "Jog XY & Probe Z" },
-      { title: "Jog to X0 Y0 Z0", id: "Jog XYZ" }
-    ],
-    value: "Current XY & Probe Z",
-    scope: "post"
-  },
-  B_Probe_OnChange: {
-    title      : "Subsequent WCS / Part",
-    description: "Multi-part jobs -- milling several parts/copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...) -- \"active WCS\" below means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS (G10 L20 P<n>); XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X and Z already in its own WCS, from a prior job or set manually). JOG (operator jogs to each part; jogging at the pause needs sender/firmware support) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0 (no probe). The attach/detach prompts around any probe follow Probe Pause. The safe-Z retract on the traverse is separate (see Retract Across Parts). Not supported on Marlin (single G92 origin -- use separate jobs). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
-    group      : "06 - On WCS / Part / Fixture Changes",
-    type       : "enum",
-    values: [
-      { title: "Use Active WCS X0 Y0, Probe Z0", id: "Probe Z" },
-      { title: "Use Active WCS X0 Y0 Z0", id: "Skip" },
-      { title: "Jog to X0 Y0, Probe Z0", id: "Jog XY & Probe Z" },
-      { title: "Jog to X0 Y0 Z0", id: "Jog XYZ" }
-    ],
-    value: "Probe Z",
-    scope: "post"
-  },
-  C_Probe_Pause: {
-    title      : "Probe Pause",
-    description: "Operator pauses around each part probe (the first part and each added part) -- the prompts to attach the Z probe (before) and detach it (after). No: no prompts (a fixed/permanent probe). Before: prompt to attach only. Before & After (default): prompt to attach before probing and to detach after -- the manual touch-off. Applies to the part probes in this group only, not the spoilboard base probe (see Probe to Set Base) or the tool-change re-probe.",
-    group      : "06 - On WCS / Part / Fixture Changes",
-    type       : "enum",
-    values: [
-      { title: "No", id: "No" },
-      { title: "Before", id: "Before" },
-      { title: "Before & After", id: "Before & After" }
-    ],
-    value: "Before & After",
-    scope: "post"
-  },
-  F_Probe_G382orG28: {
-    title      : "Probe with G38.2",
-    description: "Probe using G38.2 (On) or G28 (Off). GRBL always uses G38.2 regardless of this setting; RepRap fully supports G38.2 too, so this should be left On there as well. Off (G28) is intended for Marlin builds with no dedicated probe, using the Z homing switch as a substitute reference.",
-    group      : "06 - On WCS / Part / Fixture Changes",
-    type       : "boolean",
-    value      : true,
-    scope      : "post"
-  },
-  G_Probe_G38Target: {
-    title      : "G38 Target",
-    description: "G38 probing's furthest Z position.",
-    group      : "06 - On WCS / Part / Fixture Changes",
-    type       : "integer",
-    value      : -10,
-    scope      : "post"
-  },
-  H_Probe_G38Speed: {
-    title      : "G38 Speed",
-    description: "G38 probing's speed (mm/min).",
-    group      : "06 - On WCS / Part / Fixture Changes",
-    type       : "integer",
-    value      : 30,
-    scope      : "post"
-  },
-  I_Probe_SafeZ: {
-    title      : "Safe Z",
-    description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when no spoilboard base is reserved; with a base reserved, the Establish Spoilboard Reference group's Safe Z is used instead). Same syntax as \"Map: Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
-    group      : "06 - On WCS / Part / Fixture Changes",
-    type       : "string",
-    value      : "Retract:15",
-    scope      : "post"
-  },
-  J_Probe_Thickness: {
-    title      : "Plate Thickness",
-    description: "Thickness of the probe touchplate.",
-    group      : "06 - On WCS / Part / Fixture Changes",
-    type       : "number",
-    value      : 0.8,
-    scope      : "post"
-  },
-  C_Spoilboard_SafeZAcrossWcs: {
-    title      : "Retract Across Parts",
-    description: "Multi-fixture safety. On (default): before traversing between operations that use different WCS, the tool retracts to the Safe Z below so it clears fixtures/clamps/other parts, and the job is validated (Guard B) to reject a multi-WCS job that reserves no spoilboard base -- a clearance height is meaningless across WCS whose offsets are only known after probing at runtime. Single-WCS jobs (including a single operation) are unaffected: no extra retract is emitted and the guard does not apply. Off: no cross-WCS retract and no guard. GRBL/RepRap only (Marlin is single-frame; see Guard C).",
-    group      : "05 - Establish Spoilboard Reference",
-    type       : "boolean",
-    value      : true,
-    scope      : "post"
-  },
-  D_Spoilboard_SafeZClearance: {
-    title      : "Inter Part Safe Z",
-    description: "Absolute work-Z height in whole mm, measured above the reserved spoilboard base, that the tool retracts to whenever it must clear everything on the bed. Set it high enough to clear the tallest fixture, clamp, or part in the job. Used at two points: (1) immediately after the spoilboard base is probed at job start -- that retract is made in the base's own frame, so this is the height the tool holds while it travels to the first part's X0 Y0; and (2) before each traverse between parts (a different WCS), when Retract Across Parts is on. Because it is measured above the spoilboard rather than the stock, it is the one clearance that stays valid across parts of differing thickness. Requires a Reserved WCS -- ignored when none is reserved, and on Marlin (no per-WCS registers).",
-    group      : "05 - Establish Spoilboard Reference",
-    type       : "integer",
-    value      : 40,
-    scope      : "post"
-  },
-  D_Probe_OffsetX: {
-    title      : "Probe X Offset",
-    description: "X distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Subsequent WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin. Does NOT affect the spoilboard base probe (Probe to Set Base), which always touches off at the origin (0,0).",
-    group      : "06 - On WCS / Part / Fixture Changes",
-    type       : "integer",
-    value      : 0,
-    scope      : "post"
-  },
-  E_Probe_OffsetY: {
-    title      : "Probe Y Offset",
-    description: "Y distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Subsequent WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin. Does NOT affect the spoilboard base probe (Probe to Set Base), which always touches off at the origin (0,0).",
-    group      : "06 - On WCS / Part / Fixture Changes",
-    type       : "integer",
-    value      : 0,
-    scope      : "post"
-  },
-
   A_Include_StartFile: {
     title      : "Start GCode File",
     description: "File with custom Gcode for header/start (in nc folder).",
@@ -524,9 +539,15 @@ properties = {
     value      : "",
     scope      : "post"
   },
+  // NOT IMPLEMENTED. Declared but never read -- nothing in the post calls loadFile() with
+  // it, so a value entered here is silently ignored. Kept (rather than deleted) because the
+  // feature is wanted: the intent is to include this file at every probe, including the
+  // tool-change re-probe, which makes it part of the Tool Change branch's ordering work.
+  // The title and tooltip say so, since a dialog field that advertises a feature and does
+  // nothing is worse than no field at all. See HReview.md HR-21.
   E_Include_ProbeFile: {
-    title      : "Probe",
-    description: "File with custom Gcode for tool probe (in nc folder).",
+    title      : "Tool Change Probe",
+    description: "NOT IMPLEMENTED YET. Reserved for a file of custom Gcode to run at the tool-change Z re-probe (in nc folder). Anything entered here is currently ignored -- no file is included and no warning is issued.",
     group      : "08 - External Include Files",
     type       : "string",
     value      : "",
@@ -777,7 +798,6 @@ var sFormat = createFormat({ prefix: "S", decimals: 0 });
 var pFormat = createFormat({ prefix: "P", decimals: 0 });
 var oFormat = createFormat({ prefix: "O", decimals: 0 });
 
-var feedFormat = createFormat({ decimals: (unit == MM ? 0 : 2) });
 var fFormat = createFormat({ prefix: "F", decimals: (unit == MM ? 0 : 2) });
 
 var toolFormat = createFormat({ decimals: 0 });
@@ -816,13 +836,13 @@ function writeBlock() {
 }
 
 function flushMotions() {
+  // GRBL has no "wait for moves to finish" code: the planner drains on its own and M400 would be
+  // an unknown command, so there is deliberately nothing to emit here.
   if (fw == eFirmware.GRBL) {
+    return;
   }
 
-  // Default
-  else {
-    writeBlock(mFormat.format(400));
-  }
+  writeBlock(mFormat.format(400));
 }
 
 //---------------- Safe Rapids ----------------
@@ -843,8 +863,12 @@ var eSafeZ = {
 };
 
 var safeZMode = eSafeZ.CONST;
+// The literal fallback parsed out of the Safe-Z property, in MILLIMETRES -- every dialog dimension
+// is mm by contract (README, "Units"), whatever unit the job outputs in. Convert with
+// propertyMmToUnit() before comparing it against, or emitting it as, a coordinate. Contrast
+// safeZHeight below, which is the RESOLVED height in the job's output unit.
 var safeZHeightDefault = 15;
-var safeZHeight;
+var safeZHeight;   // resolved height, in the OUTPUT unit
 
 // Parse a Safe-Z expression string -- a bare number, or Feed:/Retract:/Clearance:<fallback> --
 // into { mode, dflt }. Shared by the Map-G1s Safe Z (C_MapRapids_SafeZ) and the probe Safe Z
@@ -885,17 +909,29 @@ function parseSafeZProperty() {
   writeComment(eComment.Debug, " parseSafeZProperty: safeZHeightDefault = " + safeZHeightDefault);
 }
 
-function safeZforSection(_section) 
+function safeZforSection(_section)
 {
   if (getProperty(properties.B_MapRapids_RestoreRapids)) {
+    // The fallback is a dialog literal, so it is mm and must be converted to the output unit before
+    // it can be compared against a coordinate. The F360 level values below are NOT converted --
+    // Fusion already reports those in the output unit. Getting this wrong on an inch job made the
+    // whole G1 -> G0 mapper silently inert: every Z was compared against a threshold of "15 inch",
+    // which no toolpath ever reaches, so no move was ever converted and nothing said so.
+    // Every level test below asks the PASSED section, never the global hasParameter(). The global
+    // form reports on whatever section is current, which is the same thing only while this is called
+    // from inside that section -- true of the sole caller today, but the _section parameter is an
+    // open invitation to call it with another one, and the first caller to do so would get the guard
+    // answering about the wrong section and the fallback handed back silently. resolveSafeZHeight()
+    // had this exact defect and it was not hypothetical there; see its comment.
+    var dfltInUnit = propertyMmToUnit(safeZHeightDefault);
     switch (safeZMode) {
       case eSafeZ.CONST:
-        safeZHeight = safeZHeightDefault;
+        safeZHeight = dfltInUnit;
         writeComment(eComment.Important, " SafeZ using const: " + safeZHeight);
         break;
 
       case eSafeZ.FEED:
-        if (hasParameter("operation:feedHeight_value") && hasParameter("operation:feedHeight_absolute")) {
+        if (_section.hasParameter("operation:feedHeight_value") && _section.hasParameter("operation:feedHeight_absolute")) {
           let feed = _section.getParameter("operation:feedHeight_value");
           let abs = _section.getParameter("operation:feedHeight_absolute");
 
@@ -904,18 +940,18 @@ function safeZforSection(_section)
             writeComment(eComment.Info, " SafeZ feed level: " + safeZHeight);
           }
           else {
-            safeZHeight = safeZHeightDefault;
+            safeZHeight = dfltInUnit;
             writeComment(eComment.Important, " SafeZ feed level not abs: " + safeZHeight);
           }
         }
         else {
-          safeZHeight = safeZHeightDefault;
+          safeZHeight = dfltInUnit;
           writeComment(eComment.Important, " SafeZ feed level not defined: " + safeZHeight);
         }
         break;
 
       case eSafeZ.RETRACT:
-        if (hasParameter("operation:retractHeight_value") && hasParameter("operation:retractHeight_absolute")) {
+        if (_section.hasParameter("operation:retractHeight_value") && _section.hasParameter("operation:retractHeight_absolute")) {
           let retract = _section.getParameter("operation:retractHeight_value");
           let abs = _section.getParameter("operation:retractHeight_absolute");
 
@@ -924,18 +960,18 @@ function safeZforSection(_section)
             writeComment(eComment.Info, " SafeZ retract level: " + safeZHeight);
           }
           else {
-            safeZHeight = safeZHeightDefault;
+            safeZHeight = dfltInUnit;
             writeComment(eComment.Important, " SafeZ retract level not abs: " + safeZHeight);
           }
         }
         else {
-          safeZHeight = safeZHeightDefault;
+          safeZHeight = dfltInUnit;
           writeComment(eComment.Important, " SafeZ: retract level not defined: " + safeZHeight);
         }
         break;
 
       case eSafeZ.CLEARANCE:
-        if (hasParameter("operation:clearanceHeight_value") && hasParameter("operation:clearanceHeight_absolute")) {
+        if (_section.hasParameter("operation:clearanceHeight_value") && _section.hasParameter("operation:clearanceHeight_absolute")) {
           let clearance = _section.getParameter("operation:clearanceHeight_value");
           let abs = _section.getParameter("operation:clearanceHeight_absolute");
 
@@ -944,18 +980,18 @@ function safeZforSection(_section)
             writeComment(eComment.Info, " SafeZ clearance level: " + safeZHeight);
           }
           else {
-            safeZHeight = safeZHeightDefault;
+            safeZHeight = dfltInUnit;
             writeComment(eComment.Important, " SafeZ clearance level not abs: " + safeZHeight);
           }
         }
         else {
-          safeZHeight = safeZHeightDefault;
+          safeZHeight = dfltInUnit;
           writeComment(eComment.Important, " SafeZ clearance level not defined: " + safeZHeight);
         }
         break;
         
       case eSafeZ.ERROR:
-        safeZHeight = safeZHeightDefault;
+        safeZHeight = dfltInUnit;
         writeComment(eComment.Important, " >>> WARNING: " + properties.C_MapRapids_SafeZ.title + " format error: " + safeZHeight);
         break;
     }
@@ -963,11 +999,19 @@ function safeZforSection(_section)
 }
 
 // Resolve a parsed Safe-Z expression against one section's F360 levels, returning a concrete
-// height in the OUTPUT unit -- the same convention safeZforSection() uses: F360 level values
-// and the literal fallback are used as-is, never mm-converted. Feed/Retract/Clearance pull the
-// matching operation level when it is defined and absolute; otherwise the literal fallback is
-// used. Pure: emits no output.
+// height in the OUTPUT unit -- the same convention safeZforSection() uses. Feed/Retract/Clearance
+// pull the matching operation level when it is defined and absolute; otherwise the literal fallback
+// is used. Pure: emits no output.
+//
+// The two inputs arrive in DIFFERENT units and only one converts:
+//   - an F360 level value is already in the output unit, so it is returned untouched;
+//   - the literal fallback is a dialog value, and every dialog dimension is mm by contract
+//     (README, "Units"), so it converts.
+// Both fallback returns below therefore go through propertyMmToUnit(). Missing that on an inch job
+// made this function hand back "15" meaning 15 inch -- 381 mm -- which probeSafeZ()'s caller then
+// emitted as an absolute G0 Z: a full-travel retract into the Z limit.
 function resolveSafeZHeight(mode, dflt, _section) {
+  var fallback = propertyMmToUnit(dflt);
   var valueParam;
   var absParam;
   switch (mode) {
@@ -984,7 +1028,7 @@ function resolveSafeZHeight(mode, dflt, _section) {
       absParam   = "operation:clearanceHeight_absolute";
       break;
     default:  // CONST or ERROR -- use the literal fallback
-      return dflt;
+      return fallback;
   }
 
   // Ask the PASSED section, not the global context. The global hasParameter() reports on whatever
@@ -993,9 +1037,9 @@ function resolveSafeZHeight(mode, dflt, _section) {
   // the global form would report false throughout and silently hand back the fallback for all of
   // them, which is exactly the misleading answer this function exists to avoid.
   if (_section.hasParameter(valueParam) && _section.hasParameter(absParam) && _section.getParameter(absParam) == 1) {
-    return _section.getParameter(valueParam);
+    return _section.getParameter(valueParam);   // already in the output unit
   }
-  return dflt;
+  return fallback;
 }
 
 // Describe a parsed Safe-Z expression for the header block: its mode, its literal fallback, and --
@@ -1003,10 +1047,16 @@ function resolveSafeZHeight(mode, dflt, _section) {
 // job's operations. "Retract:15" resolving to 5.08 on every section is the case that made reading
 // H7.gcode slow; printing only the mode and the fallback merely restates the property, under a
 // heading that promises a resolved value.
+// `dflt` arrives in mm (the parsed dialog literal). Everything this function PRINTS is in the output
+// unit, so the fallback is converted for display -- the resolved value beside it comes back from
+// resolveSafeZHeight() already converted, and printing one in mm next to the other in inch would
+// make the header contradict itself. resolveSafeZHeight() is still handed the raw mm value: it does
+// its own conversion, so pre-converting here would apply it twice.
 function describeSafeZ(mode, dflt) {
   var name = eSafeZ.prop[mode].name;
+  var fallbackText = xyzFormat.format(propertyMmToUnit(dflt));
   if (mode == eSafeZ.CONST || mode == eSafeZ.ERROR) {
-    return name + " = " + xyzFormat.format(dflt) + " -- a fixed height, no F360 level consulted";
+    return name + " = " + fallbackText + " -- a fixed height, no F360 level consulted";
   }
 
   var seen = [];
@@ -1024,16 +1074,16 @@ function describeSafeZ(mode, dflt) {
   } else {
     resolved = "varies by operation -- " + seen.join(", ");
   }
-  return name + " level, fallback " + xyzFormat.format(dflt) + ", resolves to " + resolved;
+  return name + " level, fallback " + fallbackText + ", resolves to " + resolved;
 }
 
 // ---- Probe Safe Z ----------------------------------------------------------
 // I_Probe_SafeZ ("06 - On WCS / Part / Fixture Changes" > "Safe Z") uses the SAME expression syntax and
 // F360-level resolution as the Map-G1s Safe Z (C_MapRapids_SafeZ), but is a fully independent
 // property so the two can be tuned separately. "Retract:15" pulls each operation's F360 retract
-// level when defined and absolute, else falls back to 15.
+// level when defined and absolute, else falls back to 15 mm.
 var probeSafeZMode = eSafeZ.CONST;
-var probeSafeZHeightDefault = 15;
+var probeSafeZHeightDefault = 15;   // the parsed literal fallback, in MILLIMETRES (see safeZHeightDefault)
 
 function parseProbeSafeZProperty() {
   var parsed = parseSafeZExpr(getProperty(properties.I_Probe_SafeZ));
@@ -1044,15 +1094,28 @@ function parseProbeSafeZProperty() {
   writeComment(eComment.Debug, " parseProbeSafeZProperty: probeSafeZHeightDefault = " + probeSafeZHeightDefault);
 }
 
-// Resolve I_Probe_SafeZ for the current operation. Returns a height in the output unit --
-// already unit-correct, so callers must NOT wrap it in propertyMmToUnit().
+// Resolve I_Probe_SafeZ for the current operation. Returns a height in the output unit -- already
+// unit-correct, so callers must NOT wrap it in propertyMmToUnit(). That now holds on BOTH paths:
+// an F360 level arrives in the output unit, and resolveSafeZHeight() converts the mm fallback. It
+// previously held only for the level path, so an inch job that fell back returned inches-worth of
+// millimetres straight into an absolute G0 Z.
 function probeSafeZ() {
   return resolveSafeZHeight(probeSafeZMode, probeSafeZHeightDefault, currentSection);
 }
 
 
 function roundTo(value, places) {
-  return +(Math.round(value + "e+" + places) + "e-" + places);
+  // Plain arithmetic, not the string-exponent trick this used to use. That form built a string and
+  // read it back -- "value + 'e+' + places" -- which relies on String(value) never containing an
+  // exponent of its own. JavaScript renders any magnitude below 1e-6 exponentially, so a Z of 1e-7
+  // (ordinary float noise from a toolpath that meant zero) built "1e-7e+3" and the whole expression
+  // came back NaN. In isSafeToRapid() that fails closed -- every comparison against NaN is false, so
+  // the move simply is not converted -- and in the orientation guard's Debug trace it printed the
+  // tilt as "NaN". The string form existed to dodge cases like Math.round(1.005 * 100); that error
+  // lives in the 15th digit and cannot change an answer here, where the only job is to compare two
+  // coordinates at the precision they will be written with.
+  var scale = Math.pow(10, places);
+  return Math.round(value * scale) / scale;
 }
 
 // Returns true if the rules to convert G1s to G0s are satisfied
@@ -1112,11 +1175,30 @@ function isSafeToRapid(x, y, z) {
 
 //---------------- Coolant ----------------
 
+// The four "... Custom" coolant properties name a FILE in the nc output folder, exactly as group
+// 08's five include fields do -- that is what their own tooltips say ("File with custom GCode to
+// turn ON coolant channel A (in nc folder)") and what the README's group-10 table says ("Custom
+// include files when Mode = Use custom"). They used to be written straight into the g-code stream
+// with writeBlock(), so an operator who did what the field asked and typed "air_on.g" got the
+// literal block "air_on.g" streamed to the controller, which answers an unsupported-command error
+// mid-job; leaving the field empty emitted a stray blank line. Routed through loadFile() they now
+// also inherit its missing-file error and its missing-trailing-newline repair. See review.md CR-4.
+function writeCustomCoolantFile(channel, on, file) {
+  if (file == "") {
+    writeComment(eComment.Important, " >>> WARNING: coolant channel " + channel + " is set to \"Use custom\""
+      + " but no custom file is named -- nothing emitted");
+    return;
+  }
+  loadFile(file);
+}
+
 function CoolantA(on) {
   var coolantText = on ? getProperty(properties.C_Coolant_ChannelAOn) : getProperty(properties.D_Coolant_ChannelAOff);
 
   if (coolantText == "Use custom") {
-    coolantText = on ? getProperty(properties.G_Coolant_ChannelAOnCustom) : getProperty(properties.H_Coolant_ChannelAOffCustom);
+    writeCustomCoolantFile("A", on, on ? getProperty(properties.G_Coolant_ChannelAOnCustom)
+                                       : getProperty(properties.H_Coolant_ChannelAOffCustom));
+    return;
   }
 
   writeBlock(coolantText);
@@ -1126,7 +1208,9 @@ function CoolantB(on) {
   var coolantText = on ? getProperty(properties.E_Coolant_ChannelBOn) : getProperty(properties.F_Coolant_ChannelBOff);
 
   if (coolantText == "Use custom") {
-    coolantText = on ? getProperty(properties.I_Coolant_ChannelBOnCustom) : getProperty(properties.J_Coolant_ChannelBOffCustom);
+    writeCustomCoolantFile("B", on, on ? getProperty(properties.I_Coolant_ChannelBOnCustom)
+                                       : getProperty(properties.J_Coolant_ChannelBOffCustom));
+    return;
   }
 
   writeBlock(coolantText);
@@ -1201,7 +1285,12 @@ function laserOn(power) {
   if (fw == eFirmware.GRBL) {
     var laser_pwm = power * 10;
 
-    writeBlock(mFormat.format(getProperty(properties.F_Laser_GrblMode)), sFormat.format(laser_pwm));
+    // Number(), not the raw property: F_Laser_GrblMode stores its enum id as a STRING ("4" / "3"),
+    // and this is the only mFormat.format() call in the file handed anything but a numeric literal.
+    // Whether the kernel's format() coerces a numeric string is not something reading can settle,
+    // and the cost of it not doing so is that every GRBL laser job emits a malformed laser-on block
+    // and the laser never fires. No posted file has ever exercised group 09 -- see PReview.md J4.
+    writeBlock(mFormat.format(Number(getProperty(properties.F_Laser_GrblMode))), sFormat.format(laser_pwm));
   }
 
   // Default firmware
@@ -1295,9 +1384,53 @@ function baseOriginWriteReason(base) {
   return null;
 }
 
+// Distinct tool numbers used across all sections. Counted over SECTIONS rather than getToolTable(),
+// which lists every tool the document knows about including ones this job never switches between.
+function countDistinctTools() {
+  var seen = {};
+  var count = 0;
+  var n = getNumberOfSections();
+  for (var i = 0; i < n; ++i) {
+    var t = getSection(i).getTool().number;
+    if (!seen[t]) { seen[t] = true; ++count; }
+  }
+  return count;
+}
+
 // Post-time validation guards (see docs/plan.md "Validation guards").
 // Runs once from onOpen(), before any output, so a misconfiguration fails fast.
 function validateJob() {
+  // --- Warnings ------------------------------------------------------------------------------
+  // These run before the guards and on every firmware: they describe configurations that post a
+  // perfectly valid file which then does the wrong thing at the machine. warning(), not error() --
+  // each of them is legitimate on some setup, so the operator gets told, not blocked.
+
+  // Homing MOVES the tool, and the "Set ... to Current Pos" origin modes record wherever it ends
+  // up -- which after homing is the endstop corner at the extreme of travel. writeMachineHoming()
+  // is step 2 of writeFirstSection() and writeWcsOnStart() is step 6, so the pre-jog the README
+  // instructs for the default mode ("jog the tool to the part's XY corner before posting") is
+  // destroyed in between. The result is a G38.2 that never contacts, or a part cut a bed-diagonal
+  // away from the stock. Legitimate only on a machine whose home corner IS the datum.
+  // See docs/review.md CR-2.
+  var startMode = getProperty(properties.A_Probe_OnStart);
+  if (getProperty(properties.A_Machine_HomeBeforeStart) != "None" &&
+      (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
+    warning(localize("\"Home Before Start\" moves the tool to the homing corner before "
+      + "\"First WCS / Part\" records the current position as the part origin, so jogging to the "
+      + "part before starting the job has no effect. Choose a \"Use Active WCS ...\" or "
+      + "\"Jog to ...\" mode, or set \"Home Before Start\" to None."));
+  }
+
+  // Post-time half of toolChange()'s suppression warning, so it reaches Fusion's dialog and not
+  // only the posted file. See docs/review.md CR-3.
+  if (!getProperty(properties.A_ToolChange_Enabled) && countDistinctTools() > 1) {
+    warning(localize("This job uses more than one tool, but \"Tool Changes are Included\" is off: "
+      + "no tool-change code is emitted and every operation runs with the tool already in the "
+      + "spindle, at the other tools' feeds and speeds. Enable the \"07 - Tool Changes\" group, or "
+      + "post one tool per file."));
+  }
+
+  // --- Guards --------------------------------------------------------------------------------
   // Guard C -- Marlin is single-frame: a job using more than one distinct work offset
   // is silently wrong on it. The reserved base is a per-WCS-register concept that does
   // not apply to Marlin (warned at establish time), so its guards are skipped here.
@@ -1337,8 +1470,39 @@ function validateJob() {
   }
 }
 
+// Return every mutable module global to its declared initial value. onOpen() already did this for
+// two of them -- currentWorkOffset and sequenceNumber -- which is the tell that this post does not
+// want to rely on getting a fresh JavaScript context for every output file. The other twelve were
+// simply missed. If that assumption ever breaks the failure is quiet rather than loud: a second
+// file would open with spindleEnabled already true and never emit its "Turn ON ... RPM" prompt, or
+// with coolantChannelA still holding the previous job's coolant. Collected into one function so a
+// newly added global is reset by editing one place. See docs/review.md CR-13.
+function resetPostState() {
+  currentWorkOffset = undefined;          // no work offset emitted yet
+  sequenceNumber = getProperty(properties.F_Job_SequenceNumberStart);
+  forceSectionToStartWithRapid = false;
+  sectionComment = undefined;
+  machineMode = undefined;
+  safeZHeight = undefined;
+  curCoolant = eCoolant.Off;
+  coolantChannelA = eCoolant.Off;
+  coolantChannelB = eCoolant.Off;
+  cutterOnCurrentPower = undefined;
+  powerState = false;
+  spindleEnabled = false;
+  currentSpindleSpeed = 0;
+  currentSpindleClockwise = true;
+  lastPromptedSpeed = "";
+  lastPromptedClockwise = true;
+  probePauseBefore = true;
+  probePauseAfter = true;
+  pendingRadiusCompensation = RADIUS_COMPENSATION_OFF;
+}
+
 function onOpen() {
   fw = getProperty(properties.A_Job_SelectedFirmware);
+
+  resetPostState();
 
   // Validate the job configuration before emitting anything (may error() out).
   validateJob();
@@ -1361,11 +1525,8 @@ function onOpen() {
     fOutput = createVariable({ force: true }, fFormat);
   }
 
-  // Set the starting sequence number for line numbering
-  sequenceNumber = getProperty(properties.F_Job_SequenceNumberStart);
-
-  // No work offset emitted yet
-  currentWorkOffset = undefined;
+  // (sequenceNumber and currentWorkOffset are initialised by resetPostState() above, with the
+  // other module globals.)
 
   // Set the seperator used between text
   if (!getProperty(properties.H_Job_SeparateWordsWithSpace)) {
@@ -1387,10 +1548,23 @@ function onClose() {
 
   if (getProperty(properties.B_Include_StopFile) == "") {
     onCommand(COMMAND_COOLANT_OFF);
+
+    // Stop the spindle BEFORE the return traverse, not after. On the default hobbyist configuration
+    // (Manual Spindle On/Off) COMMAND_STOP_SPINDLE is not an M5 -- it is an M0 prompt asking the
+    // operator to switch a hand-switched router off. Emitted after the move, the file sent the tool
+    // diagonally across the whole part at travel speed with the router still turning and only then
+    // asked for it to be stopped. Prompting first means the operator switches off, resumes, and the
+    // machine parks. See docs/review.md CR-6.
+    //
+    // NOTE what this deliberately does NOT do: it emits no Z retract before the X0 Y0 move. The
+    // property's own text promises "Z remains unchanged", and for milling the last operation's own
+    // end-of-toolpath retract covers it. A jet section that ends at cutting height is not covered --
+    // that is the open half of CR-6 and the same line of code as HR-16.
+    onCommand(COMMAND_STOP_SPINDLE);
+
     if (getProperty(properties.I_Job_GoOriginOnFinish)) {
       rapidMovementsXY(0, 0);
     }
-    onCommand(COMMAND_STOP_SPINDLE);
 
     flushMotions();
 
@@ -1402,8 +1576,42 @@ function onClose() {
     // Default
     else {
       display_text("Job end");
+
+      // Marlin/RepRap emitted no program end at all, and nothing ever undid Start()'s M84 S0 --
+      // which disables the idle timeout for the whole job so the machine cannot lose position
+      // mid-run. With nothing restoring it, every axis stayed energised indefinitely after the job
+      // finished: motors and drivers heating for a job that is over. GRBL has neither problem
+      // (M30 resets modal state, and there is no equivalent timeout to disable), which is why this
+      // reads as a gap in the Marlin branch rather than a design choice.
+      //
+      // S60 restores a 60 second timeout rather than releasing the motors now. A bare M84 releases
+      // immediately, and an unbalanced LowRider gantry with no brake sinks in Z the moment it does;
+      // a timeout lets the operator retrieve the part with the axes still held, then releases on
+      // its own without anyone having to remember.
+      writeComment(eComment.Info, "   Restore stepper timeout");
+      writeBlock(mFormat.format(84), sFormat.format(60));
+
+      // M2 ends the program on RepRapFirmware only. Confirmed from firmware source, not by posting:
+      //
+      // Marlin has never implemented M2. gcode.h's supported-code list jumps M1 -> M3 in both 2.0.x
+      // and 2.1.x, and gcode.cpp's M switch has no case 2, so M2 reaches unknown_command_warning()
+      // and echoes: echo:Unknown command: "M2". Harmless -- motion is flushed and the spindle is off
+      // by this point -- but a spurious error line in the console of every Marlin job. Marlin has no
+      // program-end code at all (M30 is "delete SD file" there, which is why it is GRBL-only above),
+      // so nothing replaces M2 here: end of file IS the program end on Marlin.
+      //
+      // RRF gained M2 in 3.5.1 -- "behaves the same as M0". Read from a file it calls
+      // StopPrint(normalCompletion), which ends the job and runs the operator's stop.g. On 3.4.x and
+      // earlier there is no case 2: RRF tries a /sys/M2.g macro, then reports "Bad command: M2" and
+      // carries on -- the same bounded cost as Marlin's echo, so this is not gated on a version.
+      //
+      // NOTE: stop.g runs AFTER the M84 S60 above, so a stop.g holding a bare M84/M18 releases the
+      // steppers at once and defeats the timeout restored here. See docs/HReview.md HR-11.
+      if (fw == eFirmware.REPRAP) {
+        writeBlock(mFormat.format(2));
+      }
     }
-    
+
     writeComment(eComment.Important, " *** STOP end ***");
   } else {
     loadFile(getProperty(properties.B_Include_StopFile));
@@ -1611,12 +1819,85 @@ function retractThroughBaseClearance() {
   flushMotions();
 }
 
+// A 3-axis section can still be ORIENTED off machine +Z -- a Setup built on a model face rather
+// than on the stock top, which is an easy accident in Fusion. isMultiAxis() does not catch it:
+// Fusion emits ordinary X/Y/Z words for such a section, so with no guard the post emits them as
+// though the frame were upright, the part is cut in the wrong plane, and nothing in the file says
+// so. Every reference 3-axis post rejects this. See docs/HReview.md HR-6.
+//
+// Returns true when the section may proceed; returns false AFTER raising the error when the
+// section's Z axis is readable and unambiguously not the machine Z.
+//
+// Written to FAIL OPEN, deliberately. A false positive here would abort EVERY job -- far worse
+// than the rare misconfiguration it catches -- and this is the post's first use of
+// Section.workPlane, so the shape of that object is not yet evidenced by a posted file. The
+// check therefore errors only when the orientation is readable AND unambiguously not +Z;
+// anything unreadable (no workPlane, no forward vector, non-numeric components) is treated as
+// upright and posts exactly as before. Nothing in here may throw -- that is the one hard
+// requirement, and it is why every branch concatenates rather than computes.
+//
+// Compared component-wise rather than with the kernel's isSameDirection(): that would add a
+// second unverified global to a guard whose one hard requirement is that it must not throw, and
+// the comparison costs a line either way. The tolerance is about 0.006 degrees of tilt -- orders
+// of magnitude beyond any float noise in a rotation matrix, and far below any orientation a user
+// would pick on purpose (the near-miss case posts, and cuts correctly).
+//
+// The Debug trace is emitted on EVERY path, not just the rejection. Because the guard fails open,
+// "read +Z and allowed it" and "read nothing and gave up" otherwise produce byte-identical files,
+// and the second means this guard is dead code. One Debug-level post now evidences which happened,
+// and names the reason when the orientation could not be read.
+function isSectionOrientationSupported() {
+  var toolPlane = currentSection.workPlane;
+  var toolAxis = (toolPlane == undefined) ? undefined : toolPlane.forward;
+
+  if (toolAxis == undefined) {
+    writeComment(eComment.Debug, " onSection orientation: workPlane "
+      + ((toolPlane == undefined) ? "missing" : "present") + ", forward missing"
+      + " -> UNREADABLE, check skipped, section allowed");
+    return true;
+  }
+
+  var axisText = "X" + toolAxis.x + " Y" + toolAxis.y + " Z" + toolAxis.z;
+
+  if ((typeof toolAxis.x != "number") || (typeof toolAxis.y != "number") || (typeof toolAxis.z != "number")) {
+    writeComment(eComment.Debug, " onSection orientation: forward " + axisText
+      + " types " + (typeof toolAxis.x) + "/" + (typeof toolAxis.y) + "/" + (typeof toolAxis.z)
+      + " -> UNREADABLE, check skipped, section allowed");
+    return true;
+  }
+
+  var offAxis = (Math.abs(toolAxis.x) > 1e-4) || (Math.abs(toolAxis.y) > 1e-4) || (toolAxis.z < (1 - 1e-4));
+
+  // Tilt from machine +Z, for the trace only. Clamped because a non-unit or noisy vector can push
+  // the value outside acos()'s domain; NaN components fall through as "NaN", which is itself the
+  // diagnosis (they are a fail-open case -- typeof NaN is "number", but no comparison above matches).
+  var tilt = Math.acos(Math.max(-1, Math.min(1, toolAxis.z))) * 180 / Math.PI;
+
+  writeComment(eComment.Debug, " onSection orientation: forward " + axisText
+    + ", tilt from machine Z " + roundTo(tilt, 4) + " deg -> "
+    + (offAxis ? "OFF-AXIS, section REJECTED" : "upright, section allowed"));
+
+  if (offAxis) {
+    error(localize("Tool orientation is not supported: this operation's Z axis is not the machine Z. "
+      + "Rebuild the Setup with its Z axis along the machine Z -- normally the stock top."));
+    return false;
+  }
+
+  return true;
+}
+
 function onSection() {
   // Multi-axis toolpaths aren't supported (only 3-axis / 2D-jet). Fail at the start of
   // the offending operation with a clear message, rather than partway through its motion
   // (onLinear5D/onRapid5D also guard, as a backstop).
   if (currentSection.isMultiAxis()) {
     error(localize("Multi-axis toolpath is not supported. Use a 3-axis milling or 2D/jet strategy."));
+    return;
+  }
+
+  // A 3-axis section can still be oriented off machine +Z; the check and its Debug trace live in
+  // isSectionOrientationSupported(). It has already raised the error when it returns false.
+  if (!isSectionOrientationSupported()) {
     return;
   }
 
@@ -1636,6 +1917,14 @@ function onSection() {
   }
 
   writeComment(eComment.Important, " *** SECTION begin ***");
+
+  // sectionComment is only ever assigned from onParameter("operation-comment"), which Fusion does
+  // not send for an operation with no comment. onSectionEnd() clears it so this section cannot
+  // inherit the PREVIOUS one's name in its header and on the LCD; that leaves undefined on the
+  // first section, which used to print literally. See docs/review.md CR-17 (e).
+  if (sectionComment == undefined) {
+    sectionComment = "Unnamed operation";
+  }
 
   // Print min/max boundaries for each section
   var vectorX = new Vector(1, 0, 0);
@@ -1691,6 +1980,13 @@ function onSection() {
         break;
       default:
         jetModeStr = "*** Unknown ***";
+        // Leave the power DEFINED. Every other branch sets cutterOnCurrentPower; falling through
+        // without it made laserOn() compute "undefined * 10" and emit S NaN -- or, after an earlier
+        // section had set it, silently reuse THAT section's power, which looks plausible and is not.
+        // Only the three mapped modes exist in Fusion today, so this guards a future enum value
+        // rather than a live failure, which is exactly why it must not be left producing NaN.
+        // Through is the conservative middle setting.
+        cutterOnCurrentPower = getProperty(properties.B_Laser_OnThrough);
         warn = true;
     }
 
@@ -1729,6 +2025,11 @@ function onSection() {
 // Called in every section end
 function onSectionEnd() {
   resetAll();
+  // Clear the operation name so the next section cannot inherit it. Fusion sends
+  // onParameter("operation-comment") for the next section AFTER this callback, so an operation with
+  // no comment leaves whatever was last set -- naming this section's toolpath in the next one's
+  // header and on the LCD. onSection() substitutes a placeholder when nothing arrives.
+  sectionComment = undefined;
   writeComment(eComment.Important, " *** SECTION end ***");
   writeComment(eComment.Important, "");
 }
@@ -1791,7 +2092,7 @@ function onLinear(x, y, z, feed) {
     onRapid(x, y, z);
   }
   else {
-    linearMovements(x, y, z, feed, true);
+    linearMovements(x, y, z, feed);
   }
 }
 
@@ -1815,6 +2116,28 @@ function onCircular(clockwise, cx, cy, cz, x, y, z, feed) {
     return;
   }
   circular(clockwise, cx, cy, cz, x, y, z, feed);
+}
+
+// Is the current operation a WCS / inspection PROBING operation (Fusion's probe strategies), as
+// opposed to an ordinary drill / bore / tap cycle? Only onCyclePoint() below asks.
+//
+// Defined locally on purpose. In the Autodesk reference posts `isProbeOperation()` is a post-local
+// helper, not a kernel global, so calling it without a definition made the whole canned-cycle path
+// depend on whether this kernel revision happens to supply one -- and if it does not, the first
+// drilled hole in a job aborts the post with a bare ReferenceError and no file. Defining it here is
+// harmless if the kernel also provides one, and drilling is a routine hobbyist operation.
+//
+// Two independent signals, because either alone can miss one. The operation STRATEGY names the
+// probing operation as a whole; the CYCLE TYPE names the individual cycle at each point
+// ("probing-x", "probing-xy-outer-corner", ...). Every probing cycle type is prefixed "probing", so
+// the prefix test needs no per-cycle list to stay current across Fusion versions. `cycleType` is a
+// kernel global set for the duration of a cycle -- guarded with typeof so this stays safe if it is
+// ever absent.
+function isProbeOperation() {
+  if (hasParameter("operation-strategy") && (getParameter("operation-strategy") == "probe")) {
+    return true;
+  }
+  return (typeof cycleType != "undefined") && (String(cycleType).indexOf("probing") == 0);
 }
 
 // Drilling / canned cycles.
@@ -2238,7 +2561,13 @@ function writeMachineHoming() {
     // $H is all-or-nothing on stock GRBL/FluidNC -- one $H homes every configured axis, so
     // XY and XYZ are identical here; the mode only documents which axes the user expects.
     writeComment(eComment.Debug, " writeMachineHoming: GRBL/FluidNC, emitting single combined $H (mode " + mode + ")");
-    writeBlock("$H");
+    // writeln(), NOT writeBlock(). writeBlock() prefixes an N word when "Enable Line #s" is on, and
+    // GRBL only recognises a $ system command when $ is the first character of the line -- "N10 $H"
+    // is handed to the g-code parser instead, which has no word letter $, so the controller errors
+    // and the sender halts on the first motion line of the preamble. $H is not a g-code block and
+    // takes no line number. The only other raw controller strings in this file, the GRBL "%"
+    // wrappers in onOpen()/onClose(), already use writeln() for the same reason.
+    writeln("$H");
     return;
   }
 
@@ -2444,10 +2773,17 @@ function writeWcsOnStart() {
 
   if (mode == "Skip") {
     // "Use Active WCS X0 Y0 Z0": do nothing to the origin -- use the WCS's full stored offset --
-    // but still reach its X0 Y0 safely: retract to the probe Safe Z (milling only), then rapid
+    // but still reach its X0 Y0 safely: move Z to the probe Safe Z (milling only), then rapid
     // there. This mode trusts the stored Z, so probeSafeZ() is a meaningful clearance height in
-    // that frame. Z is retracted before the XY traverse.
-    writeComment(eComment.Info, "   Use stored work origin; move to X0 Y0 at Safe Z");
+    // that frame. Z is positioned before the XY traverse.
+    //
+    // Careful with the word "retract": rapidMovementsZ() emits an ABSOLUTE Z, so if the tool is
+    // parked above Safe Z -- the top of travel is the natural place to leave it -- this DESCENDS
+    // there first, at Z travel speed, over terrain the post knows nothing about. The post cannot
+    // fix that (it has no way to read the physical Z, and the premise of this mode is that the
+    // stored frame is trusted), so the comment and the property text say "move", not "retract".
+    // See review.md CR-16; plan.md carries the related open decision for the base-reserved variant.
+    writeComment(eComment.Info, "   Use stored work origin; move Z to Safe Z, then to X0 Y0");
     resetAll();
     if (canProbe) {
       rapidMovementsZ(probeSafeZ());
@@ -2495,12 +2831,43 @@ function writeWcsOnStart() {
 
   // "Current XY & Probe Z" or "Jog XY & Probe Z"
   writeComment(eComment.Info, "   Set current X,Y position to 0,0");
-  writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
   if (canProbe) {
+    // Z0 is written PROVISIONALLY here, alongside XY: probeTool() overwrites it with the plate
+    // thickness a few blocks below, so it never survives into the cut. Its only job is to give
+    // G_Probe_G38Target ("G38 Target") the meaning its title claims -- with Z0 at the tool's
+    // current height, "G38 Target -10" is a 10 mm travel limit. Written the old way (XY only) the
+    // target was an absolute Z evaluated against whatever Z0 a PREVIOUS run persisted into this
+    // register, which the post cannot read back: on GRBL the offset survives in EEPROM while an
+    // un-homed machine's Z resets at power-on, so the same "-10" could be a 45 mm descent at probe
+    // feed, or point upward so the probe never contacts and the controller alarms. No setting of
+    // G38 Target could be made reliable while its reference point was unknowable at post time.
+    //
+    // Sound on these two modes ONLY, because the operator has just put the tool at the origin
+    // themselves (pre-jog, or the M0 jog prompt above), so the target is measured from a height
+    // they chose. Deliberately NOT applied where the probe starts from a retracted clearance --
+    // "Use Active WCS X0 Y0, Probe Z0", the added-part probes, the spoilboard base establish:
+    // there the same provisional zero would make the target too TIGHT and turn a working probe
+    // into a "did not contact" alarm. See docs/HReview.md HR-1.
+    writeComment(eComment.Info, "   Provisional Z0 at the current height so the probe target is a relative limit");
+    writeWcsOrigin(currentWorkOffset, 0, 0, 0);
     // The origin is the current position; partProbe() steps to the probe point (origin + XY
-    // offset) only when an offset is set, so a zero-offset job stays byte-identical.
+    // offset) only when an offset is set.
     partProbe(true);
   } else {
+    // Tool 0 / jet tool: no probe, so there is no G38 target to bound and nothing for a
+    // provisional Z0 to fix -- writing one would silently turn this mode into
+    // "Set X0 Y0 Z0 to Current Pos". XY only, unchanged.
+    writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
+    // ... which leaves Z0 at whatever this register already holds -- on GRBL, persisted in EEPROM by
+    // some earlier job -- while the jet section that follows emits ABSOLUTE Z words for its cutting
+    // / focus height against that unknown zero. The README documents that a jet tool never probes,
+    // but "no probe" is not the same statement as "Z0 is never set", and this is the DEFAULT mode a
+    // laser user lands on rather than the "Set X0 Y0 Z0 to Current Pos" the README tells them to
+    // pick. Suppressing the origin write is still right (see above); being quiet about it is not.
+    // See review.md CR-5, and PReview.md J1 / HR-1 (D) for the jet workstream this belongs to.
+    writeComment(eComment.Important, " >>> WARNING: a jet tool / tool 0 cannot probe, so Z0 was NOT"
+      + " established -- this job runs against whatever Z origin is already stored. Use"
+      + " \"Set X0 Y0 Z0 to Current Pos\" for a jet/laser job.");
     writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool)");
   }
 }
@@ -2595,7 +2962,13 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
     if (xyz.length == 0) {
     var lesserFeed = (xyLimit < zLimit) ? xyLimit : zLimit;
 
-    return lesserFeed;
+    // Never RAISE a feed. The contract (README, "Feeds and feedrate scaling") is that scaling only
+    // ever reduces, and with no direction vector the slowest axis limit is a sound ASSUMPTION about
+    // what this move might be -- but only as a cap on what was asked for. Returned outright it
+    // turned an F100 move into F180 on the defaults. The move is zero length so nothing is cut by
+    // it, but F is modal and resetAll() at the previous section end forces the words out, so the
+    // wrong feed does reach the file.
+    return (lesserFeed < feed) ? lesserFeed : feed;
   }
 
   // Force the speed of each axis to be within limits
@@ -2625,6 +2998,47 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
   else {
     return feed;
   }
+}
+
+// The arc counterpart of limitFeedByXYZComponents(): cap a G2/G3 feed so no axis exceeds its
+// configured maximum. Only reduces, never raises, and returns the feed untouched when Scale
+// Feedrate is off.
+//
+// Deliberately NOT the projection limitFeedByXYZComponents() uses. That function projects the
+// straight line from the current position to the destination, which for an arc is the CHORD -- and
+// on an arc the instantaneous axis velocity is tangential, reaching the full toolpath feed wherever
+// the tangent lines up with an axis. A 90-degree arc's chord runs at 45 degrees, so a chord
+// projection would report about 0.707 * feed on each axis and pass an arc that hits the full feed on
+// X at its own quadrant point: it under-protects by up to 1/cos(45deg). The real constraint on a
+// planar arc is just the limit of the axes it sweeps.
+//
+// Consequence worth knowing: this is CONSERVATIVE for a short arc that never reaches a quadrant
+// point (a 10-degree arc around 45 degrees peaks near 0.75 * feed on each axis, so capping at the
+// axis limit reduces it more than strictly necessary). That is the right side to err on for a
+// machine that cannot hold the feed, and it keeps the rule predictable -- an arc is never faster
+// than the axis limit, full stop. It also means a fillet can post slower than the straight moves
+// either side of it, which is correct rather than a defect: a diagonal G1 is allowed to exceed the
+// per-axis limit precisely because neither axis individually does.
+function limitArcFeed(feed) {
+  if (!getProperty(properties.D_Feeds_ScaleFeedrate)) {
+    return feed;
+  }
+
+  var xyLimit = propertyMmToUnit(getProperty(properties.E_Feeds_MaxCutSpeedXY));
+  var zLimit = propertyMmToUnit(getProperty(properties.F_Feeds_MaxCutSpeedZ));
+
+  // An XY arc sweeps X and Y only. A ZX / YZ arc (GRBL only -- Marlin/RepRap linearize those, and
+  // the linearized moves go through limitFeedByXYZComponents() instead) sweeps one linear axis and
+  // Z, so it must satisfy the slower of the two.
+  var limit = (getCircularPlane() == PLANE_XY) ? xyLimit : ((xyLimit < zLimit) ? xyLimit : zLimit);
+
+  // Same final cap the linear path applies to its resolved feed.
+  var xyzLimit = propertyMmToUnit(getProperty(properties.G_Feeds_MaxCutSpeedXYZ));
+  if (limit > xyzLimit) {
+    limit = xyzLimit;
+  }
+
+  return (feed > limit) ? limit : feed;
 }
 
 // Linear movements
@@ -2663,7 +3077,27 @@ function loadFile(_file) {
     if (txt.length > 0) {
       writeComment(eComment.Info, " --- Start custom gcode " + folder + _file);
       write(txt);
+      // loadText() returns the file verbatim and write() appends no line break, so an
+      // include file with no trailing newline leaves the output stream mid-line and the
+      // NEXT thing written merges onto the include's last block. A stop file ending "M5"
+      // then yields "M5M400" -- one invalid block, silently. The two Info comments here
+      // normally absorb it, which is exactly why it is dangerous: at Comment Level
+      // Important or Off they are suppressed and nothing stands between the include and
+      // the next block. Guarded here rather than at the four call sites because every
+      // include branch -- Start, Stop, and both Tool Change files -- shares this function.
+      var lastChar = txt.charAt(txt.length - 1);
+      if (lastChar != "\n" && lastChar != "\r") {
+        writeln("");
+      }
       writeComment(eComment.Info, " --- End custom gcode " + folder + _file);
+    } else {
+      // An include file that EXISTS but is empty used to emit nothing at all -- not even the
+      // Start/End markers above -- so the operator got no indication their file contributed
+      // nothing. A missing file is loud (the error() below aborts the post); an empty one was
+      // silent. It matters most on the Start include: naming a file there skips Start()
+      // entirely, so an empty one leaves G90/G21/G94/G17 unwritten and the job runs in
+      // whatever modal state the controller was left in. See docs/HReview.md HR-22.
+      writeComment(eComment.Info, " --- Custom gcode file is empty, nothing included " + folder + _file);
     }
   } else {
     writeComment(eComment.Important, " Can't open file " + folder + _file);
@@ -2706,13 +3140,56 @@ function Start() {
 
 var spindleEnabled = false;
 
+// Manual path only: the state the operator was last ASKED for. The speed is held as the formatted
+// string that reached the file, because two speeds that format identically are the same speed to the
+// operator -- prompting them to change a dial to the number it already reads is worse than saying
+// nothing. Same reasoning isSafeToRapid() uses when it rounds positions to output precision before
+// comparing them. Direction is tracked beside it so a reversal at an unchanged speed is not mistaken
+// for "nothing happened".
+var lastPromptedSpeed = "";
+var lastPromptedClockwise = true;
+
 function spindleOn(_spindleSpeed, _clockwise) {
   if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
+    var rpm = speedFormat.format(_spindleSpeed);
+
     // For manual any positive input speed assumed as enabled. so it's just a flag
     if (!spindleEnabled) {
       writeComment(eComment.Important, " >>> Spindle Speed: Manual");
-      askUser("Turn ON " + speedFormat.format(_spindleSpeed) + "RPM", "Spindle", false);
+      // Direction is named here ONLY when counterclockwise. Clockwise is the universal default for
+      // every tool this post's machines hold, so naming it would add a word to the start prompt of
+      // every job ever posted and tell the operator nothing. Counterclockwise is always exceptional
+      // and always worth saying.
+      askUser("Turn ON " + rpm + " RPM" + (_clockwise ? "" : " counterclockwise"), "Spindle", false);
     }
+
+    // Both halves of the state are compared, because setSpindeSpeed() reaches us for either.
+    //
+    // SPEED: a second operation asking for a different speed used to be dropped here --
+    // setSpindeSpeed() had detected the change and updated currentSpindleSpeed, so the post believed
+    // it had happened while nothing in the file mentioned it. On a hand-set router that is the gap
+    // between the operator's dial and the speed Fusion computed the feeds against. HReview HR-12,
+    // witnessed by Link.gcode (12000 then 10000, one prompt) against Speed Change.gcode (the same job
+    // on the automatic branch, M3 S12000 then M3 S10000).
+    //
+    // DIRECTION: a tapping reversal changes direction at an unchanged speed, twice per hole -- seven
+    // times in Drill_Tap.gcode -- and was silent for the same reason. The tap was driven back out of
+    // the hole still turning forward, with nothing in the file to say otherwise. Prompting cannot make
+    // a hand-switched router reverse, but it stops the machine and tells the operator what the job
+    // requires, which is strictly better than stripping the thread quietly. Whether tapping should be
+    // refused outright under manual control is still open: PReview HR-20.
+    else if (rpm != lastPromptedSpeed || _clockwise != lastPromptedClockwise) {
+      writeComment(eComment.Important, " >>> Spindle Speed: Manual change");
+      // Direction IS always named here, even when only the speed moved. A change prompt asks the
+      // operator to alter the machine, so it must state the whole target state rather than a delta
+      // they have to remember: "Set spindle to 1200 RPM" arriving after a reversal would leave which
+      // way ambiguous, and that ambiguity is the hazard this branch exists to remove.
+      askUser("Set spindle to " + rpm + " RPM " + (_clockwise ? "clockwise" : "counterclockwise"),
+        "Spindle", false);
+    }
+
+    lastPromptedSpeed = rpm;
+    lastPromptedClockwise = _clockwise;
   } else {
     writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed));
     writeBlock(mFormat.format(_clockwise ? 3 : 4), sOutput.format(_spindleSpeed));
@@ -2722,19 +3199,23 @@ function spindleOn(_spindleSpeed, _clockwise) {
 }
 
 function spindleOff() {
-  // Is Grbl?
-  if (fw == eFirmware.GRBL) {
-    writeBlock(mFormat.format(5));
-  }
-
-  //Default
-  else {
-    if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
-      writeBlock(mFormat.format(300), sFormat.format(300), pFormat.format(3000));
-      askUser("Turn OFF spindle", "Spindle", false);
-    } else {
-      writeBlock(mFormat.format(5));
+  // Manual control describes the MACHINE -- a hand-switched router -- not the g-code dialect, so
+  // the branch is on the property first and the firmware only inside it. It used to be the other
+  // way round: GRBL emitted a bare M5 whatever the property said, which does nothing to a router
+  // switched by hand. The result was an asymmetry on the DEFAULT hobbyist configuration (GRBL +
+  // Manual Spindle On/Off on): the file asked the operator to switch the router ON, then ended
+  // without ever asking them to switch it off -- and worse, every tool change paused for them to
+  // reach into the machine with the same silence. Marlin/RepRap already prompted correctly, so this
+  // brings GRBL into line with them and with spindleOn(). See docs/HReview.md HR-3.
+  if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
+    // No M5 on this path, mirroring spindleOn(), which emits no M3 under manual control: the post
+    // does not command a spindle the operator owns, it asks them.
+    if (fw != eFirmware.GRBL) {
+      writeBlock(mFormat.format(300), sFormat.format(300), pFormat.format(3000));   // beep -- no M300 on GRBL
     }
+    askUser("Turn OFF spindle", "Spindle", false);
+  } else {
+    writeBlock(mFormat.format(5));
   }
 
   spindleEnabled = false;
@@ -2744,8 +3225,15 @@ function spindleOff() {
 // (tool comments, operation names) embedded in a G-code message or comment can't break
 // line syntax, comment syntax, or quoted parameters. Runs of collapsed characters become a
 // single space; leading/trailing whitespace is preserved so callers keep their own indentation.
+//
+// The second pass squeezes the blanks the first pass creates. A stripped character standing next
+// to a space it did not consume -- "synchronization (rigid tapping) is" -- leaves a space of its
+// own beside the original, so the text arrived in the file with visible double gaps. Only interior
+// runs are squeezed (both neighbours must be non-blank), which is what keeps the leading and
+// trailing whitespace the contract above promises callers.
 function sanitizeMessageText(text, unsafeChars) {
-  return String(text).replace(new RegExp("[\\r\\n" + unsafeChars + "]+", "g"), " ");
+  var sanitized = String(text).replace(new RegExp("[\\r\\n" + unsafeChars + "]+", "g"), " ");
+  return sanitized.replace(/(\S) {2,}(?=\S)/g, "$1 ");
 }
 
 function display_text(txt) {
@@ -2765,6 +3253,16 @@ function circular(clockwise, cx, cy, cz, x, y, z, feed) {
     linearize(tolerance);
     return;
   }
+
+  // Scale the arc's feed to the axis limits, as linearMovements() does for a G1. Arcs previously
+  // bypassed Scale Feedrate entirely: with Use Arcs on by default and the README telling hobbyists
+  // to enable scaling, a job with a tool feed above Max XY Cut Speed had every straight cut scaled
+  // down and every fillet emitted at the raw feed -- defeating the feature on exactly the curved
+  // geometry a slow machine struggles with, and invisibly unless you watched F across a G1 -> G2
+  // boundary. Applied here rather than in onCircular() so it only touches arcs the post actually
+  // emits: the linearize() paths above and in the plane switches below re-enter through onLinear(),
+  // which limits them the ordinary way. See docs/HReview.md HR-5.
+  feed = limitArcFeed(feed);
 
   var start = getCurrentPosition();
 
@@ -2823,9 +3321,19 @@ function askUser(text, title, allowJog) {
 }
 
 function toolChange() {
-  // If tool changes are not to be include in the NC file then exit
-  if (!getProperty(properties.A_ToolChange_Enabled))
+  // If tool changes are not to be included in the NC file then SAY SO and exit. Returning silently
+  // meant a job whose sections do not all use the same tool posted a file that cut every one of
+  // them with whichever tool happened to be in the spindle, at the other tools' feeds and speeds,
+  // with nothing at the boundary marking it -- the only trace was the header's Tools Table listing
+  // two tools, which the operator had to notice and interpret. Off is the DEFAULT, so this is the
+  // configuration reached by accident (a second tool added in CAM, group 07 left alone) rather than
+  // on purpose, which is exactly why it has to be loud. validateJob() carries the post-time half of
+  // the same warning. See docs/review.md CR-3.
+  if (!getProperty(properties.A_ToolChange_Enabled)) {
+    writeComment(eComment.Important, " >>> WARNING: change to T" + tool.number + " " + tool.comment
+      + " suppressed -- \"Tool Changes are Included\" is off; the previous tool stays in the spindle");
     return;
+  }
 
   writeComment(eComment.Important, " Tool Change Start");
 
@@ -2914,7 +3422,7 @@ function probeTool(targetWcs, retractZ) {
   if (probePauseBefore) writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
   writeComment(eComment.Info, "   Do Probing");
   writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(getProperty(properties.J_Probe_Thickness))));
-  writeComment(eComment.Info, "   Retract the tool to " + retractZ);
+  writeComment(eComment.Info, "   Retract the tool to " + xyzFormat.format(retractZ));
   if (probePauseAfter) writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
 
   if (probePauseBefore) askUser("Attach ZProbe", "Probe", false);
@@ -2938,6 +3446,13 @@ function probeTool(targetWcs, retractZ) {
 
   writeWcsOrigin(targetWcs, undefined, undefined, propertyMmToUnit(getProperty(properties.J_Probe_Thickness)));
 
+  // LOAD-BEARING, not housekeeping. The G38.2 block above writes its F and Z through the RAW
+  // formats (fFormat / zFormat), deliberately: routing them through fOutput / zOutput would let the
+  // modal suppress the probe's own words. The consequence is that after that block the tracked
+  // values disagree with the controller's modals -- the controller's feed is now the probe speed,
+  // 30 mm/min by default. Without this reset, and with "Enforce Feedrate" off, the next move whose
+  // feed happened to match the stale tracked value would be emitted with no F word at all and would
+  // run at probe speed. Do not move it below rapidMovementsZ() or fold it into a caller.
   resetAll();
   // move up tool to safe height again after probing
   rapidMovementsZ(retractZ);
