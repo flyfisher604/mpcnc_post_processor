@@ -247,7 +247,7 @@ the last column says only whether the fix's rows are all in.
 | **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + `8054b6e` | **Every Marlin/RRF job's tail.** GRBL untouched | all in |
 | **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | all in |
 | **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | all in |
-| **HR-12** | Manual spindle prompts on a speed **or** direction change | `f3f23a2` | Manual-spindle jobs with >1 speed or a reversal; clockwise start prompts byte-identical | (A)–(A4) owed |
+| **HR-12** | Manual spindle prompts on a speed **or** direction change | `dd8e11d` | Manual-spindle jobs with >1 speed or a reversal; clockwise start prompts byte-identical | (A)–(A4) owed |
 | **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | `924d1f6` | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | (C) owed with the tap |
 
 Open with no code change: **HR-16** (recorded, no fix proposed), **HR-18** (`loadFile()` newline — has
