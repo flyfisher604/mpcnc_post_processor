@@ -2,16 +2,20 @@
 
 The review of the post from the hobbyist's chair, and the verification record for what it changed.
 **Reviewed:** the whole post against the README's documented hobbyist use cases, every Fusion entry
-point, and every property branch a hobbyist can reach. **Findings:** 22 (`HR-1`…`HR-22`); thirteen fixed
+point, and every property branch a hobbyist can reach. **Findings:** 26 (`HR-1`…`HR-26`); thirteen fixed
 on branch `v4.0-hreview-fixes`; six reclassified as professional and moved to `docs/PReview.md`.
 
 **Thirteen fixes have landed and every one is verified** — HR-1, HR-2, HR-3, HR-4, HR-5, HR-6, HR-11,
 HR-12, HR-14, HR-15, HR-17, **HR-18** (`loadFile()` repairs a missing line terminator) and **HR-22 (A)**
 (an empty include file announces itself), the last two landed 2026-08-01. Ten rest on posted files
 throughout; **four rows across HR-6, HR-12 and HR-18 are closed by `read`** because the artifact a post
-would need does not exist — each carries a named residual in §4.2. What remains carries no fix:
-**HR-16**, **HR-19**, **HR-21** and **HR-22 (B)** — recorded, cosmetic or awaiting a behaviour decision —
-plus **HW-6 (B)**, the posted half of the release regression sweep — its static half found nothing.
+would need does not exist — each carries a named residual in §4.2. **`HW-6 (B)`, the posted regression
+sweep, is also `read`**, so the release sweep rests on no posted file.
+
+**What remains carries no fix, and one of it is a confirmed defect: `HR-23`** — a Start/Stop include
+*replaces* the preamble/footer, discarding HR-11's stepper-timeout restore and HR-3's manual-spindle-off
+prompt. **That is the one item that should block a release or be a documented known issue in it.** Also
+open, all latent or cosmetic: **HR-16**, **HR-19**, **HR-21**, **HR-22 (B)**, **HR-24**, **HR-25**.
 
 **Every test and its state is in [§0 Test register](#0-test-register--every-test-and-its-state)** —
 one table, 76 rows, the only place a pass or fail is recorded, and **complete: every `H`/`HR`/`HW` id
@@ -43,10 +47,20 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**79 tests — ✅ 63 PASS · ❌ 0 FAIL · ⬜ 1 UNRUN · ➖ 15 n/a or moved to `PReview.md`.**
+**83 tests — ✅ 64 PASS · ❌ 1 FAIL · ⬜ 0 UNRUN · ➖ 18 n/a or moved to `PReview.md`.**
 
-> **The one ⬜ is `HW-6 (B)`, the posted half of the release regression sweep** — its static half is
-> closed (§6), and the six posts it wants are listed there. Every other
+> **⚠ The first ❌ in this register: `HR-23`.** A Start or Stop include file **replaces** the preamble or
+> footer rather than adding to it, so naming a stop file silently discards **HR-11**'s `M84 S60` stepper-
+> timeout restore, **HR-3**'s manual-spindle-off prompt, and the program end (`M30`/`M2`). Both are
+> machine-safety items and both are landed fixes. Witnessed by a file already on disk — `H11d - Marlin.gcode`
+> against `H11a.gcode` — and **not** a regression: it has always behaved this way. HR-11 (D) asserts the
+> bypass happens and is correct; it never asked whether the bypass should extend that far. **A fix is a
+> behaviour decision on a shipped property, so none has been taken** — §4.3 has three candidates and a
+> recommendation. This is the one item that should block a release, or be a documented known issue in it.
+
+> **No ⬜ rows remain.** `HW-6 (B)` was closed by inspection on direction (§6) — worth knowing that
+> **the release sweep therefore rests on no posted file**; the reasoning is a corollary of HW-6 (A) rather
+> than independent evidence, and §6 says what that costs and which single post would fix it. Every other
 > hobbyist row is settled. **Four were closed by `read` on 2026-08-01** — HR-6 (B), HR-12 (A4) and
 > HR-18 (A)(B) — each because the artifact a posted row would need does not exist (a rotated Setup, a
 > counterclockwise tool, an include file saved without its terminator) while the code path is short
@@ -146,6 +160,7 @@ A ⬜ row's Method column names what it is waiting for.
 | **HR-19** | `M291` doubled space, and `()` vs `( )` — cosmetic, no fix | — | no test proposed | ➖ |
 | **HR-20** | A fuller tapping implementation | — | → `PReview.md`; the manual path now prompts (HR-12), the automatic path always emitted `M4` | ➖ |
 | **HR-21** | `E_Include_ProbeFile` is declared but never read — dead property | — | found while fixing HR-18; dialog now declares it, wiring not chosen | ➖ |
+| **HR-26** | Base-clearance retract has no jet guard though the base *establish* does | — | → `PReview.md` §3.4 — jet + multi-WCS + base | ➖ |
 | **HR-22 (A)** | An empty include file announces itself instead of contributing nothing in silence | harness | node — emitted at `Info`, suppressed above it | ✅ |
 | **HR-22 (B)** | An empty **Start** include leaves `G90`/`G21`/`G94`/`G17` unwritten | — | recorded, behaviour unfixed — see §4.3 | ➖ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
@@ -155,14 +170,20 @@ A ⬜ row's Method column names what it is waiting for.
 | **HW-4** | `Probe Pause = Before` — attach only | posted | `HW4 - GRBL.gcode`, the middle rung of the ladder | ✅ |
 | **HW-5** | The HP-1 baseline in one file (**HP-1 amended** — §1) | posted | `HW5 - GRBL.gcode` + `H15a - GRBL.gcode` | ✅ |
 | **HW-6 (A)** | Static sweep: regression surface bounded, structure intact, harnesses green | harness + read | node — 68 props, 3 harnesses; `git diff dd8e11d..HEAD` | ✅ |
-| **HW-6 (B)** | Posted sweep: the reference set re-posted on the current build | — | 6 posts, matrix in §6 | ⬜ |
+| **HW-6 (B)** | Posted sweep: the reference set would re-post unchanged | read | posts 1–4 never reach `loadFile()`; 5–6 are (U)'s guard | ✅ |
+| **HR-23** | A Start/Stop include replaces the whole preamble/footer, discarding HR-3's and HR-11's fixes | posted | `H11d - Marlin.gcode` vs `H11a.gcode` — **defect confirmed, no fix chosen** | ❌ |
+| **HR-24** | `writeWCS(section)` consults the global `tool` — HR-15's shape, last instance | read | latent (only ever called with `currentSection`); fix in the next sweep | ➖ |
+| **HR-25** | `wcsGcode(0)` / `wcsName(0)` silently yield `G53` | read | latent (no caller passes 0); fix in the next sweep | ➖ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 1 ⬜ row is waiting on.** **HW-6 (B)** is the *posted* half of the pre-release regression
-sweep and goes last by definition — six posts, matrix in [§6](#6-hobbyist-work-owed-before-a-public-release--the-hw-rows).
-Its static half, **HW-6 (A)**, is closed and found nothing: the entire regression surface since the
-reference set was posted is `loadFile()` plus one dialog-only property title, and exactly one saved file
-reaches `loadFile()`. Ranked in [§3](#3-status).
+**Nothing is unrun.** What is *owed* is no longer verification but two decisions and a sweep:
+**HR-23** (the ❌ above — a behaviour decision on include files, and the one release blocker),
+**HR-22 (B)** (empty Start include leaves no preamble), and a tidy-up sweep carrying **HR-19**, **HR-21**,
+**HR-24** and **HR-25**. Ranked in [§3](#3-status).
+
+**Two closures rest on reading rather than posting, and both are release-relevant.** `HW-6 (B)` — the
+posted regression sweep — and `HR-18 (A)(B)`. §6 names the single post that would settle all three, using
+an artifact already on disk.
 
 > **One ✅ still owes a file.** **HW-2 (B)** is closed on quoted evidence only — its `.gcode` was
 > overwritten (§8). Re-post Link's CAM at `Manual Spindle On/Off` = **false** as
@@ -429,18 +450,47 @@ regression surface since the reference set was posted is `loadFile()` plus one d
 **exactly one saved file reaches `loadFile()`** — so every other reference would re-post byte-identical
 modulo the timestamp. That is established by construction, not by diffing thirty files.
 
-Remaining, and it is a short list:
+**Session 8 — the full code inspection — ran on 2026-08-01**, by direction, with no posting. It closed
+`HW-6 (B)` (§6) and read the whole post against the functionality `plan.md` and this file prescribe. What
+it found:
 
-1. **`HW-6 (B)` — six posts**, the matrix is in §6. Post 1 (GRBL defaults) is the one to run if only one
-   is run; posts 5 and 6 also upgrade HR-18 (A)(B) from `read` to `posted`, and their artifact already
-   exists.
-2. **One evidence restoration, no new CAM** — re-post Link at `Manual Spindle On/Off` = false as
-   `HR12-auto - GRBL.gcode`, restoring HW-2 (B)'s overwritten file. Folds into the same sitting.
-3. **Upgrade the other two `read` rows** — HR-6 (B) and HR-12 (A4) — if a rotated Setup or a
-   counterclockwise tool is ever built. Not blocking, but **HR-6 (B)'s residual is the one that could
+| | Finding |
+|---|---|
+| ❌ | **HR-23** — a Start/Stop include *replaces* the preamble/footer, discarding HR-11's `M84 S60` and HR-3's manual-spindle-off prompt. Witnessed by files already on disk. **The one release blocker.** |
+| ➖ | **HR-24** — `writeWCS(section)` consults the global `tool`; HR-15's shape, last instance. Latent |
+| ➖ | **HR-25** — `wcsGcode(0)` → `G53`, against the standing "Never `G53`". Latent |
+| → | **HR-26** — the base-clearance retract has no jet guard though the base *establish* does, so a jet multi-WCS job can move absolutely in an unestablished base frame. `PReview.md` §3.4 |
+
+**One candidate finding was withdrawn on checking**, and it is worth recording so it is not re-raised:
+`toolChange()`'s re-probe is guarded only by `tool.number != 0`, with no `isJetTool()` test — but
+`onCommand(COMMAND_TOOL_MEASURE)` wraps `probeTool()` in `if (!tool.isJetTool())`, so **every probe path
+in the post is jet-guarded**; the guard simply lives one layer down. The inconsistency is in *where* the
+checks sit, not in whether they hold.
+
+**What inspection confirmed as matching spec** (read against `plan.md`, not assumed): `writeMachineHoming()`
+(GRBL one `$H` for both XY and XYZ, Marlin/RRF independent `G28 X`/`Y` then `Z`, single prompt before any
+motion); `limitArcFeed()` (XY plane → XY limit, ZX/YZ → slower of the two, then the XYZ cap — matching
+`HW5 - GRBL.gcode`'s `F900`/`F180`); `writeWcsOnStart()`'s six modes with HR-1's provisional `Z0` on exactly
+the two just-positioned ones; `writeBaseEstablish()`'s R1 restore and its no-XY-move precondition;
+`probeTool()` writing Z only into the target register; `validateJob()`'s guard order and its early Marlin
+return; `writeWcsOrigin()`'s per-axis `undefined` handling; and the whole property structure (§6, HW-6 (A)
+item 4).
+
+Remaining — **no verification, but two decisions and a sweep**:
+
+1. **Decide HR-23.** §4.3 has three candidates; the recommendation is (a), move the machine-state items
+   outside the include branch. It is a behaviour change on a shipped property, which is why it is a
+   decision and not a repair.
+2. **Decide HR-22 (B)** — the named-but-empty Start include. Same family.
+3. **A tidy-up sweep** carrying **HR-19**, **HR-21**, **HR-24** and **HR-25** — all one-liners, none
+   changing behaviour today.
+4. **Evidence, not verification:** six rows are `read` rather than `posted`, `HW-6 (B)` among them.
+   **One post settles three** — `Stop File.gcode` as the Stop include on the Marlin job at Comment Level
+   `Important` (HR-18 (A), HW-6 (B), and the `H11d` re-baseline). Also owed: `HR12-auto - GRBL.gcode`.
+   HR-6 (B) and HR-12 (A4) need artifacts that do not exist; **HR-6 (B)'s residual is the one that could
    still hide a real defect** (§4.1).
-4. **Re-baseline the nine pre-HR-17 files** (§6, HW-6 (A) item 6) if a uniformly current-build evidence
-   set is wanted for release. No assertion among them is invalidated — this is tidiness, not risk.
+5. **Re-baseline the nine pre-HR-17 files** (§6, HW-6 (A) item 6) if a uniformly current-build evidence
+   set is wanted. No assertion among them is invalidated — tidiness, not risk.
 
 *No longer here: the HR-18 decision, taken 2026-08-01 — `loadFile()` always checks and repairs.*
 
@@ -1396,6 +1446,66 @@ where this same line of code actually bites.
 
 *(HR-18 is no longer open — the decision was taken and the guard landed on 2026-08-01; see §4.2.)*
 
+**HR-23 — a Start or Stop include replaces the whole preamble/footer, silently discarding the fixes that
+live in it.** *(Medium; found 2026-08-01 by the full code inspection, and **witnessed by a file already on
+disk**.)* `onClose()` puts the entire footer inside `if (B_Include_StopFile == "")`. Name a stop file and
+**all of it** is skipped — not augmented, replaced. The same shape applies to `A_Include_StartFile`, which
+skips `Start()` (`G90`/`G21`/`G94`/`G17`).
+
+`H11d - Marlin.gcode` against `H11a.gcode` — the same Marlin job, one property apart — is the finding:
+
+| | `H11a.gcode` (no include) | `H11d - Marlin.gcode` (stop include) |
+|---|---|---|
+| coolant off | `; COMMAND_COOLANT_OFF` | *— absent —* |
+| `At End Go to 0,0` | `G0 X0 Y0 F2500` | *— absent —* |
+| manual spindle off | `M0 Turn OFF spindle` | *— absent —* |
+| **stepper timeout** | **`M84 S60`** | *— absent —* |
+| program end | `M2` on RRF / `M30` on GRBL | *— absent —* |
+
+**Two landed fixes are undone by one property.** **HR-11** exists because a Marlin/RRF job left every
+stepper energised indefinitely — `Start()`'s `M84 S0` disables the idle timeout for the whole job and
+nothing restored it. With a stop include, nothing restores it *again*: `M84 S60` is inside the skipped
+block, so the defect returns in full, and an operator's stop file has no way to know it must add the line.
+**HR-3** exists because GRBL + `Manual Spindle On/Off` never asked the operator to switch the router off;
+a stop include drops that prompt too, leaving a hand-switched spindle running past the end of the program.
+On GRBL it also drops `M30`, so the program has no end code at all — only the `%` delimiter, which is
+written outside the branch.
+
+> **HR-11 (D) is not this row.** It asserts *that* the bypass happens (`✅`, on this same file) and it is
+> correct. What it never asked is whether the bypass should extend to the safety items. Those two
+> questions were conflated, which is how a documented behaviour and an undone fix ended up as one green
+> row.
+
+**No fix chosen — it is a design decision, and the honest options differ.** *(a)* Move the machine-state
+items — `M84 S60`, the manual-spindle-off prompt, the program end — **outside** the include branch, so an
+include augments the footer rather than replacing it. Cleanest, but it changes what a stop file *means*
+for anyone relying on total replacement. *(b)* Keep replacement and **warn at post time** when a stop
+include is set and either `Manual Spindle On/Off` is on or the firmware is Marlin/RRF. *(c)* Document it
+and leave it. **(a) is the CNC-correct answer** — a hand-switched spindle left running and a gantry with
+no holding torque are machine-safety items, not formatting — but it is a behaviour change on a property
+that has shipped, so it wants a decision rather than a quiet repair. **Reachable by a hobbyist:** group 08
+is outside HP-1…HP-5's defaults, but the README offers include files and nothing warns.
+
+**HR-24 — `writeWCS(section)` takes a section and then consults the global `tool`.** *(Low, latent; the
+last instance of HR-15's shape.)* Line 1555: `var canProbe = (tool.number != 0 && !tool.isJetTool());`
+inside a function whose other reads all go through the `section` parameter
+(`section.getWorkOffset()`). **This is exactly the trap HR-15 closed in `safeZforSection()`** — mix a
+passed-in section with a global and the function is correct only while the two agree. It is **not live**:
+both call sites pass `currentSection` (lines 1826, 2467), so the global `tool` is that section's tool by
+construction. `safeZforSection()` and `resolveSafeZHeight()` were both converted to `_section.` and are
+clean; this one was missed. **Fix is one line** — `section.getTool()` — but it is behaviour-neutral today,
+so it belongs in the next tidy-up sweep with HR-19, not in a commit of its own.
+
+**HR-25 — `wcsGcode(0)` returns `53`, i.e. `G53`.** *(Low, latent.)* `wcsGcode()` guards its upper bound
+(`return undefined` for out-of-range, RepRap-only slots checked) but not its lower: `if (workOffset <= 6)
+return 53 + workOffset` yields **`G53` — machine coordinates — for `0`**, and `wcsName(0)` likewise
+returns the string `"G53"`. The post carries a standing **"Never `G53`"** decision (see `plan.md`), so the
+one value that should be impossible is the one the function emits silently. **Not reachable today:**
+`writeWCS()` aliases `0`→`1` before calling it, and the base-clearance transit is only entered when
+`base != 0`. But both callers are *upstream* guards on a helper documented as "shared", and a future third
+caller inherits no protection. **Fix:** return `undefined` for `workOffset < 1` and let the existing
+caller-side error reporting handle it.
+
 **HR-22 — an include file that exists but is empty contributes nothing, silently — and on the Start
 branch that means no preamble at all.** *(Medium; found 2026-08-01 while inspecting HR-18's call sites.)*
 `loadFile()` guards its whole body on `txt.length > 0`, so a zero-byte file skipped the include **and**
@@ -1711,7 +1821,38 @@ a speed change or reversal (none of these), and HR-18/HR-22 reach only include j
 "not invalidated" is not "current-build", and HW-6 asks for the latter. HR-1 (C) is fine either way — it
 is a *diff* between `HR1c` and `H7c-a`, both pre-HR-17, so the pair is internally consistent.
 
-### HW-6 (B) ⬜ — the posted sweep
+### HW-6 (B) ✅ — closed by inspection 2026-08-01, and what that costs
+
+**Directed to close by code review, no posts.** The reasoning is sound and short, but say plainly what it
+is: **(B) was defined as the *posted* check, so closing it by reading makes it a corollary of (A) rather
+than independent evidence.** A release sweep now rests on no posted file. That is a recorded choice.
+
+**Posts 1–4 (GRBL / Marlin / RRF / GRBL-inch, all defaults) cannot differ.** They do not merely avoid the
+changed code — **they never call `loadFile()` at all.** All four call sites are guarded on the property
+string, and at defaults every one is `""`:
+
+| Call site | Guard | At defaults |
+|---|---|---|
+| `writeFirstSection()` | `if (A_Include_StartFile == "") Start(); else loadFile(...)` | `Start()` — no call |
+| `onClose()` | `if (B_Include_StopFile == "") {…} else loadFile(...)` | the normal footer — no call |
+| `toolChange()` ×2 | `if (C_/D_Include_ToolFile != "") loadFile(...)` | not entered |
+
+With `loadFile()` unreachable and the only other change dialog-only (§HW-6 (A) item 2), **no byte of posts
+1–4 can move.** That is stronger than a diff would have been: a diff shows two files agreed, this shows
+they could not have disagreed.
+
+**Posts 5–6 (the include path) are `loadFile()` itself**, which is what (U)'s fixture table covers —
+6 file endings × 3 comment levels, 4 merged blocks against `HEAD`, 0 after — and the call-site reading in
+HR-18 (A)/(B) supplies what follows each include. Both kernel behaviours are posted-evidenced
+(`write()` appends no break: `H11d`; `writeln()` emits one: `%` alone on every GRBL file's last line).
+
+> **What is still not established, and it is the same gap in both halves:** no file has been posted
+> *through* the fixed `loadFile()`. Every conclusion above is about code that has not run in Fusion since
+> it changed. The artifact is trivial and already on disk — `Stop File.gcode`, last byte `e` — so **post 5
+> alone would convert HR-18 (A), HW-6 (B) and the `H11d` re-baseline in one file.** Recommended before
+> release even though the row is closed.
+
+### The posted sweep, if it is ever run
 
 Six posts, covering all three firmwares, both units, and the one changed code path. Each expects
 **byte-identical output modulo the timestamp** unless stated:

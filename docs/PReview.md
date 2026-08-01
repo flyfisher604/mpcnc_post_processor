@@ -464,6 +464,25 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
 
 ### 3.4 Other outstanding professional checks
 
+- [ ] **HR-26 — the base-clearance retract has no tool-0 / jet guard, but the base *establish* does.**
+      *(Found 2026-08-01 by the full code inspection; `READ`, no fix.)* `writeBaseEstablish()` probes only
+      `if (tool.number != 0 && !tool.isJetTool())` — so on a **jet/laser job the reserved base's Z0 is
+      never established**, and the function returns having emitted nothing but a Debug line.
+      `retractThroughBaseClearance()` carries **no such guard**: it fires whenever
+      `C_Spoilboard_SafeZAcrossWcs` is on, a base is reserved, and the WCS changes. It then transit-selects
+      the base and emits an **absolute `G0 Z<Inter Part Safe Z>` in a frame whose Z0 was never set** —
+      whatever a prior job left in that register, which on GRBL persists in EEPROM. `rapidMovementsZ()` has
+      no jet guard either, so the move is emitted. **This is the one place the "never move absolutely in an
+      unestablished frame" rule is broken**, and it is broken by a combination the rest of the file guards
+      everywhere else: every probe site (`onCommand(COMMAND_TOOL_MEASURE)`, `partProbe()`'s callers,
+      `writeBaseEstablish()`) checks `isJetTool()`. *Do:* a 2-part jet job, base reserved `G59`,
+      `Probe to Set Base` = `Pause, Probe Z, Pause`, `Retract Across Parts` on. *Get:* the base select and
+      `G0 Z<clearance>` at the WCS change, with **no** base `G38.2` anywhere above it. **Pass:** currently
+      fails by design — the row exists to force the decision. *Candidates:* skip the base-relative retract
+      when the base was not established (needs a module-level `baseEstablished` flag, since the property
+      alone cannot tell you the probe ran); or refuse the combination in `validateJob()`; or fall back to
+      the outgoing frame's probe Safe Z as the no-base branch already does. **Belongs to §5's workstream**,
+      but it is a Guard-B-shaped hole rather than a jet feature gap.
 - [ ] **HR-18 (T) — the tool-change half of the `loadFile()` newline guard.** `loadFile()` now repairs a
       missing line terminator after an included file (`HReview.md` HR-18, landed 2026-08-01, harness-
       verified over six file endings × three comment levels). The guard lives in the **one shared

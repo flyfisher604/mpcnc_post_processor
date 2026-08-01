@@ -46,14 +46,15 @@ ladder's top rung), `H4base - GRBL Inch.gcode` (inch), `H15a - GRBL.gcode` (mapp
 `HW5 - GRBL.gcode` (the only GRBL file with `Scale Feedrate` on), `Link.gcode` (two-op, one-tool, HP-5
 shape). **`H2.gcode` is retired as a baseline** — it predates HR-17; keep it only as HR-17's "before".
 
-**What is left — one row and one restoration, both in a single Fusion sitting, plus two optional
-tidy-ups. No decisions outstanding.**
+**What is left — no verification, but one release blocker and two decisions.** The 2026-08-01 full code
+inspection closed the last ⬜ row and opened four findings; **`HReview.md` §0 now carries its first ❌**.
 
-| | Rows | Note |
+| | Item | Note |
 |---|---|---|
-| Last, by definition | `HW-6 (B)` | the **posted** half of the release sweep — six posts, matrix in `HReview.md` §6. The static half `HW-6 (A)` is ✅: the whole regression surface since the reference set was posted is `loadFile()` plus one dialog-only title, and exactly one saved file (`H11d - Marlin.gcode`) reaches `loadFile()`, so everything else would re-post byte-identical modulo the timestamp |
-| Restore lost evidence | — | re-post Link's CAM at `Manual Spindle On/Off` = **false** as `HR12-auto - GRBL.gcode`; HW-2 (B) is ✅ on a quotation only. Folds into the same sitting. See the overwrite note below |
-| Optional upgrades | `HR-6 (B)`, `HR-12 (A4)` | closed by `read`, not `posted`. Post if a rotated Setup or a counterclockwise tool is ever built. **HR-6 (B)'s residual is the one that could still hide a real defect.** *(HR-18 (A)(B) are also `read`, but `HW-6 (B)`'s posts 5 and 6 upgrade them — their artifact already exists, `Stop File.gcode` has no trailing newline)* |
+| **Release blocker** | **`HR-23`** ❌ | A Start/Stop **include replaces** the preamble/footer instead of adding to it, so naming a stop file silently discards **HR-11**'s `M84 S60` and **HR-3**'s manual-spindle-off prompt — two landed *machine-safety* fixes — plus `M30`/`M2`. Witnessed by `H11d - Marlin.gcode` vs `H11a.gcode`. Not a regression; it has always done this. **Fix is a behaviour decision on a shipped property** — three candidates in `HReview.md` §4.3, recommendation is to move the machine-state items outside the include branch. Ship a fix or a known-issue note, not silence |
+| A decision | `HR-22 (B)` | a named-but-**empty** Start include leaves `G90`/`G21`/`G94`/`G17` unwritten. Same family as HR-23 |
+| Next tidy-up sweep | `HR-19`, `HR-21`, `HR-24`, `HR-25` | cosmetic or latent, all one-liners. **HR-24** is HR-15's shape surviving in `writeWCS()`; **HR-25** is `wcsGcode(0)` → `G53`, against the standing "Never `G53`" |
+| Evidence, not verification | — | **six rows are `read`, not `posted`, including `HW-6 (B)` — so the release sweep rests on no posted file.** One post fixes three of them: `Stop File.gcode` (last byte `e`, no terminator) as the Stop include on the Marlin job, at Comment Level `Important` → settles HR-18 (A), HW-6 (B), and re-baselines `H11d`. Also owed: `HR12-auto - GRBL.gcode` to restore HW-2 (B)'s overwritten file |
 | Tidiness, not risk | — | nine reference files predate HR-17 and back 13 rows; no assertion is invalidated, but they are not current-build. `HReview.md` §6, HW-6 (A) item 6 |
 
 **Session 6 (2026-08-01) also amended HP-1.** Its group-03 clause required the verifier to enable a
@@ -495,10 +496,12 @@ safety comment. *(Verified all three branches — `PReview.md` §4.)*
   offset**'s added-part halves (`PReview.md` P2/P3) and the multi-part rows generally. **Remaining to
   build:** tool-change ordering + base-relative park (below).
 - **Phase 5 — not started** (likely no-op).
-- **Hobbyist review — complete for this branch's scope, bar the release sweep.** 22 findings; **thirteen
-  landed and all thirteen verified**, five moved to `PReview.md`, HR-16 / HR-19 / HR-21 / HR-22 (B) with no
-  fix. Four rows are `read` rather than `posted` (residuals named in `HReview.md` §4.2); `HW-6 (B)` is the
-  only ⬜ left. Status in `HReview.md` §0.
+- **Hobbyist review — verification complete; one confirmed defect open.** 26 findings; **thirteen landed
+  and all thirteen verified**, six moved to `PReview.md`, **no ⬜ rows left**. Open with no fix:
+  **HR-23** (❌ — an include file replaces the preamble/footer, discarding HR-3's and HR-11's fixes; the
+  one release blocker), HR-16, HR-19, HR-21, HR-22 (B), HR-24 and HR-25. Six rows are `read` rather than
+  `posted`, HW-6 (B) among them — so **the release regression sweep rests on no posted file**. Residuals
+  and the single post that would settle three of them are in `HReview.md` §4.2 / §6. Status in §0.
 - **Professional review — not started.** `PReview.md` is a parking lot until it runs.
 
 ## Completed reviews (archived)
