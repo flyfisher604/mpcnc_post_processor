@@ -40,7 +40,7 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**63 tests — ✅ 48 PASS · ❌ 0 FAIL · ⬜ 8 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
+**63 tests — ✅ 49 PASS · ❌ 0 FAIL · ⬜ 7 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
 
 **Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
 post and is the only method that proves what a hobbyist receives. `harness` is a node run against
@@ -88,7 +88,7 @@ for.
 | **HR-11 (C)** | GRBL tail untouched | posted | `H11c - GRBL.gcode` | ✅ |
 | **HR-11 (D)** | Stop file bypasses the whole stop block | posted | `H11d - Marlin.gcode` | ✅ |
 | **HR-11 (S)** | Whether Marlin / RRF honour `M2` | source | `gcode.cpp`, `GCodes2.cpp`, RRF changelog | ✅ |
-| **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | — | **no fix yet** — observed in `Drill_Tap.gcode` | ⬜ |
+| **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | — | **no fix yet** — defect witnessed by `Link.gcode` vs `Speed Change.gcode` | ⬜ |
 | **HR-14 (A)** | `Flood and Mist` matches a channel | posted | `Drill Flood Mist.gcode` | ✅ |
 | **HR-14 (B)** | Warning names the mode the operator saw | posted | `Drill Flood Mist (No).gcode` | ✅ |
 | **HR-14 (C)** | Ordinary `Flood` unchanged | posted | `Drill Flood.gcode` | ✅ |
@@ -107,17 +107,17 @@ for.
 | **HR-20** | Tapping needs a spindle reversal the post never commands | — | → `PReview.md` (professional, by decision) | ➖ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
 | **HW-2 (A)** | HP-5 boundary: WCS suppression, rapid lifecycle, position tracking | posted | `Link.gcode` | ✅ |
-| **HW-2 (B)** | HP-5 boundary: a spindle-speed change between operations | — | needs the two-op CAM at `Manual Spindle On/Off` = **false** | ⬜ |
+| **HW-2 (B)** | HP-5 boundary: a spindle-speed change between operations | posted | `Speed Change.gcode` | ✅ |
 | **HW-3** | `Probe Pause = No` — neither prompt | — | cheap; folds into any GRBL session | ⬜ |
 | **HW-4** | `Probe Pause = Before` — attach only | — | cheap; folds into any GRBL session | ⬜ |
 | **HW-5** | The documented HP-1 baseline in one file | — | no file has ever had all of it at once | ⬜ |
 | **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 8 ⬜ rows are waiting on — three things, not eight.** **Four cheap posts on CAM that
-already exists** (HW-2 (B), HW-3, HW-4, HW-5); **three one-offs** (HR-6 (B) a rotated Setup, HR-18 (A)
-a stop file, HW-6 the final sweep); and **one fix that is not written yet** (HR-12 (A) — a finding, not
-a job). **No unrun row needs new CAM.** Ranked in [§3](#3-status).
+**What the 7 ⬜ rows are waiting on — three things, not seven.** **Three cheap posts on CAM that
+already exists** (HW-3, HW-4, HW-5); **three one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a stop
+file, HW-6 the final sweep); and **one fix that is not written yet** (HR-12 (A) — a finding, not a
+job). **No unrun row needs new CAM.** Ranked in [§3](#3-status).
 
 **The one honest gap inside a ✅.** HR-4 (C2) and HW-1 are the only rows carried by `harness` alone.
 They prove `isSafeToRapid()`'s logic is right; they do **not** prove a real post ever reaches it,
@@ -328,10 +328,8 @@ owing a post. Five files on the drill CAM, differing only in group 10 and the op
 
 Remaining, ranked by value — **none of it needs new CAM**:
 
-1. **Four cheap posts on CAM that already exists** — **HW-3** and **HW-4** (`Probe Pause` = `No`, then
-   `Before`) on the face-mill job, **HW-5** (the HP-1 baseline in one file) on the same, and **HW-2**
-   which may need no post at all: `Link.gcode` is already a two-operation, one-tool, one-WCS job and
-   only needs reading.
+1. **Three cheap posts on CAM that already exists** — **HW-3** and **HW-4** (`Probe Pause` = `No`, then
+   `Before`) on the face-mill job, and **HW-5** (the HP-1 baseline in one file) on the same.
 2. **Three one-offs, in no particular order** — **HR-6 (B)** a rotated Setup, **HR-18 (A)** a stop file
    with no trailing newline, and **HW-6** the regression sweep, which goes last by definition.
 3. **Two decisions, not posts** — **HR-12** (write the fix, then its Do (A) row verifies it) and
@@ -1035,16 +1033,32 @@ manual-only — and manual is the default the README tells a hobbyist to leave o
 before section 2. **Pass:** two prompts — plus a third check, two operations at the *same* RPM giving
 **one** prompt only, since `setSpindeSpeed()` short-circuits and the common case must not gain a stop.
 
+**Witnessed on a posted pair, 2026-07-31 — one tool, one WCS, no tool change.** The two files are the
+**same CAM one property apart**, and the diff is the finding:
+
+| | `Link.gcode` (manual, the default) | `Speed Change.gcode` (automatic) |
+|---|---|---|
+| section 1 | `M0 (MSG Turn ON 12000 RPM)` | `M3 S12000` |
+| section 2 | *— nothing —* | `M3 S10000` |
+| tail | `M0 (MSG Turn OFF spindle)` | `M5` |
+
+`diff` reports section 2's pair as a pure **addition** (`2315a2316,2317`): the manual file has no
+counterpart at all. **The operations genuinely differ, 12000 → 10000**, so a hobbyist running
+`Link.gcode` cuts the second adaptive operation at 12000 with feeds Fusion computed for 10000 — 20%
+over, silently, on a two-operation job with **one tool and no tool change**. That is HP-5 exactly.
+
 > **Why it came back.** HR-12 was one of the six findings swept into `PReview.md` when HP-5 was
 > redefined, on the reasoning that Fusion Personal has no tool changes. That was right for the other
-> five and **wrong for this one: the mechanism involves no tool change at all.** Two operations on one
-> tool at different RPMs is HP-5 exactly, and a hobbyist can build it on Personal. `Drill_Tap.gcode` is
-> the first posted evidence of it firing — the tap section emits `( COMMAND_START_SPINDLE)` and
-> `( COMMAND_SPINDLE_CLOCKWISE)` and **no prompt**, and the tap's own RPM appears nowhere in the file;
-> the only prompt is the drill's `M0 (MSG Turn ON 2220 RPM)`. It was found by reading and is now
-> observed. Leaving it in a file labelled *parking lot, professional, not started* would have kept a
-> hobbyist-reachable defect out of the pre-release set. **The direction half of the same weakness stays
-> professional** — `PReview.md` **HR-20**.
+> five and **wrong for this one: the mechanism involves no tool change at all.** `Drill_Tap.gcode` was
+> the first sighting, but it used two tools and someone could fairly have answered *"you turned tool
+> changes off"*. The `Link` / `Speed Change` pair removes that objection: one tool, no tool change, two
+> ordinary adaptive operations. Found by reading, now witnessed twice. Leaving it in a file labelled
+> *parking lot, professional, not started* would have kept a hobbyist-reachable defect out of the
+> pre-release set. **The direction half of the same weakness stays professional** — `PReview.md`
+> **HR-20**.
+>
+> **Severity is unchanged at Medium** — the cost is a burnt cutter or a poor finish, not a crash — but
+> its *reachability* is no longer an argument. Re-rate if that changes the release calculus.
 
 ---
 
@@ -1163,11 +1177,14 @@ different RPM means `spindleOn()`'s manual branch swallowed it, which is HR-12. 
 settle it either: the Tools Table records geometry only (`T1 D=9.525 CR=0.508 - ZMIN=-55.88`), and the
 second operation's RPM appears nowhere in the file.
 
-**Do (B).** The **same two-operation job** with `Manual Spindle On/Off` = **false**. The automatic
-branch emits `M3 S<speed>` unconditionally, so `setSpindeSpeed()`'s short-circuit becomes visible.
-**Get (B):** **one** `M3` if the operations share an RPM, **two** if they differ. **Pass:** either —
-the row is asking what the boundary does, not which answer it gives. As a bonus it settles whether
-`Link.gcode` is a genuine HR-12 witness or merely consistent with one.
+**(B) ✅ closed by `Speed Change.gcode` — the same job, `Manual Spindle On/Off` = false.** The
+automatic branch re-emits at the boundary: `( >>> Spindle Speed 12000)` → `M3 S12000` at section 1 and
+`( >>> Spindle Speed 10000)` → `M3 S10000` at section 2. **Two `M3`s, different speeds** —
+`setSpindeSpeed()` detects the change and the automatic path acts on it. HR-3 (B)'s "automatic branch
+untouched" now also holds across a section boundary, not just a single-section job.
+
+**And it settled the other question, badly.** The two operations *do* run at different RPMs, so
+`Link.gcode` is a **genuine HR-12 witness** rather than merely consistent with one. See §4.3.
 
 > **`Face1 (auto).gcode` (2026-07-31) does not serve (B)** — it is `Manual Spindle On/Off` = false on
 > the **single-section** face-mill job, and one section cannot show a change *between* sections. What

@@ -57,14 +57,17 @@ exactly** — and the spindle-reversal half is `PReview.md` **HR-20**, professio
 `Drill Flood Mist (No).gcode` are the decisive pair — one property apart, match against warning — and
 the run added first-ever Channel B coverage as a new row, HR-14 (D).
 
-**HW-2 (A) closed on 2026-07-31 by *reading* `Link.gcode`, no post at all** — WCS re-selection
-suppression, the `forceSectionToStartWithRapid` lifecycle and position tracking across a section
-boundary. Its (B) half, a spindle-speed change, **cannot be verified on the manual path**: correct and
-defective produce byte-identical output, which is HR-12's signature. One post of the same job at
-`Manual Spindle On/Off` = false settles it.
+**HW-2 closed on 2026-07-31.** Its (A) half — WCS re-selection suppression, the
+`forceSectionToStartWithRapid` lifecycle, position tracking across a section boundary — fell out of
+*reading* `Link.gcode`, no post at all. Its (B) half could not be verified on the manual path, where
+correct and defective emit byte-identical output; one post at `Manual Spindle On/Off` = false
+(`Speed Change.gcode`) closed it, and **incidentally turned HR-12 from a reading into a witnessed
+defect**: the two operations run at 12000 and 10000 RPM, and on the default manual path the second
+change is never announced. One tool, no tool change — HP-5 exactly.
 
 **Every landed fix is now closed with posted evidence, and no unrun row needs new CAM.**
-`HReview.md` §0 is the authoritative register: **63 rows — 48 pass, 0 fail, 8 unrun, 7 n/a.** What is
+`HReview.md` §0 is the authoritative register: **63 rows — 49 pass, 0 fail, 7 unrun, 7 n/a.** The
+largest single item left is **HR-12**, which needs the fix written, not a post. What is
 left is four cheap posts on existing CAM (`HW-2`…`HW-5`), three one-offs (`HR-6 (B)`, `HR-18 (A)`,
 `HW-6` the final sweep), and two decisions that need code rather than posting (`HR-12`, `HR-18`).
 Ranked in `HReview.md` §3.
