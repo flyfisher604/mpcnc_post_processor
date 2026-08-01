@@ -5,11 +5,12 @@ The review of the post from the hobbyist's chair, and the verification record fo
 point, and every property branch a hobbyist can reach. **Findings:** 19 (`HR-1`…`HR-19`); ten fixed
 on branch `v4.0-hreview-fixes`; six reclassified as professional and moved to `docs/PReview.md`.
 
-**Twelve fixes have landed; eleven are closed with posted evidence** — HR-1, HR-2, HR-3, HR-4, HR-5,
-HR-6, HR-11, HR-14, HR-15, HR-17, and **HR-12**, which owes only **(A4)**, the one row needing a tool
-that runs counterclockwise. **HR-18** landed on 2026-08-01 (`loadFile()` now repairs a missing line
-terminator) and is harness-verified but not yet posted. What remains carries no fix: **HR-16**,
-**HR-19** and **HR-21** (recorded — cosmetic, or the direction not yet chosen), plus the `HW` rows in §6.
+**Twelve fixes have landed and every one of them is verified** — HR-1, HR-2, HR-3, HR-4, HR-5, HR-6,
+HR-11, HR-12, HR-14, HR-15, HR-17 and **HR-18** (landed 2026-08-01: `loadFile()` now repairs a missing
+line terminator). Ten rest on posted files throughout; **four rows across HR-6, HR-12 and HR-18 are
+closed by `read`** because the artifact a post would need does not exist — each carries a named residual
+in §4.2. What remains carries no fix: **HR-16**, **HR-19** and **HR-21** (recorded — cosmetic, or the
+direction not yet chosen), plus **HW-6**, the release regression sweep.
 
 **Every test and its state is in [§0 Test register](#0-test-register--every-test-and-its-state)** —
 one table, 76 rows, the only place a pass or fail is recorded, and **complete: every `H`/`HR`/`HW` id
@@ -41,7 +42,15 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**76 tests — ✅ 57 PASS · ❌ 0 FAIL · ⬜ 5 UNRUN · ➖ 14 n/a or moved to `PReview.md`.**
+**76 tests — ✅ 61 PASS · ❌ 0 FAIL · ⬜ 1 UNRUN · ➖ 14 n/a or moved to `PReview.md`.**
+
+> **The one ⬜ is `HW-6`, the release regression sweep**, which goes last by definition. Every other
+> hobbyist row is settled. **Four were closed by `read` on 2026-08-01** — HR-6 (B), HR-12 (A4) and
+> HR-18 (A)(B) — each because the artifact a posted row would need does not exist (a rotated Setup, a
+> counterclockwise tool, an include file saved without its terminator) while the code path is short
+> enough to trace end to end. They are marked `read`, not `posted`, and the distinction is deliberate:
+> see the Method note below and the per-row limits in §4.2. **If any of those four artifacts ever
+> exists, post it** — a `read` close is a reasoned conclusion, not a file.
 
 > **The list is complete by construction: every `H`, `HR` and `HW` id has a row here, including the ones
 > that belong to another file.** A finding moved to `PReview.md` keeps a `➖` row naming where it went —
@@ -49,11 +58,21 @@ whose state lives in two places will rot in one of them.
 > doc split, so the table asserted completeness while omitting five deferred findings; restored
 > 2026-08-01. If you move a finding out, leave the pointer row behind.
 
-**Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
-post and is the only method that proves what a hobbyist receives. `harness` is a node run against
-functions extracted from the `.cps`, or a post from `Personal.cps` (§8) — it proves *logic*, not
-output. `source` is a reading of firmware source. A ⬜ row's Method column names what it is waiting
-for.
+**Method** is how the row was settled, and it is not decoration, because the methods are not equally
+strong. In descending order:
+
+- **`posted`** — a real file from the real post. The only method that proves what a hobbyist receives.
+- **`harness`** — a node run against functions brace-matched out of the `.cps`, or a post from
+  `Personal.cps` (§8). Proves *logic* against a stubbed kernel, not output.
+- **`source`** — a reading of firmware source (Marlin / RRF), for questions no post can answer.
+- **`read`** — a reading of the post's own control flow: every branch between a trigger and its output
+  named, with each kernel behaviour the conclusion leans on pointed at a file that already evidences it.
+  **Weaker than `posted` and it is not a substitute** — it cannot catch a kernel that behaves other than
+  documented on a path no file has walked. Used where the artifact a `posted` row needs does not exist
+  (a rotated Setup, a counterclockwise tool) or where the chain is short enough that reading is
+  conclusive. A `read` row that is later posted should keep the post as its evidence.
+
+A ⬜ row's Method column names what it is waiting for.
 
 | Test | What it proves | Method | Evidence / blocker | State |
 |---|---|---|---|---|
@@ -89,7 +108,7 @@ for.
 | **HR-5 (D)** | Non-XY (`G18`) arc limited by the slower axis | posted | `HR5a.gcode`, `H11c - GRBL.gcode` | ✅ |
 | **HR-5 (E)** | Marlin: linearized segments limited like any `G1` | posted | `H5d - Marlin.gcode` vs `H11a.gcode` | ✅ |
 | **HR-6 (A)** | Orientation guard is live, not failing open | posted | `H2 - Debug.gcode` | ✅ |
-| **HR-6 (B)** | An off-axis section is actually rejected | — | needs a rotated Setup; optional | ⬜ |
+| **HR-6 (B)** | An off-axis section is actually rejected | harness + read | node, 13 vectors; `H2 - Debug.gcode`; `*.failed` stubs | ✅ |
 | **HR-7** | `toolChange()` clobbers `forceSectionToStartWithRapid` | — | → `PReview.md` §2 — Tool Change branch | ➖ |
 | **HR-8** | Post-injected motion never updates Fusion's tracked position | — | → `PReview.md` §2 — Tool Change branch | ➖ |
 | **HR-9** | `Do First Change` + probe-after off zeroes Z on the wrong tool | — | → `PReview.md` §2 — Tool Change branch | ➖ |
@@ -102,7 +121,7 @@ for.
 | **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | posted | `Speed Change.gcode` vs `Link.gcode` | ✅ |
 | **HR-12 (A2)** | Two operations at the *same* RPM still give one prompt | posted | `Speed Change (No Change).gcode` | ✅ |
 | **HR-12 (A3)** | Every tapping reversal is announced — 8 prompts, alternating | posted | `Drill_Tap.gcode` (re-post, 2026-08-01) | ✅ |
-| **HR-12 (A4)** | A counterclockwise start names the direction | — | needs a CCW-first tool; post as `HR12d - GRBL.gcode` | ⬜ |
+| **HR-12 (A4)** | A counterclockwise start names the direction | read | 4-hop call chain, no branch drops it; `Drill_Tap.gcode` supports | ✅ |
 | **HR-12 (A5)** | A **clockwise** start prompt is unchanged — no direction word | posted | `Speed Change.gcode`, byte-identical to `Link.gcode` | ✅ |
 | **HR-13** | `onCommand` silently discards every command it does not name | — | → `PReview.md` §2 — has a complete diff | ➖ |
 | **HR-14 (A)** | `Flood and Mist` matches a channel | posted | `Drill Flood Mist.gcode` | ✅ |
@@ -118,8 +137,8 @@ for.
 | **HR-17 (C)** | Tapping warning single-spaced | posted | `Drill_Tap.gcode` | ✅ |
 | **HR-17 (D)** | The two inert tidy-ups changed nothing | posted | `H11c - GRBL.gcode` vs `H2.gcode` | ✅ |
 | **HR-17 (U)** | Sanitizer before/after over 4 input shapes | harness | node | ✅ |
-| **HR-18 (A)** | Stop-file include: `M5` and `M400` on separate lines | — | needs a stop file with no trailing newline | ⬜ |
-| **HR-18 (B)** | Start-file include: the same, at the other end of the file | — | same stop file, set as the Start include | ⬜ |
+| **HR-18 (A)** | Stop-file include: the next block is not merged (`%` on GRBL, `M400` on Marlin/RRF) | read | call site + (U); `write`/`writeln` kernel behaviour already posted | ✅ |
+| **HR-18 (B)** | Start-file include: `G10 L20 P1 X0 Y0 Z0` not merged onto the include | read | call site + (U); same kernel evidence | ✅ |
 | **HR-18 (T)** | Tool-change includes (`ToolFile1`/`ToolFile2`) | — | → `PReview.md` §3.4 — professional, reached only via a tool change | ➖ |
 | **HR-18 (U)** | The guard over 6 file endings × 3 comment levels, before and after | harness | node — 4 merged blocks → 0 | ✅ |
 | **HR-19** | `M291` doubled space, and `()` vs `( )` — cosmetic, no fix | — | no test proposed | ➖ |
@@ -134,10 +153,9 @@ for.
 | **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 5 ⬜ rows are waiting on.** **HR-12 (A4)** needs a counterclockwise-running tool — the only
-thing left to build. **HR-6 (B)** needs a rotated Setup and is optional. **HR-18 (A)** and **(B)** need
-one stop file with no trailing newline, posted twice — as the Stop include and as the Start include — at
-Comment Level `Important`. **HW-6**, the regression sweep, goes last by definition. Ranked in [§3](#3-status).
+**What the 1 ⬜ row is waiting on.** **HW-6** is the pre-release regression sweep and goes last by
+definition — re-run the sample jobs against a current-post reference and confirm no differences beyond
+the intended Beta-2 changes. Ranked in [§3](#3-status).
 
 > **One ✅ still owes a file.** **HW-2 (B)** is closed on quoted evidence only — its `.gcode` was
 > overwritten (§8). Re-post Link's CAM at `Manual Spindle On/Off` = **false** as
@@ -272,7 +290,7 @@ the last column says only whether the fix's rows are all in.
 | | Fix | Commit | Blast radius | Rows |
 |---|---|---|---|---|
 | **HR-5** | `Scale Feedrate` reaches G2/G3 arcs | `b95c954` | Only when scaling is on (defaults off) | all in |
-| **HR-6** | Rejects a 3-axis section oriented off machine Z | `684f28a` `e2b2424` | None if correct — blocks everything if wrong | (B) optional, owed |
+| **HR-6** | Rejects a 3-axis section oriented off machine Z | `684f28a` `e2b2424` | None if correct — blocks everything if wrong | all in |
 | **HR-1** | Provisional `Z0` bounds the `G38 Target` on the two just-positioned probe modes | `8d61790` | **Default path.** Breaks the old byte anchor | all in |
 | **HR-3** | Manual spindle prompts to switch OFF on GRBL too | `43d09aa` | **Every GRBL job's tail** | all in |
 | **HR-2** | `isProbeOperation()` defined locally so canned cycles can post at all | `9c87fb0` | Drilling path only | all in |
@@ -280,9 +298,9 @@ the last column says only whether the fix's rows are all in.
 | **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + `8054b6e` | **Every Marlin/RRF job's tail.** GRBL untouched | all in |
 | **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | all in |
 | **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | all in |
-| **HR-12** | Manual spindle prompts on a speed **or** direction change | `dd8e11d` | Manual-spindle jobs with >1 speed or a reversal; clockwise start prompts byte-identical | (A4) owed |
+| **HR-12** | Manual spindle prompts on a speed **or** direction change | `dd8e11d` | Manual-spindle jobs with >1 speed or a reversal; clockwise start prompts byte-identical | all in |
 | **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | `924d1f6` | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | all in |
-| **HR-18** | `loadFile()` repairs a missing line terminator after an include | *this commit* | **Include jobs only** (group 08, default `<empty>`); no-op on a file that already ends in a newline | (U) in; (A)(B) owed |
+| **HR-18** | `loadFile()` repairs a missing line terminator after an include | `5b0b94a` | **Include jobs only** (group 08, default `<empty>`); no-op on a file that already ends in a newline | all in |
 
 Open with no code change: **HR-16** (recorded, no fix proposed), **HR-19** (cosmetic, fold into the next
 sweep), **HR-21** (dead `E_Include_ProbeFile` property — direction not chosen). Moved to
@@ -387,17 +405,25 @@ owing a post. Five files on the drill CAM, differing only in group 10 and the op
 > HR-17 (C) (eight single-spaced tapping warnings) all still read true in the new file, exactly as
 > §4.2's blast-radius note predicted. Confirmed by inspection, not assumed.
 
-Remaining, ranked by value:
+**Session 7 — the inspection pass — ran on 2026-08-01** and closed the last four open rows without a
+post, because in each case the artifact a posted row needs does not exist: **HR-6 (B)** (a rotated
+Setup), **HR-12 (A4)** (a counterclockwise tool) and **HR-18 (A)(B)** (an include file saved without its
+terminator). Method `read`, and §0's Method note says what that is worth. Two by-products:
 
-1. **Verify HR-18 — two posts from one artifact** — **(A)** and **(B)**, one stop file with no trailing
-   newline used as the Stop include then the Start include, both at Comment Level **`Important`**. The
-   guard is harness-verified but has never been posted. `H11d - Marlin.gcode` needs re-baselining at the
-   same time (it gains one newline; its HR-11 (D) assertion does not move).
-2. **One row needs something built** — **HR-12 (A4)**, a counterclockwise-running tool.
-3. **One evidence restoration, no new CAM** — re-post Link at `Manual Spindle On/Off` = false as
+- **HR-6 (B) gained a 13-vector harness** over `isSectionOrientationSupported()` — every rejection
+  case, every fail-open case, nothing throws, and the `~0.006°` tolerance in the code comment is
+  confirmed to be the `|x| > 1e-4` test rather than the looser `z` test.
+- **Reading corrected HR-18 (A)'s expected token.** It demanded `M400`, which `flushMotions()` never
+  emits on GRBL — the default firmware. A tester following the old row would have found no `M400`,
+  no merge, and drawn the wrong conclusion.
+
+Remaining:
+
+1. **One evidence restoration, no new CAM** — re-post Link at `Manual Spindle On/Off` = false as
    `HR12-auto - GRBL.gcode`, restoring HW-2 (B)'s overwritten file.
-4. **One one-off** — **HR-6 (B)**, a rotated Setup. Optional.
-5. **HW-6**, the regression sweep. Last by definition.
+2. **HW-6**, the regression sweep. Last by definition.
+3. **Upgrade the four `read` rows to `posted`** if their artifacts are ever built. Not blocking, but each
+   carries a named residual in §4.2 — HR-6 (B)'s is the one that could still hide a real defect.
 
 *No longer here: the HR-18 decision, taken 2026-08-01 — `loadFile()` always checks and repairs.*
 
@@ -479,14 +505,42 @@ Making that trace **unconditional rather than rejection-only** is what made one 
 `-> UNREADABLE, check skipped, section allowed`; **seeing UNREADABLE on a normal Setup would mean the
 guard is a no-op.**
 
-> **(B) — remaining, benign and optional:** the rejection half. Duplicate the hobby Setup with its Z along
-> the model's X and post — expect the error naming the fix, and a **truncated `.gcode` on disk**
-> (this guard fires in `onSection()`, after the header is written, unlike Guards A/B/C which write
-> nothing at all). Nothing here evidences what Fusion reports for a *re-oriented* Setup — it could in
-> principle re-express the frame rather than tilt `forward` — so a failure means a missed rejection,
-> not a blocked job. **Follow-up worth doing separately:** promote both geometry guards into
-> `validateJob()` so neither can leave a partial file. Not done here because it changes the
-> long-standing multi-axis guard's behaviour too, which deserves its own decision.
+**(B) ✅ closed 2026-08-01 by harness + reading — the rejection half, with one residual named below.**
+`isSectionOrientationSupported()` brace-matched out of the `.cps` and replayed over **13 forward
+vectors** against stubbed `writeComment`/`error`. Every case behaves as specified and **nothing throws**,
+which is the guard's one hard requirement:
+
+| Vector | Result |
+|---|---|
+| `X0 Y0 Z1` exactly; float noise at `1e-9`; tilt 0.001° | **allowed** — the near-miss posts and cuts correctly |
+| tilt 0.01°, 1°, 45°, 90° (Setup on a side face), 180° (underside), Y-only 2.87° | **REJECTED**, `error()` called, returns `false` |
+| `workPlane` undefined; `forward` missing; string components; `NaN` components | **allowed** — all four fail open, as designed |
+
+The measured boundary sits between 0.001° and 0.01°, confirming the code's **~0.006°** claim (it is the
+`|x| > 1e-4` test that binds — `sin⁻¹(1e-4)` = 0.0057° — not the looser `z < 1 - 1e-4`, which would not
+fire until 0.81°). The `NaN` row is worth keeping: `typeof NaN == "number"` so it passes the type gate,
+then every comparison against it is false, so it lands in the *allowed* branch with `tilt NaN deg` in the
+trace — fail-open, and self-diagnosing, exactly as the code comment claims.
+
+**The two kernel links the conclusion leans on are already evidenced by posted files**, which is what
+makes this closable without the rotated Setup: `forward` is populated with real numbers on a real section
+(**(A)**, `H2 - Debug.gcode`), and the kernel's `error()` genuinely aborts a post rather than warning —
+`H7d.gcode.failed` and `Setup1 Multi.gcode.failed` are both 51-byte
+`!Error: Failed to post data.` stubs from this project's own history.
+
+> **⚠ Residual, and it is not closed by any of the above: nothing evidences what Fusion puts in
+> `forward` for a *re-oriented* Setup.** Fusion could re-express the frame so that `forward` stays
+> `X0 Y0 Z1` even for a Setup built on a model face, in which case this guard is a **no-op on the very
+> case it exists to catch** and the harness above proves only that the arithmetic would have worked.
+> That is a CAM/kernel question and **no amount of code reading can settle it** — it needs the rotated
+> Setup. The row is closed because the *post's* half is proven and the artifact does not exist; the
+> failure mode if the residual bites is a **missed rejection** (a part cut in the wrong plane, silently),
+> not a blocked job. **Post a rotated Setup if one is ever built** and re-close this as `posted`.
+
+> **Follow-up worth doing separately:** promote both geometry guards into `validateJob()` so neither can
+> leave a truncated file — this one fires in `onSection()`, after the header is written, unlike Guards
+> A/B/C which write nothing at all. Not done here because it changes the long-standing multi-axis
+> guard's behaviour too, which deserves its own decision.
 
 ### 4.2 Landed — verification state per finding
 
@@ -1130,10 +1184,32 @@ of "is every reversal announced".
 *(This row previously demanded **zero** prompts here. That was correct for the speed-only fix and is
 exactly backwards now — see the box below.)*
 
-**Do (A4) — a counterclockwise start.** Any job whose **first** tool runs counterclockwise; post as
-`HR12d - GRBL.gcode`. **Get (A4):** `M0 (MSG Turn ON <n> RPM counterclockwise)`. **Pass:** the word is
-present. *This is the only remaining hobbyist row that needs anything built — a left-hand tap, or a
-tool defined to run anticlockwise. Its companion check is already closed as (A5).*
+**(A4) ✅ closed 2026-08-01 by reading the call chain — no branch between a CCW tool and the word.** The
+row needed a job whose *first* tool runs counterclockwise, and no such tool exists in the sample set.
+Four hops, each unconditional given the one before:
+
+1. `onCommand(COMMAND_START_SPINDLE)` re-dispatches on the tool itself —
+   `onCommand(tool.clockwise ? COMMAND_SPINDLE_CLOCKWISE : COMMAND_SPINDLE_COUNTERCLOCKWISE)`. A CCW tool
+   takes the second arm.
+2. `case COMMAND_SPINDLE_COUNTERCLOCKWISE` → `setSpindeSpeed(spindleSpeed, false)` for any non-jet tool.
+3. `setSpindeSpeed()` at job start has `currentSpindleSpeed == 0`, so `(0 != _spindleSpeed)` is true for
+   any real speed and it calls `spindleOn(_spindleSpeed, false)`. **The direction half of its condition
+   cannot suppress this** — the speed half already fired.
+4. `spindleEnabled` is `false` at job start (module-level initialiser, cleared only in `spindleOff()`), so
+   `spindleOn()` takes its **first** branch: `askUser("Turn ON " + rpm + " RPM" + (_clockwise ? "" :
+   " counterclockwise"), …)` → **`M0 (MSG Turn ON <n> RPM counterclockwise)`**.
+
+**Two things keep this from being a bare reading.** `Drill_Tap.gcode` proves the kernel really does emit
+`COMMAND_SPINDLE_COUNTERCLOCKWISE` and that `setSpindeSpeed(speed, false)` reaches `spindleOn()` and puts
+the literal word `counterclockwise` in a prompt — four times. And **(A5)** is the same expression's other
+arm, posted: every clockwise start reads `Turn ON <n> RPM` with no direction word, byte-identical across
+the fix. So both arms of the step-4 ternary are evidenced; what `Drill_Tap` exercised is the *change*
+prompt at line 3010, a different expression from step 4's, which is the only gap reading has to bridge.
+
+> **Residual:** this rests on Fusion setting `tool.clockwise = false` for a counterclockwise tool. That is
+> a CAM fact, not post behaviour, and the property is demonstrably readable at this exact call site (it is
+> what dispatches `COMMAND_SPINDLE_CLOCKWISE` correctly in every posted file). **Post a left-hand tap or
+> an anticlockwise-defined tool if one is ever built** and re-close as `posted`.
 
 > **Harness-verified before and after** (`node`, `spindleOn()` extracted by brace-matching so it is the
 > shipped code, not a hand-copy). Against `HEAD` the pre-fix function gives **one** prompt for (A) and
@@ -1244,15 +1320,46 @@ in miniature: **the same build that corrupts the file at `Important` looks clean
 only at the default comment level would have passed on the broken code. Terminated files stay
 byte-identical in both columns, confirming the no-op claim.
 
-**Do (A) — the stop-file end.** Set `B_Include_StopFile` to a file whose last line is `M5` with **no
-trailing newline**, post at **Comment Level `Important`** (the default `Info` hides it — see above).
-**Get:** `M5` and `M400` on separate lines. **Pass:** two blocks, not `M5M400`. *Discriminator: the
-absence of a merged block at `Important`; posting at `Info` proves nothing either way.*
+**(A) and (B) ✅ closed 2026-08-01 by reading the two call sites — and reading corrected (A)'s expected
+token, which was wrong.**
 
-**Do (B) — the start-file end.** The same file as `A_Include_StartFile`, same comment level. **Get:**
-the include's last block and whatever `Start()`'s successor writes on separate lines. **Pass:** as (A).
-*(B) is not redundant: it is the other end of the file, and the Start branch's successor is different
-code from `flushMotions()`.* **(T)**, the two tool-change includes, is professional — `PReview.md` §3.4.
+**(A) — the stop-file end. `M400` is the wrong discriminator on GRBL.** The row originally expected
+`M5` and `M400` on separate lines, taken from the `H11d - Marlin.gcode` witness. But `flushMotions()`
+**returns early on GRBL** — GRBL has no "wait for moves to finish" code, so `M400` is never emitted
+there. The next thing written after the stop include on GRBL is `writeln("%")`, the program delimiter.
+So the merge a GRBL job suffers is **`M5%`**, not `M5M400`, and a tester following the old row on the
+default firmware would have found neither token and concluded nothing was wrong. Per firmware:
+
+| Firmware | After the include | Pre-fix merge | Post-fix |
+|---|---|---|---|
+| GRBL | `writeln("%")` | `M5%` | `M5` ⏎ `%` |
+| Marlin / RRF | `flushMotions()` → `M400`, then `%` is *not* written | `M5M400` | `M5` ⏎ `M400` |
+
+**(B) — the start-file end, and it is the more serious of the two.** After `loadFile(A_Include_StartFile)`
+come `writeBaseEstablish()` and `writeWcsOnStart()`. On the hobbyist default (no base reserved) the first
+emits **only a `Debug` comment and returns**; the second's comments are `Info`/`Debug` — so at Comment
+Level `Important` every one of them is suppressed and the next thing actually written is the origin
+block, `G10 L20 P1 X0 Y0 Z0`. The pre-fix output is therefore **`M5G10 L20 P1 X0 Y0 Z0`**: one invalid
+block that **destroys the origin write on the default hobbyist path**, where (A) only corrupts the tail
+after the spindle is already off. (B) was filed as "the same thing at the other end"; it is worse.
+
+**Why reading is conclusive here.** The guard itself is **harness-proven** by (U) over six file endings ×
+three comment levels. What reading adds is the two call sites — that something real *is* written after
+each include on a default configuration, so the merge was reachable in both places. The two kernel
+behaviours the conclusion rests on are **already evidenced by posted files**, not assumed:
+
+- **`write()` appends no line break** — `H11d - Marlin.gcode`, where the `--- End custom gcode` comment
+  landed on the include's own last line. That file *is* the pre-fix witness.
+- **`writeln()` emits exactly one line break** — `writeln("%")` at the same call site puts `%` alone on
+  the last line of every GRBL file ever posted here (e.g. `HW3 - GRBL.gcode`, line 201).
+
+> **Residual:** no file has been posted *through the fixed guard*, so this rests on `loadText()`
+> returning the file's bytes as `H11d` showed it does. **Post one if an include file is ever set up** —
+> the artifact is trivial (any file saved without a trailing newline, at Comment Level `Important`) — and
+> re-close as `posted`. `H11d - Marlin.gcode` should be re-baselined then too: it gains one newline, and
+> its HR-11 (D) assertion does not move.
+
+**(T)**, the two tool-change includes, is professional — `PReview.md` §3.4.
 
 ---
 
@@ -1294,15 +1401,28 @@ warning, no error. That is worse than the property not existing, because the dia
 and the posted file gives no clue it was ignored — and the file *does* get validated for the four that
 work, so there is no "can't open file" error to hint at it either.
 
-**No fix chosen, because the two candidates differ in scope, not in quality.** Either *(a)* wire it into
-`probeTool()` the way the tool-change files are wired into `toolChange()` — the feature the title
-promises, and the reason it was presumably declared — or *(b)* delete the property. **Deleting resets no
-preset that anyone can be relying on**, since the property has never done anything, but it is a
-release-notes item under the §"What resets a saved preset" rule either way. **(a) is the professional
-call:** the probe include would fire on every probe, including the tool-change re-probe, so it belongs
-with the Tool Change branch's ordering work rather than ahead of it. Recorded here because it was found
-here; **no test row until the direction is chosen** — a row asserting the current silence would only
-have to be deleted.
+**Partly addressed 2026-08-01: the dialog now says so.** The property is **not** wired up — that is the
+Tool Change branch's work — but a field that advertises a feature and does nothing is worse than no field
+at all, so the title and tooltip were changed to declare it:
+
+| | Before | After |
+|---|---|---|
+| `title` | `Probe` | **`Tool Change Probe`** |
+| `description` | *File with custom Gcode for tool probe (in nc folder).* | **`NOT IMPLEMENTED YET.`** Reserved for a file of custom Gcode to run at the tool-change Z re-probe (in nc folder). *Anything entered here is currently ignored — no file is included and no warning is issued.* |
+
+A `NOT IMPLEMENTED YET` comment now sits above the declaration too, so the next reader of the `.cps` does
+not have to re-derive it from the absence of a `loadFile()` call. **The `title` and `description` are not
+the stored identifier — the key is — so this resets no saved preset** (see §"What resets a saved preset").
+The name gained "Tool Change" because that is the probe it was meant for and it puts the field beside the
+two `Tool Change Start`/`End` includes it belongs with.
+
+**The implementation is still unchosen, and the two candidates differ in scope, not quality.** Either
+*(a)* wire it into `probeTool()` the way the tool-change files are wired into `toolChange()` — the feature
+the title promises — or *(b)* delete the property. **Deleting would reset no preset anyone can be relying
+on**, since it has never done anything. **(a) is the professional call:** the include would fire at every
+probe, including the tool-change re-probe, so it belongs with the Tool Change branch's ordering work
+rather than ahead of it. **Still no test row** — a row asserting the current silence would only have to be
+deleted, and the tooltip now documents that silence where an operator will actually see it.
 
 ---
 
@@ -1489,9 +1609,11 @@ probe, comment syntax per firmware, arc and cycle handling, guard placement, and
 dispatch for all six First WCS / Part modes. What reading could not establish — HR-2's kernel
 dependency and HR-6's `workPlane` behaviour — **both have since settled by posting**
 (`Drill_Tap.gcode`, `H2 - Debug.gcode`). **To claim "high confidence that the post outputs correctly formatted,
-structurally sound g-code for a hobbyist from every F360 entry point"**, the **5 ⬜ rows** in
-[§0](#0-test-register--every-test-and-its-state) are what stand between here and that claim — two
-posting HR-18's guard, one needing a CCW tool, one a rotated Setup, and the final sweep. Ranked under §3.
+structurally sound g-code for a hobbyist from every F360 entry point"**, only **`HW-6`** — the release
+regression sweep — stands between here and that claim, plus the honesty that **four rows are `read`, not
+`posted`** (§0). The one whose residual could still hide a real defect is **HR-6 (B)**: nothing evidences
+what Fusion puts in `workPlane.forward` for a re-oriented Setup, so the orientation guard could be a
+no-op on exactly the case it exists to catch. Ranked under §3.
 
 ---
 

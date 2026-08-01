@@ -539,9 +539,15 @@ properties = {
     value      : "",
     scope      : "post"
   },
+  // NOT IMPLEMENTED. Declared but never read -- nothing in the post calls loadFile() with
+  // it, so a value entered here is silently ignored. Kept (rather than deleted) because the
+  // feature is wanted: the intent is to include this file at every probe, including the
+  // tool-change re-probe, which makes it part of the Tool Change branch's ordering work.
+  // The title and tooltip say so, since a dialog field that advertises a feature and does
+  // nothing is worse than no field at all. See HReview.md HR-21.
   E_Include_ProbeFile: {
-    title      : "Probe",
-    description: "File with custom Gcode for tool probe (in nc folder).",
+    title      : "Tool Change Probe",
+    description: "NOT IMPLEMENTED YET. Reserved for a file of custom Gcode to run at the tool-change Z re-probe (in nc folder). Anything entered here is currently ignored -- no file is included and no warning is issued.",
     group      : "08 - External Include Files",
     type       : "string",
     value      : "",
