@@ -40,7 +40,7 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**62 tests — ✅ 47 PASS · ❌ 0 FAIL · ⬜ 8 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
+**63 tests — ✅ 48 PASS · ❌ 0 FAIL · ⬜ 8 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
 
 **Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
 post and is the only method that proves what a hobbyist receives. `harness` is a node run against
@@ -67,7 +67,7 @@ for.
 | **HR-2 (B)** | Probing cycles still refused | — | licence cannot create one | ➖ |
 | **HR-2 (U)** | `isProbeOperation()` over 8 strategy/cycle inputs | harness | node | ✅ |
 | **HR-3 (A)** | GRBL prompts spindle OFF; no `M5`, no `M300` | posted | `H2.gcode` | ✅ |
-| **HR-3 (B)** | Automatic branch untouched | posted | `HR3b.gcode` | ✅ |
+| **HR-3 (B)** | Automatic branch untouched | posted | `HR3b.gcode`, re-baselined `Face1 (auto).gcode` | ✅ |
 | **HR-3 (C)** | Tool-change half | — | → `PReview.md` §3.4 | ➖ |
 | **HR-3 (D)** | Marlin/RRF unchanged; only GRBL moved | posted | six session-1 files | ✅ |
 | **HR-4 (A)** | Inch: bare-number probe Safe Z converts | posted | `H4a - GRBL Inch.gcode` | ✅ |
@@ -106,7 +106,8 @@ for.
 | **HR-19** | `M291` doubled space, and `()` vs `( )` — cosmetic, no fix | — | no test proposed | ➖ |
 | **HR-20** | Tapping needs a spindle reversal the post never commands | — | → `PReview.md` (professional, by decision) | ➖ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
-| **HW-2** | HP-5: two operations, one tool, one WCS | — | candidate: `Link.gcode`, unread | ⬜ |
+| **HW-2 (A)** | HP-5 boundary: WCS suppression, rapid lifecycle, position tracking | posted | `Link.gcode` | ✅ |
+| **HW-2 (B)** | HP-5 boundary: a spindle-speed change between operations | — | needs the two-op CAM at `Manual Spindle On/Off` = **false** | ⬜ |
 | **HW-3** | `Probe Pause = No` — neither prompt | — | cheap; folds into any GRBL session | ⬜ |
 | **HW-4** | `Probe Pause = Before` — attach only | — | cheap; folds into any GRBL session | ⬜ |
 | **HW-5** | The documented HP-1 baseline in one file | — | no file has ever had all of it at once | ⬜ |
@@ -114,8 +115,8 @@ for.
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
 **What the 8 ⬜ rows are waiting on — three things, not eight.** **Four cheap posts on CAM that
-already exists** (HW-2, HW-3, HW-4, HW-5); **three one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a
-stop file, HW-6 the final sweep); and **one fix that is not written yet** (HR-12 (A) — a finding, not
+already exists** (HW-2 (B), HW-3, HW-4, HW-5); **three one-offs** (HR-6 (B) a rotated Setup, HR-18 (A)
+a stop file, HW-6 the final sweep); and **one fix that is not written yet** (HR-12 (A) — a finding, not
 a job). **No unrun row needs new CAM.** Ranked in [§3](#3-status).
 
 **The one honest gap inside a ✅.** HR-4 (C2) and HW-1 are the only rows carried by `harness` alone.
@@ -1132,11 +1133,47 @@ re-checks: `grep -c '^G0'` under-counts badly (modal suppression), and refused *
 the XY travel feed, a `Personal.cps` artifact — see its banner.
 
 **HW-2 — two operations, one tool, one WCS, no base.** Every H row is a **single-section** job, so
-every section-boundary behaviour — the `forceSectionToStartWithRapid` lifecycle, position tracking
-across injected motion, spindle-speed changes, WCS re-selection suppression — is unverified for HP-5.
-The professional rows would cover some of it but change the WCS at the same boundary, confounding the
-variables. **`Link.gcode` may already be this row:** two adaptive operations, one tool, `G54` emitted
-once with no re-selection at the boundary, one spindle prompt. It needs *reading*, not posting.
+every section-boundary behaviour was unverified for HP-5. The professional rows would cover some of it
+but change the WCS at the same boundary, confounding the variables. `Link.gcode` — two adaptive
+operations, one tool `T1`, one WCS, no base, no tool change, GRBL/mm at factory defaults — supplied it
+without a new post.
+
+**(A) ✅ closed by reading `Link.gcode`, three behaviours.**
+
+- **WCS re-selection suppression.** `( WCS changed: none -> 1)` → `G54` at section 1;
+  `( WCS unchanged: 1, not re-selecting)` at section 2. **One `G54` in 19,339 lines**, and the
+  suppression names itself rather than leaving a silent absence.
+- **`forceSectionToStartWithRapid` lifecycle.** Section 2's first move is `Z15.24 F300` with **no `G0`
+  word**, which reads wrong until you check what precedes it: section 1 ends with Fusion's own
+  `G0 Z15.24 F300`, so `gMotionModal` carries G0 across the boundary and the arrival really is a rapid.
+  No `G1` is left as the modal state entering a new section. With the mapping group off the flag itself
+  is inert, so this is the baseline behaviour.
+- **Position tracking across the boundary.** `onSectionEnd()` → `resetAll()` resets
+  `xOutput`/`yOutput`/`zOutput`/`fOutput`, so section 2 re-emits `Z15.24` and full `X…Y…` instead of
+  relying on modal suppression — the section is self-describing even though the tool is already there.
+  *Weak form:* nothing is **injected** at this boundary (no WCS change, no base retract, no tool
+  change), so there is no post-generated motion for the tracking to lose. The strong version is
+  **HR-8**, professional, and needs exactly the injected motion this job lacks.
+
+**(B) ⬜ — and it cannot be verified in this configuration, which is HR-12's signature.** Section 1
+prompts `M0 (MSG Turn ON 12000 RPM)`; section 2 emits `( COMMAND_START_SPINDLE)` and
+`( COMMAND_SPINDLE_CLOCKWISE)` and no prompt. **That output is identical whether the behaviour is
+correct or defective** — same RPM means `setSpindeSpeed()` short-circuits and one prompt is right;
+different RPM means `spindleOn()`'s manual branch swallowed it, which is HR-12. The header cannot
+settle it either: the Tools Table records geometry only (`T1 D=9.525 CR=0.508 - ZMIN=-55.88`), and the
+second operation's RPM appears nowhere in the file.
+
+**Do (B).** The **same two-operation job** with `Manual Spindle On/Off` = **false**. The automatic
+branch emits `M3 S<speed>` unconditionally, so `setSpindeSpeed()`'s short-circuit becomes visible.
+**Get (B):** **one** `M3` if the operations share an RPM, **two** if they differ. **Pass:** either —
+the row is asking what the boundary does, not which answer it gives. As a bonus it settles whether
+`Link.gcode` is a genuine HR-12 witness or merely consistent with one.
+
+> **`Face1 (auto).gcode` (2026-07-31) does not serve (B)** — it is `Manual Spindle On/Off` = false on
+> the **single-section** face-mill job, and one section cannot show a change *between* sections. What
+> it does give: `( >>> Spindle Speed 7000)` → `M3 S7000` → `M5`, a current-build re-baseline of
+> **HR-3 (B)**, whose evidence `HR3b.gcode` predates the HR-17 sweep. Diffed against it, only the
+> timestamp and the group-03 heading differ.
 
 **HW-3 / HW-4 — `Probe Pause` = `No`, then `Before`.** Only the default `Before & After` is verified,
 on every H row. *Get:* `No` → the `G38.2` block with **neither** `Attach ZProbe` nor `Detach ZProbe`;
@@ -1226,6 +1263,14 @@ Recording the negative results, because "we looked" is part of the confidence cl
   that contrast is the evidence, not the "after" alone. Same lesson as the fail-open trace, applied to
   harnesses. *(Mechanics — extracting functions from the `.cps` and `eval`ing them against stubbed
   kernel globals — are in `plan.md` → Workflow notes.)*
+- **A defect that suppresses output makes its own containing behaviour unverifiable — switch to the
+  branch that emits.** HW-2 (B) asks what happens to the spindle speed at a section boundary, and on
+  the **manual** path the correct answer (same RPM, one prompt, `setSpindeSpeed()` short-circuits) and
+  the defective one (different RPM, prompt swallowed — HR-12) produce **byte-identical output**. No
+  amount of reading `Link.gcode` can separate them. The **automatic** branch emits `M3 S<speed>`
+  unconditionally, so one property change turns an unanswerable question into a countable one. When a
+  row will not resolve, check whether the thing you are testing is the same thing that would hide the
+  answer.
 - **When a code path cannot be reached, question the premise before blaming the CAM.** HW-1 cost three
   posted files to a diagnosis nobody had checked — "the toolpath is wrong" — when the call graph said
   the path was unreachable on this licence at all. `isSafeToRapid()` has **one** caller; two minutes in
