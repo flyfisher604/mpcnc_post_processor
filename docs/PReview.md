@@ -121,6 +121,26 @@ or `rapidMovementsXY()`, the kernel's model does not move. Three consumers read 
 Within a section the tracked position is accurate, which is why no single-section job has ever shown
 this. It is a boundary defect.
 
+**Re-derived independently and confirmed professional-only (2026-08-01, `docs/review.md`).** The full
+hobbyist code review reached this finding from scratch — `setCurrentPosition()` and
+`setCurrentPositionZ()` still appear **nowhere** in the file — and then established *why the hobbyist
+never sees it*, which is the part this entry was missing and which is what keeps it here rather than
+in hobbyist scope:
+
+> On a single-tool, single-WCS job the only post-injected motion before the first section's body is
+> the probe retract, and it leaves the tool **higher** than the kernel believes it is. `rapidMovements()`
+> chooses its order from `_z < getCurrentPosition().z`, so an under-reported current Z biases the
+> decision toward **Z-first** — retract before travel, the safe order. The error is therefore
+> self-correcting in the only direction that matters, and only on that path. It stops being
+> self-correcting the moment a post move takes the tool *down* without telling the kernel, which is
+> exactly the tool-change park in consumer 1 above.
+
+So the diagnosis stands unchanged and so does the recommended fix; what is now settled is that no
+hobbyist configuration can reach it, and that the narrow variant (a post-local `lastEmittedZ` feeding
+`rapidMovements()`'s ordering decision) would cover every reachable case. **Do not re-file this as a
+hobbyist finding** — `review.md`'s "Checked and found correct" section records the reasoning above so
+a future pass does not re-derive it a third time.
+
 **Recommended fix** — tell the kernel about the post's own moves: `setCurrentPosition(new Vector(_x,
 _y, cur.z))` after `rapidMovementsXY()`'s `writeBlock`, and `setCurrentPositionZ(_z)` after
 `rapidMovementsZ()`'s.
@@ -458,6 +478,17 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       nonzero Probe X/Y Offset. A field back at its default means a key changed and the move was done
       wrong. *(The header half is verified — §4. A posted file cannot distinguish "the preset
       survived" from "the values were re-entered", which is the whole point of this check.)*
+      > **`review.md` CR-14 (landed 2026-08-01) strengthens both rows.** The `properties` literal used
+      > to *declare* its groups in the order 01, 04, 02, 03, 07, 05, 06, 05, 06, 08…, with
+      > `D_Probe_OffsetX`/`E_Probe_OffsetY` declared after `J_Probe_Thickness` — so the dialog order
+      > the README promises rested entirely on Fusion sorting by `group:` string and by key. The
+      > literal is now declared in the order it is meant to display. **This is a pure move: no key,
+      > `group:` string, `id`, title, description or default was touched** (verified by matching
+      > sorted-line checksums against `HEAD`), so D3's "nothing reset" discriminator is unaffected and
+      > the 9/7/4/2/4/10/8/5/7/10/2 = 68 counts are unchanged. What it adds is that **D1 now
+      > distinguishes two things it previously could not**: if the dialog still shows the groups out
+      > of numeric order after this, Fusion is not sorting at all and the zero-padding convention in
+      > `plan.md` is wrong.
 - [ ] **D2 (remainder) — the property dump is suppressed at Comment Level `Important` and `Off`.**
       The dump's structure and the resolved Safe-Z lines are verified (§4); only the suppression half
       is unrun.
@@ -520,6 +551,14 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       `Prompt Before Home` on: **exactly one** pause before any homing motion, on every firmware and
       axis set. **Pass:** the axis commands match the table in `plan.md` → *Machine frame*, and the
       prompt appears once, not per axis.
+      > **Add a third post, and make it the first one you do — `review.md` CR-1 (landed 2026-08-01).**
+      > GRBL, `Home Before Start = XY`, **`Enable Line #s` = on**. `$H` used to go through
+      > `writeBlock()`, which prefixes an `N` word; GRBL only recognises `$` as a system command when
+      > `$` is the first character of the line, so `N10 $H` reached the g-code parser and errored on
+      > the first line of the preamble. It now uses `writeln()`. **Pass:** the line reads exactly `$H`
+      > with **no `N` prefix**, while every surrounding block still carries one. *Discriminator: the
+      > absence of the N word on that one line.* Repeat with `Include Whitespace` off (which produced
+      > `N10$H`). No configuration in the record has ever combined homing with line numbers.
 - [ ] **`Probe to Set Base = Probe Z` — the no-prompt base variant.** `None` (Info comment, no probe)
       and `Pause, Probe Z, Pause` (attach → probe → detach) are verified (§4); the middle option is
       not. *Do:* reserve `G59`, set `Probe to Set Base = Probe Z`. *Get:* the base `G38.2` and
@@ -544,6 +583,51 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       confirms the following sections' WCS is restored. (A same-WCS two-section job emitting no base
       round-trip is already spot-checked — §4.)
 
+### 3.5 Landed by the full code review, professional halves unverified
+
+Added 2026-08-01. `docs/review.md` is a hobbyist-scoped code review, but four of the changes it landed
+touch controls this file owns. Each needs the Do→Get row below before it counts as verified.
+
+- [ ] **CR-3 — a suppressed tool change now says so.** `toolChange()` used to return in silence when
+      `Tool Changes are Included` was off, so a multi-tool job posted a file that cut every operation
+      with whichever tool was in the spindle. It now writes an `Important` comment at the boundary,
+      and `validateJob()` raises a post-time `warning()` (via a new `countDistinctTools()`, counted
+      over **sections**, not `getToolTable()`). *Do:* two operations, two tools, group 07 **off**.
+      *Get:* Fusion shows the warning naming `"Tool Changes are Included"` by its exact dialog title,
+      the file still posts, and at the boundary —
+      `( >>> WARNING: change to T2 <comment> suppressed -- "Tool Changes are Included" is off; the previous tool stays in the spindle)`.
+      **Pass:** both halves present. *Discriminator: the comment survives at Comment Level
+      `Important`.* Second post with group 07 **on**: no warning, no comment, the tool-change block
+      unchanged from today. Third post, **one** tool, group 07 off: **no warning at all** — this is
+      the regression that matters, since every default hobbyist job takes that path.
+- [ ] **CR-4 — coolant `Use custom` now loads a file.** The four `... Custom` properties are
+      documented in their own tooltips and in the README's group-10 table as **files in the nc
+      folder**; `CoolantA()`/`CoolantB()` were writing the property value into the g-code stream as a
+      block. They now call `loadFile()` through a shared `writeCustomCoolantFile()`, and warn when the
+      mode is `Use custom` with the field left empty. *Do:* Channel A Mode = the tool's coolant, Turn
+      Channel A On/Off = `Use custom`, and a real `air_on.g` / `air_off.g` in the nc folder. *Get:*
+      the file's contents inline between `--- Start custom gcode` / `--- End custom gcode` markers,
+      **not** the literal filename. **Pass:** the filename appears nowhere as a block. Second post
+      with the field empty: the `no custom file is named` warning and nothing else — previously a
+      stray blank line. **This is a behaviour change for anyone who entered raw g-code in those
+      fields**; they now get a missing-file `error()` and no output at all, which is the loud failure
+      the old form lacked.
+- [ ] **CR-5 — a jet/tool-0 first part now warns that Z0 was never set.** Belongs to §5's workstream
+      and sharpens **J1** / **HR-1 (D)**. `writeWcsOnStart()`'s `canProbe == false` branch still
+      writes XY only — correct, since a provisional `Z0` would silently convert the mode into
+      `Set X0 Y0 Z0 to Current Pos` — but it no longer does so quietly. *Do:* a jet tool (then tool 0)
+      on the **default** `Set X0 Y0 to Current Pos, Probe Z0`. *Get:* `G10 L20 P1 X0 Y0` with **no
+      `Z` word**, immediately followed by
+      `( >>> WARNING: a jet tool / tool 0 cannot probe, so Z0 was NOT established ...)`.
+      **Pass:** the origin write is unchanged from HR-1 (D)'s expectation *and* the warning is
+      present at Comment Level `Important`.
+- [ ] **CR-13 — `resetPostState()`.** `onOpen()` reset only `currentWorkOffset` and `sequenceNumber`;
+      it now returns all eighteen mutable module globals to their declared values through one
+      function. Inert if Fusion gives every output file a fresh JavaScript context. *Do:* re-post any
+      verified reference job. **Pass: byte-for-byte identical output.** *This row is a pure
+      regression check — if anything at all differs, `resetPostState()` has the wrong initial value
+      for something.* Worth running against a job with **two setups posted to separate files** if
+      Fusion will do that in one invocation, which is the only case the change can affect.
 ---
 
 ## 4. Already verified — do not re-run
@@ -630,8 +714,13 @@ and those branches are essentially unexercised.
       should say so".
 
 Also on this list: **HR-16** (`onClose` traverses to `X0 Y0` before stopping the spindle, with no
-guaranteed safe Z) is recorded in `HReview.md` with no fix proposed, and its jet/laser half — a last
-operation that does not retract, so the traverse runs at cut height — is the same line of code.
+guaranteed safe Z). **Half of it landed on 2026-08-01** as `docs/review.md` CR-6: `onClose()` now
+emits `COMMAND_STOP_SPINDLE` **before** the return move, so the tool no longer crosses the work with a
+hand-switched router still turning. **The Z half is deliberately unfixed and is still owed here** —
+no retract precedes the `X0 Y0` move, the property promises "Z remains unchanged", and for milling
+the last operation's own end-of-toolpath retract covers it. **A jet/laser section that ends at cutting
+height is not covered**, and that is the same line of code: the traverse runs at cut height. Decide it
+with J5.
 
 ---
 
