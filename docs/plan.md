@@ -25,27 +25,33 @@ ignore it) and **`Personal.cps`** (a test harness — see below). **Nothing is h
 known-broken.**
 
 **Status lives in one place: `HReview.md` §0**, a 67-row register naming every hobbyist test, how it
-was settled, its evidence file and its state — currently **52 pass, 0 fail, 8 unrun, 7 n/a or moved**.
+was settled, its evidence file and its state — currently **56 pass, 0 fail, 4 unrun, 7 n/a or moved**.
 Nothing else in that file records a pass; if the two ever disagree the register is wrong and must be
 fixed. Read it first. The professional side is `PReview.md`, still a parking lot.
 
-**Eleven fixes have landed on this branch**, one commit each
-(`git log --oneline --grep='^HR-'`). Ten are closed with posted evidence; **HR-12** landed last and
-owes two of its five rows. Five posting sessions ran on 2026-07-31 — Marlin/RRF, inch, the G1→G0
-mapper, drill + tap, and coolant — and their file tables are in `HReview.md` §3. The reference files
-worth knowing: `H11c - GRBL.gcode` (GRBL/mm), `H4base - GRBL Inch.gcode` (inch), `H15a - GRBL.gcode`
-(mapping on), `Link.gcode` (two-op, one-tool, HP-5 shape). **`H2.gcode` is retired as a baseline** — it
-predates HR-17; keep it only as HR-17's "before".
+**Eleven fixes have landed on this branch**, one commit each (`git log --oneline --grep='^HR-'`), and
+**all eleven are now closed with posted evidence**; **HR-12** owes only `(A4)`. Six posting sessions
+have run — five on 2026-07-31 (Marlin/RRF, inch, the G1→G0 mapper, drill + tap, coolant) and
+**session 6 on 2026-08-01** (probe-pause ladder + the tap re-post) — with their file tables in
+`HReview.md` §3. The reference files worth knowing: `H11c - GRBL.gcode` (GRBL/mm, and the `Probe Pause`
+ladder's top rung), `H4base - GRBL Inch.gcode` (inch), `H15a - GRBL.gcode` (mapping on),
+`HW5 - GRBL.gcode` (the only GRBL file with `Scale Feedrate` on), `Link.gcode` (two-op, one-tool, HP-5
+shape). **`H2.gcode` is retired as a baseline** — it predates HR-17; keep it only as HR-17's "before".
 
-**What is left, and none of it needs new CAM except one tool.**
+**What is left — four rows, one restoration, one decision.**
 
 | | Rows | Note |
 |---|---|---|
-| Verify HR-12 | `HR-12 (A3)`, `(A4)` | (A3) is a re-post of the drill+tap CAM; (A4) needs a **counterclockwise-running tool**, the only thing left to build |
-| Restore lost evidence | — | re-post Link's CAM at `Manual Spindle On/Off` = **false** as `HR12-auto - GRBL.gcode`; see the overwrite note below |
-| Cheap posts | `HW-3`, `HW-4`, `HW-5` | `Probe Pause` = `No` then `Before`; the HP-1 baseline in one file |
-| One-offs | `HR-6 (B)`, `HR-18 (A)`, `HW-6` | a rotated Setup; a stop file with no trailing newline; the regression sweep, last by definition |
+| Needs something built | `HR-12 (A4)` | a **counterclockwise-running tool** — the only thing left to build |
+| Restore lost evidence | — | re-post Link's CAM at `Manual Spindle On/Off` = **false** as `HR12-auto - GRBL.gcode`; HW-2 (B) is ✅ on a quotation only. See the overwrite note below |
+| One-offs | `HR-6 (B)`, `HR-18 (A)` | a rotated Setup (optional); a stop file with no trailing newline (gated on the decision below) |
 | A decision | `HR-18` | whether to add the `loadFile()` newline guard at all |
+| Last, by definition | `HW-6` | the regression sweep |
+
+**Session 6 (2026-08-01) also amended HP-1.** Its group-03 clause required the verifier to enable a
+group that cannot execute on a paid Fusion licence (HW-1: `isSafeToRapid()` has one caller, `onLinear()`,
+and full Fusion emits real `G0`s). Group 03 is now part of the HP-1 *persona*, not of the config a
+verification post must carry — `HReview.md` §1 has the reasoning. Don't re-add it.
 
 **Three things a fresh session will otherwise get wrong.**
 
@@ -62,7 +68,10 @@ trap caught the first `Personal.cps` run.
 `Speed Change.gcode` held HW-2 (B)'s automatic-branch evidence and was overwritten by HR-12 (A) under
 the same name; the result survived only because it had been quoted verbatim in `HReview.md`. **Name a
 post for the row it serves** (`HR12a`), not for what the job does, and grep `HReview.md` for the
-filename before re-posting. The re-post that restores it is in the table above.
+filename before re-posting. The re-post that restores it is in the table above. *(It happened a second
+time on 2026-08-01 — `Drill_Tap.gcode` was re-posted over itself instead of to `HR12c`. **That one cost
+nothing**, because the re-post is a strict superset: HR-2 (A)(A2) and HR-17 (C) all still read true in
+the new file, checked rather than assumed. A near miss, not a loss.)*
 
 **`Personal.cps` — an uncommitted test harness, excluded via `.git/info/exclude`.** A copy of the post
 with `onRapid()` rerouted into `onLinear()`, which is what Fusion **Personal** does on its own. It
@@ -94,11 +103,11 @@ physical measurement are out of scope, so every row must stand on the posted fil
 
 **Next actions, in order.**
 
-1. **Finish the hobbyist verification — 8 rows, listed in the checkpoint table above and specified in
-   `HReview.md` §0/§3.** Five posting sessions are done and eleven fixes have landed; what remains is
-   two rows verifying HR-12, one re-post restoring overwritten evidence, three cheap posts on CAM that
-   already exists, and three one-offs. Only **HR-12 (A4)** needs anything built — a counterclockwise
-   tool. `HW-6`, the regression sweep, goes last by definition.
+1. **Finish the hobbyist verification — 4 rows, listed in the checkpoint table above and specified in
+   `HReview.md` §0/§3.** Six posting sessions are done and all eleven fixes are closed with posted
+   evidence; what remains is **HR-12 (A4)** (needs a counterclockwise tool — the only thing left to
+   build), one re-post restoring overwritten evidence, and two one-offs. `HW-6`, the regression sweep,
+   goes last by definition.
 2. **Decide HR-18** — `loadFile()` adds no newline after an included file, so with `Info` comments
    suppressed the next block merges onto the include's last line (`M5M400`). Deliberately unfixed: the
    one-line guard sits in the `loadFile()` every include branch shares, and none of those branches has
@@ -474,8 +483,8 @@ safety comment. *(Verified all three branches — `PReview.md` §4.)*
   build:** tool-change ordering + base-relative park (below).
 - **Phase 5 — not started** (likely no-op).
 - **Hobbyist review — code complete for this branch's scope.** 20 findings; **eleven landed**, five
-  moved to `PReview.md`, HR-16 and HR-19 recorded with no fix, HR-18 awaiting a decision. Ten of the
-  eleven are closed with posted evidence; HR-12 owes two rows. Status in `HReview.md` §0.
+  moved to `PReview.md`, HR-16 and HR-19 recorded with no fix, HR-18 awaiting a decision. **All eleven
+  are closed with posted evidence**; HR-12 owes only `(A4)`. Status in `HReview.md` §0.
 - **Professional review — not started.** `PReview.md` is a parking lot until it runs.
 
 ## Completed reviews (archived)

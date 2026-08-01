@@ -5,14 +5,14 @@ The review of the post from the hobbyist's chair, and the verification record fo
 point, and every property branch a hobbyist can reach. **Findings:** 19 (`HR-1`…`HR-19`); ten fixed
 on branch `v4.0-hreview-fixes`; six reclassified as professional and moved to `docs/PReview.md`.
 
-**Ten of the eleven landed fixes are closed with posted evidence** — HR-1, HR-2, HR-3, HR-4, HR-5,
-HR-6, HR-11, HR-14, HR-15, HR-17. **HR-12** landed on 2026-07-31 and owes two of its five rows. **No unrun row needs new CAM.** What remains carries no fix yet: **HR-12** (the
-manual spindle is never told about an RPM change — moved back from `PReview.md`), **HR-18**
-(`loadFile()` newline, a real corruption path), **HR-16** and **HR-19** (recorded, cosmetic or no fix
-proposed), plus the `HW` rows in §6.
+**All eleven landed fixes are closed with posted evidence** — HR-1, HR-2, HR-3, HR-4, HR-5, HR-6,
+HR-11, HR-14, HR-15, HR-17, and **HR-12**, which landed on 2026-07-31 and now owes only **(A4)**, the
+one row needing a tool that runs counterclockwise. What remains carries no fix yet: **HR-18**
+(`loadFile()` newline, a real corruption path, awaiting a decision), **HR-16** and **HR-19** (recorded,
+cosmetic or no fix proposed), plus the `HW` rows in §6.
 
 **Every test and its state is in [§0 Test register](#0-test-register--every-test-and-its-state)** —
-one table, 59 rows, and the only place a pass or fail is recorded.
+one table, 67 rows, and the only place a pass or fail is recorded.
 
 > **Standing rule — a code change is not done until this file is updated.** Every change to
 > `MPCNC_v4.0_Beta2.cps` that touches hobbyist behaviour updates this file **in the same commit**:
@@ -40,7 +40,7 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**67 tests — ✅ 52 PASS · ❌ 0 FAIL · ⬜ 8 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
+**67 tests — ✅ 56 PASS · ❌ 0 FAIL · ⬜ 4 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
 
 **Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
 post and is the only method that proves what a hobbyist receives. `harness` is a node run against
@@ -90,7 +90,7 @@ for.
 | **HR-11 (S)** | Whether Marlin / RRF honour `M2` | source | `gcode.cpp`, `GCodes2.cpp`, RRF changelog | ✅ |
 | **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | posted | `Speed Change.gcode` vs `Link.gcode` | ✅ |
 | **HR-12 (A2)** | Two operations at the *same* RPM still give one prompt | posted | `Speed Change (No Change).gcode` | ✅ |
-| **HR-12 (A3)** | Every tapping reversal is announced — 8 prompts, alternating | — | re-post the drill+tap CAM as `HR12c - GRBL.gcode` | ⬜ |
+| **HR-12 (A3)** | Every tapping reversal is announced — 8 prompts, alternating | posted | `Drill_Tap.gcode` (re-post, 2026-08-01) | ✅ |
 | **HR-12 (A4)** | A counterclockwise start names the direction | — | needs a CCW-first tool; post as `HR12d - GRBL.gcode` | ⬜ |
 | **HR-12 (A5)** | A **clockwise** start prompt is unchanged — no direction word | posted | `Speed Change.gcode`, byte-identical to `Link.gcode` | ✅ |
 | **HR-14 (A)** | `Flood and Mist` matches a channel | posted | `Drill Flood Mist.gcode` | ✅ |
@@ -112,16 +112,20 @@ for.
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
 | **HW-2 (A)** | HP-5 boundary: WCS suppression, rapid lifecycle, position tracking | posted | `Link.gcode` | ✅ |
 | **HW-2 (B)** | HP-5 boundary: a spindle-speed change between operations | posted | ⚠ evidence file **overwritten** — re-post as `HR12-auto - GRBL.gcode` | ✅ |
-| **HW-3** | `Probe Pause = No` — neither prompt | — | cheap; folds into any GRBL session | ⬜ |
-| **HW-4** | `Probe Pause = Before` — attach only | — | cheap; folds into any GRBL session | ⬜ |
-| **HW-5** | The documented HP-1 baseline in one file | — | no file has ever had all of it at once | ⬜ |
+| **HW-3** | `Probe Pause = No` — neither prompt | posted | `HW3 - GRBL.gcode` vs `H11c - GRBL.gcode` | ✅ |
+| **HW-4** | `Probe Pause = Before` — attach only | posted | `HW4 - GRBL.gcode`, the middle rung of the ladder | ✅ |
+| **HW-5** | The HP-1 baseline in one file (**HP-1 amended** — §1) | posted | `HW5 - GRBL.gcode` + `H15a - GRBL.gcode` | ✅ |
 | **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 8 ⬜ rows are waiting on — three things, not eight.** **HR-12 (A3) and (A4)**, which verify
-a landed change; **three cheap posts** (HW-3, HW-4, HW-5); and **three one-offs** (HR-6 (B) a rotated
-Setup, HR-18 (A) a stop file, HW-6 the final sweep). **No unrun row needs new CAM** — only (A4) needs
-anything built, a tool that runs counterclockwise. Ranked in [§3](#3-status).
+**What the 4 ⬜ rows are waiting on.** **HR-12 (A4)** needs a counterclockwise-running tool — the only
+thing left to build. **HR-6 (B)** needs a rotated Setup and is optional. **HR-18 (A)** needs a stop file
+with no trailing newline and is gated on the HR-18 decision (§4.3). **HW-6**, the regression sweep, goes
+last by definition. Ranked in [§3](#3-status).
+
+> **One ✅ still owes a file.** **HW-2 (B)** is closed on quoted evidence only — its `.gcode` was
+> overwritten (§8). Re-post Link's CAM at `Manual Spindle On/Off` = **false** as
+> `HR12-auto - GRBL.gcode` to restore it.
 
 **The one honest gap inside a ✅.** HR-4 (C2) and HW-1 are the only rows carried by `harness` alone.
 They prove `isSafeToRapid()`'s logic is right; they do **not** prove a real post ever reaches it,
@@ -143,11 +147,23 @@ requiring the operator to know an undocumented precondition is a finding. Severi
 
 | ID | Perspective | Config (delta from dialog defaults) |
 |---|---|---|
-| **HP-1** | *The documented baseline.* One Setup, one Operation, one tool, pre-jogged XY, touch plate. | Defaults + firmware set + real travel/max speeds + **Scale Feedrate on** + all four **`03 - Map G1s to Rapids`** on |
+| **HP-1** | *The documented baseline.* One Setup, one Operation, one tool, pre-jogged XY, touch plate. | Defaults + firmware set + travel/max speeds + **Scale Feedrate on**. Group **`03`** is *persona* config, not verifier config — see below |
 | **HP-2** | *No probe.* Same, but Z touched off by hand. | HP-1 + First WCS / Part = `Set X0 Y0 Z0 to Current Pos` |
 | **HP-3** | *Guided jog.* Prefers the post to prompt rather than pre-jogging. | HP-1 + First WCS / Part = `Jog to X0 Y0, Probe Z0` (or `Jog to X0 Y0 Z0`) |
 | **HP-4** | *Marlin / RepRap hobbyist.* Same job, different controller. | HP-1 + CNC Firmware = Marlin (or RepRap) |
 | **HP-5** | *Several operations, one tool, one part, one WCS.* | HP-1 + more than one milling operation |
+
+> **HP-1's group-03 clause was amended on 2026-08-01, when HW-5 was posted.** It previously required
+> *"all four `03 - Map G1s to Rapids` on"*. That clause asks the **verifier** to enable a group that,
+> on the paid licence every post here is made from, **cannot execute**: `isSafeToRapid()` has one
+> caller, `onLinear()`, and full Fusion emits real `G0` rapids, so nothing ever reaches it (HW-1, §6).
+> Turning it on changes **one comment and no motion**, which is precisely what **HR-15 (A)** proved by
+> posting `H15a - GRBL.gcode` against `H11c - GRBL.gcode`. So the clause could never be satisfied in
+> substance here, only in the property dump — and a baseline nobody can meet is a baseline that quietly
+> stops being used. **The group stays part of the HP-1 *persona*** (a Personal-licence hobbyist really
+> does turn it on, and that is what the group is for); it is **not** part of the HP-1 *config a
+> verification post is required to carry*. The Personal-licence half is evidenced by `Personal.cps`
+> (§8), which is the only way to reach the code at all.
 
 > **HP-5 was corrected on 2026-07-31.** It previously read *"several operations, maybe several
 > tools … optionally group 07 enabled"*. Fusion's Personal licence does not support tool changes, and
@@ -243,13 +259,13 @@ the last column says only whether the fix's rows are all in.
 | **HR-6** | Rejects a 3-axis section oriented off machine Z | `684f28a` `e2b2424` | None if correct — blocks everything if wrong | (B) optional, owed |
 | **HR-1** | Provisional `Z0` bounds the `G38 Target` on the two just-positioned probe modes | `8d61790` | **Default path.** Breaks the old byte anchor | all in |
 | **HR-3** | Manual spindle prompts to switch OFF on GRBL too | `43d09aa` | **Every GRBL job's tail** | all in |
-| **HR-2** | `isProbeOperation()` defined locally so canned cycles can post at all | `9c87fb0` | Drilling path only | (A)(A2) owed |
+| **HR-2** | `isProbeOperation()` defined locally so canned cycles can post at all | `9c87fb0` | Drilling path only | all in |
 | **HR-4** | Safe-Z literal fallbacks convert mm→output unit | `439ce2d` | **Inch jobs only** — identity in mm | all in |
 | **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + `8054b6e` | **Every Marlin/RRF job's tail.** GRBL untouched | all in |
 | **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | all in |
 | **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | all in |
-| **HR-12** | Manual spindle prompts on a speed **or** direction change | `dd8e11d` | Manual-spindle jobs with >1 speed or a reversal; clockwise start prompts byte-identical | (A3)(A4) owed |
-| **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | `924d1f6` | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | (C) owed with the tap |
+| **HR-12** | Manual spindle prompts on a speed **or** direction change | `dd8e11d` | Manual-spindle jobs with >1 speed or a reversal; clockwise start prompts byte-identical | (A4) owed |
+| **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | `924d1f6` | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | all in |
 
 Open with no code change: **HR-16** (recorded, no fix proposed), **HR-18** (`loadFile()` newline — has
 a Do→Get row, deliberately unfixed), **HR-19** (cosmetic, fold into the next sweep). Moved to
@@ -331,14 +347,39 @@ owing a post. Five files on the drill CAM, differing only in group 10 and the op
 > same build. Neither would mean much alone: (A) alone cannot rule out a build that never warns, and
 > (B) alone cannot rule out one that never matches.
 
-Remaining, ranked by value — **none of it needs new CAM**:
+**Session 6 — the probe-pause and tap session — ran on 2026-08-01** and closed **HW-3**, **HW-4**,
+**HW-5** and **HR-12 (A3)**. Four files, all GRBL/mm, three of them on the face-mill CAM:
 
-1. **Three cheap posts on CAM that already exists** — **HW-3** and **HW-4** (`Probe Pause` = `No`, then
-   `Before`) on the face-mill job, and **HW-5** (the HP-1 baseline in one file) on the same.
-2. **Three one-offs, in no particular order** — **HR-6 (B)** a rotated Setup, **HR-18 (A)** a stop file
-   with no trailing newline, and **HW-6** the regression sweep, which goes last by definition.
-3. **Two decisions, not posts** — **HR-12** (write the fix, then its Do (A) row verifies it) and
-   **HR-18** (decide the `loadFile()` guard). Both are in §4.3 with diffs or diagnostics ready.
+| File | Config (delta from defaults) | Serves |
+|---|---|---|
+| `HW3 - GRBL.gcode` | `C_Probe_Pause` = **No** | HW-3 |
+| `HW4 - GRBL.gcode` | `C_Probe_Pause` = **Before** | HW-4 |
+| `HW5 - GRBL.gcode` | `D_Feeds_ScaleFeedrate` = **true** | HW-5 — **the first GRBL file with scaling on** |
+| `Drill_Tap.gcode` | defaults; re-post of the session-4 drill + tap CAM | HR-12 (A3) |
+
+> **The three-rung ladder is the result, not any one file.** `H11c` (`Before & After`) → `HW4`
+> (`Before`) → `HW3` (`No`) are the **same CAM, same build family, one property apart**, and each diff
+> is exactly the prompt lines plus the timestamp and that one property line. `HW4`→`HW3` differs by
+> **two lines** (`( Ask User to Attach the Z Probe)` and `M0 (MSG Attach ZProbe)`); `H11c`→`HW3` by four.
+> Nothing else moved in any pair. That is HW-3/HW-4's stated pass criterion met literally.
+> **`H2.gcode` was not used** — it is retired (pre-HR-17) and carries an unrelated `B_Probe_OnChange`
+> difference; `H11c - GRBL.gcode` is the current reference and diffs clean.
+
+> **`Drill_Tap.gcode` was re-posted over itself**, the trap §8 warns about — but **no evidence was
+> lost**, because the re-post is a superset: HR-2 (A) (no `G8x`, reaches STOP end), HR-2 (A2) and
+> HR-17 (C) (eight single-spaced tapping warnings) all still read true in the new file, exactly as
+> §4.2's blast-radius note predicted. Confirmed by inspection, not assumed.
+
+Remaining, ranked by value:
+
+1. **One row needs something built** — **HR-12 (A4)**, a counterclockwise-running tool.
+2. **One evidence restoration, no new CAM** — re-post Link at `Manual Spindle On/Off` = false as
+   `HR12-auto - GRBL.gcode`, restoring HW-2 (B)'s overwritten file.
+3. **Two one-offs** — **HR-6 (B)** a rotated Setup (optional), and **HR-18 (A)** a stop file with no
+   trailing newline (gated on 4 below).
+4. **One decision, not a post** — **HR-18**, whether to add the `loadFile()` newline guard at all. §4.3
+   has the diagnostic ready.
+5. **HW-6**, the regression sweep. Last by definition.
 
 Three results worth carrying forward rather than re-deriving:
 
@@ -1009,12 +1050,13 @@ way ambiguous, and that ambiguity is the hazard the branch exists to remove.
 takes the first branch and overwrites both tracked values — a reset there would be dead code.
 
 **Blast radius.** Only jobs that actually change speed or direction gain anything; every saved
-single-operation reference is unaffected. **`Drill_Tap.gcode` will differ on a re-post**, gaining eight
-prompts in its tap section. **No row's assertions move** — HR-2 (A) asserts no `G8x` and reaching STOP
-end, HR-2 (A2) and HR-17 (C) assert the tapping warning text, and all three survive — but a diff will
-show a difference that is not a regression.
+single-operation reference is unaffected. **`Drill_Tap.gcode` differs on a re-post**, gaining eight
+prompts in its tap section — *confirmed 2026-08-01, exactly eight*. **No row's assertions moved** —
+HR-2 (A) asserts no `G8x` and reaching STOP end, HR-2 (A2) and HR-17 (C) assert the tapping warning
+text, and all three still read true in the re-posted file. The diff shows a difference that is not a
+regression, as predicted.
 
-**Verified (A)(A2)(A5) — 2026-07-31, three of the five rows.**
+**Verified (A)(A2)(A5) — 2026-07-31; (A3) — 2026-08-01. Four of the five rows.**
 
 **(A) `Speed Change.gcode`** — Link's two-operation CAM (12000 then 10000, one tool), defaults.
 `M0 (MSG Turn ON 12000 RPM)` before section 1, then `( >>> Spindle Speed: Manual change)` →
@@ -1034,14 +1076,39 @@ directions. The "absence rows need a presence-based sibling" rule in §8, applie
 across the fix. Every saved single-operation reference is therefore untouched, which is the whole
 justification for naming direction only when counterclockwise at job start.
 
-**Do (A3) — every reversal is announced.** Re-post the drill + tap CAM unchanged, **to a new name**
-(`HR12c - GRBL.gcode`; `Drill_Tap.gcode` is HR-2's evidence and this row's "before"). **Get (A3):** the
-drill's `M0 (MSG Turn ON 2220 RPM)`, then in the tap section **eight** further prompts — one for the
-speed change into the tap, then **seven alternating**
-`M0 (MSG Set spindle to <n> RPM counterclockwise)` / `... clockwise`, one for each of the seven
-direction-only calls at lines 253, 256, 267, 270, 281, 284 and 295. **Pass:** eight, alternating, and
-**no reversal left silent**. *(This row previously demanded **zero** prompts here. That was correct for
-the speed-only fix and is exactly backwards now — see the box below.)*
+**(A3) ✅ closed 2026-08-01 by the re-posted `Drill_Tap.gcode` — the prediction landed exactly.** The
+row was written from a harness replay of `setSpindeSpeed()`'s condition over the *old* file, which
+predicted the drill's `M0 (MSG Turn ON 2220 RPM)` plus **eight** tap-section prompts: one for the speed
+change into the tap, then **seven** direction-only reversals. The posted file has **nine prompts, and
+they are those nine** — one at line 152, then eight at 243, 257, 262, 275, 280, 293, 298 and 311,
+strictly alternating from `clockwise`:
+
+```
+M0 (MSG Set spindle to 500 RPM clockwise)          <- 2220 -> 500, entering the tap
+M0 (MSG Set spindle to 500 RPM counterclockwise)   <- hole 1 withdrawal
+M0 (MSG Set spindle to 500 RPM clockwise)          <- hole 1 restore
+…                                                      holes 2 and 3, the same pair
+M0 (MSG Set spindle to 500 RPM counterclockwise)   <- hole 4 withdrawal
+```
+
+**The suppression half is the stronger result, and it is free from the same file.** The tap section
+carries **twelve** `COMMAND_SPINDLE_CLOCKWISE` / `COUNTERCLOCKWISE` commands but only **eight** prompts.
+The four silent ones (253, 271, 289, 307) are each a `CLOCKWISE` re-assertion issued when the spindle is
+*already* clockwise — Fusion emits one before every plunge. Decision 1's formatted-state gate refuses
+all four while catching all eight real changes: **the post prompts on changes, not on commands.** A
+build that prompted on every direction command would produce twelve pauses and still pass a naive count
+of "is every reversal announced".
+
+> **One asymmetry, benign, recorded so it is not re-found as a defect.** Hole 4 gets its
+> `counterclockwise` withdrawal prompt but **no `clockwise` restore** — Fusion emits no
+> `COMMAND_SPINDLE_CLOCKWISE` after the last hole, going straight to deactivate-sync and retract, so
+> there is no change for the post to announce. The file therefore ends with the spindle notionally
+> reversed through `G0 Z5.08` → `Z15.24` → `X0 Y0` → `M0 (MSG Turn OFF spindle)`. All of that is in
+> air with the tap clear of the work, and the post cannot invent a command Fusion did not issue.
+> *(This is Fusion's shape, not the post's; if it ever matters it belongs to `PReview.md` **HR-20**.)*
+
+*(This row previously demanded **zero** prompts here. That was correct for the speed-only fix and is
+exactly backwards now — see the box below.)*
 
 **Do (A4) — a counterclockwise start.** Any job whose **first** tool runs counterclockwise; post as
 `HR12d - GRBL.gcode`. **Get (A4):** `M0 (MSG Turn ON <n> RPM counterclockwise)`. **Pass:** the word is
@@ -1138,7 +1205,9 @@ would need re-baselining for one blank.
 
 > **A second item for the same sweep**, found in `Drill_Tap.gcode`: empty comments emit as `()` on the
 > two `onSectionEnd()` lines and as `( )` on the other sixteen, because one call site passes `""` and
-> the rest pass `" "`. Pick one and use it everywhere.
+> the rest pass `" "`. Pick one and use it everywhere. *(Confirmed 2026-08-01 to be general, not a
+> drilling artifact: `HW3 - GRBL.gcode` — an ordinary one-operation face mill — carries the same `()`
+> on its single `onSectionEnd()` line. Every posted file has it; it is one call site, not one CAM.)*
 
 ---
 
@@ -1272,14 +1341,40 @@ untouched" now also holds across a section boundary, not just a single-section j
 > **HR-3 (B)**, whose evidence `HR3b.gcode` predates the HR-17 sweep. Diffed against it, only the
 > timestamp and the group-03 heading differ.
 
-**HW-3 / HW-4 — `Probe Pause` = `No`, then `Before`.** Only the default `Before & After` is verified,
-on every H row. *Get:* `No` → the `G38.2` block with **neither** `Attach ZProbe` nor `Detach ZProbe`;
-`Before` → attach only. **Pass:** the prompt count changes and **nothing else does** — diff each
-against `H2.gcode` and expect only the `M0` lines to differ.
+**HW-3 / HW-4 — `Probe Pause` = `No`, then `Before`. ✅ both closed 2026-08-01.** Before this, only the
+default `Before & After` was verified, on every H row. Closed as a **three-rung ladder on one CAM**, the
+reference plus two files one property apart:
 
-**HW-5 — the documented HP-1 baseline in one file.** Scaling on, all four group-03 booleans on,
-machine-real travel and max speeds. No file has ever carried all of it at once: `H15a` and `H5d` cover
-one half each, and every other session-1 file was posted at factory defaults.
+| File | `C_Probe_Pause` | Prompts in the probe block |
+|---|---|---|
+| `H11c - GRBL.gcode` | `Before & After` | `M0 (MSG Attach ZProbe)` + `M0 (MSG Detach ZProbe)` |
+| `HW4 - GRBL.gcode` | `Before` | attach only |
+| `HW3 - GRBL.gcode` | `No` | **neither** |
+
+Each adjacent diff is the timestamp, the one property line, and **the prompt lines and nothing else** —
+`HW4`→`HW3` is two lines, `H11c`→`HW3` is four (each `M0` and its Info comment). The Info comments track
+the prompts, so the *narration* stays honest at every setting rather than describing a pause that was
+suppressed. **Diff against `H11c`, not `H2`:** `H2.gcode` is retired (pre-HR-17, so its heading and RPM
+prompt text differ) and it also carries `B_Probe_OnChange = Jog XY & Probe Z`. That second difference is
+inert on a single-section single-WCS job — the dispatch only fires on a WCS change *after* the first
+section — but "inert" is a claim a reader has to check, and `H11c` needs no such claim.
+
+**HW-5 — the HP-1 baseline in one file. ✅ closed 2026-08-01, with HP-1 amended (§1).** `HW5 - GRBL.gcode`
+is the face-mill CAM at defaults + **`Scale Feedrate` on** — the **first GRBL file ever posted with
+scaling on**; `H5d` had covered only the Marlin half. Diffed against `HW4`, the delta is the timestamp,
+that one property, and **feedrates only** — no motion, no block added or removed:
+
+- every XY cut and XY arc capped `F2667`/`F1334` → **`F900`** (`E_Feeds_MaxCutSpeedXY`);
+- every plunge and every `G18` ZX-plane arc capped `F339`/`F1016` → **`F180`** (`F_Feeds_MaxCutSpeedZ`,
+  the slower of the two axes in that plane) — an independent GRBL re-confirmation of **HR-5 (A)(D)**,
+  which until now rested on `HR5a`/`HR5c` alone.
+
+**Two honest limits on the row.** The travel/max speeds were left at factory defaults (2500/300/900/180/
+1000) rather than machine-real values — but the limiting behaviour is what the row tests and it fired
+hard on every cut move, so the numbers being defaults costs nothing and makes the file more comparable.
+And group 03 was deliberately **not** enabled, because this is a full-licence post where the group cannot
+execute; see §1's amendment box and HW-1 below. That half is carried by `H15a - GRBL.gcode` (group 03 on
+changes one comment and no motion) and by `Personal.cps` (the only way to reach the code at all).
 
 **HW-6 — full regression sweep.** Last, by definition. Re-run the sample jobs and confirm no output
 differences beyond the intended Beta-2 changes — in particular that single-WCS, no-base jobs are
@@ -1297,11 +1392,12 @@ the group reorder?) are release-relevant but cover all eleven groups, so they li
 reading: preamble ordering, WCS selection before any origin write, units and absolute mode before any
 probe, comment syntax per firmware, arc and cycle handling, guard placement, and the origin/probe
 dispatch for all six First WCS / Part modes. What reading could not establish — HR-2's kernel
-dependency and HR-6's `workPlane` behaviour — HR-6 has since settled by posting; HR-2's drilling half
-is still owed. **To claim "high confidence that the post outputs correctly formatted, structurally
-sound g-code for a hobbyist from every F360 entry point"**, the **13 ⬜ rows** in
-[§0](#0-test-register--every-test-and-its-state) are what stand between here and that claim — and they
-reduce to four pieces of work, listed under §3.
+dependency and HR-6's `workPlane` behaviour — **both have since settled by posting**
+(`Drill_Tap.gcode`, `H2 - Debug.gcode`). **To claim "high confidence that the post outputs correctly formatted,
+structurally sound g-code for a hobbyist from every F360 entry point"**, the **4 ⬜ rows** in
+[§0](#0-test-register--every-test-and-its-state) are what stand between here and that claim — one
+needing a CCW tool, one a rotated Setup, one gated on the HR-18 decision, and the final sweep. Ranked
+under §3.
 
 ---
 
