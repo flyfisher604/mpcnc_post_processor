@@ -11,7 +11,7 @@ HR-12, HR-14, HR-15, HR-17, **HR-18** (`loadFile()` repairs a missing line termi
 throughout; **four rows across HR-6, HR-12 and HR-18 are closed by `read`** because the artifact a post
 would need does not exist — each carries a named residual in §4.2. What remains carries no fix:
 **HR-16**, **HR-19**, **HR-21** and **HR-22 (B)** — recorded, cosmetic or awaiting a behaviour decision —
-plus **HW-6**, the release regression sweep.
+plus **HW-6 (B)**, the posted half of the release regression sweep — its static half found nothing.
 
 **Every test and its state is in [§0 Test register](#0-test-register--every-test-and-its-state)** —
 one table, 76 rows, the only place a pass or fail is recorded, and **complete: every `H`/`HR`/`HW` id
@@ -43,9 +43,10 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**78 tests — ✅ 62 PASS · ❌ 0 FAIL · ⬜ 1 UNRUN · ➖ 15 n/a or moved to `PReview.md`.**
+**79 tests — ✅ 63 PASS · ❌ 0 FAIL · ⬜ 1 UNRUN · ➖ 15 n/a or moved to `PReview.md`.**
 
-> **The one ⬜ is `HW-6`, the release regression sweep**, which goes last by definition. Every other
+> **The one ⬜ is `HW-6 (B)`, the posted half of the release regression sweep** — its static half is
+> closed (§6), and the six posts it wants are listed there. Every other
 > hobbyist row is settled. **Four were closed by `read` on 2026-08-01** — HR-6 (B), HR-12 (A4) and
 > HR-18 (A)(B) — each because the artifact a posted row would need does not exist (a rotated Setup, a
 > counterclockwise tool, an include file saved without its terminator) while the code path is short
@@ -153,12 +154,15 @@ A ⬜ row's Method column names what it is waiting for.
 | **HW-3** | `Probe Pause = No` — neither prompt | posted | `HW3 - GRBL.gcode` vs `H11c - GRBL.gcode` | ✅ |
 | **HW-4** | `Probe Pause = Before` — attach only | posted | `HW4 - GRBL.gcode`, the middle rung of the ladder | ✅ |
 | **HW-5** | The HP-1 baseline in one file (**HP-1 amended** — §1) | posted | `HW5 - GRBL.gcode` + `H15a - GRBL.gcode` | ✅ |
-| **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
+| **HW-6 (A)** | Static sweep: regression surface bounded, structure intact, harnesses green | harness + read | node — 68 props, 3 harnesses; `git diff dd8e11d..HEAD` | ✅ |
+| **HW-6 (B)** | Posted sweep: the reference set re-posted on the current build | — | 6 posts, matrix in §6 | ⬜ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 1 ⬜ row is waiting on.** **HW-6** is the pre-release regression sweep and goes last by
-definition — re-run the sample jobs against a current-post reference and confirm no differences beyond
-the intended Beta-2 changes. Ranked in [§3](#3-status).
+**What the 1 ⬜ row is waiting on.** **HW-6 (B)** is the *posted* half of the pre-release regression
+sweep and goes last by definition — six posts, matrix in [§6](#6-hobbyist-work-owed-before-a-public-release--the-hw-rows).
+Its static half, **HW-6 (A)**, is closed and found nothing: the entire regression surface since the
+reference set was posted is `loadFile()` plus one dialog-only property title, and exactly one saved file
+reaches `loadFile()`. Ranked in [§3](#3-status).
 
 > **One ✅ still owes a file.** **HW-2 (B)** is closed on quoted evidence only — its `.gcode` was
 > overwritten (§8). Re-post Link's CAM at `Manual Spindle On/Off` = **false** as
@@ -420,13 +424,23 @@ terminator). Method `read`, and §0's Method note says what that is worth. Two b
   emits on GRBL — the default firmware. A tester following the old row would have found no `M400`,
   no merge, and drawn the wrong conclusion.
 
-Remaining:
+**HW-6 (A), the static regression sweep, ran on 2026-08-01** and is in §6. Its headline: the entire
+regression surface since the reference set was posted is `loadFile()` plus one dialog-only title, and
+**exactly one saved file reaches `loadFile()`** — so every other reference would re-post byte-identical
+modulo the timestamp. That is established by construction, not by diffing thirty files.
 
-1. **One evidence restoration, no new CAM** — re-post Link at `Manual Spindle On/Off` = false as
-   `HR12-auto - GRBL.gcode`, restoring HW-2 (B)'s overwritten file.
-2. **HW-6**, the regression sweep. Last by definition.
-3. **Upgrade the four `read` rows to `posted`** if their artifacts are ever built. Not blocking, but each
-   carries a named residual in §4.2 — HR-6 (B)'s is the one that could still hide a real defect.
+Remaining, and it is a short list:
+
+1. **`HW-6 (B)` — six posts**, the matrix is in §6. Post 1 (GRBL defaults) is the one to run if only one
+   is run; posts 5 and 6 also upgrade HR-18 (A)(B) from `read` to `posted`, and their artifact already
+   exists.
+2. **One evidence restoration, no new CAM** — re-post Link at `Manual Spindle On/Off` = false as
+   `HR12-auto - GRBL.gcode`, restoring HW-2 (B)'s overwritten file. Folds into the same sitting.
+3. **Upgrade the other two `read` rows** — HR-6 (B) and HR-12 (A4) — if a rotated Setup or a
+   counterclockwise tool is ever built. Not blocking, but **HR-6 (B)'s residual is the one that could
+   still hide a real defect** (§4.1).
+4. **Re-baseline the nine pre-HR-17 files** (§6, HW-6 (A) item 6) if a uniformly current-build evidence
+   set is wanted for release. No assertion among them is invalidated — this is tidiness, not risk.
 
 *No longer here: the HR-18 decision, taken 2026-08-01 — `loadFile()` always checks and repairs.*
 
@@ -1636,9 +1650,88 @@ And group 03 was deliberately **not** enabled, because this is a full-licence po
 execute; see §1's amendment box and HW-1 below. That half is carried by `H15a - GRBL.gcode` (group 03 on
 changes one comment and no motion) and by `Personal.cps` (the only way to reach the code at all).
 
-**HW-6 — full regression sweep.** Last, by definition. Re-run the sample jobs and confirm no output
-differences beyond the intended Beta-2 changes — in particular that single-WCS, no-base jobs are
-unaffected, diffed against a current-post reference rather than a pre-rework one.
+**HW-6 — full regression sweep.** Last, by definition. Split into a static half, which is done, and a
+posted half, which is what a release still needs.
+
+### HW-6 (A) ✅ — the static sweep, 2026-08-01
+
+**1. The regression surface since the reference set was posted is two hunks.** `git diff dd8e11d..HEAD`
+on the `.cps` — `dd8e11d` being the build every current reference file was posted from — is exactly
+`loadFile()` (HR-18's terminator guard, HR-22 (A)'s empty-file note) and `E_Include_ProbeFile`'s
+`title`/`description` (HR-21). Nothing else in the post changed.
+
+**2. The retitle reaches no posted file.** `writePropertyDump()` emits `"   " + k + " = " + v` — the
+**key**, not the title — and its heading is the **group** string. So `title` and `description` are
+dialog-only; only a `group:` change can move a posted byte, which is why HR-17's rename did and this one
+cannot. *(This is also the mechanism behind the §"What resets a saved preset" rule: the key is the
+identifier in both places.)*
+
+**3. Exactly one saved file reaches `loadFile()`.** Two independent checks agree: only
+`H11d - Marlin.gcode` has a non-empty include property (`B_Include_StopFile = Stop File.gcode`), and only
+`H11d - Marlin.gcode` contains `--- Start/End custom gcode` markers. Every other reference has all five
+group-08 properties `<empty>`.
+
+> **⇒ Every saved reference except `H11d - Marlin.gcode` would re-post byte-identical to itself modulo
+> the timestamp.** That is the regression claim, and it is established by construction rather than by
+> diffing 30 files. `H11d` gains exactly one line break, ahead of its `--- End custom gcode` comment.
+
+**4. Structural sweep of the properties literal — green, and not vacuously.** 68 properties: no duplicate
+keys (a JS literal would silently keep the last), every key `<Letter>_<Group>_<Name>`, every one carrying
+title/description/type/group/value, all 11 groups zero-padded and sorting `01`–`11`, within-group letter
+prefixes contiguous from `A` with no gaps, every enum default among its own ids with no duplicate ids and
+every option titled, and **all 67 distinct `getProperty()` references resolve**. One property is declared
+and never read — `E_Include_ProbeFile`, which is HR-21, and **it is equally dead at the branch point**, so
+this branch did not introduce it.
+
+> **The harness that produced that list was wrong on its first run and said so.** The `e*` enum bodies
+> close with `" };"` — a leading space — so a `/\n\};/` terminator over-ran, swallowed the rest of the
+> file, failed on `createFormat is not defined`, and left `props` **empty**, on which every check above
+> passes trivially. It reported "ok" eight times over nothing. Fixed by brace-matching the enums and by
+> making the harness **abort rather than report** when the extraction yields no properties. Recorded
+> because it is the same false-pass shape as §8's other entries, in a tool built to catch them.
+
+**5. All three behavioural harnesses pass on HEAD** — `isSectionOrientationSupported()` over 13 vectors
+(HR-6), `loadFile()` over 6 file endings × 3 comment levels (HR-18, HR-22 (A)), and the `spindleOn()`
+fixture (HR-12).
+
+**6. One honest gap the sweep surfaced: nine reference files predate HR-17** and would differ in two text
+respects if re-posted — the group-03 heading, and `Turn ON 7000RPM` → `Turn ON 7000 RPM`. They back 13
+register rows:
+
+| File | Rows it backs |
+|---|---|
+| `H2.gcode` | H2, HR-1 (A), HR-3 (A) — *and, correctly, HR-17 (A)(D)'s "before"* |
+| `H2 - Debug.gcode` | HR-6 (A), HR-6 (B) |
+| `HR1b.gcode`, `HR1c.gcode`, `H7c-a.gcode` | HR-1 (B), HR-1 (C), HR-4 (B) |
+| `HR3b.gcode` | HR-3 (B) — already re-baselined by `Face1 (auto).gcode` |
+| `HR5a/b/c.gcode` | HR-5 (A)(B)(C)(D) — corroborated on the current build by `HW5 - GRBL.gcode` |
+
+**No assertion among them is invalidated**: HR-17 changed comment text only, HR-12 reaches only jobs with
+a speed change or reversal (none of these), and HR-18/HR-22 reach only include jobs (none of these). But
+"not invalidated" is not "current-build", and HW-6 asks for the latter. HR-1 (C) is fine either way — it
+is a *diff* between `HR1c` and `H7c-a`, both pre-HR-17, so the pair is internally consistent.
+
+### HW-6 (B) ⬜ — the posted sweep
+
+Six posts, covering all three firmwares, both units, and the one changed code path. Each expects
+**byte-identical output modulo the timestamp** unless stated:
+
+| # | Post as | Config | Expect |
+|---|---|---|---|
+| 1 | `HW6a - GRBL.gcode` | GRBL, all defaults | identical to `H11c - GRBL.gcode` |
+| 2 | `HW6b - Marlin.gcode` | Marlin, all defaults | identical to `H11a.gcode` |
+| 3 | `HW6c - RRF.gcode` | RepRap, all defaults | identical to `H11b - RRF.gcode` |
+| 4 | `HW6d - GRBL Inch.gcode` | GRBL, inch, all defaults | identical to `H4base - GRBL Inch.gcode` |
+| 5 | `HW6e - Marlin.gcode` | Marlin + `B_Include_StopFile` = `Stop File.gcode` | **one difference**: `--- End custom gcode` moves to its own line. Re-baselines `H11d - Marlin.gcode` |
+| 6 | `HW6f - Marlin.gcode` | as 5, but the file set as `A_Include_StartFile`, Comment Level **`Important`** | the include's last block and `G10 L20 P1 X0 Y0 Z0` on **separate** lines |
+
+> **Posts 5 and 6 do double duty — they upgrade HR-18 (A) and (B) from `read` to `posted`.** The artifact
+> they need already exists: `Stop File.gcode`'s last byte is `e`, no trailing newline. Post 6 must be at
+> Comment Level `Important`; at the default `Info` the `--- End custom gcode` comment absorbs the merge
+> and the file proves nothing either way.
+>
+> **Post 1 is the one to run if only one is run.** It is the default hobbyist path on the default
+> firmware — the configuration that matters most and the reference everything else is diffed against.
 
 **HW-7 — dialog audit.** **D1** (labels/defaults) and **D3**'s dialog half (does a saved preset survive
 the group reorder?) are release-relevant but cover all eleven groups, so they live in `PReview.md`
@@ -1654,7 +1747,7 @@ probe, comment syntax per firmware, arc and cycle handling, guard placement, and
 dispatch for all six First WCS / Part modes. What reading could not establish — HR-2's kernel
 dependency and HR-6's `workPlane` behaviour — **both have since settled by posting**
 (`Drill_Tap.gcode`, `H2 - Debug.gcode`). **To claim "high confidence that the post outputs correctly formatted,
-structurally sound g-code for a hobbyist from every F360 entry point"**, only **`HW-6`** — the release
+structurally sound g-code for a hobbyist from every F360 entry point"**, only **`HW-6 (B)`** — the posted half of the release
 regression sweep — stands between here and that claim, plus the honesty that **four rows are `read`, not
 `posted`** (§0). The one whose residual could still hide a real defect is **HR-6 (B)**: nothing evidences
 what Fusion puts in `workPlane.forward` for a re-oriented Setup, so the orientation guard could be a

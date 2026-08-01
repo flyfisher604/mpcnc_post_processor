@@ -24,8 +24,8 @@ clean apart from two untracked files, both deliberate: `MPCNC_v4.0_Beta1.zip` (u
 ignore it) and **`Personal.cps`** (a test harness — see below). **Nothing is half-done and nothing is
 known-broken.**
 
-**Status lives in one place: `HReview.md` §0**, a **78-row** register naming every hobbyist test, how it
-was settled, its evidence file and its state — currently **62 pass, 0 fail, 1 unrun, 15 n/a or moved**.
+**Status lives in one place: `HReview.md` §0**, a **79-row** register naming every hobbyist test, how it
+was settled, its evidence file and its state — currently **63 pass, 0 fail, 1 unrun, 15 n/a or moved**.
 Nothing else in that file records a pass; if the two ever disagree the register is wrong and must be
 fixed. Read it first. **The register is complete: every `H`/`HR`/`HW` id has a row, including the six
 deferred to `PReview.md`, which keep `➖` pointer rows.** (HR-7/8/9/10/13 had silently vanished from it
@@ -46,13 +46,15 @@ ladder's top rung), `H4base - GRBL Inch.gcode` (inch), `H15a - GRBL.gcode` (mapp
 `HW5 - GRBL.gcode` (the only GRBL file with `Scale Feedrate` on), `Link.gcode` (two-op, one-tool, HP-5
 shape). **`H2.gcode` is retired as a baseline** — it predates HR-17; keep it only as HR-17's "before".
 
-**What is left — one row, one restoration, and four optional upgrades. No decisions outstanding.**
+**What is left — one row and one restoration, both in a single Fusion sitting, plus two optional
+tidy-ups. No decisions outstanding.**
 
 | | Rows | Note |
 |---|---|---|
-| Restore lost evidence | — | re-post Link's CAM at `Manual Spindle On/Off` = **false** as `HR12-auto - GRBL.gcode`; HW-2 (B) is ✅ on a quotation only. See the overwrite note below |
-| Last, by definition | `HW-6` | the release regression sweep |
-| Optional upgrades | `HR-6 (B)`, `HR-12 (A4)`, `HR-18 (A)`, `(B)` | closed by `read`, not `posted`. Post them if the artifacts are ever built — a rotated Setup; a left-hand tap or anticlockwise tool; one include file saved with no trailing newline, used as the Stop include then the Start include at Comment Level **`Important`** (the default `Info` hides the defect behind the `--- End custom gcode` comment). Re-baseline `H11d - Marlin.gcode` with the last of those |
+| Last, by definition | `HW-6 (B)` | the **posted** half of the release sweep — six posts, matrix in `HReview.md` §6. The static half `HW-6 (A)` is ✅: the whole regression surface since the reference set was posted is `loadFile()` plus one dialog-only title, and exactly one saved file (`H11d - Marlin.gcode`) reaches `loadFile()`, so everything else would re-post byte-identical modulo the timestamp |
+| Restore lost evidence | — | re-post Link's CAM at `Manual Spindle On/Off` = **false** as `HR12-auto - GRBL.gcode`; HW-2 (B) is ✅ on a quotation only. Folds into the same sitting. See the overwrite note below |
+| Optional upgrades | `HR-6 (B)`, `HR-12 (A4)` | closed by `read`, not `posted`. Post if a rotated Setup or a counterclockwise tool is ever built. **HR-6 (B)'s residual is the one that could still hide a real defect.** *(HR-18 (A)(B) are also `read`, but `HW-6 (B)`'s posts 5 and 6 upgrade them — their artifact already exists, `Stop File.gcode` has no trailing newline)* |
+| Tidiness, not risk | — | nine reference files predate HR-17 and back 13 rows; no assertion is invalidated, but they are not current-build. `HReview.md` §6, HW-6 (A) item 6 |
 
 **Session 6 (2026-08-01) also amended HP-1.** Its group-03 clause required the verifier to enable a
 group that cannot execute on a paid Fusion licence (HW-1: `isSafeToRapid()` has one caller, `onLinear()`,
@@ -109,10 +111,11 @@ physical measurement are out of scope, so every row must stand on the posted fil
 
 **Next actions, in order.**
 
-1. **The hobbyist verification is done apart from `HW-6`.** Six posting sessions plus an inspection pass
-   settled every row; all twelve fixes are verified. What is still owed is the `HR12-auto` re-post that
-   restores HW-2 (B)'s overwritten evidence, and `HW-6` itself, the release regression sweep, which goes
-   last by definition. The four `read` rows can be upgraded to `posted` opportunistically.
+1. **The hobbyist verification is done apart from `HW-6 (B)`.** Six posting sessions, an inspection pass
+   and a static regression sweep settled every row; all thirteen fixes are verified and **HW-6 (A) found
+   nothing**. What is owed is one sitting in Fusion: **HW-6 (B)**'s six posts (matrix in `HReview.md` §6)
+   plus the `HR12-auto` re-post that restores HW-2 (B)'s overwritten evidence. Posts 5 and 6 of that
+   matrix also upgrade HR-18 (A)(B) from `read` to `posted`.
 2. **Three items wait for the next sweep, all in group 08 except the first.** **HR-19** — doubled space
    in `M291`, plus `()` against `( )` on the `onSectionEnd()` lines. **HR-21** — `E_Include_ProbeFile` is
    declared and never read; its dialog now declares itself `NOT IMPLEMENTED YET` (retitled **Tool Change
@@ -494,7 +497,7 @@ safety comment. *(Verified all three branches — `PReview.md` §4.)*
 - **Phase 5 — not started** (likely no-op).
 - **Hobbyist review — complete for this branch's scope, bar the release sweep.** 22 findings; **thirteen
   landed and all thirteen verified**, five moved to `PReview.md`, HR-16 / HR-19 / HR-21 / HR-22 (B) with no
-  fix. Four rows are `read` rather than `posted` (residuals named in `HReview.md` §4.2); `HW-6` is the
+  fix. Four rows are `read` rather than `posted` (residuals named in `HReview.md` §4.2); `HW-6 (B)` is the
   only ⬜ left. Status in `HReview.md` §0.
 - **Professional review — not started.** `PReview.md` is a parking lot until it runs.
 
