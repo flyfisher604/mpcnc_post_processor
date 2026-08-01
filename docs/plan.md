@@ -9,8 +9,8 @@ and findings live in the two review files:
 
 | File | Owns |
 |---|---|
-| `docs/HReview.md` | The hobbyist review, its eleven landed fixes, and §0 — the register of every test and its state |
-| `docs/PReview.md` | The professional side: five deferred findings plus HR-20, every multi-WCS / base / tool-change / dialog test row, and the jet/laser workstream. **The professional review itself has not been done** |
+| `docs/HReview.md` | The hobbyist review — **complete**: thirteen landed fixes, and §0, the 83-row register of every test and its state |
+| `docs/PReview.md` | The professional side: five deferred findings plus HR-20 and HR-26, every multi-WCS / base / tool-change / dialog test row, and the jet/laser workstream. **The professional review itself has not been done** |
 | this file | Design record, remaining work, resolved decisions |
 
 ---
@@ -24,43 +24,64 @@ clean apart from two untracked files, both deliberate: `MPCNC_v4.0_Beta1.zip` (u
 ignore it) and **`Personal.cps`** (a test harness — see below). **Nothing is half-done and nothing is
 known-broken.**
 
-**Status lives in one place: `HReview.md` §0**, a **79-row** register naming every hobbyist test, how it
-was settled, its evidence file and its state — currently **63 pass, 0 fail, 1 unrun, 15 n/a or moved**.
-Nothing else in that file records a pass; if the two ever disagree the register is wrong and must be
-fixed. Read it first. **The register is complete: every `H`/`HR`/`HW` id has a row, including the six
-deferred to `PReview.md`, which keep `➖` pointer rows.** (HR-7/8/9/10/13 had silently vanished from it
-in the doc split and were restored on 2026-08-01 — if you move a finding out, leave the pointer behind.)
-The professional side is `PReview.md`, still a parking lot.
+**The headline: the hobbyist review is finished.** `HReview.md` §0 reads **83 tests — 65 pass, 0 fail,
+0 unrun, 18 n/a or moved**. Thirteen fixes landed on this branch and every one is verified. Nothing is
+half-done, nothing is failing, and no test is waiting to be run. What is left is one behaviour decision, a
+four-item tidy-up sweep, and — whenever Fusion is next open — a few posts that would upgrade evidence
+rather than establish it.
 
-**Thirteen fixes have landed on this branch**, one commit each (`git log --oneline --grep='^HR-'`), and
-**every one is verified**. Ten rest on posted files; **four rows are closed by `read`** — HR-6 (B),
-HR-12 (A4), HR-18 (A)(B) — because the artifact a post needs does not exist (a rotated Setup, a
-counterclockwise tool, an include file saved without its terminator). Each carries a named residual;
-**HR-6 (B)'s is the one that could still hide a real defect** — nothing evidences what Fusion puts in
-`workPlane.forward` for a re-oriented Setup, so the orientation guard could be a no-op on the very case
-it exists to catch. Six posting sessions
-have run — five on 2026-07-31 (Marlin/RRF, inch, the G1→G0 mapper, drill + tap, coolant) and
-**session 6 on 2026-08-01** (probe-pause ladder + the tap re-post) — with their file tables in
-`HReview.md` §3. The reference files worth knowing: `H11c - GRBL.gcode` (GRBL/mm, and the `Probe Pause`
-ladder's top rung), `H4base - GRBL Inch.gcode` (inch), `H15a - GRBL.gcode` (mapping on),
+**Status lives in one place: `HReview.md` §0**, an 83-row register naming every hobbyist test, how it was
+settled, its evidence and its state. Nothing else in that file records a pass; if the two ever disagree
+the register is wrong and must be fixed. **Read it first.** It is complete by construction — every
+`H`/`HR`/`HW` id has a row, including the six deferred to `PReview.md`, which keep `➖` pointer rows.
+(HR-7/8/9/10/13 had silently vanished from it in the doc split and were restored on 2026-08-01: **if you
+move a finding out, leave the pointer behind.**) The professional side is `PReview.md`, still a parking lot.
+
+**Read the Method column, not just the state.** `posted` is a real file from the real post and is the only
+method that proves what a hobbyist receives; `harness` is node against functions brace-matched out of the
+`.cps`; `source` is firmware source; **`read` is a reading of the post's own control flow, and it is
+weaker than the rest**. Six rows are `read` — see the table below.
+
+**Seven sessions produced this**, all on 2026-07-31 and 2026-08-01, with their file tables in
+`HReview.md` §3: five posting sessions (Marlin/RRF, inch, the G1→G0 mapper, drill + tap, coolant), a sixth
+posting session (the probe-pause ladder + the tap re-post), an inspection pass that closed the last four
+open rows, and a full code review. The reference files worth knowing: `H11c - GRBL.gcode` (GRBL/mm, and
+the `Probe Pause` ladder's top rung), `H4base - GRBL Inch.gcode` (inch), `H15a - GRBL.gcode` (mapping on),
 `HW5 - GRBL.gcode` (the only GRBL file with `Scale Feedrate` on), `Link.gcode` (two-op, one-tool, HP-5
-shape). **`H2.gcode` is retired as a baseline** — it predates HR-17; keep it only as HR-17's "before".
+shape), `H11d - Marlin.gcode` (the only file that exercises an include). **`H2.gcode` is retired as a
+baseline** — it predates HR-17; keep it only as HR-17's "before".
 
-**What is left — no verification, but one release blocker and two decisions.** The 2026-08-01 full code
-inspection closed the last ⬜ row and opened four findings; **`HReview.md` §0 now carries its first ❌**.
+**What is left.**
 
 | | Item | Note |
 |---|---|---|
-| **Release blocker** | **`HR-23`** ❌ | A Start/Stop **include replaces** the preamble/footer instead of adding to it, so naming a stop file silently discards **HR-11**'s `M84 S60` and **HR-3**'s manual-spindle-off prompt — two landed *machine-safety* fixes — plus `M30`/`M2`. Witnessed by `H11d - Marlin.gcode` vs `H11a.gcode`. Not a regression; it has always done this. **Fix is a behaviour decision on a shipped property** — three candidates in `HReview.md` §4.3, recommendation is to move the machine-state items outside the include branch. Ship a fix or a known-issue note, not silence |
-| A decision | `HR-22 (B)` | a named-but-**empty** Start include leaves `G90`/`G21`/`G94`/`G17` unwritten. Same family as HR-23 |
-| Next tidy-up sweep | `HR-19`, `HR-21`, `HR-24`, `HR-25` | cosmetic or latent, all one-liners. **HR-24** is HR-15's shape surviving in `writeWCS()`; **HR-25** is `wcsGcode(0)` → `G53`, against the standing "Never `G53`" |
-| Evidence, not verification | — | **six rows are `read`, not `posted`, including `HW-6 (B)` — so the release sweep rests on no posted file.** One post fixes three of them: `Stop File.gcode` (last byte `e`, no terminator) as the Stop include on the Marlin job, at Comment Level `Important` → settles HR-18 (A), HW-6 (B), and re-baselines `H11d`. Also owed: `HR12-auto - GRBL.gcode` to restore HW-2 (B)'s overwritten file |
-| Tidiness, not risk | — | nine reference files predate HR-17 and back 13 rows; no assertion is invalidated, but they are not current-build. `HReview.md` §6, HW-6 (A) item 6 |
+| One decision | `HR-22 (B)` | A named-but-**empty** Start include leaves `G90`/`G21`/`G94`/`G17` unwritten, so the job runs in whatever modal state the controller was left in. **Not the same as HR-23** — there the operator supplied a file and owns its contents; here nobody supplied anything and the post silently emits no preamble. Falling through to `Start()` is the likely answer. `HReview.md` §4.3 |
+| Next tidy-up sweep | `HR-19`, `HR-21`, `HR-24`, `HR-25` | Cosmetic or latent, all one-liners, none changing behaviour today. **HR-24** is HR-15's shape surviving in `writeWCS()` (it takes a `section` then reads the global `tool`); **HR-25** is `wcsGcode(0)` → `G53`, against the standing "Never `G53`"; **HR-21** is the dead `Tool Change Probe` property, wiring not chosen |
+| Evidence, not verification | six `read` rows | **`HW-6 (B)` is one of them, so the release regression sweep rests on no posted file.** One post settles three: `Stop File.gcode` (last byte `e`, no terminator) as the **Stop include** on the Marlin job at Comment Level **`Important`** → HR-18 (A), HW-6 (B), and re-baselines `H11d`. **HR-6 (B)** and **HR-12 (A4)** need artifacts that do not exist (a rotated Setup; a left-hand tap or anticlockwise tool) |
+| Owed evidence | — | Re-post Link's CAM at `Manual Spindle On/Off` = **false** as `HR12-auto - GRBL.gcode`. HW-2 (B) is ✅ on a verbatim quotation only, its file having been overwritten — see (3) below |
+| Tidiness, not risk | — | Nine reference files predate HR-17 and back 13 rows. No assertion among them is invalidated, but they are not current-build. `HReview.md` §6, HW-6 (A) item 6 |
 
-**Session 6 (2026-08-01) also amended HP-1.** Its group-03 clause required the verifier to enable a
-group that cannot execute on a paid Fusion licence (HW-1: `isSafeToRapid()` has one caller, `onLinear()`,
-and full Fusion emits real `G0`s). Group 03 is now part of the HP-1 *persona*, not of the config a
-verification post must carry — `HReview.md` §1 has the reasoning. Don't re-add it.
+**The one residual that could still hide a real defect: `HR-6 (B)`.** The orientation guard rejects a
+tilted `workPlane.forward` — proven over 13 vectors by harness — but **nothing evidences what Fusion
+actually puts in `forward` for a re-oriented Setup.** If Fusion re-expresses the frame so `forward` stays
+`X0 Y0 Z1`, the guard is a no-op on exactly the case it exists to catch and the harness proves only that
+the arithmetic would have worked. No code reading can settle it; it needs a rotated Setup. The failure
+mode is a missed rejection — a part cut in the wrong plane, silently.
+
+**Two closed-out decisions worth not relitigating.**
+
+**HP-1 was amended on 2026-08-01.** Its group-03 clause required the verifier to enable a group that
+cannot execute on a paid Fusion licence (HW-1: `isSafeToRapid()` has one caller, `onLinear()`, and full
+Fusion emits real `G0`s). Group 03 is now part of the HP-1 *persona*, not of the config a verification post
+must carry — `HReview.md` §1 has the reasoning. **Don't re-add it.**
+
+**`HR-23` is designed behaviour, not a defect.** An include file **substitutes** for the phase it names; it
+does not add to it. A stop include therefore drops the coolant-off, the manual-spindle-off prompt (HR-3),
+`M84 S60` (HR-11) and `M30`/`M2` — and that is correct: an operator supplying a custom file wants theirs
+*instead of* the post's, and merging would duplicate whatever their file already does while removing the
+ability to suppress anything. The full code review filed this as a defect and it was **resolved as correct
+the same day**. The reusable lesson is in `HReview.md` §4.3: **before calling a bypass a defect, ask
+whether the bypass is the feature.** What it does deserve is a README line — item 3 on §6's doc-sync list.
 
 **Three things a fresh session will otherwise get wrong.**
 
@@ -89,11 +110,20 @@ licence whatever the toolpath does** — a diagnosis that cost three posted file
 call graph. It closed `HW-1`. Its output is evidence about *logic*, never about what the post emits;
 re-create it from the current `.cps` rather than maintaining it. Full account in `HReview.md` §6 / §8.
 
-**Every remaining row can be verified by reading a posted file.** The one exception — whether
-Marlin/RRF honour `M2` (HR-11) — was closed by reading the *firmware* source rather than running a
-controller: Marlin has never implemented `M2`, RRF gained it in 3.5.1, so the post now emits it on
-RepRap only. Evidence in `HReview.md` → HR-11; the reusable lesson is in §8, along with six others
-worth reading before starting a session.
+**Where the harnesses live, and the trap in writing one.** Individual functions are brace-matched out of
+the `.cps` and `eval`'d in node against stubbed kernel globals — that is how HR-2, HR-4, HR-5, HR-6,
+HR-14, HR-12, HR-18 and the property structure were settled without Fusion (recipe in *Workflow notes*
+below). **The sweep harness written on 2026-08-01 was wrong on its first run and reported eight vacuous
+passes**: the `e*` enum bodies close with `" };"` (leading space), so a `/\n\};/` terminator over-ran,
+swallowed the rest of the file, failed on `createFormat is not defined`, and left the properties object
+**empty** — on which every check trivially passed. **Make a harness abort rather than report when its
+extraction yields nothing**, and always run it against `HEAD` as well as the working tree.
+
+**Two things no post can settle, both closed from firmware source instead.** Whether Marlin/RRF honour
+`M2` (HR-11): Marlin has never implemented it, RRF gained it in 3.5.1, so the post emits it on RepRap only.
+And whether `\r` alone terminates a block (HR-18's Decision 2): GRBL, Marlin and RRF all accept CR. There
+is **no controller access for this project** — settle firmware questions from source and changelogs, and
+never file a row that needs a non-GRBL machine.
 
 **The docs were reorganized at `4db467b`** (2026-07-31). Three files now, split along the
 hobbyist/professional line the work had already taken; `docs/test-plan.md` was dissolved into the two
@@ -112,33 +142,36 @@ physical measurement are out of scope, so every row must stand on the posted fil
 
 **Next actions, in order.**
 
-1. **The hobbyist verification is done apart from `HW-6 (B)`.** Six posting sessions, an inspection pass
-   and a static regression sweep settled every row; all thirteen fixes are verified and **HW-6 (A) found
-   nothing**. What is owed is one sitting in Fusion: **HW-6 (B)**'s six posts (matrix in `HReview.md` §6)
-   plus the `HR12-auto` re-post that restores HW-2 (B)'s overwritten evidence. Posts 5 and 6 of that
-   matrix also upgrade HR-18 (A)(B) from `read` to `posted`.
-2. **Three items wait for the next sweep, all in group 08 except the first.** **HR-19** — doubled space
-   in `M291`, plus `()` against `( )` on the `onSectionEnd()` lines. **HR-21** — `E_Include_ProbeFile` is
-   declared and never read; its dialog now declares itself `NOT IMPLEMENTED YET` (retitled **Tool Change
-   Probe**, no preset reset — the key is unchanged), but the choice between wiring it into `probeTool()`
-   and deleting it is open, and wiring it up belongs to the Tool Change branch. **HR-22 (B)** — naming a
-   file in `A_Include_StartFile` skips `Start()` on the *property string*, so a **named-but-empty** Start
-   include leaves `G90`/`G21`/`G94`/`G17` unwritten and the job runs in whatever modal state the
-   controller was left in. The silence is fixed (HR-22 (A): an empty include now says so at `Info`); the
-   behaviour is not, because falling through to `Start()` changes what a named-but-empty file *means* —
-   a decision, not a repair, and the Stop branch may want the opposite answer.
+*The hobbyist review is closed — none of what follows is verification.* Pick up wherever suits; only 4
+depends on anything above it.
 
-   > **Phase 5 is already answered and needs no work.** `isSafeToRapid()` is called only from
-   > `onLinear()` and is scoped to a single section, so the G1→G0 mapper cannot run across the
-   > boundaries Phase 4 injects logic at. Close it as a no-op when Phase 4 lands.
-
+1. **Decide `HR-22 (B)`, then sweep the tidy-ups.** The decision: naming a file in `A_Include_StartFile`
+   skips `Start()` on the *property string*, so a **named-but-empty** Start include leaves
+   `G90`/`G21`/`G94`/`G17` unwritten and the job runs in whatever modal state the controller was left in.
+   The silence is already fixed (HR-22 (A) — an empty include says so at `Info`); the behaviour is not,
+   because falling through to `Start()` changes what a named-but-empty file *means*, and the Stop branch
+   may want the opposite answer. Then sweep **HR-19** (doubled space in `M291`, plus `()` against `( )` on
+   the `onSectionEnd()` lines), **HR-24** (`writeWCS()` should read `section.getTool()`, not the global
+   `tool`), **HR-25** (`wcsGcode()` should return `undefined` for `< 1` rather than `G53`), and decide
+   **HR-21** (wire the dead `Tool Change Probe` property into `probeTool()` — Tool Change branch work — or
+   delete it). All one-liners; **every one of them changes no output today**, so the sweep needs one
+   posted file to confirm exactly that.
+2. **Optional, whenever Fusion is next open — one post upgrades three rows.** `Stop File.gcode` as the
+   **Stop include** on the Marlin job, Comment Level **`Important`**: settles HR-18 (A), HW-6 (B), and
+   re-baselines `H11d - Marlin.gcode`. Add `HR12-auto - GRBL.gcode` (Link's CAM, `Manual Spindle On/Off` =
+   false) to restore HW-2 (B)'s overwritten file. Neither is blocking.
 3. **Dialog-only checks, no posting** — **D1** and **D3**'s dialog half (`PReview.md` §3.3). D3 gates
    trust in every dialog row: a saved preset should survive, but a posted file cannot tell a surviving
    preset from re-entered values. HR-17 renamed group 03's label, so D3 now has a real string change
    on that group to survive, not just the reorder.
 4. **Open the Tool Change branch** — *Phase 4 — tool-change ordering + base-relative park* below,
    folded together with **HR-7/8/9/10/13** (`PReview.md` §2). Design settled for the ordering half;
-   nothing depends on it and the base machinery underneath is verified.
+   nothing depends on it and the base machinery underneath is verified. **HR-21**'s probe include belongs
+   here too, and the stale `G53` comment at the tool-change position should go with it.
+
+   > **Phase 5 is already answered and needs no work.** `isSafeToRapid()` is called only from
+   > `onLinear()` and is scoped to a single section, so the G1→G0 mapper cannot run across the
+   > boundaries Phase 4 injects logic at. Close it as a no-op when Phase 4 lands.
 5. **The professional review proper** — the pass that produces `PReview.md`'s real content, using the
    method `HReview.md` used. Needs a multi-part / multi-fixture job to post against.
 6. **Jet / laser workstream** (`PReview.md` §5) — J5 is a design question before it is a test.
@@ -153,18 +186,27 @@ physical measurement are out of scope, so every row must stand on the posted fil
 - whether the **added-part** `Jog to X0 Y0, Probe Z0` should get HR-1's provisional `Z0` for symmetry
   *(`HReview.md` HR-1; settle on the PA1/M4 run)*;
 - whether **HR-2's** two-signal probe guard keeps its extra breadth or trims to the strict reference
-  form *(`HReview.md` HR-2)*.
+  form *(`HReview.md` HR-2)*;
+- how **HR-26** should be closed — `writeBaseEstablish()` skips the probe for a jet/tool-0 job, but
+  `retractThroughBaseClearance()` has no matching guard and will still transit into the base and emit an
+  absolute `G0 Z` in a frame whose Z0 was never set. **The one place the "never move absolutely in an
+  unestablished frame" rule is broken.** Candidates: a module-level `baseEstablished` flag (the property
+  alone cannot tell you the probe ran), a `validateJob()` refusal, or falling back to the outgoing frame's
+  probe Safe Z as the no-base branch already does *(`PReview.md` §3.4)*;
+- whether **HR-22 (B)** falls through to `Start()` on an empty include *(`HReview.md` §4.3)*.
 
 *The frame-dependence of the `G38.2` probe target is no longer open on the first-part probe modes —
 HR-1 closed it there. It remains open for the `Use Active WCS`, added-part and base probes, which
 descend from a retracted clearance and would be made **worse**, not better, by the same fix.*
 
-**The README was synced on request (2026-07-25 … 2026-07-31)** and its doc-sync marker now points at
+**The README was synced on request (2026-07-25 … 2026-07-31)** and its doc-sync marker points at
 `924d1f6`, covering the probe-target asymmetry, the orientation guard, arc feed scaling, the manual
-spindle prompts and the per-firmware program end. Standing preference is unchanged: **the README is
-not touched during code changes unless asked.** One item is known missing — group 08's include files
-make Fusion raise *"This post processor might be unsafe"* on first use, and a hobbyist who answers No
-gets an aborted post that reads like a missing file. Add it on the next sync.
+spindle prompts and the per-firmware program end. Standing preference is unchanged: **the README is not
+touched during code changes unless asked.** **Four items are now owed to the next sync** and the list is
+kept in `HReview.md` §6 (HW-7's note) so it does not drift: the stale group-03 label, the group-08
+"post processor might be unsafe" prompt, **HR-23's substitution contract** (an include file replaces the
+phase it names — say what a Start file and a Stop file each owe), and the `Tool Change Probe` field that
+does nothing (HR-21).
 
 ---
 
@@ -496,10 +538,10 @@ safety comment. *(Verified all three branches — `PReview.md` §4.)*
   offset**'s added-part halves (`PReview.md` P2/P3) and the multi-part rows generally. **Remaining to
   build:** tool-change ordering + base-relative park (below).
 - **Phase 5 — not started** (likely no-op).
-- **Hobbyist review — verification complete; one confirmed defect open.** 26 findings; **thirteen landed
-  and all thirteen verified**, six moved to `PReview.md`, **no ⬜ rows left**. Open with no fix:
-  **HR-23** (❌ — an include file replaces the preamble/footer, discarding HR-3's and HR-11's fixes; the
-  one release blocker), HR-16, HR-19, HR-21, HR-22 (B), HR-24 and HR-25. Six rows are `read` rather than
+- **Hobbyist review — complete.** 26 findings; **thirteen landed and all thirteen verified**, six moved to
+  `PReview.md`, **no ⬜ rows and no failures left**. Open with no fix:
+  HR-16 and **HR-23** (both recorded as correct-as-designed), HR-19, HR-21, HR-22 (B), HR-24 and
+  HR-25 — one decision and a sweep of one-liners. Six rows are `read` rather than
   `posted`, HW-6 (B) among them — so **the release regression sweep rests on no posted file**. Residuals
   and the single post that would settle three of them are in `HReview.md` §4.2 / §6. Status in §0.
 - **Professional review — not started.** `PReview.md` is a parking lot until it runs.
