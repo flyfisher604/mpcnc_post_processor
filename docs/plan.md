@@ -9,7 +9,7 @@ and findings live in the two review files:
 
 | File | Owns |
 |---|---|
-| `docs/HReview.md` | The hobbyist review, its nine landed fixes, and the hobbyist verification record |
+| `docs/HReview.md` | The hobbyist review, its eleven landed fixes, and §0 — the register of every test and its state |
 | `docs/PReview.md` | The professional side: five deferred findings plus HR-20, every multi-WCS / base / tool-change / dialog test row, and the jet/laser workstream. **The professional review itself has not been done** |
 | this file | Design record, remaining work, resolved decisions |
 
@@ -19,125 +19,106 @@ and findings live in the two review files:
 
 *Written so a fresh session can resume with no other context. Update it when the situation moves.*
 
-**Baseline.** Branch **`v4.0-hreview-fixes`**, cut from `wcs-reworked-flow` at `baf37bf`, now at the
-session-1 results commit. Working tree clean apart from an untracked `MPCNC_v4.0_Beta1.zip`
-(unrelated; add it or ignore it). **Nothing is half-done and nothing is known-broken.**
+**Baseline.** Branch **`v4.0-hreview-fixes`**, cut from `wcs-reworked-flow` at `baf37bf`. Working tree
+clean apart from two untracked files, both deliberate: `MPCNC_v4.0_Beta1.zip` (unrelated; add it or
+ignore it) and **`Personal.cps`** (a test harness — see below). **Nothing is half-done and nothing is
+known-broken.**
 
-**Session 1 is done (2026-07-31).** Eight posted files closed **six** findings with evidence —
-**HR-1, HR-3, HR-5, HR-6, HR-11, HR-15** — and evidenced **HR-17 (A)(B)(D)**. The file table is in
-`HReview.md` §3; `H11c - GRBL.gcode` is the current GRBL/mm reference and `H15a - GRBL.gcode` the
-mapping-on one. **`H2.gcode` is retired as a comparison baseline** (it predates HR-17); keep it only
-as HR-17's "before".
+**Status lives in one place: `HReview.md` §0**, a 67-row register naming every hobbyist test, how it
+was settled, its evidence file and its state — currently **52 pass, 0 fail, 8 unrun, 7 n/a or moved**.
+Nothing else in that file records a pass; if the two ever disagree the register is wrong and must be
+fixed. Read it first. The professional side is `PReview.md`, still a parking lot.
 
-**Session 2 — the inch session — is also done (2026-07-31).** Four files closed **HR-4 (A)(B)(C1)(D)**
-and gave the project its first inch output of any kind: `H4base - GRBL Inch.gcode` is the inch
-reference.
+**Eleven fixes have landed on this branch**, one commit each
+(`git log --oneline --grep='^HR-'`). Ten are closed with posted evidence; **HR-12** landed last and
+owes two of its five rows. Five posting sessions ran on 2026-07-31 — Marlin/RRF, inch, the G1→G0
+mapper, drill + tap, and coolant — and their file tables are in `HReview.md` §3. The reference files
+worth knowing: `H11c - GRBL.gcode` (GRBL/mm), `H4base - GRBL Inch.gcode` (inch), `H15a - GRBL.gcode`
+(mapping on), `Link.gcode` (two-op, one-tool, HP-5 shape). **`H2.gcode` is retired as a baseline** — it
+predates HR-17; keep it only as HR-17's "before".
 
-**Session 3 — the mapper session — is also done (2026-07-31), and it overturned a diagnosis this file
-had been repeating.** `isSafeToRapid()`'s conversion branches were recorded here and in `HReview.md`
-as *"needs CAM, not a dialog change"*. **That was wrong.** The function has one caller, `onLinear()`,
-so on a **paid** Fusion licence — which emits real rapids — the entire `03 - Map G1s to Rapids` group
-is unreachable whatever the toolpath does. It exists to recover rapids that Fusion **Personal**
-downgrades to feed moves. Three posted files were spent on the wrong hypothesis before anyone read the
-call graph. Closed instead with `Personal.cps`, an uncommitted scratch copy that reroutes `onRapid()`
-into `onLinear()`: 74 conversions at a 5.08 threshold, 2 at 15, zero unjustified, zero eligible-but-
-refused, and all 17,779 cut moves untouched. Full result and the method note in `HReview.md` §6 / §8.
+**What is left, and none of it needs new CAM except one tool.**
 
-**Session 4 — the drill + tap session — is also done (2026-07-31).** One file, `Drill_Tap.gcode`,
-closed **HR-2 (A)(A2)** and **HR-17 (C)**: the peck drill expands to plain `G0`/`G1` with no `G8x` and
-reaches STOP end, and the tapping warning is present eight times, single-spaced. It also exposed
-`spindleOn()`'s manual branch discarding every change after the first prompt, in two forms. **Scope
-call taken: drilling must work, tapping may error or warn, and a fuller tapping implementation is
-professional-review work.** So the RPM half is `HReview.md` HR-12 — **moved back out of `PReview.md`,
-because its mechanism involves no tool change and two operations on one tool at different RPMs is HP-5
-exactly** — and the spindle-reversal half is `PReview.md` **HR-20**, professional by that decision.
+| | Rows | Note |
+|---|---|---|
+| Verify HR-12 | `HR-12 (A3)`, `(A4)` | (A3) is a re-post of the drill+tap CAM; (A4) needs a **counterclockwise-running tool**, the only thing left to build |
+| Restore lost evidence | — | re-post Link's CAM at `Manual Spindle On/Off` = **false** as `HR12-auto - GRBL.gcode`; see the overwrite note below |
+| Cheap posts | `HW-3`, `HW-4`, `HW-5` | `Probe Pause` = `No` then `Before`; the HP-1 baseline in one file |
+| One-offs | `HR-6 (B)`, `HR-18 (A)`, `HW-6` | a rotated Setup; a stop file with no trailing newline; the regression sweep, last by definition |
+| A decision | `HR-18` | whether to add the `loadFile()` newline guard at all |
 
-**Session 5 — the coolant session — is also done (2026-07-31).** Five files on the drill CAM closed
-**HR-14**, the last landed fix that owed a post. `Drill Flood Mist.gcode` and
-`Drill Flood Mist (No).gcode` are the decisive pair — one property apart, match against warning — and
-the run added first-ever Channel B coverage as a new row, HR-14 (D).
+**Three things a fresh session will otherwise get wrong.**
 
-**HW-2 closed on 2026-07-31.** Its (A) half — WCS re-selection suppression, the
-`forceSectionToStartWithRapid` lifecycle, position tracking across a section boundary — fell out of
-*reading* `Link.gcode`, no post at all. Its (B) half could not be verified on the manual path, where
-correct and defective emit byte-identical output; one post at `Manual Spindle On/Off` = false
-(`Speed Change.gcode`) closed it, and **incidentally turned HR-12 from a reading into a witnessed
-defect**: the two operations run at 12000 and 10000 RPM, and on the default manual path the second
-change is never announced. One tool, no tool change — HP-5 exactly.
+**(1) Fusion posts with its own copy** of the `.cps` at `%APPDATA%\Autodesk\Fusion 360 CAM\Posts\`.
+Session 1 was posted twice because the first run used a copy three hours stale, and **HR-11 (C) and (D)
+would have been recorded as false PASSes** — both assert an absence, which a build lacking the feature
+satisfies trivially. Copy the post, then **date the output** against a token the newest commit changed.
 
-**Every landed fix is now closed with posted evidence, and no unrun row needs new CAM.**
-`HReview.md` §0 is the authoritative register: **66 rows — 49 pass, 0 fail, 10 unrun, 7 n/a.**
+**(2) Read the posted file's own property dump before believing a row ran.** Session 1's first six
+files had the whole `03` group `false`, which is what left HR-15 unrun rather than passed; the same
+trap caught the first `Personal.cps` run.
 
-**HR-12 landed on 2026-07-31** — the eleventh fix on this branch, and the first since the review docs
-were reorganised. The manual spindle path now prompts on a speed **or** direction change; a clockwise
-job's start prompt is byte-identical, so no saved reference moves. Its filed diff had been wrong (a
-bare `else` would have added seven spurious pauses to a tapping job, because `setSpindeSpeed()` fires
-on direction as well as speed) and the correction is recorded rather than quietly applied. Two
-decisions taken with it: **direction is named only when counterclockwise at job start but always on a
-change prompt**, and **tapping is not refused under manual control** — someone will make that path
-work, so the post warns instead. That part-fixes `PReview.md` **HR-20**, which keeps the fuller
-tapping implementation. What is
-left is four cheap posts on existing CAM (`HW-2`…`HW-5`), three one-offs (`HR-6 (B)`, `HR-18 (A)`,
-`HW-6` the final sweep), and two decisions that need code rather than posting (`HR-12`, `HR-18`).
-Ranked in `HReview.md` §3.
+**(3) Posted `.gcode` is not in the repo, so a reused filename destroys evidence with no way back.**
+`Speed Change.gcode` held HW-2 (B)'s automatic-branch evidence and was overwritten by HR-12 (A) under
+the same name; the result survived only because it had been quoted verbatim in `HReview.md`. **Name a
+post for the row it serves** (`HR12a`), not for what the job does, and grep `HReview.md` for the
+filename before re-posting. The re-post that restores it is in the table above.
 
-**Two operational lessons from session 1, both cheap to forget and expensive to repeat.**
-**(1) Fusion posts with its own copy** of the `.cps` at
-`%APPDATA%\Autodesk\Fusion 360 CAM\Posts\` — session 1 was posted twice because the first run used a
-copy three hours stale, and **HR-11 (C) and (D) would have been recorded as false PASSes**, since both
-assert an absence that a build lacking the feature satisfies trivially. **Copy the post, then date the
-output** against a token the newest commit changed. **(2) Read the posted file's own property dump
-before believing a row ran** — session 1's first six files had the whole `03` group `false`, which is
-what left HR-15 unrun rather than passed.
+**`Personal.cps` — an uncommitted test harness, excluded via `.git/info/exclude`.** A copy of the post
+with `onRapid()` rerouted into `onLinear()`, which is what Fusion **Personal** does on its own. It
+exists because `isSafeToRapid()` has exactly one caller and is therefore **unreachable on a paid
+licence whatever the toolpath does** — a diagnosis that cost three posted files before anyone read the
+call graph. It closed `HW-1`. Its output is evidence about *logic*, never about what the post emits;
+re-create it from the current `.cps` rather than maintaining it. Full account in `HReview.md` §6 / §8.
 
 **Every remaining row can be verified by reading a posted file.** The one exception — whether
-Marlin/RRF honour `M2` (HR-11) — was closed on 2026-07-31 by reading the *firmware* source rather
-than running a controller: Marlin has never implemented `M2`, RRF gained it in 3.5.1, so the post now
-emits it on RepRap only. Full evidence in `HReview.md` → HR-11; the reusable lesson is in §8.
+Marlin/RRF honour `M2` (HR-11) — was closed by reading the *firmware* source rather than running a
+controller: Marlin has never implemented `M2`, RRF gained it in 3.5.1, so the post now emits it on
+RepRap only. Evidence in `HReview.md` → HR-11; the reusable lesson is in §8, along with six others
+worth reading before starting a session.
 
-**The docs were reorganized at `4db467b`** (2026-07-31), which is why nothing here reads like the
-per-row tracking it replaced. Three files now, split along the hobbyist/professional line the work had
-already taken; `docs/test-plan.md` was dissolved into the two review files and deleted (recover it with
-`git log --follow -- docs/test-plan.md`). Pruning rule applied throughout, and worth keeping to:
-**verified + committed → one paragraph; committed but unposted → the finding plus its Do→Get row and
-any as-built decision the code does not already state; unimplemented → keep the proposed diff.** A
-restated diff of committed code is noise — read the code and the commit message instead.
+**The docs were reorganized at `4db467b`** (2026-07-31). Three files now, split along the
+hobbyist/professional line the work had already taken; `docs/test-plan.md` was dissolved into the two
+review files and deleted (recover it with `git log --follow -- docs/test-plan.md`). Pruning rule,
+worth keeping to: **verified + committed → one paragraph; committed but unposted → the finding plus its
+Do→Get row and any as-built decision the code does not already state; unimplemented → keep the proposed
+diff.** A restated diff of committed code is noise — read the code and the commit message instead.
 
 **Standing rule — a code change is not done until its review file is updated**, in the same commit:
 hobbyist behaviour → `HReview.md`, professional behaviour → `PReview.md`. Add the Do→Get row, name the
-discriminator, and flag any row whose saved `.gcode` the change invalidates. The full rule is at the
-top of each file. It is a priority, not a courtesy — a stale PASS is worse than an unrun test.
+discriminator, and flag any row whose saved `.gcode` the change invalidates. It is a priority, not a
+courtesy — a stale PASS is worse than an unrun test.
 
 **How verification works here:** post the job from Fusion and read the g-code. Machine dry-runs and
 physical measurement are out of scope, so every row must stand on the posted file alone.
 
 **Next actions, in order.**
 
-1. ~~Session 1 — Marlin + RRF~~ — **done 2026-07-31**, six findings closed. See above.
-2. ~~Session 2 — GRBL/inch~~ — **done 2026-07-31**, **HR-4** closed. ~~Session 3 — the mapper~~ —
-   **done 2026-07-31**, **HW-1** closed by harness. Both above.
-3. ~~Session 4 — drill + tap~~ — **done 2026-07-31**, **HR-2** and **HR-17** closed. ~~Session 5 —
-   coolant~~ — **done 2026-07-31**, **HR-14** closed. **No posting session remains**: the eight unrun
-   rows are four cheap posts on existing CAM, three one-offs, and two code decisions. `HReview.md` §3.
-4. **Decide HR-18** — `loadFile()` adds no newline after an included file, so with `Info` comments
-   suppressed the next block merges onto the include's last line (`M5M400`). Found in session 1,
-   deliberately unfixed: the one-line guard sits in the `loadFile()` every include branch shares, and
-   none of those branches has a test row. Diagnostic post specified in `HReview.md` §4.3.
-   **HR-19** (doubled space in `M291`) waits for the next tidy-up sweep.
-5. ~~CAM-dependent gap: `isSafeToRapid()`~~ — **closed 2026-07-31 as `HW-1`**, by harness rather than
-   by CAM. See the session-3 note above; the standing consequence for *this* file is **Phase 5** below,
-   which can now be answered: the mapper is `onLinear()`-only and single-section-scoped, so it cannot
-   run across the boundaries Phase 4 injects logic at.
-6. **Dialog-only checks, no posting** — **D1** and **D3**'s dialog half (`PReview.md` §3.3). D3 gates
+1. **Finish the hobbyist verification — 8 rows, listed in the checkpoint table above and specified in
+   `HReview.md` §0/§3.** Five posting sessions are done and eleven fixes have landed; what remains is
+   two rows verifying HR-12, one re-post restoring overwritten evidence, three cheap posts on CAM that
+   already exists, and three one-offs. Only **HR-12 (A4)** needs anything built — a counterclockwise
+   tool. `HW-6`, the regression sweep, goes last by definition.
+2. **Decide HR-18** — `loadFile()` adds no newline after an included file, so with `Info` comments
+   suppressed the next block merges onto the include's last line (`M5M400`). Deliberately unfixed: the
+   one-line guard sits in the `loadFile()` every include branch shares, and none of those branches has
+   a test row. Diagnostic post specified in `HReview.md` §4.3. **HR-19** (doubled space in `M291`, plus
+   `()` against `( )` on the two `onSectionEnd()` lines) waits for the next tidy-up sweep.
+
+   > **Phase 5 is already answered and needs no work.** `isSafeToRapid()` is called only from
+   > `onLinear()` and is scoped to a single section, so the G1→G0 mapper cannot run across the
+   > boundaries Phase 4 injects logic at. Close it as a no-op when Phase 4 lands.
+
+3. **Dialog-only checks, no posting** — **D1** and **D3**'s dialog half (`PReview.md` §3.3). D3 gates
    trust in every dialog row: a saved preset should survive, but a posted file cannot tell a surviving
    preset from re-entered values. HR-17 renamed group 03's label, so D3 now has a real string change
    on that group to survive, not just the reorder.
-7. **Open the Tool Change branch** — *Phase 4 — tool-change ordering + base-relative park* below,
+4. **Open the Tool Change branch** — *Phase 4 — tool-change ordering + base-relative park* below,
    folded together with **HR-7/8/9/10/13** (`PReview.md` §2). Design settled for the ordering half;
    nothing depends on it and the base machinery underneath is verified.
-8. **The professional review proper** — the pass that produces `PReview.md`'s real content, using the
+5. **The professional review proper** — the pass that produces `PReview.md`'s real content, using the
    method `HReview.md` used. Needs a multi-part / multi-fixture job to post against.
-9. **Jet / laser workstream** (`PReview.md` §5) — J5 is a design question before it is a test.
+6. **Jet / laser workstream** (`PReview.md` §5) — J5 is a design question before it is a test.
 
 **Open decisions carried forward.** Each is written up where it lives:
 
@@ -492,9 +473,9 @@ safety comment. *(Verified all three branches — `PReview.md` §4.)*
   offset**'s added-part halves (`PReview.md` P2/P3) and the multi-part rows generally. **Remaining to
   build:** tool-change ordering + base-relative park (below).
 - **Phase 5 — not started** (likely no-op).
-- **Hobbyist review — code complete for this branch's scope.** 17 findings; nine landed, five moved to
-  `PReview.md`, HR-16 recorded with no fix, HR-17 tidy-ups pending. Verification status in
-  `HReview.md` §3.
+- **Hobbyist review — code complete for this branch's scope.** 20 findings; **eleven landed**, five
+  moved to `PReview.md`, HR-16 and HR-19 recorded with no fix, HR-18 awaiting a decision. Ten of the
+  eleven are closed with posted evidence; HR-12 owes two rows. Status in `HReview.md` §0.
 - **Professional review — not started.** `PReview.md` is a parking lot until it runs.
 
 ## Completed reviews (archived)

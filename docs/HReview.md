@@ -6,7 +6,7 @@ point, and every property branch a hobbyist can reach. **Findings:** 19 (`HR-1`�
 on branch `v4.0-hreview-fixes`; six reclassified as professional and moved to `docs/PReview.md`.
 
 **Ten of the eleven landed fixes are closed with posted evidence** — HR-1, HR-2, HR-3, HR-4, HR-5,
-HR-6, HR-11, HR-14, HR-15, HR-17. **HR-12** landed on 2026-07-31 and owes its four rows. **No unrun row needs new CAM.** What remains carries no fix yet: **HR-12** (the
+HR-6, HR-11, HR-14, HR-15, HR-17. **HR-12** landed on 2026-07-31 and owes two of its five rows. **No unrun row needs new CAM.** What remains carries no fix yet: **HR-12** (the
 manual spindle is never told about an RPM change — moved back from `PReview.md`), **HR-18**
 (`loadFile()` newline, a real corruption path), **HR-16** and **HR-19** (recorded, cosmetic or no fix
 proposed), plus the `HW` rows in §6.
@@ -40,7 +40,7 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**66 tests — ✅ 49 PASS · ❌ 0 FAIL · ⬜ 10 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
+**67 tests — ✅ 52 PASS · ❌ 0 FAIL · ⬜ 8 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
 
 **Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
 post and is the only method that proves what a hobbyist receives. `harness` is a node run against
@@ -88,10 +88,11 @@ for.
 | **HR-11 (C)** | GRBL tail untouched | posted | `H11c - GRBL.gcode` | ✅ |
 | **HR-11 (D)** | Stop file bypasses the whole stop block | posted | `H11d - Marlin.gcode` | ✅ |
 | **HR-11 (S)** | Whether Marlin / RRF honour `M2` | source | `gcode.cpp`, `GCodes2.cpp`, RRF changelog | ✅ |
-| **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | — | fix landed; re-post `Link.gcode`'s CAM | ⬜ |
-| **HR-12 (A2)** | Two operations at the *same* RPM still give one prompt | — | needs the fix | ⬜ |
-| **HR-12 (A3)** | Every tapping reversal is announced — 8 prompts, alternating | — | re-post `Drill_Tap.gcode` | ⬜ |
-| **HR-12 (A4)** | A counterclockwise start names the direction; clockwise does not | — | any CCW-first job | ⬜ |
+| **HR-12 (A)** | Manual spindle prompts on an RPM change between operations | posted | `Speed Change.gcode` vs `Link.gcode` | ✅ |
+| **HR-12 (A2)** | Two operations at the *same* RPM still give one prompt | posted | `Speed Change (No Change).gcode` | ✅ |
+| **HR-12 (A3)** | Every tapping reversal is announced — 8 prompts, alternating | — | re-post the drill+tap CAM as `HR12c - GRBL.gcode` | ⬜ |
+| **HR-12 (A4)** | A counterclockwise start names the direction | — | needs a CCW-first tool; post as `HR12d - GRBL.gcode` | ⬜ |
+| **HR-12 (A5)** | A **clockwise** start prompt is unchanged — no direction word | posted | `Speed Change.gcode`, byte-identical to `Link.gcode` | ✅ |
 | **HR-14 (A)** | `Flood and Mist` matches a channel | posted | `Drill Flood Mist.gcode` | ✅ |
 | **HR-14 (B)** | Warning names the mode the operator saw | posted | `Drill Flood Mist (No).gcode` | ✅ |
 | **HR-14 (C)** | Ordinary `Flood` unchanged | posted | `Drill Flood.gcode` | ✅ |
@@ -110,17 +111,17 @@ for.
 | **HR-20** | A fuller tapping implementation | — | → `PReview.md`; the manual path now prompts (HR-12), the automatic path always emitted `M4` | ➖ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
 | **HW-2 (A)** | HP-5 boundary: WCS suppression, rapid lifecycle, position tracking | posted | `Link.gcode` | ✅ |
-| **HW-2 (B)** | HP-5 boundary: a spindle-speed change between operations | posted | `Speed Change.gcode` | ✅ |
+| **HW-2 (B)** | HP-5 boundary: a spindle-speed change between operations | posted | ⚠ evidence file **overwritten** — re-post as `HR12-auto - GRBL.gcode` | ✅ |
 | **HW-3** | `Probe Pause = No` — neither prompt | — | cheap; folds into any GRBL session | ⬜ |
 | **HW-4** | `Probe Pause = Before` — attach only | — | cheap; folds into any GRBL session | ⬜ |
 | **HW-5** | The documented HP-1 baseline in one file | — | no file has ever had all of it at once | ⬜ |
 | **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 10 ⬜ rows are waiting on — three things, not ten.** **HR-12's four rows**, which all verify
-one landed change on CAM that already exists; **three cheap posts** (HW-3, HW-4, HW-5); and **three
-one-offs** (HR-6 (B) a rotated Setup, HR-18 (A) a stop file, HW-6 the final sweep).
-**No unrun row needs new CAM.** Ranked in [§3](#3-status).
+**What the 8 ⬜ rows are waiting on — three things, not eight.** **HR-12 (A3) and (A4)**, which verify
+a landed change; **three cheap posts** (HW-3, HW-4, HW-5); and **three one-offs** (HR-6 (B) a rotated
+Setup, HR-18 (A) a stop file, HW-6 the final sweep). **No unrun row needs new CAM** — only (A4) needs
+anything built, a tool that runs counterclockwise. Ranked in [§3](#3-status).
 
 **The one honest gap inside a ✅.** HR-4 (C2) and HW-1 are the only rows carried by `harness` alone.
 They prove `isSafeToRapid()`'s logic is right; they do **not** prove a real post ever reaches it,
@@ -247,7 +248,7 @@ the last column says only whether the fix's rows are all in.
 | **HR-11** | Marlin/RRF `M84 S60` timeout restore; program end (`M2`) on RRF only | `7a35f7f` + `8054b6e` | **Every Marlin/RRF job's tail.** GRBL untouched | all in |
 | **HR-14** | `coolantLevels` derived from `eCoolant` so both compound modes match | `7e38777` | Coolant-channel jobs only; defaults `Off` | all in |
 | **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | all in |
-| **HR-12** | Manual spindle prompts on a speed **or** direction change | `dd8e11d` | Manual-spindle jobs with >1 speed or a reversal; clockwise start prompts byte-identical | (A)–(A4) owed |
+| **HR-12** | Manual spindle prompts on a speed **or** direction change | `dd8e11d` | Manual-spindle jobs with >1 speed or a reversal; clockwise start prompts byte-identical | (A3)(A4) owed |
 | **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | `924d1f6` | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | (C) owed with the tap |
 
 Open with no code change: **HR-16** (recorded, no fix proposed), **HR-18** (`loadFile()` newline — has
@@ -1013,27 +1014,39 @@ prompts in its tap section. **No row's assertions move** — HR-2 (A) asserts no
 end, HR-2 (A2) and HR-17 (C) assert the tapping warning text, and all three survive — but a diff will
 show a difference that is not a regression.
 
-**Do (A) — the speed change is announced.** Re-post `Link.gcode`'s CAM (two operations, one tool, 12000
-then 10000), `Manual Spindle On/Off` on. **Get (A):** `M0 (MSG Turn ON 12000 RPM)` before section 1,
-then `( >>> Spindle Speed: Manual change)` → **`M0 (MSG Set spindle to 10000 RPM clockwise)`** before
-section 2. **Pass:** two prompts; the second names 10000 **and** the direction.
+**Verified (A)(A2)(A5) — 2026-07-31, three of the five rows.**
 
-**Do (A2) — the common case gains no stop.** Two operations at the **same** RPM and direction.
-**Get (A2):** one prompt. **Pass:** exactly one — `setSpindeSpeed()` short-circuits before `spindleOn()`
-is reached, and if it ever stopped doing so this row would catch it.
+**(A) `Speed Change.gcode`** — Link's two-operation CAM (12000 then 10000, one tool), defaults.
+`M0 (MSG Turn ON 12000 RPM)` before section 1, then `( >>> Spindle Speed: Manual change)` →
+**`M0 (MSG Set spindle to 10000 RPM clockwise)`** before section 2. Diffed against `Link.gcode` — the
+same CAM and the same dialog, one build apart — the delta is the timestamp plus **exactly those two
+lines** (`2315a2316,2317`). Nothing else in 19,338 lines moved.
 
-**Do (A3) — every reversal is announced.** Re-post `Drill_Tap.gcode` unchanged. **Get (A3):** the drill's
-`M0 (MSG Turn ON 2220 RPM)`, then in the tap section **eight** further prompts — one for the speed
-change into the tap, then **seven alternating**
+**(A2) `Speed Change (No Change).gcode`** — the same job with operation 2 set to 12000 as well. One
+prompt, no `Manual change` line; diffed against (A) the delta is exactly those two lines removed.
+**The pair is what makes (A2) mean anything:** a manual post records an operation's RPM *nowhere* but
+in the prompt, so on its own this file cannot prove the two speeds are equal. Posted two minutes later
+on the same build that demonstrably prompts on a change, absence here plus presence there settles both
+directions. The "absence rows need a presence-based sibling" rule in §8, applied.
+
+**(A5) — the regression guard, free from both files.** Each starts `M0 (MSG Turn ON 12000 RPM)` with
+**no direction word**, and that line does not appear in the `Link.gcode` diff at all: byte-identical
+across the fix. Every saved single-operation reference is therefore untouched, which is the whole
+justification for naming direction only when counterclockwise at job start.
+
+**Do (A3) — every reversal is announced.** Re-post the drill + tap CAM unchanged, **to a new name**
+(`HR12c - GRBL.gcode`; `Drill_Tap.gcode` is HR-2's evidence and this row's "before"). **Get (A3):** the
+drill's `M0 (MSG Turn ON 2220 RPM)`, then in the tap section **eight** further prompts — one for the
+speed change into the tap, then **seven alternating**
 `M0 (MSG Set spindle to <n> RPM counterclockwise)` / `... clockwise`, one for each of the seven
 direction-only calls at lines 253, 256, 267, 270, 281, 284 and 295. **Pass:** eight, alternating, and
 **no reversal left silent**. *(This row previously demanded **zero** prompts here. That was correct for
 the speed-only fix and is exactly backwards now — see the box below.)*
 
-**Do (A4) — a counterclockwise start.** Any job whose first tool runs counterclockwise. **Get (A4):**
-`M0 (MSG Turn ON <n> RPM counterclockwise)`. **Pass:** the word is present. Second check, and the one
-that protects every saved file: a **clockwise** job's start prompt still reads `Turn ON <n> RPM` with
-**no** direction word.
+**Do (A4) — a counterclockwise start.** Any job whose **first** tool runs counterclockwise; post as
+`HR12d - GRBL.gcode`. **Get (A4):** `M0 (MSG Turn ON <n> RPM counterclockwise)`. **Pass:** the word is
+present. *This is the only remaining hobbyist row that needs anything built — a left-hand tap, or a
+tool defined to run anticlockwise. Its companion check is already closed as (A5).*
 
 > **Harness-verified before and after** (`node`, `spindleOn()` extracted by brace-matching so it is the
 > shipped code, not a hand-copy). Against `HEAD` the pre-fix function gives **one** prompt for (A) and
@@ -1347,6 +1360,13 @@ Recording the negative results, because "we looked" is part of the confidence cl
   that contrast is the evidence, not the "after" alone. Same lesson as the fail-open trace, applied to
   harnesses. *(Mechanics — extracting functions from the `.cps` and `eval`ing them against stubbed
   kernel globals — are in `plan.md` → Workflow notes.)*
+- **The register cites files that live outside version control — a reused name is evidence
+  destroyed.** Posted `.gcode` lives in Fusion's NC folder, not the repo, so nothing recovers an
+  overwritten one. `Speed Change.gcode` was the automatic-branch evidence for HW-2 (B) and the
+  automatic half of HR-12's witness pair; HR-12 (A) was then posted over it under the same name. The
+  results survived only because both had already been quoted verbatim in this file. **Name a post for
+  the row it serves, not for what the job does** — `HR12a`, not `Speed Change` — and before re-posting
+  anything, grep this file for the filename.
 - **A defect that suppresses output makes its own containing behaviour unverifiable — switch to the
   branch that emits.** HW-2 (B) asks what happens to the spindle speed at a section boundary, and on
   the **manual** path the correct answer (same RPM, one prompt, `setSpindeSpeed()` short-circuits) and
