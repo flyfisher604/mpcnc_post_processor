@@ -12,10 +12,10 @@ throughout; **four rows across HR-6, HR-12 and HR-18 are closed by `read`** beca
 would need does not exist — each carries a named residual in §4.2. **`HW-6 (B)`, the posted regression
 sweep, is also `read`**, so the release sweep rests on no posted file.
 
-**What remains carries no fix, and one of it is a confirmed defect: `HR-23`** — a Start/Stop include
-*replaces* the preamble/footer, discarding HR-11's stepper-timeout restore and HR-3's manual-spindle-off
-prompt. **That is the one item that should block a release or be a documented known issue in it.** Also
-open, all latent or cosmetic: **HR-16**, **HR-19**, **HR-21**, **HR-22 (B)**, **HR-24**, **HR-25**.
+**Nothing is failing and nothing is unrun.** What remains carries no fix: **HR-16** and **HR-23**
+(recorded — HR-23 is designed behaviour, an include file substitutes for the post's block rather than
+adding to it), **HR-19**, **HR-21**, **HR-24** and **HR-25** (a tidy-up sweep of one-liners), and
+**HR-22 (B)** (one behaviour decision).
 
 **Every test and its state is in [§0 Test register](#0-test-register--every-test-and-its-state)** —
 one table, 76 rows, the only place a pass or fail is recorded, and **complete: every `H`/`HR`/`HW` id
@@ -47,16 +47,12 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**83 tests — ✅ 64 PASS · ❌ 1 FAIL · ⬜ 0 UNRUN · ➖ 18 n/a or moved to `PReview.md`.**
+**83 tests — ✅ 65 PASS · ❌ 0 FAIL · ⬜ 0 UNRUN · ➖ 18 n/a or moved to `PReview.md`.**
 
-> **⚠ The first ❌ in this register: `HR-23`.** A Start or Stop include file **replaces** the preamble or
-> footer rather than adding to it, so naming a stop file silently discards **HR-11**'s `M84 S60` stepper-
-> timeout restore, **HR-3**'s manual-spindle-off prompt, and the program end (`M30`/`M2`). Both are
-> machine-safety items and both are landed fixes. Witnessed by a file already on disk — `H11d - Marlin.gcode`
-> against `H11a.gcode` — and **not** a regression: it has always behaved this way. HR-11 (D) asserts the
-> bypass happens and is correct; it never asked whether the bypass should extend that far. **A fix is a
-> behaviour decision on a shipped property, so none has been taken** — §4.3 has three candidates and a
-> recommendation. This is the one item that should block a release, or be a documented known issue in it.
+> **Nothing is failing and nothing is unrun.** The hobbyist review is verification-complete. What is left
+> is a tidy-up sweep (**HR-19**, **HR-21**, **HR-24**, **HR-25** — all one-liners, none changing behaviour
+> today), one behaviour decision (**HR-22 (B)**, the named-but-empty Start include), and two recorded
+> no-fix observations (**HR-16**, and **HR-23**, which is designed behaviour — see §4.3).
 
 > **No ⬜ rows remain.** `HW-6 (B)` was closed by inspection on direction (§6) — worth knowing that
 > **the release sweep therefore rests on no posted file**; the reasoning is a corollary of HW-6 (A) rather
@@ -171,15 +167,14 @@ A ⬜ row's Method column names what it is waiting for.
 | **HW-5** | The HP-1 baseline in one file (**HP-1 amended** — §1) | posted | `HW5 - GRBL.gcode` + `H15a - GRBL.gcode` | ✅ |
 | **HW-6 (A)** | Static sweep: regression surface bounded, structure intact, harnesses green | harness + read | node — 68 props, 3 harnesses; `git diff dd8e11d..HEAD` | ✅ |
 | **HW-6 (B)** | Posted sweep: the reference set would re-post unchanged | read | posts 1–4 never reach `loadFile()`; 5–6 are (U)'s guard | ✅ |
-| **HR-23** | A Start/Stop include replaces the whole preamble/footer, discarding HR-3's and HR-11's fixes | posted | `H11d - Marlin.gcode` vs `H11a.gcode` — **defect confirmed, no fix chosen** | ❌ |
+| **HR-23** | A Start/Stop include replaces the whole preamble/footer — total substitution, by design | posted | `H11d - Marlin.gcode` vs `H11a.gcode` — **as designed; the operator's file owns the phase** | ✅ |
 | **HR-24** | `writeWCS(section)` consults the global `tool` — HR-15's shape, last instance | read | latent (only ever called with `currentSection`); fix in the next sweep | ➖ |
 | **HR-25** | `wcsGcode(0)` / `wcsName(0)` silently yield `G53` | read | latent (no caller passes 0); fix in the next sweep | ➖ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**Nothing is unrun.** What is *owed* is no longer verification but two decisions and a sweep:
-**HR-23** (the ❌ above — a behaviour decision on include files, and the one release blocker),
-**HR-22 (B)** (empty Start include leaves no preamble), and a tidy-up sweep carrying **HR-19**, **HR-21**,
-**HR-24** and **HR-25**. Ranked in [§3](#3-status).
+**Nothing is unrun.** What is *owed* is no longer verification but one decision and a sweep:
+**HR-22 (B)** (a named-but-empty Start include leaves no preamble) and a tidy-up sweep carrying
+**HR-19**, **HR-21**, **HR-24** and **HR-25**. Ranked in [§3](#3-status).
 
 **Two closures rest on reading rather than posting, and both are release-relevant.** `HW-6 (B)` — the
 posted regression sweep — and `HR-18 (A)(B)`. §6 names the single post that would settle all three, using
@@ -456,10 +451,16 @@ it found:
 
 | | Finding |
 |---|---|
-| ❌ | **HR-23** — a Start/Stop include *replaces* the preamble/footer, discarding HR-11's `M84 S60` and HR-3's manual-spindle-off prompt. Witnessed by files already on disk. **The one release blocker.** |
+| ✅ | **HR-23** — a Start/Stop include *replaces* the preamble/footer. **Filed as a defect, resolved as designed behaviour the same day:** an operator who supplies a custom file wants theirs *instead of* the post's, not as well. The rationale and what the file inherits are in §4.3 |
 | ➖ | **HR-24** — `writeWCS(section)` consults the global `tool`; HR-15's shape, last instance. Latent |
 | ➖ | **HR-25** — `wcsGcode(0)` → `G53`, against the standing "Never `G53`". Latent |
 | → | **HR-26** — the base-clearance retract has no jet guard though the base *establish* does, so a jet multi-WCS job can move absolutely in an unestablished base frame. `PReview.md` §3.4 |
+
+> **HR-23 is the one the inspection got wrong, and it is worth knowing why.** The reading was accurate —
+> a stop include really does drop `M84 S60` and the spindle-off prompt — but it treated "two landed fixes
+> stop being emitted" as necessarily a defect. It is not: the fixes are part of a block the operator has
+> deliberately replaced. **The lesson for the next reviewer: before calling a bypass a defect, ask whether
+> the bypass is the feature.** Total substitution is the include contract.
 
 **One candidate finding was withdrawn on checking**, and it is worth recording so it is not re-raised:
 `toolChange()`'s re-probe is guarded only by `tool.number != 0`, with no `isJetTool()` test — but
@@ -476,15 +477,15 @@ the two just-positioned ones; `writeBaseEstablish()`'s R1 restore and its no-XY-
 return; `writeWcsOrigin()`'s per-axis `undefined` handling; and the whole property structure (§6, HW-6 (A)
 item 4).
 
-Remaining — **no verification, but two decisions and a sweep**:
+Remaining — **no verification, one decision and a sweep**:
 
-1. **Decide HR-23.** §4.3 has three candidates; the recommendation is (a), move the machine-state items
-   outside the include branch. It is a behaviour change on a shipped property, which is why it is a
-   decision and not a repair.
-2. **Decide HR-22 (B)** — the named-but-empty Start include. Same family.
-3. **A tidy-up sweep** carrying **HR-19**, **HR-21**, **HR-24** and **HR-25** — all one-liners, none
+1. **Decide HR-22 (B)** — a named-but-**empty** Start include leaves `G90`/`G21`/`G94`/`G17` unwritten.
+   Note this is *not* HR-23: there the operator supplied a file and owns its contents, here the file is
+   empty so nobody supplied anything and the post silently emits no preamble. Falling through to `Start()`
+   is the likely answer; §4.3 has the options.
+2. **A tidy-up sweep** carrying **HR-19**, **HR-21**, **HR-24** and **HR-25** — all one-liners, none
    changing behaviour today.
-4. **Evidence, not verification:** six rows are `read` rather than `posted`, `HW-6 (B)` among them.
+3. **Evidence, not verification:** six rows are `read` rather than `posted`, `HW-6 (B)` among them.
    **One post settles three** — `Stop File.gcode` as the Stop include on the Marlin job at Comment Level
    `Important` (HR-18 (A), HW-6 (B), and the `H11d` re-baseline). Also owed: `HR12-auto - GRBL.gcode`.
    HR-6 (B) and HR-12 (A4) need artifacts that do not exist; **HR-6 (B)'s residual is the one that could
@@ -1446,13 +1447,21 @@ where this same line of code actually bites.
 
 *(HR-18 is no longer open — the decision was taken and the guard landed on 2026-08-01; see §4.2.)*
 
-**HR-23 — a Start or Stop include replaces the whole preamble/footer, silently discarding the fixes that
-live in it.** *(Medium; found 2026-08-01 by the full code inspection, and **witnessed by a file already on
-disk**.)* `onClose()` puts the entire footer inside `if (B_Include_StopFile == "")`. Name a stop file and
-**all of it** is skipped — not augmented, replaced. The same shape applies to `A_Include_StartFile`, which
-skips `Start()` (`G90`/`G21`/`G94`/`G17`).
+**HR-23 — a Start or Stop include replaces the whole preamble/footer. ✅ Working as designed** — filed as
+a defect by the 2026-08-01 inspection and **resolved as correct behaviour by decision the same day.**
 
-`H11d - Marlin.gcode` against `H11a.gcode` — the same Marlin job, one property apart — is the finding:
+**The contract is total replacement, and that is the point.** An operator who supplies a custom start or
+stop file is saying *"emit mine, not yours"* — they do not want the post's block **as well**. Merging the
+two would be worse than either: the post cannot know whether the operator's file already stops the
+spindle, restores the timeout or ends the program, so augmenting risks a duplicated `M30`, a second
+spindle-off prompt, or two contradictory `M84`s, and the operator loses the ability to *not* emit
+something. **The include file owns the whole phase, and the operator owns the include file.** That is why
+`onClose()` puts the entire footer inside `if (B_Include_StopFile == "")` and why `writeFirstSection()`
+skips `Start()` outright.
+
+**The consequence, which is real and is the operator's to carry:** a custom file must supply everything
+the block it replaces would have. `H11d - Marlin.gcode` against `H11a.gcode` — the same Marlin job, one
+property apart — shows exactly what a stop file is taking responsibility for:
 
 | | `H11a.gcode` (no include) | `H11d - Marlin.gcode` (stop include) |
 |---|---|---|
@@ -1462,29 +1471,27 @@ skips `Start()` (`G90`/`G21`/`G94`/`G17`).
 | **stepper timeout** | **`M84 S60`** | *— absent —* |
 | program end | `M2` on RRF / `M30` on GRBL | *— absent —* |
 
-**Two landed fixes are undone by one property.** **HR-11** exists because a Marlin/RRF job left every
-stepper energised indefinitely — `Start()`'s `M84 S0` disables the idle timeout for the whole job and
-nothing restored it. With a stop include, nothing restores it *again*: `M84 S60` is inside the skipped
-block, so the defect returns in full, and an operator's stop file has no way to know it must add the line.
-**HR-3** exists because GRBL + `Manual Spindle On/Off` never asked the operator to switch the router off;
-a stop include drops that prompt too, leaving a hand-switched spindle running past the end of the program.
-On GRBL it also drops `M30`, so the program has no end code at all — only the `%` delimiter, which is
-written outside the branch.
+**What a stop file inherits responsibility for**, on the evidence above: coolant off, `At End Go to 0,0`,
+the manual-spindle-off prompt (**HR-3**), the Marlin/RRF stepper-timeout restore `M84 S60` (**HR-11** —
+note `Start()`'s `M84 S0` disables the idle timeout for the whole job, so *something* must restore it), and
+the program end (`M30` on GRBL, `M2` on RRF). Only the `%` delimiter is written outside the branch and
+therefore still emitted. A Start file correspondingly inherits `G90`, `G21`, `G94` and `G17`.
 
-> **HR-11 (D) is not this row.** It asserts *that* the bypass happens (`✅`, on this same file) and it is
-> correct. What it never asked is whether the bypass should extend to the safety items. Those two
-> questions were conflated, which is how a documented behaviour and an undone fix ended up as one green
-> row.
+> **Not merged into HR-11 (D), which asserts the same mechanism from the other side** — *that* a stop file
+> bypasses the whole stop block, `✅` on this same file. HR-11 (D) is the test; this entry is the
+> **rationale**, recorded because "the include discards two landed fixes" reads like a defect to anyone
+> who meets it cold. It is the operator's deliberate substitution, not a leak.
 
-**No fix chosen — it is a design decision, and the honest options differ.** *(a)* Move the machine-state
-items — `M84 S60`, the manual-spindle-off prompt, the program end — **outside** the include branch, so an
-include augments the footer rather than replacing it. Cleanest, but it changes what a stop file *means*
-for anyone relying on total replacement. *(b)* Keep replacement and **warn at post time** when a stop
-include is set and either `Manual Spindle On/Off` is on or the firmware is Marlin/RRF. *(c)* Document it
-and leave it. **(a) is the CNC-correct answer** — a hand-switched spindle left running and a gantry with
-no holding torque are machine-safety items, not formatting — but it is a behaviour change on a property
-that has shipped, so it wants a decision rather than a quiet repair. **Reachable by a hobbyist:** group 08
-is outside HP-1…HP-5's defaults, but the README offers include files and nothing warns.
+**Rejected: making the include augment rather than replace.** Considered and turned down — moving the
+machine-state items outside the branch would emit them alongside the operator's file, duplicating whatever
+the file already does and removing the ability to suppress them. Also rejected: a post-time warning when a
+stop include is combined with `Manual Spindle On/Off` or Marlin/RRF — it would fire on every correct use
+of the feature, which is the definition of a noisy guard.
+
+**Documentation, not code, is where this belongs.** Group 08 sits outside HP-1…HP-5's defaults, but the
+README offers include files, and what a custom file must supply is worth stating there. **Added to the
+next doc-sync list** (§6) alongside the existing group-08 item; per the standing rule the README is not
+touched during code changes.
 
 **HR-24 — `writeWCS(section)` takes a section and then consults the global `tool`.** *(Low, latent; the
 last instance of HR-15's shape.)* Line 1555: `var canProbe = (tool.number != 0 && !tool.isJetTool());`
@@ -1878,9 +1885,18 @@ Six posts, covering all three firmwares, both units, and the one changed code pa
 the group reorder?) are release-relevant but cover all eleven groups, so they live in `PReview.md`
 §3.3. Neither needs a post; both need the dialog.
 
-> ⚠ **`README.md` still carries the old group-03 label**
-> (`03 - Map G1s to Rapids (disable when using full license)`) — left alone per the standing "no README
-> edits during code changes" rule. Fold it into the next doc-sync pass.
+> ⚠ **Owed to the next `README.md` doc-sync pass** — all left alone per the standing "no README edits
+> during code changes" rule:
+> 1. The **old group-03 label** (`03 - Map G1s to Rapids (disable when using full license)`) — the parens
+>    were dropped by HR-17.
+> 2. Group 08's include files make Fusion raise *"This post processor might be unsafe"* on first use, and a
+>    hobbyist who answers No gets an aborted post that reads like a missing file.
+> 3. **An include file replaces the phase it names, it does not add to it** (HR-23, §4.3). A Start file
+>    owes `G90`/`G21`/`G94`/`G17`; a Stop file owes coolant off, the manual-spindle-off prompt, `M84 S60`
+>    on Marlin/RRF, and `M30`/`M2`. This is designed behaviour, and it is exactly the kind of thing a
+>    custom-file user needs told once.
+> 4. The **`Tool Change Probe`** field (`E_Include_ProbeFile`) is declared but does nothing — HR-21. Its
+>    tooltip now says so; the README should not imply otherwise.
 
 **Confidence statement.** For HP-1 through HP-5 the *structure* of the emitted file is established by
 reading: preamble ordering, WCS selection before any origin write, units and absolute mode before any
