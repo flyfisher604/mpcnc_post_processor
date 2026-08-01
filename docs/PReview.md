@@ -53,7 +53,7 @@ All five land **as one unit** with *Phase 4 — tool-change ordering + base-rela
 (`docs/plan.md`), rather than patching the same section-boundary code twice. **HR-10** and **HR-13**
 are independent of the reorder and have complete diffs, so they can go in first as warm-up commits.
 
-> **HR-12 left this file on 2026-07-31** and is now `HReview.md` §4.2, where it has since been fixed. It was swept in here with the
+> **HR-12 left this file on 2026-07-31** and is now in `HReview.md`, where it has since been fixed. It was swept in here with the
 > other five when HP-5 was redefined, on the reasoning that Personal has no tool changes — true of
 > them, false of it: two operations on **one** tool at different RPMs needs no tool change and is HP-5
 > exactly. `Drill_Tap.gcode` then observed it firing, and the `Link.gcode` / `Speed Change.gcode` pair
