@@ -2,15 +2,16 @@
 
 The review of the post from the hobbyist's chair, and the verification record for what it changed.
 **Reviewed:** the whole post against the README's documented hobbyist use cases, every Fusion entry
-point, and every property branch a hobbyist can reach. **Findings:** 19 (`HR-1`…`HR-19`); ten fixed
+point, and every property branch a hobbyist can reach. **Findings:** 22 (`HR-1`…`HR-22`); thirteen fixed
 on branch `v4.0-hreview-fixes`; six reclassified as professional and moved to `docs/PReview.md`.
 
-**Twelve fixes have landed and every one of them is verified** — HR-1, HR-2, HR-3, HR-4, HR-5, HR-6,
-HR-11, HR-12, HR-14, HR-15, HR-17 and **HR-18** (landed 2026-08-01: `loadFile()` now repairs a missing
-line terminator). Ten rest on posted files throughout; **four rows across HR-6, HR-12 and HR-18 are
-closed by `read`** because the artifact a post would need does not exist — each carries a named residual
-in §4.2. What remains carries no fix: **HR-16**, **HR-19** and **HR-21** (recorded — cosmetic, or the
-direction not yet chosen), plus **HW-6**, the release regression sweep.
+**Thirteen fixes have landed and every one is verified** — HR-1, HR-2, HR-3, HR-4, HR-5, HR-6, HR-11,
+HR-12, HR-14, HR-15, HR-17, **HR-18** (`loadFile()` repairs a missing line terminator) and **HR-22 (A)**
+(an empty include file announces itself), the last two landed 2026-08-01. Ten rest on posted files
+throughout; **four rows across HR-6, HR-12 and HR-18 are closed by `read`** because the artifact a post
+would need does not exist — each carries a named residual in §4.2. What remains carries no fix:
+**HR-16**, **HR-19**, **HR-21** and **HR-22 (B)** — recorded, cosmetic or awaiting a behaviour decision —
+plus **HW-6**, the release regression sweep.
 
 **Every test and its state is in [§0 Test register](#0-test-register--every-test-and-its-state)** —
 one table, 76 rows, the only place a pass or fail is recorded, and **complete: every `H`/`HR`/`HW` id
@@ -42,7 +43,7 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**76 tests — ✅ 61 PASS · ❌ 0 FAIL · ⬜ 1 UNRUN · ➖ 14 n/a or moved to `PReview.md`.**
+**78 tests — ✅ 62 PASS · ❌ 0 FAIL · ⬜ 1 UNRUN · ➖ 15 n/a or moved to `PReview.md`.**
 
 > **The one ⬜ is `HW-6`, the release regression sweep**, which goes last by definition. Every other
 > hobbyist row is settled. **Four were closed by `read` on 2026-08-01** — HR-6 (B), HR-12 (A4) and
@@ -143,7 +144,9 @@ A ⬜ row's Method column names what it is waiting for.
 | **HR-18 (U)** | The guard over 6 file endings × 3 comment levels, before and after | harness | node — 4 merged blocks → 0 | ✅ |
 | **HR-19** | `M291` doubled space, and `()` vs `( )` — cosmetic, no fix | — | no test proposed | ➖ |
 | **HR-20** | A fuller tapping implementation | — | → `PReview.md`; the manual path now prompts (HR-12), the automatic path always emitted `M4` | ➖ |
-| **HR-21** | `E_Include_ProbeFile` is declared but never read — dead property | — | found while fixing HR-18; recorded, no fix yet | ➖ |
+| **HR-21** | `E_Include_ProbeFile` is declared but never read — dead property | — | found while fixing HR-18; dialog now declares it, wiring not chosen | ➖ |
+| **HR-22 (A)** | An empty include file announces itself instead of contributing nothing in silence | harness | node — emitted at `Info`, suppressed above it | ✅ |
+| **HR-22 (B)** | An empty **Start** include leaves `G90`/`G21`/`G94`/`G17` unwritten | — | recorded, behaviour unfixed — see §4.3 | ➖ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
 | **HW-2 (A)** | HP-5 boundary: WCS suppression, rapid lifecycle, position tracking | posted | `Link.gcode` | ✅ |
 | **HW-2 (B)** | HP-5 boundary: a spindle-speed change between operations | posted | ⚠ evidence file **overwritten** — re-post as `HR12-auto - GRBL.gcode` | ✅ |
@@ -1378,6 +1381,48 @@ where this same line of code actually bites.
 *(HR-17's tidy-ups are no longer open — they landed as one sweep; see §4.2.)*
 
 *(HR-18 is no longer open — the decision was taken and the guard landed on 2026-08-01; see §4.2.)*
+
+**HR-22 — an include file that exists but is empty contributes nothing, silently — and on the Start
+branch that means no preamble at all.** *(Medium; found 2026-08-01 while inspecting HR-18's call sites.)*
+`loadFile()` guards its whole body on `txt.length > 0`, so a zero-byte file skipped the include **and**
+both `--- Start/End custom gcode` markers. The asymmetry is the problem: a **missing** file is loud —
+`FileSystem.isFile()` fails and `error()` aborts the post — while an **empty** one produced a normal-
+looking file with nothing in it from the include and no way to tell.
+
+**Why the Start branch makes it more than cosmetic.** Naming any file in `A_Include_StartFile` skips
+`Start()` entirely:
+
+```js
+if (getProperty(properties.A_Include_StartFile) == "") { Start(); }
+else { loadFile(getProperty(properties.A_Include_StartFile)); }
+```
+
+The test is on the **property string**, not on what the file contains. So an empty Start include leaves
+`G90`, `G21`, `G94` and `G17` unwritten, and the post goes straight to `G10 L20 P1 X0 Y0 Z0` and a probing
+descent with **absolute/relative mode and units never established** — the job runs in whatever modal state
+the controller was left in. A machine left in `G91` takes the origin write and the probe as relative moves.
+Low likelihood (it needs a placeholder file) but not a cosmetic failure.
+
+**(A) ✅ fixed and harness-verified 2026-08-01 — the silence is gone.** `loadFile()` now emits
+`( --- Custom gcode file is empty, nothing included <path>)` on the `length == 0` branch. Verified by the
+same fixture table that covers the newline guard: emitted at `Info`, correctly absent above it.
+
+> **The message is `Info`, so it is suppressed at Comment Level `Important` and `Off`** — the same levels
+> where HR-18's merge bit. That is a deliberate choice of level, not an oversight, but it means the note
+> informs a reader of a default-level file and not an operator who has turned comments down. If (B) is
+> ever fixed with a warning rather than a fallback, `>>> WARNING` at `Important` is the level to use.
+
+**(B) — the behaviour is unchanged and still open.** Two candidate fixes, and they may want different
+answers per branch:
+
+- **Fall through to `Start()`** when the include turns out to be empty — treats "empty" as "no include",
+  which is almost certainly what the operator meant, and restores the preamble. Right for the Start branch.
+- **Warn, or refuse.** Right if an empty include should be treated as a mistake.
+
+The Stop branch plausibly wants neither: an intentionally-empty Stop file meaning "emit no footer" is a
+reasonable thing to want, and there is no `Start()`-equivalent to fall back to there. **Not fixed here
+because the Start branch's fix changes what a named-but-empty file means**, which is a behaviour decision
+rather than a repair. No test row until it is taken.
 
 **HR-19 — `M291` blocks carry a doubled space.** *(Cosmetic.)* `askUser()` builds its RRF parameter
 string starting with a space (`" P\"" + …`) and then hands it to `writeBlock()`, which inserts the word

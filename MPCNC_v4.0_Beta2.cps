@@ -2921,6 +2921,14 @@ function loadFile(_file) {
         writeln("");
       }
       writeComment(eComment.Info, " --- End custom gcode " + folder + _file);
+    } else {
+      // An include file that EXISTS but is empty used to emit nothing at all -- not even the
+      // Start/End markers above -- so the operator got no indication their file contributed
+      // nothing. A missing file is loud (the error() below aborts the post); an empty one was
+      // silent. It matters most on the Start include: naming a file there skips Start()
+      // entirely, so an empty one leaves G90/G21/G94/G17 unwritten and the job runs in
+      // whatever modal state the controller was left in. See docs/HReview.md HR-22.
+      writeComment(eComment.Info, " --- Custom gcode file is empty, nothing included " + folder + _file);
     }
   } else {
     writeComment(eComment.Important, " Can't open file " + folder + _file);

@@ -24,15 +24,15 @@ clean apart from two untracked files, both deliberate: `MPCNC_v4.0_Beta1.zip` (u
 ignore it) and **`Personal.cps`** (a test harness — see below). **Nothing is half-done and nothing is
 known-broken.**
 
-**Status lives in one place: `HReview.md` §0**, a **76-row** register naming every hobbyist test, how it
-was settled, its evidence file and its state — currently **61 pass, 0 fail, 1 unrun, 14 n/a or moved**.
+**Status lives in one place: `HReview.md` §0**, a **78-row** register naming every hobbyist test, how it
+was settled, its evidence file and its state — currently **62 pass, 0 fail, 1 unrun, 15 n/a or moved**.
 Nothing else in that file records a pass; if the two ever disagree the register is wrong and must be
 fixed. Read it first. **The register is complete: every `H`/`HR`/`HW` id has a row, including the six
 deferred to `PReview.md`, which keep `➖` pointer rows.** (HR-7/8/9/10/13 had silently vanished from it
 in the doc split and were restored on 2026-08-01 — if you move a finding out, leave the pointer behind.)
 The professional side is `PReview.md`, still a parking lot.
 
-**Twelve fixes have landed on this branch**, one commit each (`git log --oneline --grep='^HR-'`), and
+**Thirteen fixes have landed on this branch**, one commit each (`git log --oneline --grep='^HR-'`), and
 **every one is verified**. Ten rest on posted files; **four rows are closed by `read`** — HR-6 (B),
 HR-12 (A4), HR-18 (A)(B) — because the artifact a post needs does not exist (a rotated Setup, a
 counterclockwise tool, an include file saved without its terminator). Each carries a named residual;
@@ -113,12 +113,16 @@ physical measurement are out of scope, so every row must stand on the posted fil
    settled every row; all twelve fixes are verified. What is still owed is the `HR12-auto` re-post that
    restores HW-2 (B)'s overwritten evidence, and `HW-6` itself, the release regression sweep, which goes
    last by definition. The four `read` rows can be upgraded to `posted` opportunistically.
-2. **Two items wait for the next tidy-up sweep.** **HR-19** — doubled space in `M291`, plus `()` against
-   `( )` on the `onSectionEnd()` lines. **HR-21** — `E_Include_ProbeFile` is declared and never read;
-   found while fixing HR-18. Its dialog now declares itself `NOT IMPLEMENTED YET` (retitled
-   **Tool Change Probe**, no preset reset — the key is unchanged), but the choice between wiring it into
-   `probeTool()` and deleting it is still open, and wiring it up belongs to the Tool Change branch since
-   the include would fire at the tool-change re-probe.
+2. **Three items wait for the next sweep, all in group 08 except the first.** **HR-19** — doubled space
+   in `M291`, plus `()` against `( )` on the `onSectionEnd()` lines. **HR-21** — `E_Include_ProbeFile` is
+   declared and never read; its dialog now declares itself `NOT IMPLEMENTED YET` (retitled **Tool Change
+   Probe**, no preset reset — the key is unchanged), but the choice between wiring it into `probeTool()`
+   and deleting it is open, and wiring it up belongs to the Tool Change branch. **HR-22 (B)** — naming a
+   file in `A_Include_StartFile` skips `Start()` on the *property string*, so a **named-but-empty** Start
+   include leaves `G90`/`G21`/`G94`/`G17` unwritten and the job runs in whatever modal state the
+   controller was left in. The silence is fixed (HR-22 (A): an empty include now says so at `Info`); the
+   behaviour is not, because falling through to `Start()` changes what a named-but-empty file *means* —
+   a decision, not a repair, and the Stop branch may want the opposite answer.
 
    > **Phase 5 is already answered and needs no work.** `isSafeToRapid()` is called only from
    > `onLinear()` and is scoped to a single section, so the G1→G0 mapper cannot run across the
@@ -488,8 +492,8 @@ safety comment. *(Verified all three branches — `PReview.md` §4.)*
   offset**'s added-part halves (`PReview.md` P2/P3) and the multi-part rows generally. **Remaining to
   build:** tool-change ordering + base-relative park (below).
 - **Phase 5 — not started** (likely no-op).
-- **Hobbyist review — complete for this branch's scope, bar the release sweep.** 21 findings; **twelve
-  landed and all twelve verified**, five moved to `PReview.md`, HR-16 / HR-19 / HR-21 recorded with no
+- **Hobbyist review — complete for this branch's scope, bar the release sweep.** 22 findings; **thirteen
+  landed and all thirteen verified**, five moved to `PReview.md`, HR-16 / HR-19 / HR-21 / HR-22 (B) with no
   fix. Four rows are `read` rather than `posted` (residuals named in `HReview.md` §4.2); `HW-6` is the
   only ⬜ left. Status in `HReview.md` §0.
 - **Professional review — not started.** `PReview.md` is a parking lot until it runs.
