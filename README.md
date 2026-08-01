@@ -1,7 +1,7 @@
-<!-- doc-sync: MPCNC_v4.0_Beta2.cps @ 924d1f6
+<!-- doc-sync: MPCNC_v4.0_Beta2.cps @ 7b80b44
      This README documents the post as of the commit above. It is NOT kept in sync
      automatically. To refresh it, review only what changed in the post since that ref:
-       git diff 924d1f6..HEAD -- MPCNC_v4.0_Beta2.cps
+       git diff 7b80b44..HEAD -- MPCNC_v4.0_Beta2.cps
      Then bump the ref to the new HEAD. -->
 Fusion 360 CAM Post Processor for MPCNC / LowRider
 ====
@@ -22,6 +22,62 @@ Supported firmware (set by the **Job → CNC Firmware** property):
 - Marlin 2.x
 - RepRap firmware (Duet3D)
 - Repetier 1.0.3 (untested; g-code is the same as Marlin)
+
+---
+
+# Release history
+
+## v4.0 Beta 2 — current
+
+Beta 1 knew one zero: wherever the tool happened to be when the job started. Beta 2 can keep
+track of several — the machine, the spoilboard, and each part — and move safely between them.
+
+1. **More than one work zero.** Beta 1 set a single origin for the whole program. Beta 2 can
+   store a separate zero for each part, in the controller's own memory, and switch between
+   them as the job runs. (Marlin can still only hold one.)
+   → [What is a WCS?](#first-what-is-a-wcs)
+2. **You choose how the zero gets set.** Beta 1 had two checkboxes. Beta 2 asks you to pick:
+   use where the tool is now, use a zero the controller already has stored, or stop and let
+   you jog to it — each with or without probing Z off a touch plate.
+   → [Origin modes](#origin-modes--first-vs-subsequent-wcs--part)
+3. **Several parts in one job.** Cut copies of a part on separate fixtures in a single run,
+   re-probing each one so stock thickness can vary.
+   → [Multiple fixtures](#b-multiple-fixtures--several-copies-of-a-part-replicate)
+4. **Homing at job start**, if your machine has endstops — new group **04**.
+   → [Establishing the machine frame](#establishing-the-machine-frame-homing--mcs)
+5. **A spoilboard reference** — new group **05**. Zero one slot to the table rather than to
+   the stock, so the tool can lift to a height that clears everything on the bed before it
+   travels to another part. → [The reserved spoilboard base](#the-reserved-spoilboard-base)
+6. **Unsafe jobs are refused before any file is written**, with a message saying what to
+   change, and two common mistakes now warn you.
+   → [Validation guards](#validation-guards)
+7. **Better probing.** Prompts to attach and remove the probe, and the option to touch off
+   away from the corner so the origin can sit off the material.
+   → [Probing and tool changes](#probing-and-tool-changes)
+8. **The dialog was rebuilt** — 11 groups instead of 9, numbered in the order you work through
+   them, and every setting is now listed at the top of the posted file.
+   → [Property reference](#property-reference)
+9. **Safer endings and clearer prompts.** The spindle stops *before* the tool returns to
+   X0 Y0; a hand-set router is prompted whenever the speed or direction changes, not just at
+   the start; and each firmware now gets the right end-of-program code.
+10. **Your saved settings carry over**, but **check group 06 before your first job** — the
+    origin choice is new and its default is not what Beta 1 did. One setting does need
+    changing: the coolant *"… Custom"* boxes now want a **filename**, not g-code.
+    → [10 - Coolant](#10---coolant)
+
+## v4.0 Beta 1
+
+Beta 1 was v3.0 Beta 3 renamed — the post itself was unchanged. Its work was tidying and
+correctness rather than new machine features:
+
+- A **grouped, named property dialog** in place of a flat list of settings.
+- **Drilling operations post at all** — canned cycles are expanded into ordinary moves.
+- **Manual NC pass-through** commands are emitted as written.
+- **Rapid moves are ordered** so the tool lifts before it travels and travels before it
+  descends, instead of dragging or plunging.
+- **Jobs the post can't handle are refused with a useful message** — 4/5-axis toolpaths, and
+  cutter compensation set to anything but *In computer*.
+- A long list of smaller corrections.
 
 ---
 
@@ -102,7 +158,7 @@ origin choice applies.
   - set **Travel Speed X/Y**, **Travel Speed Z**, and the **Max XY Cut Speed** / **Max Z Cut Speed** limits to your machine's real capability.
   - Enable **Scale Feedrate** so cut moves are scaled to stay within those limits, and keep
   **Enforce Feedrate** on so a feedrate is always included on each gcode statement.
-- **03 - Map G1s to Rapids**
+- **03 - Map G1s to Rapids - disable when using full license**
   - **Hobbyists should turn all options in this group on.**
   - A Personal-license of Fusion 360 forces all rapid moves to be emitted as cutting moves.
   - Converts some of the cutting movements back to rapids and restores safe, properly-ordered
@@ -171,8 +227,8 @@ Fusion assigns a WCS to each Setup via its **Work Offset** field (1 → `G54`, 2
 The common full-license job: several operations (face, pocket, contour), possibly
 several tools, all on one part in one Setup — so one WCS throughout.
 
-- Turn the **03 - Map G1s to Rapids** group **off** — the full license already posts real
-  `G0` rapids, so the hobby workaround isn't needed.
+- Turn the **03 - Map G1s to Rapids - disable when using full license** group **off** — the
+  full license already posts real `G0` rapids, so the hobby workaround isn't needed.
 - Set **First WCS / Part**:
   - If this Setup's WCS is a pre-set fixture, choose **`Use Active
   WCS X0 Y0, Probe Z0`** (rapid to the stored X0 Y0, re-probe Z);
@@ -280,7 +336,17 @@ re-probe Z). Pick a `Jog to …` mode only when you want the post to pause and g
 *and* your setup supports jogging at the pause.
 
 > **A jet tool or tool 0 never probes.** Any probe-Z mode degrades to recording the origin
-> with no `G38.2`, on every firmware.
+> with no `G38.2`, on every firmware. On a **probe-Z** mode that also means **Z0 is never
+> established** — the job then runs against whatever Z origin the register already holds, so
+> the post emits a warning. For a laser / jet job choose **`Set X0 Y0 Z0 to Current Pos`**
+> and set Z by hand.
+
+> **⚠ `Use Active WCS X0 Y0 Z0` starts by *moving* Z to Safe Z, then rapids to the stored
+> X0 Y0.** Safe Z is an absolute height in the stored frame, so this is a retract only if the
+> tool is *below* it — park the tool above Safe Z and the job's first motion is a **descent**,
+> at Z travel speed, over ground the post knows nothing about. The post cannot do better: it
+> has no way to read the physical Z, and the premise of the mode is that the stored frame is
+> trusted. Either park below Safe Z, or raise **Safe Z** (group 06) to clear everything.
 
 ### What "Active WCS" means
 
@@ -304,7 +370,7 @@ origin is still good:
 | | Safe to use | Watch out for |
 |---|---|---|
 | `Use Active WCS X0 Y0, Probe Z0` | XY fixtures are pre-set and unchanged; stock thickness may vary (Z is re-probed) | A fixture that moved — XY is trusted blindly |
-| `Use Active WCS X0 Y0 Z0` | Nothing has changed since the origin was set, incl. stock thickness | New/different stock — the stored Z will be wrong |
+| `Use Active WCS X0 Y0 Z0` | Nothing has changed since the origin was set, incl. stock thickness | New/different stock — the stored Z will be wrong; and the opening move to **Safe Z** can descend (above) |
 
 On a **fresh controller** every offset is `0`, so `G54` means machine coordinates — on a machine
 with no endstops, wherever it powered on. Don't use a `Use Active WCS …` mode until the WCS has
@@ -399,6 +465,46 @@ safe height is meaningful across all of a job's parts. It is:
 - **Manual tool changes** (no ATC): retract, move to the work-relative change position,
   pause for the swap, re-probe Z, resume. Every leg is collision-sensitive.
 
+## Manual spindle control
+
+With **Manual Spindle On/Off** on (the default) the post never emits `M3`/`M5`. Instead it
+**stops the machine and asks you**, so a hand-switched router or trim spindle is safe:
+
+- **At job start** — `Turn ON 7000 RPM` (the direction is named only when the operation is
+  counterclockwise, which is the exceptional case).
+- **Whenever the speed or the direction changes** — `Set spindle to 10000 RPM clockwise`. A
+  change prompt always states the full target, so there is nothing to remember. A second
+  operation at a different RPM, and a tapping reversal, both trip this.
+- **At each tool change and at the end of the job** — a prompt to switch **off**. At the end
+  this comes *before* the return to X0 Y0, so you switch off, resume, and the machine parks.
+
+Turn the property **off** if your spindle is under g-code control; you then get real
+`M3 S…`/`M5` and no prompts.
+
+## External include files
+
+Group **08 - External Include Files** lets you substitute your own g-code, read from a file
+in the nc output folder, at five points in the program.
+
+> **An include file *replaces* the phase it names — it does not add to it.** That is the
+> point of the feature, but it means the built-in code for that phase, **including the modal
+> preamble**, is not emitted:
+>
+> - A **Start GCode File** owns `G90` and `G21`/`G20`, plus `G94` and `G17` on GRBL, or the
+>   `M84 S0` stepper-timeout disable on Marlin/RepRap. Your file must set whatever it needs.
+> - A **Stop GCode File** owns coolant-off, the spindle-off prompt, the *At End Go to 0,0*
+>   move, `M84 S60`, and `M30`/`M2`. (On GRBL the closing `%` is still written.)
+> - A file that **exists but is empty** is the same rule taken to its limit: the phase is
+>   still replaced, by nothing. The post says so with an Info comment rather than leaving you
+>   to wonder.
+> - A file that is **named but missing** aborts the post with an error.
+
+**Fusion will ask "This post processor might be unsafe…" the first time you name any file
+here** — reading a file is what triggers it. Answer **Yes**; answering No cancels the post.
+
+**Tool Change Probe is not implemented.** The field exists and is reserved, but nothing reads
+it — anything typed there is ignored, silently. Its title says so.
+
 ## Validation guards
 
 The post checks the job at post time (it can't read the live controller) and errors
@@ -416,12 +522,29 @@ before emitting bad g-code:
   rejected with the tilt named. Re-orient the Setup's Z. Unlike the guards above this one fires
   once output has started, so it leaves a truncated file on disk; discard it.
 
+Two further checks **warn** rather than stop the post — each is legitimate on some setup, so
+you are told, not blocked. The message appears in Fusion's post dialog:
+
+- **Homing plus a `Set … to Current Pos` origin mode.** Homing runs first and parks the tool
+  at the endstop corner, so the origin is recorded there and the pre-jog you did is discarded.
+  Choose a `Use Active WCS …` or `Jog to …` mode, or set **Home Before Start** to `None`.
+  Legitimate only on a machine whose home corner *is* the datum.
+- **More than one tool with *Tool Changes are Included* off.** No tool-change code is emitted,
+  so every operation runs with whichever tool is already in the spindle, at the other tools'
+  feeds and speeds. Enable group **07**, or post one tool per file. The file also marks each
+  suppressed change.
+
+A third warning is written into the file rather than the dialog: **a jet / laser tool cannot
+probe**, so on a probe-Z origin mode Z0 is never established and the job runs against whatever
+Z the register already holds.
+
 ## G1 → G0 rapid mapping (hobby-license workaround)
 
 The Personal license restricts all moves to the max cut speed — and Fusion implements
 this by turning every `G0` rapid into a `G1` cut. The side effect is dragging cuts and
-collisions at the start of jobs and after tool changes. Group **03 - Map G1s to Rapids**
-selectively converts those `G1` moves back into `G0` rapids where it's safe:
+collisions at the start of jobs and after tool changes. Group **03 - Map G1s to Rapids -
+disable when using full license** selectively converts those `G1` moves back into `G0`
+rapids where it's safe:
 
 - **First G1 → G0 Rapid** — restores the lost initial positioning move at the start of a
   toolpath (the "tool dragged across the work" problem).
@@ -463,14 +586,14 @@ Groups appear in the Fusion dialog in the order below.
 |Title|Description|Default|
 |---|---|---|
 |CNC Firmware|Dialect of g-code to create (GRBL / Marlin / RepRap).|**GRBL**|
-|Manual Spindle On/Off|Issue pauses to manually turn the spindle on/off — a prompt to switch **on** at the start and to switch **off** at each tool change and at the end, on every firmware. No `M3`/`M5` is emitted on this path; the post asks rather than commands.|**true**|
+|Manual Spindle On/Off|Issue pauses to manually turn the spindle on/off — a prompt to switch **on** at the start, to **change** speed or direction whenever the job asks for a different one, and to switch **off** at each tool change and at the end, on every firmware. No `M3`/`M5` is emitted on this path; the post asks rather than commands. See *Manual spindle control*.|**true**|
 |Comment Level|Verbosity: Off, Important, Info, Debug.|**Info**|
 |Use Arcs|Use G2/G3 for circular moves.|**true**|
 |Enable Line #s|Emit sequence numbers.|**false**|
 |First Line #|First sequence number.|**10**|
 |Line # Increment|Sequence-number increment.|**1**|
 |Include Whitespace|Whitespace separation between words.|**true**|
-|At End Go to 0,0|Go to X0 Y0 at program end; Z unchanged.|**true**|
+|At End Go to 0,0|Go to X0 Y0 at program end; Z unchanged. The spindle is stopped (or the switch-off prompt issued) **before** this move.|**true**|
 
 ## 02 - Feeds and Speeds
 |Title|Description|Default|
@@ -494,7 +617,7 @@ Groups appear in the Fusion dialog in the order below.
 ## 04 - Establish Machine Coordinates
 |Title|Description|Default|
 |---|---|---|
-|Home Before Start|Home at job start to establish the machine frame: **None** (no homing), **XY** (home X/Y), **XYZ** (also home Z, only if wired for it). GRBL homes all axes with one `$H` if XY or XYZ.|**None**|
+|Home Before Start|Home at job start to establish the machine frame: **None** (no homing), **XY** (home X/Y), **XYZ** (also home Z, only if wired for it). GRBL homes all axes with one `$H` if XY or XYZ. Warns if combined with a **Set … to Current Pos** origin mode — homing would overwrite your pre-jog.|**None**|
 |Prompt Before Home|Pause before homing so you can prepare the machine (place a movable Z plate, clear the bed). Fires whenever homing runs.|**false**|
 
 ## 05 - Establish Spoilboard Reference
@@ -508,21 +631,21 @@ Groups appear in the Fusion dialog in the order below.
 ## 06 - On WCS / Part / Fixture Changes
 |Title|Description|Default|
 |---|---|---|
-|First WCS / Part|Origin for the first/only part: **Set X0 Y0 to Current Pos, Probe Z0** / **Set X0 Y0 Z0 to Current Pos** / **Use Active WCS X0 Y0, Probe Z0** / **Use Active WCS X0 Y0 Z0** / **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**.|**Set X0 Y0 to Current Pos, Probe Z0**|
+|First WCS / Part|Origin for the first/only part: **Set X0 Y0 to Current Pos, Probe Z0** / **Set X0 Y0 Z0 to Current Pos** / **Use Active WCS X0 Y0, Probe Z0** / **Use Active WCS X0 Y0 Z0** / **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**. `Use Active WCS X0 Y0 Z0` opens with a **move** to *Safe Z* that can descend — see *Origin modes*.|**Set X0 Y0 to Current Pos, Probe Z0**|
 |Subsequent WCS / Part|Multi-part only — what to do at each added part's WCS: **Use Active WCS X0 Y0, Probe Z0** / **Use Active WCS X0 Y0 Z0** / **Jog to X0 Y0, Probe Z0** / **Jog to X0 Y0 Z0**. Not supported on Marlin.|**Use Active WCS X0 Y0, Probe Z0**|
 |Probe Pause|Operator prompts around each part probe: **No** / **Before** / **Before & After**.|**Before & After**|
+|Probe X Offset|X from a part's origin to its Z-probe touch-point. Applied at every part probe (first + added), never to the spoilboard base probe. `0` = probe at the origin.|**0**|
+|Probe Y Offset|Y from a part's origin to its Z-probe touch-point. Applied at every part probe (first + added), never to the spoilboard base probe. `0` = probe at the origin.|**0**|
 |Probe with G38.2|Probe with `G38.2` (On) or `G28` (Off). GRBL always `G38.2`.|**On**|
 |G38 Target|Furthest Z the probe move travels to. A true relative limit on the two just-positioned modes; relative to the *stored* zero on the **Use Active WCS …** modes — see *Probing and tool changes*.|**-10**|
 |G38 Speed|Probe feedrate (mm/min).|**30**|
-|Safe Z|Retract height after probing; also the no-base added-part re-probe retract. A number or a Fusion height (e.g. `Retract:15`).|**Retract:15**|
+|Safe Z|Retract height after probing; the no-base added-part re-probe retract; and the height `Use Active WCS X0 Y0 Z0` moves to before rapiding to the stored X0 Y0. A number or a Fusion height (e.g. `Retract:15`).|**Retract:15**|
 |Plate Thickness|Touch-plate thickness (compensated into Z).|**0.8**|
-|Probe X Offset|X from a part's origin to its Z-probe touch-point. Applied at every part probe (first + added), never to the spoilboard base probe. `0` = probe at the origin.|**0**|
-|Probe Y Offset|Y from a part's origin to its Z-probe touch-point. Applied at every part probe (first + added), never to the spoilboard base probe. `0` = probe at the origin.|**0**|
 
 ## 07 - Tool Changes
 |Title|Description|Default|
 |---|---|---|
-|Tool Changes are Included|Emit tool-change code when the tool changes.|**false**|
+|Tool Changes are Included|Emit tool-change code when the tool changes. Left off in a multi-tool job the post warns, and each suppressed change is marked in the file.|**false**|
 |Include Relocation Code|Move to the change position (X/Y/Z below); off = plain M6/select.|**false**|
 |Tool Change X / Y / Z|Change position, relative to the current WCS (plain `G0`).|**0 / 0 / 40**|
 |Disable Z Stepper|Disable the Z stepper after reaching the change position.|**false**|
@@ -531,13 +654,16 @@ Groups appear in the Fusion dialog in the order below.
 
 ## 08 - External Include Files
 Each names a file in the nc output folder whose contents are inserted verbatim at that
-point. Leave empty for built-in code.
+point. Leave empty for built-in code. **A Start or Stop file *replaces* that phase, modal
+preamble and all** — see *External include files*. Naming any file here makes Fusion ask
+*"This post processor might be unsafe…"*; answer **Yes**.
 
-|Title|Default|
-|---|---|
-|Start GCode File / Stop GCode File|empty|
-|Tool Change Start / Tool Change End|empty|
-|Probe|empty|
+|Title|Description|Default|
+|---|---|---|
+|Start GCode File|Replaces the whole start phase — your file owns `G90`, `G21`/`G20`, and `G94`/`G17` (GRBL) or `M84 S0` (Marlin/RepRap).|empty|
+|Stop GCode File|Replaces the whole stop phase — your file owns coolant-off, the spindle-off prompt, the *At End Go to 0,0* move, `M84 S60` and `M30`/`M2`.|empty|
+|Tool Change Start / Tool Change End|Inserted around the tool-change code (added, not substituted).|empty|
+|Tool Change Probe|**NOT IMPLEMENTED.** Reserved; anything entered is ignored with no warning.|empty|
 
 ## 09 - Laser
 Fusion's four Through levels all map to "On - Through". The **CNC Firmware** selection
@@ -555,13 +681,20 @@ decides whether the GRBL or Marlin/RepRap laser mode is used.
 Two channels (A, B); each maps a Fusion coolant mode to enable/disable g-code. If a
 tool's coolant matches a channel, that channel is enabled; a warning is emitted if a
 requested coolant matches no channel. Marlin and GRBL command options are both offered —
-pick to match your wiring. Set a channel to **Use custom** to use the custom strings.
+pick to match your wiring.
+
+**For anything the built-in options don't cover, set *Turn Channel A/B On* (or *Off*) to
+`Use custom`** and put the **name of a file** in the matching *… Custom* field — these name a
+file in the nc output folder exactly as the group-08 include fields do, not a literal g-code
+block. The file's contents are inserted at that point; a missing file aborts the post, and
+`Use custom` with the field left empty emits a warning and nothing else. As with group 08,
+Fusion asks *"This post processor might be unsafe…"* the first time — answer **Yes**.
 
 |Title|Description|Default|
 |---|---|---|
 |Channel A / B Mode|Coolant mode that enables the channel.|**off**|
-|Turn Channel A / B On/Off|Enable/disable g-code for the channel.|**M42 P6/P11 S255/S0**|
-|Channel A / B On/Off Custom|Custom include files when Mode = Use custom.|empty|
+|Turn Channel A / B On/Off|Enable/disable g-code for the channel, or **Use custom**.|**M42 P6/P11 S255/S0**|
+|Channel A / B On/Off Custom|**Filename** (in the nc folder) included when the matching On/Off is set to `Use custom`.|empty|
 
 ## 11 - Duet
 |Title|Description|Default|
