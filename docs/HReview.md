@@ -5,14 +5,15 @@ The review of the post from the hobbyist's chair, and the verification record fo
 point, and every property branch a hobbyist can reach. **Findings:** 19 (`HR-1`…`HR-19`); ten fixed
 on branch `v4.0-hreview-fixes`; six reclassified as professional and moved to `docs/PReview.md`.
 
-**All eleven landed fixes are closed with posted evidence** — HR-1, HR-2, HR-3, HR-4, HR-5, HR-6,
-HR-11, HR-14, HR-15, HR-17, and **HR-12**, which landed on 2026-07-31 and now owes only **(A4)**, the
-one row needing a tool that runs counterclockwise. What remains carries no fix yet: **HR-18**
-(`loadFile()` newline, a real corruption path, awaiting a decision), **HR-16** and **HR-19** (recorded,
-cosmetic or no fix proposed), plus the `HW` rows in §6.
+**Twelve fixes have landed; eleven are closed with posted evidence** — HR-1, HR-2, HR-3, HR-4, HR-5,
+HR-6, HR-11, HR-14, HR-15, HR-17, and **HR-12**, which owes only **(A4)**, the one row needing a tool
+that runs counterclockwise. **HR-18** landed on 2026-08-01 (`loadFile()` now repairs a missing line
+terminator) and is harness-verified but not yet posted. What remains carries no fix: **HR-16**,
+**HR-19** and **HR-21** (recorded — cosmetic, or the direction not yet chosen), plus the `HW` rows in §6.
 
 **Every test and its state is in [§0 Test register](#0-test-register--every-test-and-its-state)** —
-one table, 67 rows, and the only place a pass or fail is recorded.
+one table, 76 rows, the only place a pass or fail is recorded, and **complete: every `H`/`HR`/`HW` id
+has a row, including the six deferred to `docs/PReview.md`.**
 
 > **Standing rule — a code change is not done until this file is updated.** Every change to
 > `MPCNC_v4.0_Beta2.cps` that touches hobbyist behaviour updates this file **in the same commit**:
@@ -40,7 +41,13 @@ pass/fail; the sections below carry the *reasoning*, the expected tokens and the
 for whatever is still owed. If the two ever disagree, this table is wrong and must be fixed — a row
 whose state lives in two places will rot in one of them.
 
-**67 tests — ✅ 56 PASS · ❌ 0 FAIL · ⬜ 4 UNRUN · ➖ 7 n/a or moved to `PReview.md`.**
+**76 tests — ✅ 57 PASS · ❌ 0 FAIL · ⬜ 5 UNRUN · ➖ 14 n/a or moved to `PReview.md`.**
+
+> **The list is complete by construction: every `H`, `HR` and `HW` id has a row here, including the ones
+> that belong to another file.** A finding moved to `PReview.md` keeps a `➖` row naming where it went —
+> it is not deleted. **HR-7, HR-8, HR-9, HR-10 and HR-13 had silently vanished** in the 2026-07-31
+> doc split, so the table asserted completeness while omitting five deferred findings; restored
+> 2026-08-01. If you move a finding out, leave the pointer row behind.
 
 **Method** is how the row was settled, and it is not decoration: `posted` is a real file from the real
 post and is the only method that proves what a hobbyist receives. `harness` is a node run against
@@ -83,6 +90,10 @@ for.
 | **HR-5 (E)** | Marlin: linearized segments limited like any `G1` | posted | `H5d - Marlin.gcode` vs `H11a.gcode` | ✅ |
 | **HR-6 (A)** | Orientation guard is live, not failing open | posted | `H2 - Debug.gcode` | ✅ |
 | **HR-6 (B)** | An off-axis section is actually rejected | — | needs a rotated Setup; optional | ⬜ |
+| **HR-7** | `toolChange()` clobbers `forceSectionToStartWithRapid` | — | → `PReview.md` §2 — Tool Change branch | ➖ |
+| **HR-8** | Post-injected motion never updates Fusion's tracked position | — | → `PReview.md` §2 — Tool Change branch | ➖ |
+| **HR-9** | `Do First Change` + probe-after off zeroes Z on the wrong tool | — | → `PReview.md` §2 — Tool Change branch | ➖ |
+| **HR-10** | `Disable Z Stepper` emits Marlin-only `M84 Z` on GRBL | — | → `PReview.md` §2 — has a complete diff | ➖ |
 | **HR-11 (A)** | Marlin: `M84 S60`, no `M2` | posted | `H11a.gcode` | ✅ |
 | **HR-11 (B)** | RepRap: `M2` after `M84 S60` | posted | `H11b - RRF.gcode` | ✅ |
 | **HR-11 (C)** | GRBL tail untouched | posted | `H11c - GRBL.gcode` | ✅ |
@@ -93,6 +104,7 @@ for.
 | **HR-12 (A3)** | Every tapping reversal is announced — 8 prompts, alternating | posted | `Drill_Tap.gcode` (re-post, 2026-08-01) | ✅ |
 | **HR-12 (A4)** | A counterclockwise start names the direction | — | needs a CCW-first tool; post as `HR12d - GRBL.gcode` | ⬜ |
 | **HR-12 (A5)** | A **clockwise** start prompt is unchanged — no direction word | posted | `Speed Change.gcode`, byte-identical to `Link.gcode` | ✅ |
+| **HR-13** | `onCommand` silently discards every command it does not name | — | → `PReview.md` §2 — has a complete diff | ➖ |
 | **HR-14 (A)** | `Flood and Mist` matches a channel | posted | `Drill Flood Mist.gcode` | ✅ |
 | **HR-14 (B)** | Warning names the mode the operator saw | posted | `Drill Flood Mist (No).gcode` | ✅ |
 | **HR-14 (C)** | Ordinary `Flood` unchanged | posted | `Drill Flood.gcode` | ✅ |
@@ -106,9 +118,13 @@ for.
 | **HR-17 (C)** | Tapping warning single-spaced | posted | `Drill_Tap.gcode` | ✅ |
 | **HR-17 (D)** | The two inert tidy-ups changed nothing | posted | `H11c - GRBL.gcode` vs `H2.gcode` | ✅ |
 | **HR-17 (U)** | Sanitizer before/after over 4 input shapes | harness | node | ✅ |
-| **HR-18 (A)** | `loadFile()` newline — diagnostic, fix undecided | — | needs a stop file with no trailing newline | ⬜ |
+| **HR-18 (A)** | Stop-file include: `M5` and `M400` on separate lines | — | needs a stop file with no trailing newline | ⬜ |
+| **HR-18 (B)** | Start-file include: the same, at the other end of the file | — | same stop file, set as the Start include | ⬜ |
+| **HR-18 (T)** | Tool-change includes (`ToolFile1`/`ToolFile2`) | — | → `PReview.md` §3.4 — professional, reached only via a tool change | ➖ |
+| **HR-18 (U)** | The guard over 6 file endings × 3 comment levels, before and after | harness | node — 4 merged blocks → 0 | ✅ |
 | **HR-19** | `M291` doubled space, and `()` vs `( )` — cosmetic, no fix | — | no test proposed | ➖ |
 | **HR-20** | A fuller tapping implementation | — | → `PReview.md`; the manual path now prompts (HR-12), the automatic path always emitted `M4` | ➖ |
+| **HR-21** | `E_Include_ProbeFile` is declared but never read — dead property | — | found while fixing HR-18; recorded, no fix yet | ➖ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
 | **HW-2 (A)** | HP-5 boundary: WCS suppression, rapid lifecycle, position tracking | posted | `Link.gcode` | ✅ |
 | **HW-2 (B)** | HP-5 boundary: a spindle-speed change between operations | posted | ⚠ evidence file **overwritten** — re-post as `HR12-auto - GRBL.gcode` | ✅ |
@@ -118,10 +134,10 @@ for.
 | **HW-6** | Full regression sweep before release | — | last, after everything above | ⬜ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | ➖ |
 
-**What the 4 ⬜ rows are waiting on.** **HR-12 (A4)** needs a counterclockwise-running tool — the only
-thing left to build. **HR-6 (B)** needs a rotated Setup and is optional. **HR-18 (A)** needs a stop file
-with no trailing newline and is gated on the HR-18 decision (§4.3). **HW-6**, the regression sweep, goes
-last by definition. Ranked in [§3](#3-status).
+**What the 5 ⬜ rows are waiting on.** **HR-12 (A4)** needs a counterclockwise-running tool — the only
+thing left to build. **HR-6 (B)** needs a rotated Setup and is optional. **HR-18 (A)** and **(B)** need
+one stop file with no trailing newline, posted twice — as the Stop include and as the Start include — at
+Comment Level `Important`. **HW-6**, the regression sweep, goes last by definition. Ranked in [§3](#3-status).
 
 > **One ✅ still owes a file.** **HW-2 (B)** is closed on quoted evidence only — its `.gcode` was
 > overwritten (§8). Re-post Link's CAM at `Manual Spindle On/Off` = **false** as
@@ -266,11 +282,12 @@ the last column says only whether the fix's rows are all in.
 | **HR-15** | `safeZforSection()` asks the passed section | `88c7817` | None — latent trap closed, no output change | all in |
 | **HR-12** | Manual spindle prompts on a speed **or** direction change | `dd8e11d` | Manual-spindle jobs with >1 speed or a reversal; clockwise start prompts byte-identical | (A4) owed |
 | **HR-17** | Four tidy-ups: sanitizer double spaces, group rename, vestigial arg, empty GRBL block | `924d1f6` | **Every saved `.gcode`** — property heading and manual-spindle prompt text; no motion | all in |
+| **HR-18** | `loadFile()` repairs a missing line terminator after an include | *this commit* | **Include jobs only** (group 08, default `<empty>`); no-op on a file that already ends in a newline | (U) in; (A)(B) owed |
 
-Open with no code change: **HR-16** (recorded, no fix proposed), **HR-18** (`loadFile()` newline — has
-a Do→Get row, deliberately unfixed), **HR-19** (cosmetic, fold into the next sweep). Moved to
+Open with no code change: **HR-16** (recorded, no fix proposed), **HR-19** (cosmetic, fold into the next
+sweep), **HR-21** (dead `E_Include_ProbeFile` property — direction not chosen). Moved to
 `docs/PReview.md`: **HR-7**, **HR-8**, **HR-9**, **HR-10**, **HR-13** — and **HR-20**, opened there by
-decision. **HR-12 was moved back here** (§4.3).
+decision; each keeps a `➖` pointer row in §0. **HR-12 was moved back here** (§4.2).
 
 ### Verification owed — sessions 1 and 2 are done; one session remains
 
@@ -372,14 +389,17 @@ owing a post. Five files on the drill CAM, differing only in group 10 and the op
 
 Remaining, ranked by value:
 
-1. **One row needs something built** — **HR-12 (A4)**, a counterclockwise-running tool.
-2. **One evidence restoration, no new CAM** — re-post Link at `Manual Spindle On/Off` = false as
+1. **Verify HR-18 — two posts from one artifact** — **(A)** and **(B)**, one stop file with no trailing
+   newline used as the Stop include then the Start include, both at Comment Level **`Important`**. The
+   guard is harness-verified but has never been posted. `H11d - Marlin.gcode` needs re-baselining at the
+   same time (it gains one newline; its HR-11 (D) assertion does not move).
+2. **One row needs something built** — **HR-12 (A4)**, a counterclockwise-running tool.
+3. **One evidence restoration, no new CAM** — re-post Link at `Manual Spindle On/Off` = false as
    `HR12-auto - GRBL.gcode`, restoring HW-2 (B)'s overwritten file.
-3. **Two one-offs** — **HR-6 (B)** a rotated Setup (optional), and **HR-18 (A)** a stop file with no
-   trailing newline (gated on 4 below).
-4. **One decision, not a post** — **HR-18**, whether to add the `loadFile()` newline guard at all. §4.3
-   has the diagnostic ready.
+4. **One one-off** — **HR-6 (B)**, a rotated Setup. Optional.
 5. **HW-6**, the regression sweep. Last by definition.
+
+*No longer here: the HR-18 decision, taken 2026-08-01 — `loadFile()` always checks and repairs.*
 
 Three results worth carrying forward rather than re-deriving:
 
@@ -1157,6 +1177,83 @@ over, silently, on a two-operation job with **one tool and no tool change**. Tha
 > **Severity is unchanged at Medium** — the cost is a burnt cutter or a poor finish, not a crash — but
 > its *reachability* is no longer an argument. Re-rate if that changes the release calculus.
 
+#### HR-18 — `loadFile()` guarantees no line break after an included file, so the next block merges onto its last line — **Medium**
+
+*Decided and fixed 2026-08-01. The decision was whether to add the guard at all; the answer is that
+`loadFile()` should always check and repair a missing terminator.*
+
+**Reached by:** any job using group `08 - External Include Files` whose include file does not end in a
+newline — which is the normal state of a file saved by a text editor that does not add one, and is
+invisible in every editor. Outside HP-1…HP-5's defaults, but a **silent corruption** when it fires.
+
+`loadFile()` emitted the file's text with `write()`, the post's only bare `write()` call, which appends
+no line break. `H11d - Marlin.gcode` witnessed the consequence directly:
+
+```
+Stop file last line; --- End custom gcode C:\…\Stop File.gcode
+```
+
+The closing `--- End custom gcode` comment landed **on** the include's last line. Benign as posted — a
+trailing comment is legal on all three firmwares — **but that comment is `Info` level.** At Comment
+Level `Important` or `Off` it is suppressed, and the next thing written is `flushMotions()`'s `M400`.
+A stop file ending `M5` then yields **`M5M400`: one invalid block, no warning, no way to see it in the
+source file.** *The Info comment was hiding the defect, not preventing it* — which is why the witnessed
+artifact looked cosmetic and was not.
+
+**As built — repair in `loadFile()`, not at the call sites.** After `write(txt)`, inspect the last
+character and emit `writeln("")` when it is neither `\n` nor `\r`. Read the code and the commit; the
+two decisions it embeds:
+
+**Decision 1 — always check and repair, unconditionally.** The alternative considered was to leave it
+and document "your include file must end in a newline". Rejected: the precondition is invisible (no
+editor shows a missing terminator), the failure is silent and produces an invalid block rather than a
+refusal, and the repair costs one comparison on a path that runs at most four times per job. A
+precondition the operator cannot check is not a precondition, it is a trap.
+
+**Decision 2 — `\r` counts as a terminator.** GRBL, Marlin and RRF all accept CR, LF and CRLF as a
+block separator, so a CR-terminated file is already well-formed and adding an LF would append a blank
+line to it. The guard therefore accepts either character rather than testing for `\n` alone.
+
+**One guard covers every branch, which is the point of putting it here.** All four include sites —
+`A_Include_StartFile`, `B_Include_StopFile`, `C_Include_ToolFile1`, `D_Include_ToolFile2` — call this one
+function, and `write()` appears nowhere else in the post. Guarding at the call sites would have needed
+the same four-line block four times, with a fifth site added silently by the next include property.
+
+**Blast radius.** An include file that already ends in a newline is **byte-identical** — the guard does
+not fire. Only a file missing its terminator changes, and there it adds exactly one line break. **No
+saved reference is invalidated:** every posted file in §3 either uses no include (`A`/`B_Include_*` =
+`<empty>`) or, in `H11d - Marlin.gcode`'s case, will gain one newline before the `--- End custom gcode`
+comment. `H11d` should be re-posted to re-baseline it, but its HR-11 (D) assertion — that the stop file
+bypasses the whole stop block — does not move.
+
+**(U) ✅ verified by harness, before and after — 2026-08-01.** `loadFile()` brace-matched out of the
+`.cps` and run against stubbed `write`/`writeln`/`writeComment`/`loadText`, so it is the shipped code.
+The fixture table is **six file endings × three comment levels**, each replaying what
+`flushMotions()` writes next:
+
+| Include file ends… | `Info` | `Important` | `Off` |
+|---|---|---|---|
+| `M5` — no terminator | ok *(comment absorbed it)* | **merged → fixed** | **merged → fixed** |
+| `M5` alone, no terminator | ok *(same)* | **merged → fixed** | **merged → fixed** |
+| `M5\n`, `M5\r\n`, `M5\r` | ok | ok | ok |
+| empty file (length-0 guard) | ok | ok | ok |
+
+**Against `HEAD` the harness reports four merged blocks; against the fix, none** — and the contrast is
+the evidence, not the "after" column. The two `Info`-level "ok"s in the before column are the finding
+in miniature: **the same build that corrupts the file at `Important` looks clean at `Info`.** A test run
+only at the default comment level would have passed on the broken code. Terminated files stay
+byte-identical in both columns, confirming the no-op claim.
+
+**Do (A) — the stop-file end.** Set `B_Include_StopFile` to a file whose last line is `M5` with **no
+trailing newline**, post at **Comment Level `Important`** (the default `Info` hides it — see above).
+**Get:** `M5` and `M400` on separate lines. **Pass:** two blocks, not `M5M400`. *Discriminator: the
+absence of a merged block at `Important`; posting at `Info` proves nothing either way.*
+
+**Do (B) — the start-file end.** The same file as `A_Include_StartFile`, same comment level. **Get:**
+the include's last block and whatever `Start()`'s successor writes on separate lines. **Pass:** as (A).
+*(B) is not redundant: it is the other end of the file, and the Start branch's successor is different
+code from `flushMotions()`.* **(T)**, the two tool-change includes, is professional — `PReview.md` §3.4.
+
 ---
 
 ### 4.3 Open — no code change
@@ -1173,28 +1270,7 @@ where this same line of code actually bites.
 
 *(HR-17's tidy-ups are no longer open — they landed as one sweep; see §4.2.)*
 
-**HR-18 — `loadFile()` does not guarantee a line break after an included file, so the next block can
-be appended to its last line.** *(Medium; group 08, so outside HP-1…HP-5's defaults, but it is a
-silent corruption when it fires.)* `loadFile()` emits the file's text with `write()`, which adds no
-newline. `H11d - Marlin.gcode` shows the consequence directly:
-
-```
-Stop file last line; --- End custom gcode C:\…\Stop File.gcode
-```
-
-The closing `--- End custom gcode` comment landed **on** the include file's last line, because
-`Stop File.gcode` has no trailing newline. Benign as posted — a trailing comment is legal on all three
-firmwares — **but that comment is `Info` level.** At Comment Level `Important` or `Off` it is
-suppressed, and the next thing written is `flushMotions()`'s `M400`, which would then merge into
-`Stop file last lineM400`. A real stop file ending `M5` with no trailing newline yields `M5M400`: one
-invalid block, silently. The same applies to the Start and Tool include files, and to the g-code
-*before* the include if that path ever writes without a newline.
-
-*Not fixed here.* The fix is a one-line guard — emit a newline after the loaded text when it does not
-end in one — but it touches the shared `loadFile()` used by **every** include branch, and those
-branches have no test rows at all yet. **Do:** set a Stop File whose last line is `M5` with no
-trailing newline, post at Comment Level `Important`, and read the last block. **Pass:** `M5` and
-`M400` are on separate lines.
+*(HR-18 is no longer open — the decision was taken and the guard landed on 2026-08-01; see §4.2.)*
 
 **HR-19 — `M291` blocks carry a doubled space.** *(Cosmetic.)* `askUser()` builds its RRF parameter
 string starting with a space (`" P\"" + …`) and then hands it to `writeBlock()`, which inserts the word
@@ -1208,6 +1284,25 @@ would need re-baselining for one blank.
 > the rest pass `" "`. Pick one and use it everywhere. *(Confirmed 2026-08-01 to be general, not a
 > drilling artifact: `HW3 - GRBL.gcode` — an ordinary one-operation face mill — carries the same `()`
 > on its single `onSectionEnd()` line. Every posted file has it; it is one call site, not one CAM.)*
+
+**HR-21 — `E_Include_ProbeFile` is declared in the dialog but never read.** *(Low; found 2026-08-01
+while auditing `loadFile()`'s call sites for HR-18.)* Group 08 offers five include-file properties. Four
+are consumed — `A_Include_StartFile`, `B_Include_StopFile`, `C_Include_ToolFile1`, `D_Include_ToolFile2`
+each reach `loadFile()`. **`E_Include_ProbeFile` ("Probe — File with custom Gcode for tool probe") is
+declared and never referenced again**, so a user who fills it in gets **silence**: no include, no
+warning, no error. That is worse than the property not existing, because the dialog advertises a feature
+and the posted file gives no clue it was ignored — and the file *does* get validated for the four that
+work, so there is no "can't open file" error to hint at it either.
+
+**No fix chosen, because the two candidates differ in scope, not in quality.** Either *(a)* wire it into
+`probeTool()` the way the tool-change files are wired into `toolChange()` — the feature the title
+promises, and the reason it was presumably declared — or *(b)* delete the property. **Deleting resets no
+preset that anyone can be relying on**, since the property has never done anything, but it is a
+release-notes item under the §"What resets a saved preset" rule either way. **(a) is the professional
+call:** the probe include would fire on every probe, including the tool-change re-probe, so it belongs
+with the Tool Change branch's ordering work rather than ahead of it. Recorded here because it was found
+here; **no test row until the direction is chosen** — a row asserting the current silence would only
+have to be deleted.
 
 ---
 
@@ -1394,10 +1489,9 @@ probe, comment syntax per firmware, arc and cycle handling, guard placement, and
 dispatch for all six First WCS / Part modes. What reading could not establish — HR-2's kernel
 dependency and HR-6's `workPlane` behaviour — **both have since settled by posting**
 (`Drill_Tap.gcode`, `H2 - Debug.gcode`). **To claim "high confidence that the post outputs correctly formatted,
-structurally sound g-code for a hobbyist from every F360 entry point"**, the **4 ⬜ rows** in
-[§0](#0-test-register--every-test-and-its-state) are what stand between here and that claim — one
-needing a CCW tool, one a rotated Setup, one gated on the HR-18 decision, and the final sweep. Ranked
-under §3.
+structurally sound g-code for a hobbyist from every F360 entry point"**, the **5 ⬜ rows** in
+[§0](#0-test-register--every-test-and-its-state) are what stand between here and that claim — two
+posting HR-18's guard, one needing a CCW tool, one a rotated Setup, and the final sweep. Ranked under §3.
 
 ---
 

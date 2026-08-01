@@ -24,13 +24,17 @@ clean apart from two untracked files, both deliberate: `MPCNC_v4.0_Beta1.zip` (u
 ignore it) and **`Personal.cps`** (a test harness — see below). **Nothing is half-done and nothing is
 known-broken.**
 
-**Status lives in one place: `HReview.md` §0**, a 67-row register naming every hobbyist test, how it
-was settled, its evidence file and its state — currently **56 pass, 0 fail, 4 unrun, 7 n/a or moved**.
+**Status lives in one place: `HReview.md` §0**, a **76-row** register naming every hobbyist test, how it
+was settled, its evidence file and its state — currently **57 pass, 0 fail, 5 unrun, 14 n/a or moved**.
 Nothing else in that file records a pass; if the two ever disagree the register is wrong and must be
-fixed. Read it first. The professional side is `PReview.md`, still a parking lot.
+fixed. Read it first. **The register is complete: every `H`/`HR`/`HW` id has a row, including the six
+deferred to `PReview.md`, which keep `➖` pointer rows.** (HR-7/8/9/10/13 had silently vanished from it
+in the doc split and were restored on 2026-08-01 — if you move a finding out, leave the pointer behind.)
+The professional side is `PReview.md`, still a parking lot.
 
-**Eleven fixes have landed on this branch**, one commit each (`git log --oneline --grep='^HR-'`), and
-**all eleven are now closed with posted evidence**; **HR-12** owes only `(A4)`. Six posting sessions
+**Twelve fixes have landed on this branch**, one commit each (`git log --oneline --grep='^HR-'`).
+Eleven are closed with posted evidence; **HR-12** owes only `(A4)`, and **HR-18** (landed 2026-08-01) is
+harness-verified but not yet posted. Six posting sessions
 have run — five on 2026-07-31 (Marlin/RRF, inch, the G1→G0 mapper, drill + tap, coolant) and
 **session 6 on 2026-08-01** (probe-pause ladder + the tap re-post) — with their file tables in
 `HReview.md` §3. The reference files worth knowing: `H11c - GRBL.gcode` (GRBL/mm, and the `Probe Pause`
@@ -38,14 +42,14 @@ ladder's top rung), `H4base - GRBL Inch.gcode` (inch), `H15a - GRBL.gcode` (mapp
 `HW5 - GRBL.gcode` (the only GRBL file with `Scale Feedrate` on), `Link.gcode` (two-op, one-tool, HP-5
 shape). **`H2.gcode` is retired as a baseline** — it predates HR-17; keep it only as HR-17's "before".
 
-**What is left — four rows, one restoration, one decision.**
+**What is left — five rows and one restoration. No decisions outstanding.**
 
 | | Rows | Note |
 |---|---|---|
+| Verify HR-18 | `HR-18 (A)`, `(B)` | **one** artifact serves both: a stop file whose last line is `M5` with no trailing newline, used as the Stop include then the Start include, posted at Comment Level **`Important`** — the default `Info` hides the defect behind the `--- End custom gcode` comment. Re-baseline `H11d - Marlin.gcode` at the same time |
 | Needs something built | `HR-12 (A4)` | a **counterclockwise-running tool** — the only thing left to build |
 | Restore lost evidence | — | re-post Link's CAM at `Manual Spindle On/Off` = **false** as `HR12-auto - GRBL.gcode`; HW-2 (B) is ✅ on a quotation only. See the overwrite note below |
-| One-offs | `HR-6 (B)`, `HR-18 (A)` | a rotated Setup (optional); a stop file with no trailing newline (gated on the decision below) |
-| A decision | `HR-18` | whether to add the `loadFile()` newline guard at all |
+| One-off | `HR-6 (B)` | a rotated Setup. Optional |
 | Last, by definition | `HW-6` | the regression sweep |
 
 **Session 6 (2026-08-01) also amended HP-1.** Its group-03 clause required the verifier to enable a
@@ -108,11 +112,13 @@ physical measurement are out of scope, so every row must stand on the posted fil
    evidence; what remains is **HR-12 (A4)** (needs a counterclockwise tool — the only thing left to
    build), one re-post restoring overwritten evidence, and two one-offs. `HW-6`, the regression sweep,
    goes last by definition.
-2. **Decide HR-18** — `loadFile()` adds no newline after an included file, so with `Info` comments
-   suppressed the next block merges onto the include's last line (`M5M400`). Deliberately unfixed: the
-   one-line guard sits in the `loadFile()` every include branch shares, and none of those branches has
-   a test row. Diagnostic post specified in `HReview.md` §4.3. **HR-19** (doubled space in `M291`, plus
-   `()` against `( )` on the two `onSectionEnd()` lines) waits for the next tidy-up sweep.
+2. **Post HR-18 (A) and (B)** — the guard landed 2026-08-01 (`loadFile()` now checks the last character
+   and emits a line break when it is neither `\n` nor `\r`), harness-verified over six file endings ×
+   three comment levels: four merged blocks against `HEAD`, none after. What it has never had is a
+   *posted* file, and the artifact is trivial — one stop file with no trailing newline, used at both ends,
+   at Comment Level `Important`. **HR-19** (doubled space in `M291`, plus `()` against `( )` on the
+   `onSectionEnd()` lines) and **HR-21** (`E_Include_ProbeFile` declared but never read — found while
+   fixing HR-18; wire it into `probeTool()` or delete it) wait for the next tidy-up sweep.
 
    > **Phase 5 is already answered and needs no work.** `isSafeToRapid()` is called only from
    > `onLinear()` and is scoped to a single section, so the G1→G0 mapper cannot run across the
@@ -482,9 +488,9 @@ safety comment. *(Verified all three branches — `PReview.md` §4.)*
   offset**'s added-part halves (`PReview.md` P2/P3) and the multi-part rows generally. **Remaining to
   build:** tool-change ordering + base-relative park (below).
 - **Phase 5 — not started** (likely no-op).
-- **Hobbyist review — code complete for this branch's scope.** 20 findings; **eleven landed**, five
-  moved to `PReview.md`, HR-16 and HR-19 recorded with no fix, HR-18 awaiting a decision. **All eleven
-  are closed with posted evidence**; HR-12 owes only `(A4)`. Status in `HReview.md` §0.
+- **Hobbyist review — code complete for this branch's scope.** 21 findings; **twelve landed**, five
+  moved to `PReview.md`, HR-16 / HR-19 / HR-21 recorded with no fix. Eleven are closed with posted
+  evidence — HR-12 owes `(A4)`, HR-18 is harness-verified and owes `(A)(B)`. Status in `HReview.md` §0.
 - **Professional review — not started.** `PReview.md` is a parking lot until it runs.
 
 ## Completed reviews (archived)

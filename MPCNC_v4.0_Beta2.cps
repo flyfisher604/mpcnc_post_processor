@@ -2902,6 +2902,18 @@ function loadFile(_file) {
     if (txt.length > 0) {
       writeComment(eComment.Info, " --- Start custom gcode " + folder + _file);
       write(txt);
+      // loadText() returns the file verbatim and write() appends no line break, so an
+      // include file with no trailing newline leaves the output stream mid-line and the
+      // NEXT thing written merges onto the include's last block. A stop file ending "M5"
+      // then yields "M5M400" -- one invalid block, silently. The two Info comments here
+      // normally absorb it, which is exactly why it is dangerous: at Comment Level
+      // Important or Off they are suppressed and nothing stands between the include and
+      // the next block. Guarded here rather than at the four call sites because every
+      // include branch -- Start, Stop, and both Tool Change files -- shares this function.
+      var lastChar = txt.charAt(txt.length - 1);
+      if (lastChar != "\n" && lastChar != "\r") {
+        writeln("");
+      }
       writeComment(eComment.Info, " --- End custom gcode " + folder + _file);
     }
   } else {

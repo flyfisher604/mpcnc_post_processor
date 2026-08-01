@@ -464,6 +464,19 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
 
 ### 3.4 Other outstanding professional checks
 
+- [ ] **HR-18 (T) — the tool-change half of the `loadFile()` newline guard.** `loadFile()` now repairs a
+      missing line terminator after an included file (`HReview.md` HR-18, landed 2026-08-01, harness-
+      verified over six file endings × three comment levels). The guard lives in the **one shared
+      function all four include branches call**, so the two tool-change includes are fixed by
+      construction — but "by construction" is a reading, not a posted file, and the tool-change branch is
+      the only one where the include is followed by post-injected motion rather than by `flushMotions()`.
+      *Do:* GRBL, two tools, group 07 on, and set **`C_Include_ToolFile1`** (then `D_Include_ToolFile2`)
+      to a file whose last line is `M5` with **no trailing newline**; post at Comment Level
+      **`Important`** — the default `Info` hides the defect behind the `--- End custom gcode` comment.
+      *Get:* the include's last block and the next emitted block on separate lines. **Pass:** no merged
+      block. *Discriminator: the absence of a merge at `Important`; a post at `Info` proves nothing.*
+      **Also worth capturing while the include files are set up:** whether `ToolFile2`'s include lands
+      before or after the re-probe, which HR-9's ordering work will move.
 - [ ] **HR-3 (C) — the tool-change half of a landed hobbyist fix.** `spindleOff()` now prompts a
       hand-switched spindle to stop on GRBL as well as Marlin/RRF (`HReview.md` HR-3, committed
       `43d09aa`, verified at job end). The tool-change half is unverified and is the case that matters
