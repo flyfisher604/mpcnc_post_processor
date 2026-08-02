@@ -363,6 +363,39 @@ verification post must carry — it cannot execute on a paid licence (HW-1).
 
 ---
 
+## Tooling that ships with the repo
+
+Two gates. They exist because every rule in this file used to be a prose imperative a session had to
+remember, and three counts in `HReview.md` had already drifted by the time anyone counted them.
+
+| Artifact | Fired by | Checks | Travels? |
+|---|---|---|---|
+| `docs/check-docs.js` | the pre-commit hook, or by hand | The contracts above: size budgets (warn), tallies vs their tables, findings-vs-register id completeness, heading ranges and row counts, Rule 3's pointer direction, the README `doc-sync` ref | ✅ tracked |
+| `.githooks/pre-commit` | `git commit` — **anyone's**, not just a session's | runs `check-docs.js --staged`; non-zero aborts the commit | ✅ tracked, ❌ **not armed** — see below |
+| `.claude/hooks/post-edit.js` | Claude Code, after every `Edit`/`Write` | `node --check` when the file is the `.cps`; silent for everything else | ✅ tracked |
+
+Run the doc check by hand with `node docs/check-docs.js` (working tree) or `--staged` (what a commit
+would record). It is deliberately quiet: `WARN` never fails a commit, only `FAIL` does.
+
+**A fresh clone must run this once — nothing else installs it:**
+
+```
+git config core.hooksPath .githooks
+```
+
+`core.hooksPath` lives in `.git/config`, which is **never cloned**, so the tracked `.githooks/pre-commit`
+arrives present but inert. `post-edit.js` — which *does* self-arm, through the tracked
+`.claude/settings.json` — checks for the setting when the `.cps` is edited and prints the command if it
+is missing. That is the only reason the omission cannot go unnoticed.
+
+Claude Code asks for approval the first time a project's `settings.json` hooks block is seen or changes.
+That is by design — a checked-in hook is executable code arriving from a repository — and is not a fault.
+
+**Why the split.** Syntax is meaningful at *every* edit, so `node --check` runs then; deferring it to
+commit lets further edits stack on a broken file. Document contracts are meaningful only once a change
+is settled, which is what *Registers ship with the code* already says — the register is updated before
+the commit lands, **not** after every intermediate edit — so checking them per-edit would fight that rule.
+
 ## Working method — harness and tooling
 
 - **`node --check MPCNC_v4.0_Beta2.cps` is a valid syntax gate** — run it after every edit.
