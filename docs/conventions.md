@@ -13,6 +13,38 @@ year, not every session — if you are editing it often, something live has leak
 
 ---
 
+## Document contracts
+
+Each file has a fixed job. The set has been reorganised twice because content drifted into whichever file
+happened to be open — a design write-up in the status file, a working rule in per-user memory, a finding
+restated in four places. These contracts are what stop that recurring.
+
+| File | May contain | Must **not** contain | Size guide |
+|---|---|---|---|
+| `CLAUDE.md` | Imperatives that change how a session works: read order, show-a-diff, `node --check`, the register rule, commit convention, what to leave alone | Rationale, history, design, anything that fires only once you are deep in one function | **≤ 60 lines** — it loads in full every session |
+| `plan.md` | The checkpoint (baseline, what is true now, **what is left in order**, live risks), phase status, pointers to completed reviews | Design write-ups, findings, test rows, resolved decisions, open questions, backlog detail | **≤ 120 lines** |
+| `conventions.md` | The durable half: stance, coordinate model, base/frame/probing, guards, firmware capabilities, property & dialog conventions, how to run a test, working method, these contracts | Status of anything, what is next, unbuilt design | — |
+| `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | — |
+| `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | — |
+| `README.md` | User-facing usage only. Its `doc-sync` marker records the ref it last synced to | Anything developer-facing | — |
+
+**Three rules that keep it that way.**
+
+1. **A new top-level section in `plan.md` requires changing its contract here first.** If the content does
+   not fit a section it already has, the question is *which register owns this*, not *can plan.md hold it*.
+2. **Over the size guide means something has stopped being live.** Check what has quietly become durable
+   (→ here) or register-shaped (→ a register) rather than trimming prose.
+3. **Never point two ways.** If file A says "written up in B", B must hold the write-up and must not point
+   back. `plan.md` and `PReview.md` §6 pointed at each other for four items, and neither held the content.
+   A pointer is only valid in one direction: from status toward the register that owns the work.
+
+**Which register?** Hobbyist is *a Personal-licence user, one part, one WCS, one tool, several operations*.
+Professional is multi-WCS, spoilboard base, tool changes, Manual NC, and the dialog audit. An unscheduled
+idea goes to `PReview.md` §6 **unless a hobbyist needs it for correct operation** — a nice-to-have is not
+a hobbyist item just because a hobbyist could use it.
+
+---
+
 ## Context and stance
 
 The post targets the V1 Engineering **MPCNC / LowRider** family and similar GRBL / Marlin / RepRap

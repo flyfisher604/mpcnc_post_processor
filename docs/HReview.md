@@ -1,8 +1,9 @@
 # HReview — hobbyist review of `MPCNC_v4.0_Beta2.cps`
 
-The hobbyist-side findings register and test register. **43 findings** — 26 `HR-` from the hobbyist
+The hobbyist-side findings register and test register. **44 findings** — 27 `HR-` from the hobbyist
 review, 17 `CR-` from the 2026-08-01 whole-file review. All are fixed, closed by design, or moved to
-`docs/PReview.md`, except three one-liners awaiting a tidy-up sweep. Nothing is failing.
+`docs/PReview.md`, except three one-liners awaiting a tidy-up sweep and one unstarted robustness fix
+(HR-27). Nothing is failing.
 
 Reasoning, diffs and session narratives were trimmed 2026-08-01 — read the code and the commit messages
 for *why*. What is kept is what a later reader needs: every issue with its status, and every test with
@@ -30,8 +31,8 @@ comment that names one still resolves.
 
 | ID | Finding | Sev | Resolution | Status |
 |---|---|---|---|---|
-| **HR-1** | `G38 Target` was an absolute Z in a frame whose Z0 is stale, on the default probe path | High | Provisional `Z0` on the two just-positioned modes only; gated on `canProbe` | ✅ fixed `8d61790` |
-| **HR-2** | `isProbeOperation()` undefined — any drilling operation could abort the post | High | Defined locally, two signals (strategy + `cycleType` prefix) | ✅ fixed `9c87fb0` |
+| **HR-1** | `G38 Target` was an absolute Z in a frame whose Z0 is stale, on the default probe path | High | Provisional `Z0` on the two just-positioned modes only; gated on `canProbe`. **Scope is deliberate:** the frame-dependence remains open for the `Use Active WCS`, added-part and base probes, which descend from a retracted clearance and would be made **worse** by the same fix. Added-part symmetry is an open question — `PReview.md` **M4** | ✅ fixed `8d61790` |
+| **HR-2** | `isProbeOperation()` undefined — any drilling operation could abort the post | High | Defined locally, two signals (strategy + `cycleType` prefix). ⬜ **Open question:** keep the extra breadth, or trim to the strict reference form? Two signals catch more than the reference post does, at the cost of possibly refusing an operation it would accept | ✅ fixed `9c87fb0` |
 | **HR-3** | GRBL + Manual Spindle never prompted to switch the router **off** | High | `spindleOff()` branches on the property first, firmware inside | ✅ fixed `43d09aa` |
 | **HR-4** | Safe-Z fallback constants never converted mm → output unit | Med-High | Four call sites converted; inch only, identity in mm | ✅ fixed `439ce2d` |
 | **HR-5** | `Scale Feedrate` did not apply to G2/G3 arcs | Med-High | `limitArcFeed()` caps at the arc's **plane's** axis limits | ✅ fixed `b95c954` |
@@ -40,7 +41,7 @@ comment that names one still resolves.
 | **HR-8** | Post-injected motion never updates Fusion's tracked position | Medium | → `PReview.md` §2. Confirmed unreachable on any hobbyist path (2026-08-01) | ➖ moved |
 | **HR-9** | `Do First Change` + probe-after off zeroes Z against the wrong tool | Medium | → `PReview.md` §2 | ➖ moved |
 | **HR-10** | `Disable Z Stepper` emits Marlin-only `M84 Z` on GRBL | Medium | → `PReview.md` §2 — has a complete diff | ➖ moved |
-| **HR-11** | Marlin/RRF jobs never ended and left every stepper energised | Medium | `M84 S60` both; `M2` on RepRap only (Marlin has never implemented it) | ✅ fixed `7a35f7f` `8054b6e` |
+| **HR-11** | Marlin/RRF jobs never ended and left every stepper energised | Medium | `M84 S60` both; `M2` on RepRap only (Marlin has never implemented it). **`S60`, not a bare `M84`, deliberately** — a 60-second idle timeout rather than releasing the steppers at once, which would drop Z on an unbalanced LowRider gantry | ✅ fixed `7a35f7f` `8054b6e` |
 | **HR-12** | A manual spindle is never told about an RPM change between operations | Medium | Prompt on formatted-speed **or** direction change | ✅ fixed `dd8e11d` |
 | **HR-13** | `onCommand` silently discards every command it does not name | Low-Med | → `PReview.md` §2 — has a complete diff | ➖ moved |
 | **HR-14** | Two coolant modes could never match a channel | Low | `coolantLevels` derived from `eCoolant` | ✅ fixed `7e38777` |
@@ -77,9 +78,15 @@ comment that names one still resolves.
 | **CR-17 (c)** | `feedFormat` declared and never used | Cosmetic | Deleted | ✅ fixed `c73726c` |
 | **CR-17 (d)** | `wcsGcode(0)` returns `G53` against the standing "never `G53`" rule | Cosmetic | **By design** — a pure conversion carries no frame policy, and no caller can pass 0. Same as HR-25 | ✅ closed |
 | **CR-17 (e)** | `sectionComment` printed `undefined`, or inherited the previous operation's name | Cosmetic | Fixed in `onSection()`/`onSectionEnd()` | ✅ fixed `c73726c` |
+| **HR-27** | The two **geometry** guards fire in `onSection()`, not `onOpen()`, so a rejected job can leave a **truncated `.gcode` on disk** | Medium | Guards A/B/C run before any output, so they write no file; multi-axis and HR-6's orientation check do not. A hobbyist who builds a Setup on a model face gets a partial file rather than a clean refusal. Fix: promote both into `validateJob()`. Not started | ⬜ open |
 
 **Open, no fix:** HR-19 (`M291` space), HR-21 / CR-15 (one decision, two ids), HR-24 — a tidy-up sweep of
-one-liners, none changing output today. Everything else is fixed, closed by design, or moved.
+one-liners, none changing output today. Plus **HR-27**, which is not a one-liner and is not in that sweep.
+Everything else is fixed, closed by design, or moved.
+
+**Open questions carried in the rows above:** HR-1 (added-part provisional `Z0` — settle on `PReview.md`
+M4), HR-2 (guard breadth), HR-16 / CR-6 (jet Z retract — `PReview.md` §5), HR-21 / CR-15 (wire or delete).
+Professional ones live in `PReview.md` §6.
 
 **Nothing found by either pass breaks the factory-default single-operation job.** Every High/Medium
 finding needed the operator to move one dialog field off its default — but each of those is a field the

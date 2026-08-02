@@ -49,9 +49,36 @@ everything the README puts outside the hobbyist's reach:
 
 ## 2. Findings deferred from the hobbyist review
 
-All five land **as one unit** with *Phase 4 — tool-change ordering + base-relative park*
-(`docs/plan.md`), rather than patching the same section-boundary code twice. **HR-10** and **HR-13**
-are independent of the reorder and have complete diffs, so they can go in first as warm-up commits.
+All five land **as one unit** with the tool-change ordering rework below, rather than patching the same
+section-boundary code twice. **HR-10** and **HR-13** are independent of the reorder and have complete
+diffs, so they can go in first as warm-up commits.
+
+#### Phase 4 — tool-change ordering + base-relative park *(design settled; not built)*
+
+**This is the Tool Change branch's work.** Tool changes are a professional feature — the Fusion Personal
+licence does not support them — so this rework and the five findings below land together on a separate
+branch.
+
+Root cause: in `onSection()`, `toolChange()` runs **before** `writeWCS(currentSection)` for non-first
+sections, so a boundary that is both a tool change and a WCS change **re-probes into the wrong WCS**
+(`toolChange()`'s re-probe writes `G10 L20` into `currentWorkOffset`, still the *previous* part's WCS) and
+**parks in the wrong frame**.
+
+Fix — reorder so the WCS is resolved before the tool-change re-probe, and coordinate the two so a combined
+boundary does each thing once:
+
+1. Run `writeWCS()` first — it owns the base retract and the frame switch. When a tool change on the same
+   section will re-probe, have `writeWCS()` **skip its own `B_Probe_OnChange` probe** and let the
+   tool-change flow own the single re-probe, now into the correct WCS.
+2. The tool-change re-probe **repositions to the new part's `X0 Y0`** before measuring (the same fix
+   already applied to the added-part probe), so it reads the stock top and not the park point.
+3. **Park position, two branches — decided:** base reserved → park relative to the base (a fixed physical
+   spot for the whole job), reusing the transit-select machinery; no base → plain `G0` in the current WCS,
+   as today. **Never `G53`.** *(The stale code comment at the tool-change position still argues for `G53`;
+   remove it with this work.)* Current code implements only the no-base branch.
+
+Net at a both-boundary: retract through base → switch WCS → park → swap → rapid to `X0 Y0` → probe once
+into the correct WCS. Test matrix in §3.4.
 
 > **HR-12 left this file on 2026-07-31** and is now in `HReview.md`, where it has since been fixed. It was swept in here with the
 > other five when HP-5 was redefined, on the reasoning that Personal has no tool changes — true of
@@ -488,7 +515,7 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       > the 9/7/4/2/4/10/8/5/7/10/2 = 68 counts are unchanged. What it adds is that **D1 now
       > distinguishes two things it previously could not**: if the dialog still shows the groups out
       > of numeric order after this, Fusion is not sorting at all and the zero-padding convention in
-      > `plan.md` is wrong.
+      > `conventions.md` is wrong.
 - [ ] **D2 (remainder) — the property dump is suppressed at Comment Level `Important` and `Off`.**
       The dump's structure and the resolved Safe-Z lines are verified (§4); only the suppression half
       is unrun.
@@ -549,7 +576,7 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       `$H` on GRBL/FluidNC for **both** modes (`$H` is all-or-nothing, so the mode only documents
       intent); on Marlin/RRF `G28 X` / `G28 Y` for `XY`, plus `G28 Z` for `XYZ`. Then repeat with
       `Prompt Before Home` on: **exactly one** pause before any homing motion, on every firmware and
-      axis set. **Pass:** the axis commands match the table in `plan.md` → *Machine frame*, and the
+      axis set. **Pass:** the axis commands match the table in `conventions.md` → *Machine frame*, and the
       prompt appears once, not per axis.
       > **Add a third post, and make it the first one you do — CR-1 (landed 2026-08-01, `HReview.md`).**
       > GRBL, `Home Before Start = XY`, **`Enable Line #s` = on**. `$H` used to go through
@@ -573,7 +600,7 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
 - [ ] **`wcsDefinitions` offset-0 decision.** Work offset `0` displays unresolved (`#0`) in the
       Operations panel (`useZeroOffset: false`) and silently aliases to WCS 1. Decide whether to leave
       it unresolved, set `useZeroOffset: true`, suppress WCS output, or reset to machine coordinates —
-      then verify the choice. Related: the mixed `0`/`1` design warning in `plan.md`'s backlog.
+      then verify the choice. Related: the mixed `0`/`1` design warning in §6.
 - [ ] **Tool-change ordering + base-relative park matrix** *(after the Phase-4 rework lands)*:
       tool-change-only, WCS-change-only, and a combined boundary, each with and without a reserved
       base. Confirm the re-probe lands in the **new** WCS, repositions to the new part's `X0 Y0`
@@ -724,24 +751,70 @@ with J5.
 
 ---
 
-## 6. Design work already scoped elsewhere
+## 6. Design backlog — unbuilt work and open questions
 
-Not repeated here; read these before starting the corresponding findings.
+Unbuilt design, and the questions that must be answered before it can be built. Nothing here is
+scheduled; `plan.md`'s checkpoint carries the ordered list of what is actually next.
 
-- **Tool-change ordering + base-relative park** — `plan.md` → *Remaining work* → *Phase 4 —
-  tool-change ordering + base-relative park*. Root cause (`toolChange()` runs before
-  `writeWCS()` for non-first sections, so a combined boundary re-probes into the wrong WCS and parks
-  in the wrong frame), the four-step fix, and the park-position decision. **HR-7/8/9/10/12/13 land
-  with it.**
-- **"Copy first part's Z" mode on `Subsequent WCS / Part`** — `plan.md` backlog. A register write for
-  same-thickness co-planar fixtures; no motion, no probe.
-- **A machine-coordinate base probe point (`G53`)** — `plan.md` → *Future work*. Would replace the
-  park-where-you-are precondition on the base probe; carries the "homing makes the WCS trustworthy,
-  it doesn't change it" analysis and the standing `Never G53` conflict that must be reconciled across
-  all three candidate uses at once.
-- **Flip / re-clamp multi-datum work** — future; PA1 covers only the same-fixture re-reference case.
-- **Open decision — first-part `Use Active WCS X0 Y0 Z0` with a base reserved.** It retracts to the
-  group-06 probe Safe Z *in the part's frame*, so with a base reserved the tool arrives at spoilboard
-  + Inter Part Safe Z and then **descends** to a part-relative hop that may not clear a taller clamp
-  elsewhere on the bed. Whether `Skip` (both stages) should instead hold the base clearance is
-  undecided; it is a verified path, so any change is deliberate. Full write-up in `plan.md`.
+**Tool-change ordering + base-relative park** is **§2**, with the five findings that land alongside it.
+
+### Standing decision this section is bounded by
+
+**Multi-WCS supports two coexisting per-part workflows** — one WCS per part or copy. (1) *Pre-set fixture
+offsets (Replicate):* `Skip` or `Probe Z`. (2) *Manual per-part:* the two `Jog …` modes. One part from
+**multiple datums on the same fixture** is supported (PA1); a **flip or re-clamp** is out of scope for a
+single run — those are separate jobs, and remain future work.
+
+### A machine-coordinate base probe point (`G53`) *(not started; design sketch)*
+
+The base probes wherever the tool is parked, defended only by an operator precondition. The durable fix is
+to give the base an explicit **probe point in machine coordinates** — `G53 G0 X<n> Y<n>` before the
+`G38.2` — so the touch-off lands on the same bare-spoilboard spot every run.
+
+**Rejected: `G53 G0 X0 Y0` (machine zero itself).** It is the homing corner — the extreme of travel,
+routinely off the spoilboard entirely; it is machine-config dependent (`$23`/`$27`/`$130`–`$132`); and Z is
+unsolved. Today the base establish emits *no motion at all*, so the unknown Z is inert; adding a traverse
+converts that into a full-bed diagonal at an unknown height.
+
+**Sketch, if built.** A group-05 property pair (base probe point X/Y, machine coordinates, whole mm),
+emitted as `G53 G0 X<n> Y<n>` immediately before the base `G38.2`, plus:
+
+- **Guard: requires homing.** Refuse (or warn) when `A_Machine_HomeBeforeStart = None` — machine zero is
+  arbitrary there. This is the first place groups `04` and `05` interact, and why they sit adjacent.
+- **An answer for Z:** require `XYZ` homing, or precede the move with an `M0` *"jog clear in Z, then
+  continue"*. The prompt is preferred — it works on the no-Z-endstop machines that are the majority.
+- **Default off** (empty = today's probe-where-parked behaviour).
+
+**Reconcile `G53` across all three uses before building any of it.** The project carries a standing
+**"Never `G53`"** decision. The three candidate uses — base probe point, tool-change park (§2),
+cross-part retract — should be decided **together**, since they share one question: *does this post ever
+address the machine frame directly, or is everything work-relative?* The current answer is "everything
+work-relative"; this item is the strongest case for revisiting it, because a spoilboard is the one thing
+in the job that genuinely is fixed to the machine. **This subsumes the open question of whether the
+spoilboard base should gain an explicit probe-point XY** — it is the same decision.
+
+### Open question — first-part `Use Active WCS X0 Y0 Z0` with a base reserved
+
+It retracts to the group-06 probe Safe Z *in the part's frame*, so with a base reserved the tool arrives
+at spoilboard + Inter Part Safe Z and then **descends** to a part-relative hop that may not clear a taller
+clamp elsewhere on the bed. **Should `Skip` (both stages) instead hold the base clearance?** Undecided. It
+is a verified path, so any change is deliberate.
+
+### Unscheduled ideas
+
+Professional or nice-to-have; none is scheduled, and none is a defect.
+
+- **"Copy first part's Z" mode on `B_Probe_OnChange`.** Write the first part's probed Z into each added
+  copy's own register (`G10 L20 P<n> Z<firstPartZ>`) — a register write, **no motion, no probe** — for
+  same-thickness co-planar fixtures. Requires caching the first part's probed Z. Marlin no-op.
+- **WCS `0`/`1` mixed-design warning (human factors).** A job using work offset `0` in one section and `1`
+  in another resolves both to `G54`, but reads as two deliberate fixtures in Fusion's Operations panel.
+  Emit a `>>> WARNING` when a job mixes `0` with a *different* explicit offset. The correct rule is
+  any-section-vs-any-other-section, broader than Fanuc's order-dependent check.
+- **`useZeroOffset` enforcement — open question.** `wcsDefinitions.useZeroOffset: false` is declared but
+  likely inert: the enforcing `validateCommonParameters()` lives in a shared post library this post does
+  not import, so `writeWCS()` still silently aliases `0`→`1`. **Should the post enforce it itself?**
+  Natural companion to the item above; test row in §3.4.
+- **`permittedCommentChars` global.** A comparable community GRBL post declares it; research whether it
+  adds real kernel-side filtering on top of `sanitizeMessageText()` before adding — may be informational.
+- **Global-metadata gaps.** Optionally `model`. Cosmetic.
