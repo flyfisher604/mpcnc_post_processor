@@ -23,12 +23,14 @@ restated in four places. These contracts are what stop that recurring.
 |---|---|---|---|
 | `CLAUDE.md` | Imperatives that change how a session works: read order, show-a-diff, `node --check`, the register rule, commit convention, what to leave alone | Rationale, history, design, anything that fires only once you are deep in one function | **≤ 60 lines** — it loads in full every session |
 | `plan.md` | The checkpoint (baseline, what is true now, **what is left in order**, live risks), phase status, pointers to completed reviews | Design write-ups, findings, test rows, resolved decisions, open questions, backlog detail | **≤ 120 lines** |
-| `conventions.md` | The durable half: stance, coordinate model, base/frame/probing, guards, firmware capabilities, property & dialog conventions, how to run a test, working method, these contracts | Status of anything, what is next, unbuilt design | — |
-| `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | — |
-| `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | — |
+| `conventions.md` | The durable half: stance, coordinate model, base/frame/probing, guards, firmware capabilities, property & dialog conventions, how to run a test, working method, these contracts | Status of anything, what is next, unbuilt design | **≤ 450 lines** — it changes a few times a year; an overrun means something live has leaked in. It is also the file the volatile ones drain *into*, so it absorbs before it trims |
+| `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 300 lines** — a register grows one line per row |
+| `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | **≤ 850 lines, and falling** — §2 and §3 are unbuilt design and unrun rows, and **both retire on build**. This file must shrink, not grow |
 | `README.md` | User-facing usage only. Its `doc-sync` marker records the ref it last synced to | Anything developer-facing | — |
 
-**Three rules that keep it that way.**
+`docs/check-docs.js` enforces the numbers above — see *Tooling that ships with the repo*.
+
+**Four rules that keep it that way.**
 
 1. **A new top-level section in `plan.md` requires changing its contract here first.** If the content does
    not fit a section it already has, the question is *which register owns this*, not *can plan.md hold it*.
@@ -37,6 +39,17 @@ restated in four places. These contracts are what stop that recurring.
 3. **Never point two ways.** If file A says "written up in B", B must hold the write-up and must not point
    back. `plan.md` and `PReview.md` §6 pointed at each other for four items, and neither held the content.
    A pointer is only valid in one direction: from status toward the register that owns the work.
+4. **Every accumulating section states what empties it.** A section that only ever gains rows will
+   outgrow its file, and "we'll tidy it later" has never once been the thing that happened. Three exist
+   today and these are their clauses:
+   - `HReview.md` → *Invalidated by the … code-review fixes* — delete a row when its test is re-posted;
+     delete the **section** when it empties. It expires with the `⬜` rows it was written for.
+   - `HReview.md` → *Checked and found correct* and `PReview.md` §4 → *Already verified* — delete a row
+     when a `posted` row supersedes it. Both are `read`-strength, and `posted` is strictly stronger.
+   - Findings tables — the **row** stays, always, because commit messages and code comments cite the id
+     and it must still resolve. What goes is the prose: on closure the Resolution collapses to the
+     commit ref plus one clause. This is the same rule as *retire the long form on close*, applied to
+     the row that outlives it.
 
 **Which register?** Hobbyist is *a Personal-licence user, one part, one WCS, one tool, several operations*.
 Professional is multi-WCS, spoilboard base, tool changes, Manual NC, and the dialog audit. An unscheduled
