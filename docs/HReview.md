@@ -247,8 +247,10 @@ a `posted` row and stronger than nothing.
    upgrade HR-18 (A)(B) from `read` to `posted`. *(All six now also carry CR-6's reordered tail.)*
 5. **Nine reference files predate HR-17** and would differ in two text respects if re-posted. No
    assertion is invalidated — tidiness, not risk.
-6. **Owed to the next README doc-sync** (README is not touched during code changes): the stale group-03
-   label; group 08's *"post processor might be unsafe"* prompt; **HR-23's substitution contract** — a
-   Start file owes `G90`/`G21`/`G94`/`G17`, a Stop file owes coolant off, the spindle-off prompt,
-   `M84 S60` and `M30`/`M2`; and the `Tool Change Probe` field that does nothing (HR-21).
+6. **Owed to the next README doc-sync: nothing.** The six items this list used to carry — the group-03
+   label, group 08's *"post processor might be unsafe"* prompt, HR-23's substitution contract, the
+   `Tool Change Probe` field, CR-4's coolant file loading and CR-16's descending Safe Z move — all
+   landed in `cd57a48`, whose `doc-sync` marker reads `7b80b44`. The only `.cps` commit since is
+   comment-only. Refresh from `git diff 7b80b44..HEAD -- MPCNC_v4.0_Beta2.cps` and re-bump the marker
+   when the post next changes what it emits. **The README is not touched during code changes.**
 
