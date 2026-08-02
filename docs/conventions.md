@@ -26,12 +26,31 @@ restated in four places. These contracts are what stop that recurring.
 
 `docs/check-docs.js` enforces the numbers above — see *Tooling that ships with the repo*.
 
+**What earns a place in this file: can the code state it?** If yes, the code owns it — a property enum,
+a function signature, a step summary is one edit away from being a lie, and deleting it loses nothing
+because the `.cps` says it. What belongs here is what reading the post **cannot** answer:
+
+- an **external fact** — what Marlin, GRBL, RRF or Fusion does;
+- a **rejected alternative** — the code cannot contain what was decided against;
+- a **silent consequence** — an *absence* of output never explains itself;
+- the **why** behind an ordering that looks arbitrary in code.
+
+**The exception that matters:** a derivable fact stays when it is a **premise the surrounding argument
+needs**. That `onOpen()` sets `currentWorkOffset = undefined` is readable from the code, but the
+*selection is deterministic, origin is trusted* argument collapses without it. Cut conclusions the code
+already states; keep the steps that make a non-derivable argument stand up.
+
+This is the answer to *"why these facts and not the hundreds of others in the post?"* — the rest are
+undocumented because reading the code answers them. `check-docs.js` warns when a symbol named here no
+longer exists, but nothing can check whether a *claim* is still true; that is what this test is for.
+
 **Four rules that keep it that way.**
 
-1. **A new top-level section in `plan.md` or in any review document requires changing its contract here
-   first.** If the content does not fit a section the file already has, the question is *which register
-   owns this*, not *can the file hold it*. For a review document the sections are fixed — see
-   *The shape of a review document* below.
+1. **A new top-level section in *any* of these files requires changing its contract here first** —
+   `plan.md`, a review document, or **this file**. If the content does not fit a section the file already
+   has, the question is *which file owns this*, not *can this one hold it*. For a review document the
+   sections are fixed — see *The shape of a review document* below. For this file there is no fixed list,
+   because it is heterogeneous by design; the gate is the admission test above.
 2. **Over the size guide means something has stopped being live.** Check what has quietly become durable
    (→ here) or register-shaped (→ a register) rather than trimming prose.
 3. **Never point two ways.** If file A says "written up in B", B must hold the write-up and must not point
@@ -142,13 +161,15 @@ FluidNC <http://wiki.fluidnc.com/> · Duet/RRF <https://docs.duet3d.com/User_man
 Production controls keep three references separate: **MCS** (`G53`), **WCS** (`G54`–`G59`, `G59.1`–`G59.3`
 on RepRap), and **TLO** (`G43`). Most V1E machines have none fully, hence the work-relative stance.
 
+**There is no tool-length system at all** — no TLO, no tool setter — so a work-Z re-probe after each tool
+change is the substitute, and **X/Y is never probed**.
+
 - **Persistence:** WCS origins are written with `G10 L20 P<n>` on GRBL/RepRap — scoped to that WCS's own
   register. `P` maps 1:1 to Fusion's `workOffset` (P1–P6 = G54–G59; P7–P9 = G59.1–G59.3, RepRap only).
 - **Marlin is single-frame:** no per-WCS registers, so one global `G92` origin. A Marlin job using more
   than one distinct work offset is a hard error (Guard C).
-- **`workOffset 0`** (Fusion's "default / unset") aliases to WCS 1 / `G54`.
-- Helper `writeWcsOrigin(wcsNumber, x, y, z)` persists a position into a WCS's own origin (any axis
-  `undefined` = leave alone).
+- **`workOffset 0`** is Fusion's "default / unset", **not** a request for `G53`; it aliases to WCS 1 /
+  `G54`, and must alias identically everywhere, or two paths disagree about which frame a section is in.
 
 **The post asserts the WCS selection; it never inherits it.** This is the justification for the ordering
 in `writeFirstSection()`:
@@ -176,25 +197,22 @@ For multi-fixture jobs one WCS can be reserved as a **spoilboard base** — a *f
 independent of stock thickness. It is the one frame in which a safe height is meaningful across parts of
 differing thickness, which is why the cross-part safe-Z feature requires it (Guard B).
 
-- **`A_Spoilboard_BaseReserve`** (`None` default | `G54`–`G59` | `G59.1`–`G59.3 (RepRap)`). When reserved,
-  `G59` is the natural choice. Ignored on Marlin (warned).
-- **`B_Spoilboard_BaseEstablish`**, default **Pause & Probe Z**: `None` = assume pre-set (Info comment);
-  `Probe Z` = probe with no prompt; `Pause & Probe Z` = prompt, probe, prompt. The probe XY offset never
-  applies.
+Ignored on Marlin (warned) — it has no per-WCS registers to reserve. **The probe XY offset never applies
+to the base**, for the reason below.
 
 **The base probe emits no XY move — the park position is an operator precondition.** The base establish
 runs before any origin is established, so there is no frame in which an XY target could be trusted. The
 consequence is real and silent: **whatever is under the tool becomes the base's Z0**, so parking over the
 stock records the stock top as "the spoilboard" and every clearance derived from it is short by the stock
-thickness. Mitigation is documentation, not code. The durable fix is *Future work — a machine-coordinate
-base probe point*.
+thickness. **Mitigation is documentation, not code** — the durable fix is unbuilt and written up in
+`PReview.md` §6.
 
 > **Rejected: giving the base an XY origin.** The base stays a Z-only reference.
 
 ## Machine frame (homing / MCS)
 
-Group `04`, one enum `A_Machine_HomeBeforeStart`: **None** (default — accept the current position, no
-motion), **XY** (the usual case), or **XYZ** (only where wired for it). Per-axis granularity was dropped.
+**Per-axis granularity was dropped** — the modes (**None** / **XY** / **XYZ**) document operator intent,
+not an axis mask, which is why GRBL can collapse two of them onto one command without losing anything.
 
 | Firmware | Command |
 |---|---|
@@ -229,29 +247,18 @@ into plain `G0`/`G1`/`G4` is correct and needs no revisiting.
 Two more settled the same way: **Marlin has never implemented `M2`** (RRF gained it in 3.5.1, with a
 `stop.g` interaction), and **GRBL, Marlin and RRF all accept a bare `\r`** as a block terminator.
 
-## Probing & tool changes
+## Validation guards — reject before emitting
 
-- **Work-Z probing only** (`G38.2`, thickness-compensated, attach/remove pauses). No tool-length system;
-  X/Y is never probed.
-- **Re-probe after each tool change** is the tool-length substitute (`H_ToolChange_ProbeAfterChange`).
-- **Manual tool change:** retract → move to change position → pause → re-probe Z → resume. The ordering
-  fix and the base-relative park are `PReview.md` §2 — Tool Change branch.
+Every guard is **post-time only**: the post cannot read the live controller, so all of them are
+design-time checks on the job Fusion handed over. Nothing here can protect against machine state.
 
-## Validation guards
+**Where a guard runs decides what a rejected job leaves behind.** Those in `onOpen()` reject before any
+output, so the job writes **no file at all** — a clean refusal. The two *geometry* guards (multi-axis,
+and HR-6's orientation check) fire later, in `onSection()`, and so leave a **truncated `.gcode` on disk**,
+which an operator may not notice. That asymmetry is a defect, not the design: `HReview.md` **HR-27**.
 
-Post-time only (the post can't read the live controller):
-
-- **Guard A — no base redefine.** *Using* the reserved base is fine; an operation that would
-  **re-establish** its origin errors.
-- **Guard B — safe-Z across parts needs a base.** `C_Spoilboard_SafeZAcrossWcs` on + >1 distinct offset on
-  GRBL/RRF + no base reserved → error. Single-WCS jobs are exempt.
-- **Guard C — Marlin single-frame.** A Marlin job using >1 distinct work offset → hard error.
-
-Guards A/B/C run in `onOpen()`, before any output, so a rejected job writes **no file at all**. Two
-non-fatal `warning()`s run alongside them (`HReview.md` CR-2, CR-3): homing combined with a
-`Set … to Current Pos` origin mode, and a multi-tool job with group 07 off. The two *geometry* guards
-(multi-axis, and HR-6's orientation check) fire later, in `onSection()`, and can therefore leave a
-truncated file on disk — promoting both into `validateJob()` is a recorded follow-up.
+Each guard is named and explained at its own site in `validateJob()`, so the code is the list. It is
+deliberately not repeated here — a copy would silently become wrong the first time a guard is added.
 
 ## Property / dialog conventions
 
@@ -326,9 +333,8 @@ WCS is only known after runtime probing). Two rules:
   before any cutting; never cut with the base left active.
 - **R2 — never round-trip the base empty.** Enter the base only when a real move is emitted there.
 
-Mechanism (`retractThroughBaseClearance()`): transit-select the base with a low-level `writeBlock`
-(**not** `writeWCS()` — no re-probe, no origin write), emit the `G0 Z` clearance, leave the base active;
-the caller then selects the destination WCS. No base transit at `onClose`.
+A transit selects the base with a low-level `writeBlock`, **not** `writeWCS()` — going through `writeWCS()`
+would re-probe and rewrite the origin, which is the opposite of passing through a frame.
 
 The same rules govern the **base establish**: it transit-selects the base *before* probing so that both the
 `G38.2` target and the post-probe retract are measured against the base, then restores the operating WCS.
