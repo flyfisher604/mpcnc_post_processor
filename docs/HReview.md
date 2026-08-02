@@ -1,7 +1,8 @@
 # HReview — hobbyist review of `MPCNC_v4.0_Beta2.cps`
 
-The hobbyist-side findings register and test register. **26 findings; 13 fixed and verified; 6 moved to
-`docs/PReview.md`.** Nothing is failing and nothing is unrun.
+The hobbyist-side findings register and test register. **43 findings** — 26 `HR-` from the hobbyist
+review, 17 `CR-` from the 2026-08-01 whole-file review. All are fixed, closed by design, or moved to
+`docs/PReview.md`, except three one-liners awaiting a tidy-up sweep. Nothing is failing.
 
 Reasoning, diffs and session narratives were trimmed 2026-08-01 — read the code and the commit messages
 for *why*. What is kept is what a later reader needs: every issue with its status, and every test with
@@ -21,7 +22,11 @@ them.
 
 ---
 
-## Findings — HR-1 … HR-26
+## Findings — HR-1 … HR-26 · CR-1 … CR-17
+
+`HR-` came from the hobbyist review; `CR-` from the 2026-08-01 whole-file review driven by the dialog and
+the F360 API. Both registers merged here on the same terms — ids kept, so every commit message and code
+comment that names one still resolves.
 
 | ID | Finding | Sev | Resolution | Status |
 |---|---|---|---|---|
@@ -40,26 +45,51 @@ them.
 | **HR-13** | `onCommand` silently discards every command it does not name | Low-Med | → `PReview.md` §2 — has a complete diff | ➖ moved |
 | **HR-14** | Two coolant modes could never match a channel | Low | `coolantLevels` derived from `eCoolant` | ✅ fixed `7e38777` |
 | **HR-15** | `safeZforSection()` mixed global `hasParameter()` with `_section.getParameter()` | Low | All three guards read `_section.` | ✅ fixed `88c7817` |
-| **HR-16** | `onClose` traverses to X0 Y0 before stopping the spindle, no guaranteed safe Z | Low | **Spindle-order half fixed** 2026-08-01 (`review.md` CR-6). **Z half still open** → `PReview.md` §5 | ◑ part-fixed |
+| **HR-16** | `onClose` traverses to X0 Y0 before stopping the spindle, no guaranteed safe Z | Low | **Spindle-order half fixed** 2026-08-01 (CR-6). **Z half still open** → `PReview.md` §5 | ◑ part-fixed |
 | **HR-17** | Four tidy-ups; two change emitted text | Cosmetic | Sanitizer double-spaces, group-03 rename, vestigial arg, empty GRBL block | ✅ fixed `924d1f6` |
 | **HR-18** | `loadFile()` left no line break after an include — the next block merges | Medium | Repair in `loadFile()`; `\r` counts as a terminator | ✅ fixed `5b0b94a` |
-| **HR-19** | `M291` doubled space; `()` vs `( )` on empty comments | Cosmetic | `()` **closed as by design** (`review.md` CR-17b). The `M291` space remains — next sweep | ⬜ open |
+| **HR-19** | `M291` doubled space; `()` vs `( )` on empty comments | Cosmetic | `()` **closed as by design** (CR-17b). The `M291` space remains — next sweep | ⬜ open |
 | **HR-20** | Tapping is not really implemented | Medium | → `PReview.md` — manual path now prompts (HR-12); automatic path always emitted `M4` | ➖ moved |
 | **HR-21** | `E_Include_ProbeFile` declared but never read — dead property | Low | Tooltip now says `NOT IMPLEMENTED YET`. Wire into `probeTool()` or delete — undecided | ⬜ open |
-| **HR-22** | An include file that exists but is **empty** contributes nothing, silently | Medium | **(A)** empty include now announces itself ✅. **(B)** empty Start include leaves no preamble — **closed as by design** 2026-08-01 (`review.md` CR-7): the include owns the phase | ✅ closed |
+| **HR-22** | An include file that exists but is **empty** contributes nothing, silently | Medium | **(A)** empty include now announces itself ✅. **(B)** empty Start include leaves no preamble — **closed as by design** 2026-08-01 (CR-7): the include owns the phase | ✅ closed |
 | **HR-23** | A Start/Stop include *replaces* the whole preamble/footer | — | **Designed behaviour.** Filed as a defect and resolved as correct the same day. Lesson: before calling a bypass a defect, ask whether the bypass is the feature | ✅ closed |
 | **HR-24** | `writeWCS(section)` takes a section then consults the global `tool` | Low | Latent (both callers pass `currentSection`). One line: `section.getTool()` — next sweep | ⬜ open |
-| **HR-25** | `wcsGcode(0)` / `wcsName(0)` yield `G53` | Low | **Closed as by design** 2026-08-01 (`review.md` CR-17d): a pure conversion should not carry frame policy; no caller can pass 0 | ✅ closed |
+| **HR-25** | `wcsGcode(0)` / `wcsName(0)` yield `G53` | Low | **Closed as by design** 2026-08-01 (CR-17d): a pure conversion should not carry frame policy; no caller can pass 0 | ✅ closed |
 | **HR-26** | Base-clearance retract has no jet guard though the base *establish* does | Medium | → `PReview.md` §3.4 — jet + multi-WCS + base | ➖ moved |
+| **CR-1** | `$H` went through `writeBlock()`, so `Enable Line #s` emitted `N10 $H` and GRBL rejects it | High | `writeln()` — `$` must be the line's first character | ✅ fixed `c73726c` |
+| **CR-2** | Homing moves the tool, then a `Current Pos` origin mode records the **homing corner** as the part origin | High | Post-time `warning()` in `validateJob()` | ✅ fixed `c73726c` |
+| **CR-3** | A required tool change dropped in complete silence when group 07 is off (the default) | Med-High | `>>> WARNING` per boundary + `validateJob()` warning via `countDistinctTools()`, counted over **sections** | ✅ fixed `c73726c` |
+| **CR-4** | Coolant `Use custom` wrote the property text as g-code; tooltip and README call it a **file** | Medium | `writeCustomCoolantFile()` → `loadFile()`; warns when named but empty | ✅ fixed `c73726c` |
+| **CR-5** | A jet/laser job on the default First-WCS mode never established **Z0** at all | Medium | `Important` warning; the XY-only origin write is unchanged | ✅ fixed `c73726c` |
+| **CR-6** | `onClose()` traversed to X0 Y0 **before** stopping the spindle | Medium | Spindle stops first. **Z retract deliberately not added** — that half stays open as HR-16 → `PReview.md` §5 | ◑ part-fixed |
+| **CR-7** | A Start include substitutes for `G90`/`G21`/`G94`/`G17`, so the job inherits unknown modal state | Medium | **By design** — an include owns the phase it names. Same rule as HR-23 / HR-22 (B) | ✅ closed |
+| **CR-8** | Feed scaling could **raise** a feedrate on a zero-length move, against its documented contract | Low-Med | Clamped; harness-verified against both the working tree and `HEAD` | ✅ fixed `c73726c` |
+| **CR-9** | An unrecognised jet mode left the laser power `undefined` → `S NaN` | Low | Explicit branch | ✅ fixed `c73726c` |
+| **CR-10** | GRBL laser mode passed the enum's **string** id into `mFormat.format()` | Low | Explicit `Number()`. Group 09 still has no posted evidence — `PReview.md` J4 | ✅ fixed `c73726c` |
+| **CR-11** | `roundTo()` returned `NaN` for any value JS renders in exponential notation | Low | Plain arithmetic replaces the string-exponent trick; harness-verified | ✅ fixed `c73726c` |
+| **CR-12** | `probeTool()` wrote `F`/`Z` through the raw formats, desynchronising `fOutput`/`zOutput` | Low | No behaviour change — `resetAll()` documented as **load-bearing** | ✅ fixed `c73726c` |
+| **CR-13** | `onOpen()` reset 2 of ~14 mutable module globals | Low | `resetPostState()` — all 18, one function | ✅ fixed `c73726c` |
+| **CR-14** | The `properties` literal was declared out of the dialog order it promises | Low | Pure move, proved by sorted-line checksum. Keep new properties in dialog order | ✅ fixed `c73726c` |
+| **CR-15** | `Tool Change Probe` is a dialog field wired to nothing | Low | The same defect as **HR-21** — wire into `probeTool()` or delete, undecided | ⬜ open |
+| **CR-16** | `Use Active WCS X0 Y0 Z0` called a move a "retract" when it can descend | Low | Comment + tooltip corrected | ✅ fixed `c73726c` |
+| **CR-17 (a)** | `Retract the tool to 5.080000000000001` — a raw JS number in a comment | Cosmetic | Formatted | ✅ fixed `c73726c` |
+| **CR-17 (b)** | Section separator is an empty comment `()`, not a blank line | Cosmetic | **By design** — the separator is comment-level-gated on purpose. Closes HR-19's `()` half | ✅ closed |
+| **CR-17 (c)** | `feedFormat` declared and never used | Cosmetic | Deleted | ✅ fixed `c73726c` |
+| **CR-17 (d)** | `wcsGcode(0)` returns `G53` against the standing "never `G53`" rule | Cosmetic | **By design** — a pure conversion carries no frame policy, and no caller can pass 0. Same as HR-25 | ✅ closed |
+| **CR-17 (e)** | `sectionComment` printed `undefined`, or inherited the previous operation's name | Cosmetic | Fixed in `onSection()`/`onSectionEnd()` | ✅ fixed `c73726c` |
 
-**Open, no fix:** HR-19 (`M291` space), HR-21 (decision), HR-24 — a tidy-up sweep of one-liners, none
-changing output today. Everything else is fixed, closed by design, or moved.
+**Open, no fix:** HR-19 (`M291` space), HR-21 / CR-15 (one decision, two ids), HR-24 — a tidy-up sweep of
+one-liners, none changing output today. Everything else is fixed, closed by design, or moved.
+
+**Nothing found by either pass breaks the factory-default single-operation job.** Every High/Medium
+finding needed the operator to move one dialog field off its default — but each of those is a field the
+README tells a hobbyist to consider.
 
 ---
 
-## Test register — 83 rows
+## Test register — 87 rows
 
-**✅ 66 PASS · ❌ 0 FAIL · ⬜ 0 UNRUN · ➖ 17 n/a or moved.** Complete by construction: every `H`/`HR`/`HW`
+**✅ 66 PASS · ❌ 0 FAIL · ⬜ 4 UNRUN · ➖ 17 n/a or moved — 87 rows.** Complete by construction: every `H`/`HR`/`HW`
 id has a row, including the ones that belong to another file. **If you move a finding out, leave the
 pointer row behind.**
 
@@ -135,7 +165,7 @@ pointer row behind.**
 | **HR-21** | `E_Include_ProbeFile` is dead | — | tooltip declares it; wiring undecided | — | — | ➖ |
 | **HR-26** | Base-clearance retract has no jet guard | — | → `PReview.md` §3.4 | — | — | ➖ |
 | **HR-22 (A)** | An empty include announces itself | a zero-byte include file, Comment Level `Info` | `( --- Custom gcode file is empty, nothing included <path>)`; **absent above `Info`** | harness | node | ✅ |
-| **HR-22 (B)** | An empty Start include leaves no preamble | — | **closed as by design** — the include owns the phase (`review.md` CR-7) | read | — | ✅ |
+| **HR-22 (B)** | An empty Start include leaves no preamble | — | **closed as by design** — the include owns the phase (CR-7) | read | — | ✅ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | `Personal.cps`, group 03 all on, Map Safe Z = `Retract:15` then `15` | **74 conversions → 2** on identical geometry; all three cases fire at 5.08; **all 17,779 genuine cut moves stay `G1`**. Traps: `grep -c '^G0'` under-counts (modal suppression) | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
 | **HW-2 (A)** | HP-5 section boundary: WCS suppression, rapid lifecycle, tracking | 2 ops, 1 tool, 1 WCS, no base | **one `G54` in the whole file**; `( WCS unchanged: 1, not re-selecting)` at section 2; `resetAll()` makes section 2 re-emit full coordinates | posted | `Link.gcode` | ✅ |
 | **HW-2 (B)** | HP-5 boundary: a spindle-speed change | same CAM, `Manual Spindle On/Off` = **false** | `M3 S12000` then `M3 S10000` — two `M3`s, different speeds | posted | ⚠ **file overwritten** — re-post as `HR12-auto - GRBL.gcode` | ✅ |
@@ -146,14 +176,18 @@ pointer row behind.**
 | **HW-6 (B)** | Posted regression sweep | the six posts below | byte-identical modulo timestamp except posts 5–6 | read | ⚠ **the release sweep rests on no posted file** | ✅ |
 | **HR-23** | An include replaces the phase it names | Marlin + stop include, vs the same job without | coolant off, `G0 X0 Y0`, the spindle prompt, `M84 S60` and the program end **all absent** — **as designed** | posted | `H11d - Marlin.gcode` vs `H11a.gcode` | ✅ |
 | **HR-24** | `writeWCS()` consults the global `tool` | — | latent — both callers pass `currentSection`; next sweep | read | — | ➖ |
-| **HR-25** | `wcsGcode(0)` yields `G53` | — | **closed as by design** (`review.md` CR-17d) | read | — | ✅ |
+| **HR-25** | `wcsGcode(0)` yields `G53` | — | **closed as by design** (CR-17d) | read | — | ✅ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | — | — | ➖ |
+| **CR-REG** | The 14 fixes leave a factory-default job **otherwise unchanged** | GRBL/mm, Comment Level `Info`, all defaults, single operation | `M0 (MSG Turn OFF spindle)` **precedes** `G0 X0 Y0`; the probe comment reads **`Retract the tool to 5.08`**, not `5.080000000000001`; **the header property dump is unchanged** — it was always post-sorted, so CR-14's reorder must not show there | posted | — **owed** | ⬜ |
+| **CR-1 (A)** | `$H` survives line numbering | GRBL, `Home Before Start = XY`, `Enable Line #s` **on** | **`$H` on its own line with no `N` prefix**, while every surrounding block carries one. No configuration in the record has ever combined homing with line numbers — which is why it shipped broken | posted | — **owed** | ⬜ |
+| **CR-2 (A)** | The homing / `Current Pos` warning fires, and the job still posts | homing on + a `Set … to Current Pos` origin mode | the warning names the control by its exact dialog title; **the file still posts**. Negative half: a default job with homing **off** produces no warning | posted | — **owed** | ⬜ |
+| **CR-10 (A)** | GRBL laser mode formats its M-code as a number | group 09 on, GRBL, a laser operation | a real M-code number, **never `M NaN`**. Group 09 has never appeared in any posted file — see `PReview.md` **J4**, which this post also serves | posted | — **owed** | ⬜ |
 
 ---
 
 ## Invalidated by the 2026-08-01 code-review fixes
 
-`docs/review.md` landed 14 fixes at `c73726c`. Assertions below still hold; **the quoted token
+The `CR-` pass landed 14 fixes at `c73726c`. Assertions below still hold; **the quoted token
 *sequences* do not.** Re-baseline when the affected rows are next posted.
 
 | Row | What moved | Was | Now |
@@ -166,10 +200,39 @@ pointer row behind.**
 
 ---
 
+## Checked and found correct
+
+Recorded so a later pass can tell *"looked at, fine"* from *"never looked at"*. All of it by reading
+control flow against the API — **no posted file was consulted**, which makes every line here weaker than
+a `posted` row and stronger than nothing.
+
+| Area | Verdict |
+|---|---|
+| **The default single-op job, all three firmwares** | Phase order is right where it matters: `writeWCS()` emits `G54` **before** any origin write, so the origin cannot land on a WCS a previous job left active; `Start()` sets `G90`/`G21` before the base establish and the probe; the provisional `Z0` precedes the `G38.2`; probe and prompts run with the spindle **off** |
+| **Multi-op, single WCS** (the common Personal-licence job) | Section 2+ short-circuits on `workOffset == currentWorkOffset` — no spurious retract, re-probe or re-select. Two Setups both left at Fusion's default offset `0` alias to `1` consistently in both `collectDistinctOffsets()` and `writeWCS()` |
+| **Guard reachability from hobbyist settings** | Guard B exempts the single-WCS job, so default `Retract Across Parts = on` with no base does **not** fire; Guard C's Marlin check runs before the base logic; Guard A is unreachable with no base. All three run in `onOpen()`, so a rejected job writes no file |
+| **Units** | Every dialog dimension is converted by `propertyMmToUnit()` before being emitted or compared; F360 level values arrive in the output unit already and are correctly **not** converted |
+| **Safe-Z expression parsing** | `parseSafeZExpr()` handles a bare number and all three `Feed:`/`Retract:`/`Clearance:` forms and falls to `ERROR` (15 mm fallback + warning) for anything else; every level path asks the **passed** section, not the global |
+| **The G1→G0 mapper's move ordering** | Safe despite the untracked position: the only post-injected motion before the first section body is the probe retract, which leaves the tool *higher* than the kernel believes, so `rapidMovements()` errs toward Z-first. The general defect is real and professional-scoped (HR-8) |
+| **Feed handling** | `G0` blocks carry their travel `F` through the same `fOutput` the cut moves use (the one exception is CR-12); `limitArcFeed()` caps against the axes the arc actually sweeps; both limiters return the feed untouched when `Scale Feedrate` is off |
+| **Canned cycles** | Expansion is the only correct choice on all three firmwares — derivation in `conventions.md` → *Firmware capabilities*. `isProbeOperation()` is defined locally rather than depending on the kernel supplying one |
+| **Early rejections** | Multi-axis (`onSection`, with `onRapid5D`/`onLinear5D` as a backstop) and `onRadiusCompensation` both `error()` with actionable text; the off-axis Setup guard fails **open**, the right bias for a check whose false positive would abort every job |
+| **Comment levels** | Behaviourally inert — no control flow depends on a comment being emitted. `loadFile()`'s trailing-newline repair is independent of the surrounding `Info` markers, which is why it works at `Important` and `Off` |
+| **`Include Whitespace = off`** | Valid blocks everywhere — `askUser()` and `display_text()` prepend their own separator, and the concatenated forms (`G10L20P1X0Y0Z0`, `G38.2F30Z-10`) are accepted by all three parsers |
+| **Coolant channel bookkeeping** | `setCoolant()` turns both channels off before switching, warns when a tool requests a coolant no channel is configured for, and derives `coolantLevels` from `eCoolant` so the numeric index and the enum ids cannot drift apart |
+| **Property structure** | 68 properties across 11 groups — 9/7/4/2/4/10/8/5/7/10/2 — no gaps or duplicates in the per-group letter prefixes, every one carrying `scope: "post"`. `writeAllProperties()` iterates the object rather than a hand-kept list, so the header dump cannot drift |
+
+---
+
 ## Owed
 
-1. **Tidy-up sweep** — HR-19's `M291` space, HR-21 (decide: wire or delete), HR-24. One-liners, none
-   changing output; one posted file confirms exactly that.
+0. **Post-verify the 14 `CR-` fixes** — the four `⬜` rows in the register above, **`CR-REG` first**: it is
+   the regression that matters most, and everything else rests on a default job still posting cleanly.
+   Two further posts serve `PReview.md` §3.5's CR-3 / CR-4 / CR-5 / CR-13 rows, and the laser post
+   (`CR-10 (A)`) is also **J4** — group 09 has never appeared in any posted file, so a fix and its
+   first-ever exercise coincide there.
+1. **Tidy-up sweep** — HR-19's `M291` space, HR-21 / CR-15 (decide: wire or delete), HR-24. One-liners,
+   none changing output; one posted file confirms exactly that.
 2. **Six `read` rows want a post.** **One post settles three**: `Stop File.gcode` (last byte `e`, no
    terminator) as the **Stop include** on the Marlin job at Comment Level **`Important`** → HR-18 (A),
    HW-6 (B), and re-baselines `H11d`. Also owed: `HR12-auto - GRBL.gcode` (Link's CAM, `Manual Spindle

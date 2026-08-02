@@ -121,7 +121,7 @@ or `rapidMovementsXY()`, the kernel's model does not move. Three consumers read 
 Within a section the tracked position is accurate, which is why no single-section job has ever shown
 this. It is a boundary defect.
 
-**Re-derived independently and confirmed professional-only (2026-08-01, `docs/review.md`).** The full
+**Re-derived independently and confirmed professional-only (2026-08-01, the `CR-` pass).** The full
 hobbyist code review reached this finding from scratch — `setCurrentPosition()` and
 `setCurrentPositionZ()` still appear **nowhere** in the file — and then established *why the hobbyist
 never sees it*, which is the part this entry was missing and which is what keeps it here rather than
@@ -138,7 +138,7 @@ in hobbyist scope:
 So the diagnosis stands unchanged and so does the recommended fix; what is now settled is that no
 hobbyist configuration can reach it, and that the narrow variant (a post-local `lastEmittedZ` feeding
 `rapidMovements()`'s ordering decision) would cover every reachable case. **Do not re-file this as a
-hobbyist finding** — `review.md`'s "Checked and found correct" section records the reasoning above so
+hobbyist finding** — `HReview.md`'s *Checked and found correct* table records the reasoning above so
 a future pass does not re-derive it a third time.
 
 **Recommended fix** — tell the kernel about the post's own moves: `setCurrentPosition(new Vector(_x,
@@ -478,7 +478,7 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       nonzero Probe X/Y Offset. A field back at its default means a key changed and the move was done
       wrong. *(The header half is verified — §4. A posted file cannot distinguish "the preset
       survived" from "the values were re-entered", which is the whole point of this check.)*
-      > **`review.md` CR-14 (landed 2026-08-01) strengthens both rows.** The `properties` literal used
+      > **CR-14 (landed 2026-08-01, `HReview.md`) strengthens both rows.** The `properties` literal used
       > to *declare* its groups in the order 01, 04, 02, 03, 07, 05, 06, 05, 06, 08…, with
       > `D_Probe_OffsetX`/`E_Probe_OffsetY` declared after `J_Probe_Thickness` — so the dialog order
       > the README promises rested entirely on Fusion sorting by `group:` string and by key. The
@@ -551,7 +551,7 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       `Prompt Before Home` on: **exactly one** pause before any homing motion, on every firmware and
       axis set. **Pass:** the axis commands match the table in `plan.md` → *Machine frame*, and the
       prompt appears once, not per axis.
-      > **Add a third post, and make it the first one you do — `review.md` CR-1 (landed 2026-08-01).**
+      > **Add a third post, and make it the first one you do — CR-1 (landed 2026-08-01, `HReview.md`).**
       > GRBL, `Home Before Start = XY`, **`Enable Line #s` = on**. `$H` used to go through
       > `writeBlock()`, which prefixes an `N` word; GRBL only recognises `$` as a system command when
       > `$` is the first character of the line, so `N10 $H` reached the g-code parser and errored on
@@ -585,7 +585,7 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
 
 ### 3.5 Landed by the full code review, professional halves unverified
 
-Added 2026-08-01. `docs/review.md` is a hobbyist-scoped code review, but four of the changes it landed
+Added 2026-08-01. The `CR-` pass (now in `HReview.md`) was hobbyist-scoped, but four of the changes it landed
 touch controls this file owns. Each needs the Do→Get row below before it counts as verified.
 
 - [ ] **CR-3 — a suppressed tool change now says so.** `toolChange()` used to return in silence when
@@ -714,7 +714,7 @@ and those branches are essentially unexercised.
       should say so".
 
 Also on this list: **HR-16** (`onClose` traverses to `X0 Y0` before stopping the spindle, with no
-guaranteed safe Z). **Half of it landed on 2026-08-01** as `docs/review.md` CR-6: `onClose()` now
+guaranteed safe Z). **Half of it landed on 2026-08-01** as CR-6 (`HReview.md`): `onClose()` now
 emits `COMMAND_STOP_SPINDLE` **before** the return move, so the tool no longer crosses the work with a
 hand-switched router still turning. **The Z half is deliberately unfixed and is still owed here** —
 no retract precedes the `X0 Y0` move, the property promises "Z remains unchanged", and for milling

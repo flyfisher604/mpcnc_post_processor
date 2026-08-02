@@ -124,6 +124,23 @@ On GRBL `$H` is all-or-nothing, so XY and XYZ both emit one `$H` (the mode docum
 The post does not control homing order. **`$H` is emitted with `writeln()`, not `writeBlock()`** — GRBL
 only recognises `$` as a system command when it is the first character of the line (`HReview.md` CR-1).
 
+## Firmware capabilities
+
+Settled by reading each firmware's own source and changelog rather than by testing on a machine — see
+*Working method*. Cite the file and version when adding to this.
+
+**No supported firmware has canned drilling cycles**, so `onCyclePoint()` expanding drill/peck/bore/tap
+into plain `G0`/`G1`/`G4` is correct and needs no revisiting.
+
+| Firmware | Canned drilling cycles? |
+|---|---|
+| **GRBL 1.1 / FluidNC** | **No** — deliberately omitted. The supported set is G0–G3, G4, G10 L2/L20, G17–G19, G20/G21, G28/G30(.1), G38.2–G38.5, G40, G43.1, G49, G53, G54–G59, G61, G80, G90/G91(.1), G92(.1), G93/G94. **`G80` is "cancel motion mode", not "cancel canned cycle"** — there is no cycle to cancel. Only the third-party *GRBL-Advanced* fork adds G73/G76/G81–G83 |
+| **Marlin 2.x** | **Only in an opt-in build.** G81/G82/G83 exist but are gated behind `CNC_DRILLING_CYCLE`, off by default and added by community PRs. A post cannot know whether the operator compiled it in |
+| **RepRapFirmware / Duet** | **No — and worse than absent.** RRF's "GCodes not implemented" list carries G80 and G81–G89, while the wider RepRap dialect assigns those numbers to *other* functions: `G80` mesh-based Z probe, `G81` mesh bed levelling status, `G82` single Z probe, `G83` babystep Z and store. The post's decision is safe under either reading — either the command is unknown, or it triggers a bed-probing routine instead of drilling |
+
+Two more settled the same way: **Marlin has never implemented `M2`** (RRF gained it in 3.5.1, with a
+`stop.g` interaction), and **GRBL, Marlin and RRF all accept a bare `\r`** as a block terminator.
+
 ## Probing & tool changes
 
 - **Work-Z probing only** (`G38.2`, thickness-compensated, attach/remove pauses). No tool-length system;
