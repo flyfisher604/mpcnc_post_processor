@@ -4,12 +4,7 @@ The **durable** half of the project record for `MPCNC_v4.0_Beta2.cps`: the model
 conventions a change must follow, and the method by which anything is verified. It changes a few times a
 year, not every session — if you are editing it often, something live has leaked in.
 
-| Looking for | Read |
-|---|---|
-| What is done, what is next, what is still open | `plan.md` |
-| A finding or a test row — hobbyist | `HReview.md` |
-| A finding or a test row — professional | `PReview.md` |
-| How an operator uses the post | `README.md` |
+Which file owns what is the *Document contracts* table immediately below — it is the only copy.
 
 ---
 

@@ -11,13 +11,10 @@
 > proposals rather than records — with one exception, **HR-20**, whose manual-spindle half was
 > part-fixed on 2026-07-31 alongside `HReview.md` HR-12.
 
-**Standing rule.** A change to `MPCNC_v4.0_Beta2.cps` that touches professional behaviour updates
-this file **in the same commit**: add the Do→Get row that verifies it (exact settings, exact
-expected g-code, and the *discriminator* — the one token whose presence or absence proves it), and
-flag any row whose saved `.gcode` it invalidates. A stale PASS is worse than an unrun test.
-
-**How rows are verified:** post the job from Fusion and read the g-code. Machine dry-runs and
-physical measurement are out of scope, so every row must stand on the posted file alone.
+**Standing rule** for updating this register — add the Do→Get row in the same commit, retire the long
+form on close — is `CLAUDE.md` → *Registers ship with the code*, and `/close-finding` runs it.
+**How rows are verified** is `conventions.md` → *How to run a test*, which also fixes the defaults every
+row below is a delta from.
 
 ---
 
@@ -340,11 +337,9 @@ operation in the same post is unaffected and still expands to plain `G0`/`G1`.
 
 ## 3. Verification owed
 
-Absorbed from the Beta-2 test plan. Conventions: comments are `( … )` on GRBL and `; …` on
-Marlin/RRF, otherwise the tokens are identical; `G10 L20 P<n>` is GRBL/RepRap, Marlin uses `G92` and
-rejects >1 WCS (Guard C). Default probe target / speed / thickness = `Z-10` / `F30` / `Z0.8`.
-Default origin modes are First = `Set X0 Y0 to Current Pos, Probe Z0`, Subsequent = `Use Active WCS
-X0 Y0, Probe Z0` — both no-prompt; the `Jog to …` modes are opt-in.
+Absorbed from the Beta-2 test plan. Every row is a delta from the defaults fixed in `conventions.md` →
+*How to run a test*; the one convention worth restating here because half these rows turn on it is that
+Marlin uses `G92` and **rejects >1 WCS** (Guard C), where GRBL/RepRap write `G10 L20 P<n>`.
 
 > **⚠ Every saved GRBL `.gcode` predating 2026-07-31 differs at the tail** (HR-3: the manual-spindle
 > stop now prompts on GRBL, so a default job ends `M0 (MSG Turn OFF spindle)` where it once ended
@@ -753,8 +748,8 @@ with J5.
 
 ## 6. Design backlog — unbuilt work and open questions
 
-Unbuilt design, and the questions that must be answered before it can be built. Nothing here is
-scheduled; `plan.md`'s checkpoint carries the ordered list of what is actually next.
+Unbuilt design, and the questions that must be answered before it can be built. **Nothing here is
+scheduled** — this is a backlog, not an order of work. The checkpoint holds the ordered list.
 
 **Tool-change ordering + base-relative park** is **§2**, with the five findings that land alongside it.
 

@@ -6,13 +6,7 @@ pointers to the **completed reviews**. Design write-ups, findings, test rows, re
 questions all belong in a register — see `conventions.md` → *Document contracts*, which defines what may
 appear here and is the thing to change first if you think something new belongs.
 
-| File | Owns |
-|---|---|
-| `docs/conventions.md` | **The durable half** — stance, coordinate model, base/frame/probing, guards, firmware capabilities, property & dialog conventions, how to run a test, harness method |
-| `docs/HReview.md` | The hobbyist findings register (`HR-`, `CR-`) + the 87-row test register |
-| `docs/PReview.md` | The professional side — findings, every multi-WCS / base / tool-change / dialog row, the jet/laser workstream. **The professional review itself has not been done** |
-| `README.md` | User-facing usage. Not touched during code changes; its own `doc-sync` marker records what it last synced to |
-| this file | Checkpoint, phase status, completed-review pointers — nothing else |
+Which file owns what: `conventions.md` → *Document contracts*.
 
 ---
 
@@ -55,16 +49,12 @@ false PASSes before.
 | 5 | **The professional review proper** | The pass that produces `PReview.md`'s real content. Needs a multi-part / multi-fixture job to post against |
 | 6 | **Jet / laser workstream** | `PReview.md` §5. **J4 is the priority** — group 09 has never appeared in *any* posted file, and CR-10 landed a fix there sight-unseen. The `CR-10 (A)` row is that post. J5 is a design question before it is a test |
 
-**The one residual that could still hide a real defect: `HR-6 (B)`.** The orientation guard rejects a
-tilted `workPlane.forward` — proven over 13 vectors by harness — but **nothing evidences what Fusion
-actually puts in `forward` for a re-oriented Setup.** If Fusion re-expresses the frame so `forward` stays
-`X0 Y0 Z1`, the guard is a no-op on exactly the case it exists to catch. No code reading can settle it; it
-needs a rotated Setup. The failure mode is a **missed** rejection — a part cut in the wrong plane,
-silently.
+**The one live risk that could still hide a real defect: `HR-6 (B)`** — the orientation guard may be a
+no-op on exactly the case it exists to catch, and the failure mode is a part cut in the wrong plane,
+silently. It needs a rotated Setup. Written up in `HReview.md` → *Owed*.
 
-**No controller access.** Settle firmware questions from Marlin/RRF source and changelogs; never file a
-row that needs a non-GRBL machine. Three have been answered that way and the answers are in
-`conventions.md` → *Firmware capabilities*.
+**No controller access**, so firmware questions are settled from source — `conventions.md` →
+*How to run a test* and *Firmware capabilities*.
 
 ---
 

@@ -9,17 +9,10 @@ Reasoning, diffs and session narratives were trimmed 2026-08-01 — read the cod
 for *why*. What is kept is what a later reader needs: every issue with its status, and every test with
 enough to set it up and run it again.
 
-**How to run a test, the personas, and the method notes now live in `conventions.md`** — they govern this
+**How to run a test, the personas, and the method notes live in `conventions.md`** — they govern this
 register and `PReview.md` alike, so they sit in one place rather than in whichever file happened to hold
-them.
-
-> **Standing rule.** A change to the `.cps` touching hobbyist behaviour updates this file **in the same
-> commit**: add the Do→Get row, name the discriminator, and flag any row whose saved `.gcode` it
-> invalidates. Professional behaviour → `PReview.md`. A stale PASS is worse than an unrun test.
->
-> **And the other half — compress on close.** When a finding reaches FIXED or closed-by-design, the same
-> commit deletes its long form and leaves the register row. The buggy code, the diagnosis and the diff
-> are all in `git show <commit>`. Long form is a promissory note, justified only while work is unbuilt.
+them. **The standing rule for updating this register** — add the Do→Get row in the same commit, retire
+the long form on close — is `CLAUDE.md` → *Registers ship with the code*, and `/close-finding` runs it.
 
 ---
 
@@ -235,31 +228,30 @@ a `posted` row and stronger than nothing.
 
 ## Owed
 
-0. **Post-verify the 14 `CR-` fixes** — the four `⬜` rows in the register above, **`CR-REG` first**: it is
-   the regression that matters most, and everything else rests on a default job still posting cleanly.
-   Two further posts serve `PReview.md` §3.5's CR-3 / CR-4 / CR-5 / CR-13 rows, and the laser post
-   (`CR-10 (A)`) is also **J4** — group 09 has never appeared in any posted file, so a fix and its
-   first-ever exercise coincide there.
-1. **Tidy-up sweep** — HR-19's `M291` space, HR-21 / CR-15 (decide: wire or delete), HR-24. One-liners,
-   none changing output; one posted file confirms exactly that.
-2. **Six `read` rows want a post.** **One post settles three**: `Stop File.gcode` (last byte `e`, no
+**Which of these to do next, and in what order, is the checkpoint's job — not this list's.** What
+follows is what the register itself owes: the specific artifacts, and why each one is worth a post.
+
+1. **Six `read` rows want a post.** **One post settles three**: `Stop File.gcode` (last byte `e`, no
    terminator) as the **Stop include** on the Marlin job at Comment Level **`Important`** → HR-18 (A),
    HW-6 (B), and re-baselines `H11d`. Also owed: `HR12-auto - GRBL.gcode` (Link's CAM, `Manual Spindle
    On/Off` = false) to restore HW-2 (B)'s overwritten file.
-3. **HR-6 (B) is the one residual that could still hide a real defect** — nothing evidences what Fusion
-   puts in `workPlane.forward` for a re-oriented Setup. Needs a rotated Setup; the failure mode is a
-   **missed** rejection, i.e. a part cut in the wrong plane, silently.
-4. **The posted regression sweep**, if run: 1 `HW6a - GRBL` (defaults) ≡ `H11c` · 2 `HW6b - Marlin` ≡
+2. **HR-6 (B) is the one residual that could still hide a real defect** — the orientation guard rejects a
+   tilted `workPlane.forward`, proven over 13 vectors by harness, but **nothing evidences what Fusion
+   actually puts in `forward` for a re-oriented Setup**. If Fusion re-expresses the frame so `forward`
+   stays `X0 Y0 Z1`, the guard is a no-op on exactly the case it exists to catch. No code reading can
+   settle it; it needs a rotated Setup. The failure mode is a **missed** rejection — a part cut in the
+   wrong plane, silently. **HR-27's row shares this dependency**, and the same post answers both.
+3. **The posted regression sweep**, if run: 1 `HW6a - GRBL` (defaults) ≡ `H11c` · 2 `HW6b - Marlin` ≡
    `H11a` · 3 `HW6c - RRF` ≡ `H11b` · 4 `HW6d - GRBL Inch` ≡ `H4base` · 5 `HW6e - Marlin` + stop include
    → one difference, `--- End custom gcode` on its own line · 6 `HW6f - Marlin` as 5 but as the **Start**
    include at Comment Level `Important`. **Post 1 is the one to run if only one is run.** Posts 5–6
    upgrade HR-18 (A)(B) from `read` to `posted`. *(All six now also carry CR-6's reordered tail.)*
-5. **Nine reference files predate HR-17** and would differ in two text respects if re-posted. No
+4. **Nine reference files predate HR-17** and would differ in two text respects if re-posted. No
    assertion is invalidated — tidiness, not risk.
-6. **Owed to the next README doc-sync: nothing.** The six items this list used to carry — the group-03
+5. **Owed to the next README doc-sync: nothing.** The six items this list used to carry — the group-03
    label, group 08's *"post processor might be unsafe"* prompt, HR-23's substitution contract, the
    `Tool Change Probe` field, CR-4's coolant file loading and CR-16's descending Safe Z move — all
-   landed in `cd57a48`, whose `doc-sync` marker reads `7b80b44`. The only `.cps` commit since is
-   comment-only. Refresh from `git diff 7b80b44..HEAD -- MPCNC_v4.0_Beta2.cps` and re-bump the marker
+   landed in `cd57a48`, whose `doc-sync` marker reads `7b80b44`. The two `.cps` commits since
+   (`6cad4ca`, `e056def`) are both comment-only. Refresh from `git diff 7b80b44..HEAD -- MPCNC_v4.0_Beta2.cps` and re-bump the marker
    when the post next changes what it emits. **The README is not touched during code changes.**
 
