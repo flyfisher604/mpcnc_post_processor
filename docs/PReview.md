@@ -18,7 +18,7 @@ row below is a delta from.
 
 ---
 
-## 1. What "professional" means here
+## 1. Scope — what "professional" means here
 
 The professional persona has the full Fusion licence and a real fixture setup. In post terms that is
 everything the README puts outside the hobbyist's reach:
@@ -44,11 +44,25 @@ everything the README puts outside the hobbyist's reach:
 
 ---
 
-## 2. Findings deferred from the hobbyist review
+## 2. Findings
 
-All five land **as one unit** with the tool-change ordering rework below, rather than patching the same
-section-boundary code twice. **HR-10** and **HR-13** are independent of the reorder and have complete
-diffs, so they can go in first as warm-up commits.
+**✅ 0 fixed · ◑ 1 part-fixed · ⬜ 5 open — 6 findings.** All carry `HR-` ids: they were found by the
+hobbyist pass and reclassified as professional, and the ids are **kept deliberately** so commit history,
+`HReview.md` and this file all name the same defect the same way. Nothing here is committed code — the
+diffs below are proposals, not records.
+
+| ID | Finding | Sev | Resolution | Status |
+|---|---|---|---|---|
+| **HR-7** | `toolChange()` clobbers `forceSectionToStartWithRapid`, defeating "First G1 → G0" on every tool-change section | Medium | Lands with the Phase 4 reorder below | ⬜ open |
+| **HR-8** | Post-injected motion never updates Fusion's tracked position | Medium | Lands with Phase 4. Confirmed unreachable on any hobbyist path (2026-08-01) | ⬜ open |
+| **HR-9** | `Do First Change` with `Probe After Tool Change` off zeroes Z against the wrong tool | Medium | Lands with Phase 4 | ⬜ open |
+| **HR-10** | `Disable Z Stepper` emits Marlin-only `M84 Z` on GRBL | Medium | **Complete diff, independent of the reorder** — can go first as a warm-up commit | ⬜ open |
+| **HR-13** | `onCommand` silently discards every command it does not name | Low-Med | **Complete diff, independent of the reorder** — can go first as a warm-up commit | ⬜ open |
+| **HR-20** | Tapping is not really implemented | Medium | Manual path prompts (via HR-12); the automatic path always emitted `M4`. **Not tool-change work and does not wait for Phase 4** — it is here only because tapping was *decided* to be professional | ◑ part-fixed |
+
+The five tool-change findings — HR-7, HR-8, HR-9, HR-10, HR-13 — land **as one unit** with the ordering
+rework below, rather than patching the same section-boundary code twice. HR-10 and HR-13 are the
+exception that can go first, being independent of the reorder.
 
 #### Phase 4 — tool-change ordering + base-relative park *(design settled; not built)*
 
@@ -82,9 +96,6 @@ into the correct WCS. Test matrix in §3.4.
 > them, false of it: two operations on **one** tool at different RPMs needs no tool change and is HP-5
 > exactly. `Drill_Tap.gcode` then observed it firing, and the `Link.gcode` / `Speed Change.gcode` pair
 > witnessed it on a one-tool job. Do not re-file it here.
-
-**HR-20 is different from the other five** — it is not tool-change work and does not wait for Phase 4.
-It is here because tapping was *decided* to be professional, not because it shares their code.
 
 ---
 
@@ -335,16 +346,67 @@ operation in the same post is unaffected and still expands to plain `G0`/`G1`.
 
 ---
 
-## 3. Verification owed
+## 3. Test register
 
-Absorbed from the Beta-2 test plan. Every row is a delta from the defaults fixed in `conventions.md` →
-*How to run a test*; the one convention worth restating here because half these rows turn on it is that
-Marlin uses `G92` and **rejects >1 WCS** (Guard C), where GRBL/RepRap write `G10 L20 P<n>`.
+**✅ 0 PASS · ❌ 0 FAIL · ⬜ 38 UNRUN · ➖ 5 n/a or moved — 43 rows.** Nothing professional has been
+verified yet; this is the whole of what the professional side owes. Absorbed from the Beta-2 test plan.
 
-> **⚠ Every saved GRBL `.gcode` predating 2026-07-31 differs at the tail** (HR-3: the manual-spindle
-> stop now prompts on GRBL, so a default job ends `M0 (MSG Turn OFF spindle)` where it once ended
-> `M5`, and each tool change gains the same prompt). No row's assertions are affected. Don't read a
-> tail diff as a regression.
+Every row is a delta from the defaults fixed in `conventions.md` → *How to run a test*; the one
+convention worth restating here, because half these rows turn on it, is that Marlin uses `G92` and
+**rejects >1 WCS** (Guard C), where GRBL/RepRap write `G10 L20 P<n>`.
+
+This is the **index**. Rows whose expected output is a multi-line g-code block — most of §3.1 — carry
+that block in their expansion below, in the subsection named in the Expansion column; a cell cannot
+hold it, and the *Expect* must exist in exactly one place.
+
+| Test | Proves | Setup (delta from defaults) | Method | Expansion | State |
+|---|---|---|---|---|---|
+| **PB1** | Re-probe per copy | Replicate 2-copy, base `G59`, Retract Across Parts on, Subsequent = `Use Active WCS X0 Y0, Probe Z0` | posted | §3.1 | ⬜ |
+| **PB2** | Trust the stored Z | as PB1, Subsequent = `Use Active WCS X0 Y0 Z0` | posted | §3.1 | ⬜ |
+| **PBV1** | Setup run — record each fixture origin | 2-fixture, First = `Set X0 Y0 Z0 to Current Pos`, Subsequent = `Jog to X0 Y0, Probe Z0` | posted | §3.1 | ⬜ |
+| **PBV2** | Production run — reuse fixtures, re-probe Z | First = `Use Active WCS X0 Y0 Z0`, Subsequent = `Use Active WCS X0 Y0, Probe Z0` | posted | §3.1 | ⬜ |
+| **PBV3** | Production run — trust the stored Z too | as PBV2, Subsequent = `Use Active WCS X0 Y0 Z0` | posted | §3.1 | ⬜ |
+| **PA1** | New WCS from a machined face, operator jogs the new datum | two Setups on one clamped part, Subsequent = `Jog to X0 Y0 Z0` | posted | §3.1 | ⬜ |
+| **PA1b** | Variant — WCS 2's XY already known, only Z re-references | same job, Subsequent = `Use Active WCS X0 Y0, Probe Z0` | posted | §3.1 | ⬜ |
+| **P2** | Nonzero offset, Replicate + reserved base | 2-part job, base `G59` | posted | §3.1 | ⬜ |
+| **P3** | Zero-offset added-part regression | same 2-part job, offsets `0` | posted | §3.1 | ⬜ |
+| **M1** | Boundary dispatch — `Use Active WCS X0 Y0 Z0` | multi-WCS + base | posted | §3.1 | ⬜ |
+| **M2** | Boundary dispatch — `Use Active WCS X0 Y0, Probe Z0` | multi-WCS + base | posted | §3.1 | ⬜ |
+| **M3** | Boundary dispatch — `Jog to X0 Y0 Z0` | multi-WCS + base | posted | §3.1 | ⬜ |
+| **M4** | Boundary dispatch — `Jog to X0 Y0, Probe Z0` | multi-WCS + base | posted | §3.1 | ⬜ |
+| **M5** | Single-WCS regression — byte-for-byte unchanged | single WCS | posted | §3.1 | ⬜ |
+| **M6** | First-part `Use Active WCS X0 Y0 Z0` actually reaches `X0 Y0` | milling tool, first section | posted | §3.1 | ⬜ |
+| **H7e** | First-part `Use Active WCS X0 Y0, Probe Z0` on Marlin and RRF | firmware Marlin, then RepRap | posted | §3.2 | ⬜ |
+| **D1** | Labels, groups and field types | the dialog | dialog | §3.3 | ⬜ |
+| **D3** | A saved preset survives the group reorder **and** the group-03 rename | a preset saved before the reorder | dialog | §3.3 | ⬜ |
+| **D2** | The property dump is suppressed at Comment Level `Important` and `Off` | Comment Level `Important`, then `Off` | posted | §3.3 | ⬜ |
+| **HR-26** | The base-clearance retract has no tool-0 / jet guard though the base *establish* does | jet tool + multi-WCS + base | posted | §3.4 | ⬜ |
+| **HR-18 (T)** | Tool-change half of the `loadFile()` newline guard | tool-change include whose last byte is not a newline | posted | §3.4 | ⬜ |
+| **HR-3 (C)** | Tool-change half of the GRBL spindle-off prompt | GRBL, manual spindle, a tool change | posted | §3.4 | ⬜ |
+| **P4** | `Home Before Start` — the `XY` and `XYZ` branches, never posted | group `04` = `XY`, then `XYZ` | posted | §3.4 | ⬜ |
+| **P5** | `Probe to Set Base = Probe Z` — the no-prompt base variant | group `05` B = `Probe Z` | posted | §3.4 | ⬜ |
+| **P6** | `writeWCS()` debug/info logging | Comment Level `Debug`, then `Info` | posted | §3.4 | ⬜ |
+| **P7** | `wcsDefinitions` offset-0 decision | work offset `0` | dialog | §3.4 | ⬜ |
+| **P8** | Tool-change ordering + base-relative park matrix | **after the Phase-4 rework lands** | posted | §3.4 | ⬜ |
+| **P9** | Spoilboard surfacing on the base (R1) | multi-WCS job with a section cutting *on* the base | posted | §3.4 | ⬜ |
+| **CR-3** | A suppressed tool change now says so | multi-tool job, group 07 off | posted | §3.5 | ⬜ |
+| **CR-4** | Coolant `Use custom` now loads a file | a `… Custom` coolant property naming a real file | posted | §3.5 | ⬜ |
+| **CR-5** | A jet / tool-0 first part warns that Z0 was never set | jet job, default First mode | posted | §3.5 | ⬜ |
+| **CR-13** | `resetPostState()` | two posts in one Fusion session | posted | §3.5 | ⬜ |
+| **J1** | First-part origin modes — all six, with a jet tool and with tool 0 | jet tool / tool 0 | posted | §5 | ⬜ |
+| **J2** | Subsequent WCS / Part with a jet tool — the `canProbe` false branches | jet tool, multi-WCS | posted | §5 | ⬜ |
+| **J3** | Spoilboard base with a jet tool — `writeBaseEstablish()` skips the probe | jet tool, base reserved | posted | §5 | ⬜ |
+| **J4** | The laser property group (`09 - Laser`, 7 properties) — **never posted at all** | group 09 on, GRBL, a laser operation | posted | §5 | ⬜ |
+| **J5** | Laser/jet × the Phase-4 features | jet + base + Retract Across Parts | posted | §5 | ⬜ |
+| **HR-7** | First-rapid flag survives a tool change | — verified by **P8**'s matrix once Phase 4 lands | — | §2 | ➖ |
+| **HR-8** | Tracked position after post-injected motion | — verified by **P8**'s matrix | — | §2 | ➖ |
+| **HR-9** | `Do First Change` zeroes Z against the right tool | — verified by **P8**'s matrix | — | §2 | ➖ |
+| **HR-10** | `Disable Z Stepper` is not Marlin-only | — has a complete diff; folds into **P8** | — | §2 | ➖ |
+| **HR-13** | `onCommand` no longer discards silently | — has a complete diff; folds into **P8** | — | §2 | ➖ |
+| **HR-20** | Tapping beyond a warning on the manual path | a drill + tap job, automatic spindle | posted | §2 | ⬜ |
+
+`dialog` is a fifth method alongside the four in `conventions.md` → *How to run a test*: it is settled by
+opening the Fusion dialog, and no posted file can show it.
 
 ### 3.1 Multi-part / multi-fixture — needs a job nobody has posted yet
 
@@ -652,7 +714,7 @@ touch controls this file owns. Each needs the Do→Get row below before it count
       Fusion will do that in one invocation, which is the only case the change can affect.
 ---
 
-## 4. Already verified — do not re-run
+## 4. Checked and found correct — do not re-run
 
 Carried over so a later professional pass can tell "looked at, fine" from "never looked at". Every
 `.gcode` named here is in Fusion's NC output folder, not the repo.
@@ -813,3 +875,25 @@ Professional or nice-to-have; none is scheduled, and none is a defect.
 - **`permittedCommentChars` global.** A comparable community GRBL post declares it; research whether it
   adds real kernel-side filtering on top of `sanitizeMessageText()` before adding — may be informational.
 - **Global-metadata gaps.** Optionally `model`. Cosmetic.
+
+---
+
+## 7. Invalidated by landed fixes
+
+Rows whose saved `.gcode` a change has broken. **Delete a row when its test is re-posted, and delete
+this section when it empties** — Rule 4.
+
+| Rows | What moved | Effect |
+|---|---|---|
+| **every saved GRBL `.gcode` predating 2026-07-31** | HR-3 — the manual-spindle stop now prompts on GRBL | A default job ends `M0 (MSG Turn OFF spindle)` where it once ended `M5`, and each tool change gains the same prompt. **No row's assertions are affected** — do not read a tail diff as a regression |
+
+## 8. Owed
+
+What this register owes, not the order to do it in — that is the checkpoint's job.
+
+1. **Every one of the 37 rows.** Nothing professional has been posted. §3.1 is the largest untested area
+   in the post and needs a job nobody has built: a 2-copy Replicate or a two-Setup job.
+2. **J4 first among the jet rows** — group `09` has never appeared in *any* posted file, and CR-10
+   landed a fix there sight-unseen. `HReview.md`'s `CR-10 (A)` is that post and serves both registers.
+3. **P8 waits on Phase 4.** It is the matrix that proves the tool-change reorder, so it cannot run until
+   §2's five findings land.

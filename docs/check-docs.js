@@ -223,6 +223,26 @@ function checkFindingCount(rel) {
   if (+m[4] !== (byPrefix[m[5]] || 0)) fail(where, 'says ' + m[4] + ' ' + m[5] + '-, table has ' + (byPrefix[m[5]] || 0));
 }
 
+// "— 6 findings." anywhere above the findings table. HReview phrases its count one way and PReview
+// another, so this covers the bare form and checkFindingCount() covers HReview's per-prefix breakdown.
+function checkFindingTotal(rel) {
+  var text = read(rel);
+  if (text === null) return;
+  var lines = text.split('\n');
+  var t = findingsTable(lines, rel);
+  if (!t) return;
+  var n = idsIn(t.rows).length;
+
+  for (var i = 0; i < lines.length; i++) {
+    var m = /—\s*(\d+)\s+findings\b/.exec(lines[i]);
+    if (!m) continue;
+    if (+m[1] !== n) {
+      fail(rel + ':' + (i + 1), 'claims ' + m[1] + ' findings, the findings table has ' + n);
+    }
+    return;                                  // the first such claim is the register's own
+  }
+}
+
 function lineOf(lines, re) {
   for (var i = 0; i < lines.length; i++) if (re.test(lines[i])) return i + 1;
   return 0;
@@ -286,18 +306,23 @@ function checkHeadingRanges(rel) {
   });
 }
 
-function findingsTable(lines, rel) {
-  var i = lines.findIndex(function (l) { return /^##\s+Findings\b/.test(l); });
+// Canonical sections are identified by NAME, not by number -- PReview numbers its sections and
+// HReview does not, and renumbering PReview would break ~30 cross-references for cosmetic gain.
+// See conventions.md -> The shape of a review document.
+function sectionTable(lines, rel, name, label) {
+  var re = new RegExp('^##\\s+(\\d+\\.\\s+)?' + name + '\\b', 'i');
+  var i = lines.findIndex(function (l) { return re.test(l); });
   if (i === -1) return null;
   var t = tableAfter(lines, i);
-  return requireRows(t, rel, 'the findings table') ? t : null;
+  return requireRows(t, rel, label) ? t : null;
+}
+
+function findingsTable(lines, rel) {
+  return sectionTable(lines, rel, 'Findings', 'the findings table');
 }
 
 function testRegisterTable(lines, rel) {
-  var i = lines.findIndex(function (l) { return /^##\s+Test register\b/.test(l); });
-  if (i === -1) return null;
-  var t = tableAfter(lines, i);
-  return requireRows(t, rel, 'the test register') ? t : null;
+  return sectionTable(lines, rel, 'Test register', 'the test register');
 }
 
 // ---------------------------------------------------------------- 5. pointer direction
@@ -343,21 +368,42 @@ function checkDocSync() {
 
 // ---------------------------------------------------------------- run
 
+// What the run actually inspected. A checker that says nothing about the sections it could not parse
+// reads as a clean bill of health -- which is exactly how PReview went ungated while this reported
+// "clean": both its section matchers returned -1 and every id check silently skipped.
+var coverage = [];
+
 checkSizes(readBudgets());
-['docs/HReview.md', 'docs/PReview.md'].forEach(function (rel) {
+REGISTERS.forEach(function (rel) {
+  var text = read(rel);
+  if (text === null) { coverage.push(short(rel) + ': unreadable'); return; }
+  var lines = text.split('\n');
+  var seen = [];
+  var f = findingsTable(lines, rel);
+  var t = testRegisterTable(lines, rel);
+  if (f) seen.push('findings ' + idsIn(f.rows).length);
+  if (t) seen.push('rows ' + t.rows.length);
+  if (!f) seen.push('NO findings table');
+  if (!t) seen.push('NO test register');
+  coverage.push(short(rel) + ': ' + seen.join(', '));
+
   checkTallies(rel);
   checkHeadingRowCounts(rel);
   checkFindingCount(rel);
+  checkFindingTotal(rel);
   checkIdCompleteness(rel);
   checkHeadingRanges(rel);
 });
 checkPointerDirection();
 checkDocSync();
 
+function short(rel) { return rel.replace(/^docs\//, '').replace(/\.md$/, ''); }
+
 var fails = problems.filter(function (p) { return p.level === 'FAIL'; });
 problems.forEach(function (p) {
   process.stderr.write(p.level + ' ' + p.where + '  ' + p.msg + '\n');
 });
+process.stderr.write('checked  ' + coverage.join('  |  ') + '\n');
 
 if (fails.length) {
   process.stderr.write('\n' + fails.length + ' document-contract violation(s). See docs/conventions.md → Document contracts.\n');

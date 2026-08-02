@@ -18,9 +18,9 @@ restated in four places. These contracts are what stop that recurring.
 |---|---|---|---|
 | `CLAUDE.md` | Imperatives that change how a session works: read order, show-a-diff, `node --check`, the register rule, commit convention, what to leave alone | Rationale, history, design, anything that fires only once you are deep in one function | **≤ 60 lines** — it loads in full every session |
 | `plan.md` | The checkpoint (baseline, what is true now, **what is left in order**, live risks), phase status, pointers to completed reviews | Design write-ups, findings, test rows, resolved decisions, open questions, backlog detail | **≤ 120 lines** |
-| `conventions.md` | The durable half: stance, coordinate model, base/frame/probing, guards, firmware capabilities, property & dialog conventions, how to run a test, working method, these contracts | Status of anything, what is next, unbuilt design | **≤ 450 lines** — it changes a few times a year; an overrun means something live has leaked in. It is also the file the volatile ones drain *into*, so it absorbs before it trims |
+| `conventions.md` | The durable half: stance, coordinate model, base/frame/probing, guards, firmware capabilities, property & dialog conventions, how to run a test, working method, these contracts | Status of anything, what is next, unbuilt design | **≤ 520 lines** — it changes a few times a year; an overrun means something live has leaked in. It is also the file the volatile ones drain *into*, so it absorbs before it trims. **This number moved twice on 2026-08-02** (420 → 450 → 520) as the tooling section and the review-document skeleton landed; it should not move again without something genuinely new, not merely longer |
 | `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 300 lines** — a register grows one line per row |
-| `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | **≤ 850 lines, and falling** — §2 and §3 are unbuilt design and unrun rows, and **both retire on build**. This file must shrink, not grow |
+| `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | **≤ 920 lines, and falling** — §2's long form and §3's expansions are unbuilt design and unrun rows, and **both retire on build**. The §3 index table is permanent; everything under it is not. This file must shrink, not grow |
 | `README.md` | User-facing usage only. Its `doc-sync` marker records the ref it last synced to | Anything developer-facing | — |
 | per-user **memory** (outside the repo) | Constraints about the user that hold across projects and cannot be derived from this repo — e.g. no controller hardware is available | **Anything about this post**: its code, conventions, status, findings or history | One short file per fact. Nothing here is reviewed in a diff, which is why so little belongs |
 
@@ -28,8 +28,10 @@ restated in four places. These contracts are what stop that recurring.
 
 **Four rules that keep it that way.**
 
-1. **A new top-level section in `plan.md` requires changing its contract here first.** If the content does
-   not fit a section it already has, the question is *which register owns this*, not *can plan.md hold it*.
+1. **A new top-level section in `plan.md` or in any review document requires changing its contract here
+   first.** If the content does not fit a section the file already has, the question is *which register
+   owns this*, not *can the file hold it*. For a review document the sections are fixed — see
+   *The shape of a review document* below.
 2. **Over the size guide means something has stopped being live.** Check what has quietly become durable
    (→ here) or register-shaped (→ a register) rather than trimming prose.
 3. **Never point two ways.** If file A says "written up in B", B must hold the write-up and must not point
@@ -40,12 +42,51 @@ restated in four places. These contracts are what stop that recurring.
    today and these are their clauses:
    - `HReview.md` → *Invalidated by the … code-review fixes* — delete a row when its test is re-posted;
      delete the **section** when it empties. It expires with the `⬜` rows it was written for.
-   - `HReview.md` → *Checked and found correct* and `PReview.md` §4 → *Already verified* — delete a row
+   - *Checked and found correct* in either register — delete a row
      when a `posted` row supersedes it. Both are `read`-strength, and `posted` is strictly stronger.
    - Findings tables — the **row** stays, always, because commit messages and code comments cite the id
      and it must still resolve. What goes is the prose: on closure the Resolution collapses to the
      commit ref plus one clause. This is the same rule as *retire the long form on close*, applied to
      the row that outlives it.
+
+### The shape of a review document
+
+`HReview.md` and `PReview.md` are the two that exist; a third review pass gets the same shape. Before
+this was written the two had already diverged — the same content type carried a different heading and a
+different *shape* in each — and the consequence was concrete: `check-docs.js` matched HReview's headings
+only, so the larger register went ungated except for its size.
+
+| § | Section | Holds | Required? |
+|---|---|---|---|
+| 1 | **Scope** | Which persona and which controls this review covers, and what it deliberately excludes | yes |
+| 2 | **Findings** | The register **table**: `ID · Finding · Sev · Resolution · Status`. One row per finding, forever — commit messages cite the ids | yes |
+| 3 | **Test register** | The register **index table**: `Test · Proves · Setup · Method · State`, one row per id | yes |
+| 4 | **Invalidated by …** | Rows whose saved `.gcode` a change broke. Retires per Rule 4 | when non-empty |
+| 5 | **Checked and found correct** | `read`-strength readings. Retires per Rule 4 when a `posted` row supersedes | when non-empty |
+| 6 | **Owed** | What the register itself owes: which artifacts, and why each is worth a post. **Not** the order of work — that is the checkpoint's | yes |
+| 7 | **Design backlog** | Unbuilt design and its open questions. **Only** where the file's contract admits unbuilt design — `PReview.md` does, `HReview.md` does not | optional |
+
+**The fields are canonical; the rendering is not.** A test row must carry an id, a state marker, a
+setup delta, a method, and an *Expect* naming its discriminator. Where the expected output fits one
+line, put it in the index table as HReview does. Where it needs a multi-line g-code block — which a
+markdown cell cannot hold — the index row carries id, proves, setup, method and state, and the block
+lives in an expansion directly beneath **in the same section**. That is an index, not a cross-reference,
+so Rule 3 does not apply; what Rule 3 forbids is the *Expect* existing in two places.
+
+Three mechanical rules the checker depends on:
+
+- **The state marker is the *last* column** of every register table. Put an Expansion reference before
+  it, never after.
+- **Every register states its tally above its table** — `✅ n · ❌ n · ⬜ n · ➖ n — n rows`, and for a
+  findings table `— n findings`.
+- **Every findings id resolves to a test row.** If a finding is verified by another row's matrix, leave
+  a `➖` pointer row saying so, exactly as a moved finding does.
+
+Sections are matched **by name, not by number**. `PReview.md` numbers its sections and `HReview.md` does
+not; renumbering either to force the order above would break some thirty cross-references for cosmetic
+gain, so the names are canonical and the numbering is local. `check-docs.js` prints which registers it
+actually parsed on every run — a checker silent about what it skipped reads as a clean bill of health,
+which is precisely how `PReview.md` stayed ungated while the check reported success.
 
 **Which register?** Hobbyist is *a Personal-licence user, one part, one WCS, one tool, several operations*.
 Professional is multi-WCS, spoilboard base, tool changes, Manual NC, and the dialog audit. An unscheduled
