@@ -126,8 +126,14 @@ only recognises `$` as a system command when it is the first character of the li
 
 ## Firmware capabilities
 
-Settled by reading each firmware's own source and changelog rather than by testing on a machine — see
-*Working method*. Cite the file and version when adding to this.
+Settled by reading each firmware's own source and changelog rather than by testing on a machine. **Do the
+source read *before* filing a question as needing hardware** — the `M2` question was filed as unanswerable
+without a controller and closed in one sitting from source, with a better answer than a dry run would have
+given. Cite the file and version when adding here.
+
+- Marlin — `MarlinFirmware/Marlin`, `Marlin/src/gcode/gcode.h` + `gcode.cpp`
+- RepRapFirmware — `Duet3D/RepRapFirmware`, `src/GCodes/GCodes2.cpp`, plus the RRF wiki changelog
+- GRBL — `gnea/grbl` wiki; FluidNC — `wiki.fluidnc.com`
 
 **No supported firmware has canned drilling cycles**, so `onCyclePoint()` expanding drill/peck/bore/tap
 into plain `G0`/`G1`/`G4` is correct and needs no revisiting.
@@ -175,8 +181,15 @@ truncated file on disk — promoting both into `validateJob()` is a recorded fol
   New properties take the next free letter (re-letter following ones if inserting mid-group).
 - **The literal is now declared in that same order** (`HReview.md` CR-14), so display order no longer rests
   solely on Fusion sorting. Keep it that way when adding a property.
-- This post uses the **combined-inline** `properties = {}` form. The split `properties` +
-  `propertyDefinitions` form is the *old broken* approach — do not reintroduce it.
+- This post uses the **combined-inline** `properties = {}` form, read with `getProperty(properties.key)`
+  (an object reference, correct for this form). The split `properties` + `propertyDefinitions` form is the
+  *old broken* approach — do not reintroduce it.
+  > **Why this keeps coming up.** The predecessor `MPCNC.cps` used the split form; a Fusion change **broke**
+  > it, and that break is the entire reason v3 exists — *"Updated to new method of handling properties"* in
+  > the file header. So the split form is the **old** approach, not a newer target. Autodesk forum threads
+  > describing `propertyDefinitions` as a "May 2021 enhancement" are not grounds to migrate (and those
+  > pages 403 to automated fetching, so they cannot be verified anyway) — corroborate against this repo's
+  > own history instead. Closed as-designed once already, as compliance finding F10.
 - **What resets a saved preset:** the **key** is the stored identifier, so renaming or re-lettering a key
   resets that property to its default, as does changing an enum **`id`** or a boolean→enum conversion.
   Changing only a `group:` string, a title, an option title, or the declaration *order* does **not**. Every
@@ -345,3 +358,13 @@ verification post must carry — it cannot execute on a paid licence (HW-1).
   current `.cps`; its evidence is about *logic*, never about what the post emits.
 - **Every one of the fixes deviated from its proposed diff, always the same way:** the proposal
   understated the number of call sites. Count them in the code before believing a diff is complete.
+- **An ordering or synchronisation fix must cover every `loadFile()` branch, not just the default path.**
+  A missing `flushMotions()` before job end was once patched only in the no-custom-file branch, leaving
+  the `else { loadFile(...) }` branch — which injects motion from a user's footer file — still broken. It
+  took a second corrected diff. Search for `loadFile(` and check the parallel branch before proposing.
+- **Write every Pass criterion as something visible in the file** — exact tokens, their order, and what
+  must be **absent**. When a row passes, mark it `PASS` outright: no "static PASS" hedging and no note
+  explaining what was skipped. Splitting rows into static and physical halves once left them permanently
+  half-passed and made the summary unreadable. Operator-safety facts a file cannot show (*park the tool
+  over bare spoilboard before starting*) belong in code comments, here, and the README — never as a test
+  step.
