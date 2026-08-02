@@ -194,7 +194,7 @@ Two more settled the same way: **Marlin has never implemented `M2`** (RRF gained
   X/Y is never probed.
 - **Re-probe after each tool change** is the tool-length substitute (`H_ToolChange_ProbeAfterChange`).
 - **Manual tool change:** retract → move to change position → pause → re-probe Z → resume. The ordering
-  fix and the base-relative park are in *Remaining work*.
+  fix and the base-relative park are `PReview.md` §2 — Tool Change branch.
 
 ## Validation guards
 
@@ -259,7 +259,7 @@ the spoilboard); group 06's `I_Probe_SafeZ` keeps "Safe Z" (the post-probe retra
 
 ---
 
-## Design notes that constrain the remaining work
+## Design notes behind the shipped behaviour
 
 ### Traverse clearance is not the G1→G0 plane
 
