@@ -1182,7 +1182,7 @@ function isSafeToRapid(x, y, z) {
 // with writeBlock(), so an operator who did what the field asked and typed "air_on.g" got the
 // literal block "air_on.g" streamed to the controller, which answers an unsupported-command error
 // mid-job; leaving the field empty emitted a stray blank line. Routed through loadFile() they now
-// also inherit its missing-file error and its missing-trailing-newline repair. See review.md CR-4.
+// also inherit its missing-file error and its missing-trailing-newline repair. See HReview.md CR-4.
 function writeCustomCoolantFile(channel, on, file) {
   if (file == "") {
     writeComment(eComment.Important, " >>> WARNING: coolant channel " + channel + " is set to \"Use custom\""
@@ -2782,7 +2782,7 @@ function writeWcsOnStart() {
     // there first, at Z travel speed, over terrain the post knows nothing about. The post cannot
     // fix that (it has no way to read the physical Z, and the premise of this mode is that the
     // stored frame is trusted), so the comment and the property text say "move", not "retract".
-    // See review.md CR-16; plan.md carries the related open decision for the base-reserved variant.
+    // See HReview.md CR-16; plan.md carries the related open decision for the base-reserved variant.
     writeComment(eComment.Info, "   Use stored work origin; move Z to Safe Z, then to X0 Y0");
     resetAll();
     if (canProbe) {
@@ -2864,7 +2864,7 @@ function writeWcsOnStart() {
     // but "no probe" is not the same statement as "Z0 is never set", and this is the DEFAULT mode a
     // laser user lands on rather than the "Set X0 Y0 Z0 to Current Pos" the README tells them to
     // pick. Suppressing the origin write is still right (see above); being quiet about it is not.
-    // See review.md CR-5, and PReview.md J1 / HR-1 (D) for the jet workstream this belongs to.
+    // See HReview.md CR-5, and PReview.md J1 / HR-1 (D) for the jet workstream this belongs to.
     writeComment(eComment.Important, " >>> WARNING: a jet tool / tool 0 cannot probe, so Z0 was NOT"
       + " established -- this job runs against whatever Z origin is already stored. Use"
       + " \"Set X0 Y0 Z0 to Current Pos\" for a jet/laser job.");
