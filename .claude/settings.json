@@ -12,5 +12,15 @@
       "Bash(wc *)",
       "Bash(file *)"
     ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/post-edit.js" }
+        ]
+      }
+    ]
   }
 }

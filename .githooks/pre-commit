@@ -1,0 +1,4 @@
+#!/bin/sh
+# Document-contract gate. Checks the staged content -- what this commit will actually record.
+# Enable in a fresh clone with:  git config core.hooksPath .githooks
+exec node docs/check-docs.js --staged
