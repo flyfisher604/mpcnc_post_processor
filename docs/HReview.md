@@ -7,41 +7,17 @@ Reasoning, diffs and session narratives were trimmed 2026-08-01 — read the cod
 for *why*. What is kept is what a later reader needs: every issue with its status, and every test with
 enough to set it up and run it again.
 
+**How to run a test, the personas, and the method notes now live in `conventions.md`** — they govern this
+register and `PReview.md` alike, so they sit in one place rather than in whichever file happened to hold
+them.
+
 > **Standing rule.** A change to the `.cps` touching hobbyist behaviour updates this file **in the same
 > commit**: add the Do→Get row, name the discriminator, and flag any row whose saved `.gcode` it
 > invalidates. Professional behaviour → `PReview.md`. A stale PASS is worse than an unrun test.
-
----
-
-## How to run a test
-
-- **Post the job from Fusion and read the g-code.** Machine dry-runs and physical measurement are out of
-  scope — every row must stand on the posted file alone.
-- **Fusion posts with its own copy of the `.cps`** at `%APPDATA%\Autodesk\Fusion 360 CAM\Posts\`. Re-import
-  before every session and **date the output** against a token the newest commit changed, or you will
-  verify a stale build. Absence-based rows pass trivially on a build lacking the feature.
-- **Read the posted file's own property dump before believing a row ran.** It records the whole dialog
-  state; a row can silently not have been exercised.
-- Output goes to `C:\Users\don_m\Documents\Fusion 360\NC Programs\`, **is not in the repo**, and a reused
-  filename destroys evidence. **Name a post for the row it serves** (`HR12a`), not for what the job does,
-  and grep this file for the name first.
-- Setting any group-08 include makes Fusion ask *"This post processor might be unsafe…"* — answer **Yes**.
-  Answering No aborts the post and **invalidates** the row rather than failing it.
-- Defaults unless stated: GRBL/mm, Comment Level `Info`, probe target/speed/thickness `Z-10`/`F30`/`Z0.8`,
-  probe Safe Z resolves to `5.08`. Comments are `( … )` on GRBL, `; …` on Marlin/RRF. `G10 L20 P<n>` on
-  GRBL/RepRap, `G92` on Marlin.
-
-**Method**, strongest first: **`posted`** a real file from the real post — the only method that proves what
-a hobbyist receives · **`harness`** node against functions brace-matched out of the `.cps`, or a post from
-`Personal.cps` — proves *logic*, not output · **`source`** firmware source · **`read`** a reading of the
-post's own control flow — **weaker than the rest**, used only where the artifact a posted row needs does
-not exist.
-
-**Personas** (setup shorthand): **HP-1** one Setup / one Operation / one tool, pre-jogged XY, touch plate —
-defaults + firmware + travel/max speeds + `Scale Feedrate` on · **HP-2** HP-1 + First WCS/Part =
-`Set X0 Y0 Z0 to Current Pos` · **HP-3** HP-1 + a `Jog to …` mode · **HP-4** HP-1 on Marlin or RepRap ·
-**HP-5** HP-1 + more than one operation. Group 03 is part of the HP-1 *persona*, not of the config a
-verification post must carry — it cannot execute on a paid licence (HW-1).
+>
+> **And the other half — compress on close.** When a finding reaches FIXED or closed-by-design, the same
+> commit deletes its long form and leaves the register row. The buggy code, the diagnosis and the diff
+> are all in `git show <commit>`. Long form is a promissory note, justified only while work is unbuilt.
 
 ---
 
@@ -213,26 +189,3 @@ pointer row behind.**
    Start file owes `G90`/`G21`/`G94`/`G17`, a Stop file owes coolant off, the spindle-off prompt,
    `M84 S60` and `M30`/`M2`; and the `Tool Change Probe` field that does nothing (HR-21).
 
----
-
-## Method notes worth reusing
-
-- **A guard written to fail open produces a byte-identical file whether it read the value correctly or
-  read nothing at all.** Make its diagnostic **unconditional**, not rejection-only (HR-6).
-- **Absence-based rows need a presence-based sibling posted from the same build** (HR-11 (A)/(B)).
-- **Run every harness against `HEAD` as well as the working tree** — a harness that only passes on the
-  fixed file cannot tell you it would have caught anything (HR-14: 7/9 → 9/9).
-- **Make a harness abort rather than report when its extraction yields nothing.** The 2026-08-01 sweep
-  harness reported eight vacuous passes over an empty object. A `const` inside `eval()` does not leak to
-  the caller's scope under `'use strict'` — bind function *expressions* instead.
-- **When a code path cannot be reached, question the premise before blaming the CAM.** HW-1 cost three
-  posted files: `isSafeToRapid()` has one caller and is unreachable on a paid licence.
-- **When a defect suppresses output it makes its own behaviour unverifiable — switch to the branch that
-  emits.** HW-2 (B) was unanswerable on the manual path and trivial on the automatic one.
-- **When the question is "does the controller honour this?", read the controller's source.** HR-11's `M2`
-  was settled from `gcode.cpp` and the RRF changelog with no hardware.
-- **`Personal.cps`** (repo root, git-excluded) is the post with `onRapid()` rerouted into `onLinear()` —
-  the only way to reach the group-03 code, since a paid licence emits real `G0`s. Re-create it from the
-  current `.cps`; its evidence is about *logic*, never about what the post emits.
-- **Every one of the fixes deviated from its proposed diff, always the same way:** the proposal
-  understated the number of call sites. Count them in the code before believing a diff is complete.

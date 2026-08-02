@@ -1,0 +1,330 @@
+# Conventions — the models, the rules, and the method
+
+The **durable** half of the project record for `MPCNC_v4.0_Beta2.cps`: the models the code assumes, the
+conventions a change must follow, and the method by which anything is verified. It changes a few times a
+year, not every session — if you are editing it often, something live has leaked in.
+
+| Looking for | Read |
+|---|---|
+| What is done, what is next, what is still open | `plan.md` |
+| A finding or a test row — hobbyist | `HReview.md` |
+| A finding or a test row — professional | `PReview.md` |
+| How an operator uses the post | `README.md` |
+
+---
+
+## Context and stance
+
+The post targets the V1 Engineering **MPCNC / LowRider** family and similar GRBL / Marlin / RepRap
+hobby-class machines. The aim is **production-quality CNC workflows** (multi-fixture, multi-tool, probing,
+safe cross-part traverses) that **also degrade simply** for a hobby user on the Fusion Personal licence
+cutting a single operation. Both are first-class.
+
+**Development role.** Decisions are made from two expert lenses together: **post-processor engineering**
+(clean JavaScript faithful to this post's idioms, careful regression discipline) and **best-practice CNC
+operations** (how these machines behave, and what a safe workflow looks like for both personas). The habit
+is: settle the CNC-correct workflow first, then design the software that delivers it.
+
+Two principles drive every decision:
+
+- **Work-relative.** Most target machines have no reliable machine-Z (no tool setter, often no Z endstop).
+  The everyday reference is the active **WCS**, never the machine frame. Tool length is folded into a **Z
+  re-probe after each tool change** (there is no TLO). Homing, where present, gives **X/Y** repeatability
+  only.
+- **Graceful degradation.** Every advanced feature (reserved base, cross-part safe-Z, per-part probing,
+  jog prompts) is opt-in and emits nothing until enabled.
+  > **The byte-identical guarantee is gone, deliberately.** This was originally "the default job's output
+  > stays byte-for-byte unchanged". The full property dump broke it for comments, **HR-1** broke it for
+  > *emitted commands*, and `HReview.md` CR-6 reordered the tail. What survives is the *shape* — advanced
+  > features still emit nothing until enabled. **Treat a future default-output change as a decision to be
+  > argued, not a line that cannot be crossed.**
+
+---
+
+## References — Fusion 360 post-processor documentation
+
+- **PostProcessor API class reference** — <https://cam.autodesk.com/posts/reference/classPostProcessor.html>
+- **Post Processor Training Guide (PDF)** — <https://cam.autodesk.com/posts/posts/guides/Post%20Processor%20Training%20Guide.pdf>
+- **Dumper post** — emits every property/parameter/section value Fusion exposes; run it before relying on
+  anything: <https://cam.autodesk.com/hsmposts?p=dump>
+- **Library of existing posts** — <https://cam.autodesk.com/hsmposts> · **Forum** —
+  <https://forums.autodesk.com/t5/hsm-post-processor-forum/bd-p/218>
+
+Firmware: Marlin <https://marlinfw.org/meta/gcode/> · GRBL 1.1 <https://github.com/gnea/grbl/wiki> ·
+FluidNC <http://wiki.fluidnc.com/> · Duet/RRF <https://docs.duet3d.com/User_manual/Reference/Gcodes>
+
+---
+
+## Coordinate model
+
+Production controls keep three references separate: **MCS** (`G53`), **WCS** (`G54`–`G59`, `G59.1`–`G59.3`
+on RepRap), and **TLO** (`G43`). Most V1E machines have none fully, hence the work-relative stance.
+
+- **Persistence:** WCS origins are written with `G10 L20 P<n>` on GRBL/RepRap — scoped to that WCS's own
+  register. `P` maps 1:1 to Fusion's `workOffset` (P1–P6 = G54–G59; P7–P9 = G59.1–G59.3, RepRap only).
+- **Marlin is single-frame:** no per-WCS registers, so one global `G92` origin. A Marlin job using more
+  than one distinct work offset is a hard error (Guard C).
+- **`workOffset 0`** (Fusion's "default / unset") aliases to WCS 1 / `G54`.
+- Helper `writeWcsOrigin(wcsNumber, x, y, z)` persists a position into a WCS's own origin (any axis
+  `undefined` = leave alone).
+
+**The post asserts the WCS selection; it never inherits it.** This is the justification for the ordering
+in `writeFirstSection()`:
+
+- Fusion **always** supplies a work offset per section, so the post always has a design-time answer.
+- `currentWorkOffset` is **not** machine state. `onOpen()` sets it `undefined` — "no work offset emitted
+  yet". Because it starts undefined the suppression cannot match on the first section, so section 1
+  **unconditionally emits its select**, overwriting whatever the sender left modal. From then on the post
+  is the only thing changing the selection. This is exactly why `writeWCS()` runs before `Start()`, the
+  base establish and `writeWcsOnStart()`.
+- **The distinction that matters:** the post always knows *which* frame is active (it commanded it); it
+  never knows *where* that frame is. Register contents are controller-side runtime state and cannot be
+  read back. So **selection is deterministic, origin is trusted** — every "Use Active WCS" mode is a trust
+  assertion, which is why the *defaults* establish an origin rather than rely on one.
+- **Homing does not change a WCS — it makes one trustworthy.** `G54`–`G59` hold offsets from machine zero
+  and `$H` never touches those registers. On a homed machine a stored offset points at the same physical
+  place across power cycles; with no endstops, machine zero is wherever the controller was last reset. So
+  `Home Before Start = None` + `Use Active WCS X0 Y0` after a power cycle is quietly unsound, and worth a
+  warning independent of anything else.
+- Undefendable by any post: an operator typing `G55` into the console *mid-run*. Out of scope.
+
+## Reserved spoilboard base
+
+For multi-fixture jobs one WCS can be reserved as a **spoilboard base** — a *fixed-surface* zero,
+independent of stock thickness. It is the one frame in which a safe height is meaningful across parts of
+differing thickness, which is why the cross-part safe-Z feature requires it (Guard B).
+
+- **`A_Spoilboard_BaseReserve`** (`None` default | `G54`–`G59` | `G59.1`–`G59.3 (RepRap)`). When reserved,
+  `G59` is the natural choice. Ignored on Marlin (warned).
+- **`B_Spoilboard_BaseEstablish`**, default **Pause & Probe Z**: `None` = assume pre-set (Info comment);
+  `Probe Z` = probe with no prompt; `Pause & Probe Z` = prompt, probe, prompt. The probe XY offset never
+  applies.
+
+**The base probe emits no XY move — the park position is an operator precondition.** The base establish
+runs before any origin is established, so there is no frame in which an XY target could be trusted. The
+consequence is real and silent: **whatever is under the tool becomes the base's Z0**, so parking over the
+stock records the stock top as "the spoilboard" and every clearance derived from it is short by the stock
+thickness. Mitigation is documentation, not code. The durable fix is *Future work — a machine-coordinate
+base probe point*.
+
+> **Rejected: giving the base an XY origin.** The base stays a Z-only reference.
+
+## Machine frame (homing / MCS)
+
+Group `04`, one enum `A_Machine_HomeBeforeStart`: **None** (default — accept the current position, no
+motion), **XY** (the usual case), or **XYZ** (only where wired for it). Per-axis granularity was dropped.
+
+| Firmware | Command |
+|---|---|
+| Marlin / RRF | `G28 X` / `G28 Y` (XY) then `G28 Z` (XYZ) — independent per axis |
+| GRBL / FluidNC | `$H` only — one command homes all configured axes |
+
+On GRBL `$H` is all-or-nothing, so XY and XYZ both emit one `$H` (the mode documents intent).
+`B_Machine_PromptBeforeHome` pauses **once before any homing motion**, independent of firmware and axes.
+The post does not control homing order. **`$H` is emitted with `writeln()`, not `writeBlock()`** — GRBL
+only recognises `$` as a system command when it is the first character of the line (`HReview.md` CR-1).
+
+## Probing & tool changes
+
+- **Work-Z probing only** (`G38.2`, thickness-compensated, attach/remove pauses). No tool-length system;
+  X/Y is never probed.
+- **Re-probe after each tool change** is the tool-length substitute (`H_ToolChange_ProbeAfterChange`).
+- **Manual tool change:** retract → move to change position → pause → re-probe Z → resume. The ordering
+  fix and the base-relative park are in *Remaining work*.
+
+## Validation guards
+
+Post-time only (the post can't read the live controller):
+
+- **Guard A — no base redefine.** *Using* the reserved base is fine; an operation that would
+  **re-establish** its origin errors.
+- **Guard B — safe-Z across parts needs a base.** `C_Spoilboard_SafeZAcrossWcs` on + >1 distinct offset on
+  GRBL/RRF + no base reserved → error. Single-WCS jobs are exempt.
+- **Guard C — Marlin single-frame.** A Marlin job using >1 distinct work offset → hard error.
+
+Guards A/B/C run in `onOpen()`, before any output, so a rejected job writes **no file at all**. Two
+non-fatal `warning()`s run alongside them (`HReview.md` CR-2, CR-3): homing combined with a
+`Set … to Current Pos` origin mode, and a multi-tool job with group 07 off. The two *geometry* guards
+(multi-axis, and HR-6's orientation check) fire later, in `onSection()`, and can therefore leave a
+truncated file on disk — promoting both into `validateJob()` is a recorded follow-up.
+
+## Property / dialog conventions
+
+- **Group order** = the `group:` string, zero-padded to two digits, so `11 - Duet` sorts last. Current:
+  `01 - Job`, `02 - Feeds and Speeds`, `03 - Map G1s to Rapids…`, `04 - Establish Machine Coordinates`,
+  `05 - Establish Spoilboard Reference`, `06 - On WCS / Part / Fixture Changes`, `07 - Tool Changes`,
+  `08 - External Include Files`, `09 - Laser`, `10 - Coolant`, `11 - Duet`.
+- **Within-group order** = a single-letter key prefix, `<Letter>_<Group>_<Name>`, restarting per group.
+  New properties take the next free letter (re-letter following ones if inserting mid-group).
+- **The literal is now declared in that same order** (`HReview.md` CR-14), so display order no longer rests
+  solely on Fusion sorting. Keep it that way when adding a property.
+- This post uses the **combined-inline** `properties = {}` form. The split `properties` +
+  `propertyDefinitions` form is the *old broken* approach — do not reintroduce it.
+- **What resets a saved preset:** the **key** is the stored identifier, so renaming or re-lettering a key
+  resets that property to its default, as does changing an enum **`id`** or a boolean→enum conversion.
+  Changing only a `group:` string, a title, an option title, or the declaration *order* does **not**. Every
+  reset is a release-notes item.
+
+**Origin/probe controls (group `06`).** Three separate controls — merging the two origin controls was
+rejected, since it would apply job-start XY-zeroing to a mid-job WCS change. Both dropdowns are ordered
+default-first, and both defaults are **no-prompt** modes because jogging at a pause isn't universally
+supported.
+
+- `A_Probe_OnStart` = **"First WCS / Part"** — `Set X0 Y0 to Current Pos, Probe Z0` (default) /
+  `Set X0 Y0 Z0 to Current Pos` / `Use Active WCS X0 Y0, Probe Z0` / `Use Active WCS X0 Y0 Z0` /
+  `Jog to X0 Y0, Probe Z0` / `Jog to X0 Y0 Z0`. The *Current Pos* modes assume a pre-jog; the *Use Active
+  WCS* modes trust the stored fixture offset; the *Jog* modes pause (M0).
+- `B_Probe_OnChange` = **"Subsequent WCS / Part"** — the same four non-Current modes, default
+  `Use Active WCS X0 Y0, Probe Z0`. Fires on a genuine WCS change after the first section.
+- `C_Probe_Pause` = **"Probe Pause"** — `No` / `Before` / `Before & After` (default). Gates the
+  attach/detach prompts for the **part** probes only; adds no new stops.
+
+> **"Use Active WCS", not "Use Existing WCS".** "Existing" read as a *temporal* claim — the WCS active
+> before the job — which is wrong: the register is the one this Setup designates, and the post *selects*
+> it at job start.
+
+**Two properties were both titled "Safe Z".** Group 05's is now **"Inter Part Safe Z"** (whole mm above
+the spoilboard); group 06's `I_Probe_SafeZ` keeps "Safe Z" (the post-probe retract). Keys unchanged.
+
+---
+
+## Design notes that constrain the remaining work
+
+### Traverse clearance is not the G1→G0 plane
+
+`C_MapRapids_SafeZ` answers a narrower question — "within *this* operation, is Z high enough to re-emit a
+cut G1 as a G0?" It is operation-scoped and only populated when the hobby group is on, so it is the wrong
+source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance measured
+above the spoilboard base** (`D_Spoilboard_SafeZClearance`).
+
+**Why the Inter Part Safe Z can't be an F360 expression (asked and answered).** `Clearance:40` would parse
+today, and it is still the wrong source: every F360 height parameter is **per-operation and expressed in
+that operation's own WCS**, while this must be expressed in the **base's** frame — feeding a part-frame
+number into a base-frame `G0 Z` under-clears by the stock thickness, silently. F360 has no job-level
+"above the machine table" height at all; the base frame is a post-invented concept. So it stays a plain
+whole-mm `integer`. If an expression is ever wanted here, the only sound use is as a **floor**
+(`max(constant, resolved)`), never a substitute.
+
+### Base WCS is transited, not parked (R1/R2)
+
+The base-relative retract must *select* the base to move in its frame (the numeric relation between two
+WCS is only known after runtime probing). Two rules:
+
+- **R1 — always restore the operating WCS.** After a base transit, advance to the next operation's WCS
+  before any cutting; never cut with the base left active.
+- **R2 — never round-trip the base empty.** Enter the base only when a real move is emitted there.
+
+Mechanism (`retractThroughBaseClearance()`): transit-select the base with a low-level `writeBlock`
+(**not** `writeWCS()` — no re-probe, no origin write), emit the `G0 Z` clearance, leave the base active;
+the caller then selects the destination WCS. No base transit at `onClose`.
+
+The same rules govern the **base establish**: it transit-selects the base *before* probing so that both the
+`G38.2` target and the post-probe retract are measured against the base, then restores the operating WCS.
+
+> **Superseded reasoning, kept because it is the plausible wrong answer.** An earlier note argued the base
+> establish needed no `G59` select, since `G10 L20` does not change the active WCS. Correct as far as it
+> goes — but it missed that the base's own probe and its post-probe retract would then execute in the
+> *part's* frame, whose Z may be stale. **The missing select was the defect.**
+
+### Why the first section's arrival is asymmetric
+
+In `writeWCS()`, `isTraverse = (previousWorkOffset != undefined)` is false on the first section, so the
+first section skips **both** the safe-Z retract and the origin/probe dispatch that every later WCS change
+gets. Un-suppressing it where it sits does **not** work:
+
+- **Ordering.** `writeWCS()` is step 3 of `writeFirstSection()`; `writeBaseEstablish()` is step 5. At step
+  3 *neither* the part WCS's Z nor the base's Z has been established, so both retract paths would emit an
+  absolute `G0 Z` into a stale frame — the same defect relocated.
+- **Direction.** An absolute Z against a stale zero can move the tool *down*.
+- **Blast radius.** With `isTraverse` true on the first section, the fallback fires on *every* job.
+
+The resolution keeps the intent and fixes the placement: the first section's safe arrival happens **after**
+the base establish, in the base's frame. And it exposes a hard limit — **with no base reserved there is no
+established frame at job start at all**, so no retract can be made safe there. That case gets an Info
+comment instead (`Ensuring that Z is safe. Unknown Z for XY move.`), emitted only on the one path that
+deliberately emits no absolute Z move and only when no base is established.
+
+
+## Reference — per-machine settings
+
+| Machine / firmware | Home Before Start | Prompt Before Home | Reserved base | Operator does |
+|---|---|---|---|---|
+| LowRider (Marlin or FluidNC) | `XYZ` if Z endstops fitted, else `XY` | Off | `G59` if multi-fixture, else `None` | homes X/Y; work-Z touched off with the plate either way |
+| MPCNC + FluidNC, X/Y switches | `XY` | Off | `G59` if multi-fixture | homes X/Y; machine Z n/a, Z set by the work plate |
+| MPCNC + Marlin, plate as Z-endstop | `XYZ` | On | `G59` if multi-fixture | homes X/Y; at the pause places the movable plate, then Z homes to it |
+| MPCNC, no switches | `None` | Off | `G59` if multi-fixture | parks X/Y by hand as zero; Z set by the work plate |
+| Single-part job (any machine) | per row above | per row above | `None` | one WCS zeroed to the part; no base |
+
+> **Note the interaction** (`HReview.md` CR-2): any row above with homing on must **not** use a
+> `Set … to Current Pos` origin mode — homing moves the tool, and the origin would be recorded at the
+> endstop corner. `validateJob()` now warns.
+
+---
+
+## How to run a test
+
+- **Post the job from Fusion and read the g-code.** Machine dry-runs and physical measurement are out of
+  scope — every row must stand on the posted file alone.
+- **Fusion posts with its own copy of the `.cps`** at `%APPDATA%\Autodesk\Fusion 360 CAM\Posts\`. Re-import
+  before every session and **date the output** against a token the newest commit changed, or you will
+  verify a stale build. Absence-based rows pass trivially on a build lacking the feature.
+- **Read the posted file's own property dump before believing a row ran.** It records the whole dialog
+  state; a row can silently not have been exercised.
+- Output goes to `C:\Users\don_m\Documents\Fusion 360\NC Programs\`, **is not in the repo**, and a reused
+  filename destroys evidence. **Name a post for the row it serves** (`HR12a`), not for what the job does,
+  and grep this file for the name first.
+- Setting any group-08 include makes Fusion ask *"This post processor might be unsafe…"* — answer **Yes**.
+  Answering No aborts the post and **invalidates** the row rather than failing it.
+- Defaults unless stated: GRBL/mm, Comment Level `Info`, probe target/speed/thickness `Z-10`/`F30`/`Z0.8`,
+  probe Safe Z resolves to `5.08`. Comments are `( … )` on GRBL, `; …` on Marlin/RRF. `G10 L20 P<n>` on
+  GRBL/RepRap, `G92` on Marlin.
+
+**Method**, strongest first: **`posted`** a real file from the real post — the only method that proves what
+a hobbyist receives · **`harness`** node against functions brace-matched out of the `.cps`, or a post from
+`Personal.cps` — proves *logic*, not output · **`source`** firmware source · **`read`** a reading of the
+post's own control flow — **weaker than the rest**, used only where the artifact a posted row needs does
+not exist.
+
+**Personas** (setup shorthand): **HP-1** one Setup / one Operation / one tool, pre-jogged XY, touch plate —
+defaults + firmware + travel/max speeds + `Scale Feedrate` on · **HP-2** HP-1 + First WCS/Part =
+`Set X0 Y0 Z0 to Current Pos` · **HP-3** HP-1 + a `Jog to …` mode · **HP-4** HP-1 on Marlin or RepRap ·
+**HP-5** HP-1 + more than one operation. Group 03 is part of the HP-1 *persona*, not of the config a
+verification post must carry — it cannot execute on a paid licence (HW-1).
+
+---
+
+## Working method — harness and tooling
+
+- **`node --check MPCNC_v4.0_Beta2.cps` is a valid syntax gate** — run it after every edit.
+- **Individual functions can be brace-matched out of the `.cps` and `eval`'d in node against stubbed kernel
+  globals.** `propertyMmToUnit`, `getProperty`, `getCircularPlane`, `hasParameter`, `cycleType`, `unit`,
+  `Vector` and a fake section are all easy to fake. Not a substitute for posting, but it settles
+  arithmetic cheaply.
+- **Bind extracted functions as *expressions*** — `eval('(' + src + ')')`. A bare declaration (or a
+  `const`/`let`) inside `eval()` does not leak to the caller's scope under `'use strict'`.
+- **Run every harness against `HEAD` as well as the working tree** (`git show HEAD:MPCNC_v4.0_Beta2.cps` to
+  a temp file, taking the path as `argv[2]`). A harness that only passes on the fixed file cannot tell you
+  it would have caught anything — HR-14 went 7/9 → 9/9 that way.
+- **Make a harness abort rather than report when its extraction yields nothing.** The 2026-08-01 sweep
+  harness over-ran its terminator, left the properties object **empty**, and reported eight vacuous passes.
+- **A pure reorder can be proved safe by matching sorted-line checksums** against `HEAD` — that is how
+  CR-14's properties move was shown to change no character of any key, title or default.
+- **`git commit -m` with a PowerShell here-string mangles messages containing double quotes** — write the
+  message to a file and use `git commit -F`.
+
+## Working method — lessons that keep paying off
+
+- **A guard written to fail open produces a byte-identical file whether it read the value correctly or
+  read nothing at all.** Make its diagnostic **unconditional**, not rejection-only (HR-6).
+- **Absence-based rows need a presence-based sibling posted from the same build** (HR-11 (A)/(B)).
+- **When a code path cannot be reached, question the premise before blaming the CAM.** HW-1 cost three
+  posted files: `isSafeToRapid()` has one caller and is unreachable on a paid licence.
+- **When a defect suppresses output it makes its own behaviour unverifiable — switch to the branch that
+  emits.** HW-2 (B) was unanswerable on the manual path and trivial on the automatic one.
+- **When the question is "does the controller honour this?", read the controller's source.** HR-11's `M2`
+  was settled from `gcode.cpp` and the RRF changelog with no hardware.
+- **`Personal.cps`** (repo root, git-excluded) is the post with `onRapid()` rerouted into `onLinear()` —
+  the only way to reach the group-03 code, since a paid licence emits real `G0`s. Re-create it from the
+  current `.cps`; its evidence is about *logic*, never about what the post emits.
+- **Every one of the fixes deviated from its proposed diff, always the same way:** the proposal
+  understated the number of call sites. Count them in the code before believing a diff is complete.
