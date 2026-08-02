@@ -1397,7 +1397,7 @@ function countDistinctTools() {
   return count;
 }
 
-// Post-time validation guards (see docs/plan.md "Validation guards").
+// Post-time validation guards (see docs/conventions.md "Validation guards").
 // Runs once from onOpen(), before any output, so a misconfiguration fails fast.
 function validateJob() {
   // --- Warnings ------------------------------------------------------------------------------
@@ -1411,7 +1411,7 @@ function validateJob() {
   // instructs for the default mode ("jog the tool to the part's XY corner before posting") is
   // destroyed in between. The result is a G38.2 that never contacts, or a part cut a bed-diagonal
   // away from the stock. Legitimate only on a machine whose home corner IS the datum.
-  // See docs/review.md CR-2.
+  // See docs/HReview.md CR-2.
   var startMode = getProperty(properties.A_Probe_OnStart);
   if (getProperty(properties.A_Machine_HomeBeforeStart) != "None" &&
       (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
@@ -1422,7 +1422,7 @@ function validateJob() {
   }
 
   // Post-time half of toolChange()'s suppression warning, so it reaches Fusion's dialog and not
-  // only the posted file. See docs/review.md CR-3.
+  // only the posted file. See docs/HReview.md CR-3.
   if (!getProperty(properties.A_ToolChange_Enabled) && countDistinctTools() > 1) {
     warning(localize("This job uses more than one tool, but \"Tool Changes are Included\" is off: "
       + "no tool-change code is emitted and every operation runs with the tool already in the "
@@ -1476,7 +1476,7 @@ function validateJob() {
 // simply missed. If that assumption ever breaks the failure is quiet rather than loud: a second
 // file would open with spindleEnabled already true and never emit its "Turn ON ... RPM" prompt, or
 // with coolantChannelA still holding the previous job's coolant. Collected into one function so a
-// newly added global is reset by editing one place. See docs/review.md CR-13.
+// newly added global is reset by editing one place. See docs/HReview.md CR-13.
 function resetPostState() {
   currentWorkOffset = undefined;          // no work offset emitted yet
   sequenceNumber = getProperty(properties.F_Job_SequenceNumberStart);
@@ -1554,7 +1554,7 @@ function onClose() {
     // operator to switch a hand-switched router off. Emitted after the move, the file sent the tool
     // diagonally across the whole part at travel speed with the router still turning and only then
     // asked for it to be stopped. Prompting first means the operator switches off, resumes, and the
-    // machine parks. See docs/review.md CR-6.
+    // machine parks. See docs/HReview.md CR-6.
     //
     // NOTE what this deliberately does NOT do: it emits no Z retract before the X0 Y0 move. The
     // property's own text promises "Z remains unchanged", and for milling the last operation's own
@@ -1804,7 +1804,7 @@ function wcsGcode(workOffset) {
 // writeWCS(), so it triggers no B_Probe_OnChange re-probe and writes no origin -- then
 // commands the clearance (a real Z move, so this is never an empty base round-trip). LEAVES
 // the base active; the caller selects the destination WCS next. Caller guarantees a base is
-// reserved. See docs/plan.md "Base WCS is transited, not parked".
+// reserved. See docs/conventions.md "Base WCS is transited, not parked".
 function retractThroughBaseClearance() {
   var base = getReservedBaseWcs();
   writeComment(eComment.Info, "   Retract to spoilboard-base clearance " + wcsName(base) + " before traverse");
@@ -1921,7 +1921,7 @@ function onSection() {
   // sectionComment is only ever assigned from onParameter("operation-comment"), which Fusion does
   // not send for an operation with no comment. onSectionEnd() clears it so this section cannot
   // inherit the PREVIOUS one's name in its header and on the LCD; that leaves undefined on the
-  // first section, which used to print literally. See docs/review.md CR-17 (e).
+  // first section, which used to print literally. See docs/HReview.md CR-17 (e).
   if (sectionComment == undefined) {
     sectionComment = "Unnamed operation";
   }
@@ -3328,7 +3328,7 @@ function toolChange() {
   // two tools, which the operator had to notice and interpret. Off is the DEFAULT, so this is the
   // configuration reached by accident (a second tool added in CAM, group 07 left alone) rather than
   // on purpose, which is exactly why it has to be loud. validateJob() carries the post-time half of
-  // the same warning. See docs/review.md CR-3.
+  // the same warning. See docs/HReview.md CR-3.
   if (!getProperty(properties.A_ToolChange_Enabled)) {
     writeComment(eComment.Important, " >>> WARNING: change to T" + tool.number + " " + tool.comment
       + " suppressed -- \"Tool Changes are Included\" is off; the previous tool stays in the spindle");
