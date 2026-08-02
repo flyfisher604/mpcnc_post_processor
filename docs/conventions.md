@@ -18,7 +18,7 @@ restated in four places. These contracts are what stop that recurring.
 |---|---|---|---|
 | `CLAUDE.md` | Imperatives that change how a session works: read order, show-a-diff, `node --check`, the register rule, commit convention, what to leave alone | Rationale, history, design, anything that fires only once you are deep in one function | **≤ 60 lines** — it loads in full every session |
 | `plan.md` | The checkpoint (baseline, what is true now, **what is left in order**, live risks), phase status, pointers to completed reviews | Design write-ups, findings, test rows, resolved decisions, open questions, backlog detail | **≤ 120 lines** |
-| `conventions.md` | The durable half: stance, coordinate model, base/frame/probing, guards, firmware capabilities, property & dialog conventions, how to run a test, working method, these contracts | Status of anything, what is next, unbuilt design | **≤ 520 lines** — it changes a few times a year; an overrun means something live has leaked in. It is also the file the volatile ones drain *into*, so it absorbs before it trims. **This number moved twice on 2026-08-02** (420 → 450 → 520) as the tooling section and the review-document skeleton landed; it should not move again without something genuinely new, not merely longer |
+| `conventions.md` | The durable half — despite the name, **conventions are the smallest part of it**. Three things: **the model** (coordinate model, base/frame, stance), **the conventions** (property & dialog rules, the one genuinely prescriptive part), and **the method** (how to run a test, harness, tooling). Plus external firmware facts and these contracts | Status of anything, what is next, unbuilt design | **≤ 520 lines** — it changes a few times a year; an overrun means something live has leaked in. It is also the file the volatile ones drain *into*, so it absorbs before it trims. **This number moved twice on 2026-08-02** (420 → 450 → 520) as the tooling section and the review-document skeleton landed; it should not move again without something genuinely new, not merely longer |
 | `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 300 lines** — a register grows one line per row |
 | `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | **≤ 920 lines, and falling** — §2's long form and §3's expansions are unbuilt design and unrun rows, and **both retire on build**. The §3 index table is permanent; everything under it is not. This file must shrink, not grow |
 | `README.md` | User-facing usage only. Its `doc-sync` marker records the ref it last synced to | Anything developer-facing | — |
@@ -40,9 +40,23 @@ needs**. That `onOpen()` sets `currentWorkOffset = undefined` is readable from t
 *selection is deterministic, origin is trusted* argument collapses without it. Cut conclusions the code
 already states; keep the steps that make a non-derivable argument stand up.
 
-This is the answer to *"why these facts and not the hundreds of others in the post?"* — the rest are
-undocumented because reading the code answers them. `check-docs.js` warns when a symbol named here no
-longer exists, but nothing can check whether a *claim* is still true; that is what this test is for.
+**That test alone is not enough for design content.** The code can never state *why*, so every design
+rationale passes it, and the post contains several hundred design choices. A design fact needs a second
+warrant — it is either **the model** or **a trap**:
+
+- **The model** — the shared vocabulary the rest of this file is unreadable without: what a WCS, the
+  base frame and a transit *are*. *Coordinate model* is that section, and it does not grow.
+- **A trap** — someone reached the wrong answer, or the wrong answer would fail **silently**. Every trap
+  here names its evidence: a finding id, a *Rejected*, or a *Superseded*. If a section cannot name one,
+  that is the signal it has stopped earning its place.
+
+A design choice that is merely *true* is neither, and stays in the code. **This is a gate, not a home:
+there is deliberately nowhere to put the other several hundred**, and adding such a place would only
+invite filling it.
+
+Together these answer *"why these facts and not the hundreds of others?"* — the rest are undocumented
+because reading the code answers them. `check-docs.js` warns when a symbol named here no longer exists,
+but nothing can check whether a *claim* is still true; that is what these tests are for.
 
 **Four rules that keep it that way.**
 
@@ -156,7 +170,7 @@ FluidNC <http://wiki.fluidnc.com/> · Duet/RRF <https://docs.duet3d.com/User_man
 
 ---
 
-## Coordinate model
+## Coordinate model — *the model; every other section reads against this one*
 
 Production controls keep three references separate: **MCS** (`G53`), **WCS** (`G54`–`G59`, `G59.1`–`G59.3`
 on RepRap), and **TLO** (`G43`). Most V1E machines have none fully, hence the work-relative stance.
@@ -247,18 +261,17 @@ into plain `G0`/`G1`/`G4` is correct and needs no revisiting.
 Two more settled the same way: **Marlin has never implemented `M2`** (RRF gained it in 3.5.1, with a
 `stop.g` interaction), and **GRBL, Marlin and RRF all accept a bare `\r`** as a block terminator.
 
-## Validation guards — reject before emitting
+## Validation guards — a rejected job can still leave a file
 
-Every guard is **post-time only**: the post cannot read the live controller, so all of them are
-design-time checks on the job Fusion handed over. Nothing here can protect against machine state.
+**The trap:** *where* a guard runs decides what a rejected job leaves on disk. A guard in `onOpen()`
+refuses before any output, so the job writes **no file at all**. The two *geometry* guards — multi-axis,
+and HR-6's orientation check — fire later, in `onSection()`, so a rejected job leaves a **truncated
+`.gcode`**: a partial file an operator may not notice, rather than a clean refusal. That is a defect and
+it is open — `HReview.md` **HR-27**.
 
-**Where a guard runs decides what a rejected job leaves behind.** Those in `onOpen()` reject before any
-output, so the job writes **no file at all** — a clean refusal. The two *geometry* guards (multi-axis,
-and HR-6's orientation check) fire later, in `onSection()`, and so leave a **truncated `.gcode` on disk**,
-which an operator may not notice. That asymmetry is a defect, not the design: `HReview.md` **HR-27**.
-
-Each guard is named and explained at its own site in `validateJob()`, so the code is the list. It is
-deliberately not repeated here — a copy would silently become wrong the first time a guard is added.
+Guards are **post-time only**; the post cannot read the live controller, so none of them protects against
+machine state. Each is named and explained at its own site in `validateJob()`, so the code is the list —
+deliberately not copied here, where it would go wrong the first time a guard is added.
 
 ## Property / dialog conventions
 
