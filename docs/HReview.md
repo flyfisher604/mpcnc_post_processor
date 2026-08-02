@@ -23,7 +23,7 @@ them.
 
 ---
 
-## Findings — HR-1 … HR-26 · CR-1 … CR-17
+## Findings — HR-1 … HR-27 · CR-1 … CR-17
 
 `HR-` came from the hobbyist review; `CR-` from the 2026-08-01 whole-file review driven by the dialog and
 the F360 API. Both registers merged here on the same terms — ids kept, so every commit message and code
@@ -94,11 +94,12 @@ README tells a hobbyist to consider.
 
 ---
 
-## Test register — 87 rows
+## Test register — 88 rows
 
-**✅ 66 PASS · ❌ 0 FAIL · ⬜ 4 UNRUN · ➖ 17 n/a or moved — 87 rows.** Complete by construction: every `H`/`HR`/`HW`
+**✅ 67 PASS · ❌ 0 FAIL · ⬜ 5 UNRUN · ➖ 16 n/a or moved — 88 rows.** Complete by construction: every `H`/`HR`/`HW`
 id has a row, including the ones that belong to another file. **If you move a finding out, leave the
-pointer row behind.**
+pointer row behind.** `CR-` ids are exempt — most are cosmetic or by-design closures that were never
+separate tests. `docs/check-docs.js` enforces the tally, the completeness and the exemption.
 
 | Test | Proves | Setup (delta from defaults) | Expect — *discriminator in bold* | Method | Evidence | State |
 |---|---|---|---|---|---|---|
@@ -189,6 +190,7 @@ pointer row behind.**
 | **CR-1 (A)** | `$H` survives line numbering | GRBL, `Home Before Start = XY`, `Enable Line #s` **on** | **`$H` on its own line with no `N` prefix**, while every surrounding block carries one. No configuration in the record has ever combined homing with line numbers — which is why it shipped broken | posted | — **owed** | ⬜ |
 | **CR-2 (A)** | The homing / `Current Pos` warning fires, and the job still posts | homing on + a `Set … to Current Pos` origin mode | the warning names the control by its exact dialog title; **the file still posts**. Negative half: a default job with homing **off** produces no warning | posted | — **owed** | ⬜ |
 | **CR-10 (A)** | GRBL laser mode formats its M-code as a number | group 09 on, GRBL, a laser operation | a real M-code number, **never `M NaN`**. Group 09 has never appeared in any posted file — see `PReview.md` **J4**, which this post also serves | posted | — **owed** | ⬜ |
+| **HR-27** | A geometry-rejected job writes **no file at all** | **(a)** a Setup built on a tilted model face, GRBL/mm defaults; **(b)** the same job on an upright Setup | **(a)** the post `error()`s and **no `.gcode` exists on disk** — the discriminator is the *absence of the output file*, not its contents. Today the guard fires in `onSection()` and leaves a **truncated** file ending mid-toolpath, which is the pre-fix discriminator and must stop appearing. **(b)** posts normally and completely, proving the promotion into `validateJob()` did not reject a job it should accept. Shares HR-6 (B)'s dependency — it needs the same rotated Setup, and if Fusion re-expresses `forward` as `Z1` then branch (a) is unreachable and that is itself the HR-6 (B) answer | posted | — **owed** | ⬜ |
 
 ---
 
