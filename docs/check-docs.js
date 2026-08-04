@@ -7,6 +7,11 @@
 // nobody measures drifts: three of these checks exist because the hand-maintained tallies in
 // HReview.md had already gone wrong.
 //
+// SCOPE: documents only. It opens nothing but docs/*.md, CLAUDE.md and README.md -- the .cps is named
+// once, to ask git whether it has commits newer than README's doc-sync ref, and is never read. The post
+// is gated by .claude/hooks/post-edit.js, on every edit. Two checks that inspected the post's own
+// contents have been removed from here for crossing that line; do not add a third.
+//
 //   node docs/check-docs.js            check the working tree
 //   node docs/check-docs.js --staged   check what `git commit` is about to record (the pre-commit hook)
 //
@@ -341,86 +346,6 @@ function checkPointerDirection() {
   });
 }
 
-// ---------------------------------------------------------------- 7. symbols conventions.md names (WARN)
-
-// conventions.md is allowed to hold only what the code cannot state -- but where it does name a symbol,
-// that symbol must still exist. This catches the drift the admission test cannot: the code is renamed or
-// deleted and the document quietly keeps describing what used to be there.
-//
-// WARN, never FAIL: prose sometimes names a function conversationally, and a check that blocks a commit
-// on a false positive is a check someone disables.
-//
-// It cannot verify a *claim* -- only that the names in it resolve. A sentence can be entirely wrong while
-// every symbol it mentions still exists. The admission test is the primary defence; this is the backstop.
-
-// Named in the harness notes or used in prose as a formula, not defined by the post. `max(constant,
-// resolved)` describes the shape of an expression; it is not a call into this file.
-var JS_BUILTINS = ['eval', 'parseInt', 'parseFloat', 'isNaN', 'String', 'Number', 'Boolean', 'Math',
-  'JSON', 'Array', 'Object', 'RegExp', 'Date', 'max', 'min'];
-
-function symbolCoverage() {
-  var text = read('docs/conventions.md');
-  if (text === null) return 'conventions: unreadable';
-  var cps = read(CPS);
-  if (cps === null) return 'conventions: no ' + CPS;
-  // Property keys are plain camelCase (`probeOnStart`), so nothing recognises them by shape the way
-  // `A_Probe_OnStart` could -- and without a recognizer this class would match ordinary prose words like
-  // `order`, every one of which "resolves" as a substring of the .cps. That is a vacuous pass, not a clean
-  // one. A key begins with its group's key, so the group keys are the recognizer; take them from the
-  // groupDefinitions block, which is the .cps's own list.
-  var groupKeys = [], gm, gre = /^groupDefinitions\.([A-Za-z][A-Za-z0-9]*)\s*=/gm;
-  while ((gm = gre.exec(cps)) !== null) groupKeys.push(gm[1]);
-  var looksLikeProperty = function (name) {
-    for (var i = 0; i < groupKeys.length; i++) {
-      if (name.indexOf(groupKeys[i]) === 0 && name.length > groupKeys[i].length) return true;
-    }
-    return false;
-  };
-
-  // Both classes are delimited with BACKTICKS in this document. Matching quotes instead is what once made
-  // a group-title scan find nothing and report success.
-  //
-  // There was a third class, group titles (`03 - Map G1s …`). It is gone because its subject is: dialog
-  // group order and titles are `groupDefinitions` content, so this document names no group title at all,
-  // and a class that can only ever extract zero is machinery reporting on nothing.
-  var classes = [
-    // Matches both `name()` and `name(args)`. Requiring empty parens once hid three references,
-    // including the only documented signature -- found by perturbation, not by reading.
-    { name: 'functions', re: /`([a-zA-Z_][a-zA-Z0-9_]*)\([^`]*\)`/g, skip: JS_BUILTINS },
-    { name: 'properties', re: /`([a-z][A-Za-z0-9]*)`/g, skip: [], keep: looksLikeProperty }
-  ];
-
-  var parts = [];
-  classes.forEach(function (c) {
-    var found = [], m;
-    c.re.lastIndex = 0;
-    while ((m = c.re.exec(text)) !== null) {
-      if (c.keep && !c.keep(m[1])) continue;
-      if (found.indexOf(m[1]) === -1 && c.skip.indexOf(m[1]) === -1) found.push(m[1]);
-    }
-
-    // Zero extracted is a broken pattern, not a clean result -- the vacuous-pass trap, which this very
-    // check already fell into once while being built.
-    if (!found.length) {
-      fail('docs/conventions.md', 'extracted 0 ' + c.name + ' — the pattern is broken, not the document');
-      parts.push(c.name + ' 0!');
-      return;
-    }
-
-    var missing = found.filter(function (name) {
-      // A title ending in an ellipsis is deliberately truncated for line length; match the prefix.
-      var needle = /…$/.test(name) ? name.replace(/…$/, '') : name;
-      return cps.indexOf(needle) === -1;
-    });
-    missing.forEach(function (name) {
-      warn('docs/conventions.md', 'names `' + name + '` but ' + CPS + ' no longer contains it');
-    });
-    parts.push(c.name + ' ' + (found.length - missing.length) + '/' + found.length);
-  });
-
-  return 'conventions: ' + parts.join(', ');
-}
-
 // ---------------------------------------------------------------- 6. README doc-sync (WARN)
 
 function checkDocSync() {
@@ -475,7 +400,6 @@ REGISTERS.forEach(function (rel) {
   checkHeadingRanges(rel);
 });
 checkPointerDirection();
-coverage.push(symbolCoverage());
 checkDocSync();
 
 function short(rel) { return rel.replace(/^docs\//, '').replace(/\.md$/, ''); }

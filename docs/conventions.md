@@ -51,9 +51,9 @@ either **the model** or **a trap**:
   stopped earning its place.
 
 A design choice that is merely *true* is neither, and stays in the code. **This is a gate, not a home:
-there is deliberately nowhere to put the other several hundred.** `check-docs.js` warns when a symbol
-named here no longer exists, but nothing can check whether a *claim* is still true; these two tests are
-the only defence.
+there is deliberately nowhere to put the other several hundred.** **Nothing mechanical defends this** —
+no checker reads the post to see whether a name here still resolves, let alone whether a claim still
+holds. These two tests, applied by whoever is editing, are the only defence.
 
 ### Four rules that keep it that way
 
@@ -394,7 +394,7 @@ verification post must carry — it cannot execute on a paid licence (HW-1).
 
 | Artifact | Fired by | Checks | Travels? |
 |---|---|---|---|
-| `docs/check-docs.js` | the pre-commit hook, or by hand | The contracts above: size budgets (warn), tallies vs their tables, findings-vs-register id completeness, heading ranges and row counts, Rule 3's pointer direction, the README `doc-sync` ref. Prints which registers it actually parsed — a checker silent about what it skipped reads as a clean bill of health | ✅ tracked |
+| `docs/check-docs.js` | the pre-commit hook, or by hand | The contracts above: size budgets (warn), tallies vs their tables, findings-vs-register id completeness, heading ranges and row counts, Rule 3's pointer direction, the README `doc-sync` ref. Prints which registers it actually parsed — a checker silent about what it skipped reads as a clean bill of health. **Documents only:** it never reads the `.cps`, and two checks that did have been removed for it | ✅ tracked |
 | `.githooks/pre-commit` | `git commit` — **anyone's**, not just a session's | runs `check-docs.js --staged`; non-zero aborts the commit | ✅ tracked, ❌ **not armed** — see below |
 | `.claude/hooks/post-edit.js` | Claude Code, after every `Edit`/`Write` | `node --check` when the file is the `.cps`; silent for everything else | ✅ tracked |
 
