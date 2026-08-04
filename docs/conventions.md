@@ -215,7 +215,7 @@ not an axis mask, which is why GRBL can collapse two of them onto one command wi
 | GRBL / FluidNC | `$H` only — one command homes all configured axes |
 
 On GRBL `$H` is all-or-nothing, so XY and XYZ both emit one `$H` (the mode documents intent).
-`machinePromptBeforeHome` pauses **once before any homing motion**, independent of firmware and axes.
+**"Prompt Before Home"** pauses **once before any homing motion**, independent of firmware and axes.
 The post does not control homing order. **`$H` is emitted with `writeln()`, not `writeBlock()`** — GRBL
 only recognises `$` as a system command when it is the first character of the line (`HReview.md` CR-1).
 
@@ -267,10 +267,10 @@ deliberately not copied here, where it would go wrong the first time a guard is 
   `group:` string, a title, an option title, `order:`, or the declaration *order* does **not**. Every reset
   is a release-notes item.
 
-**Origin/probe controls (group `probe`).** Three separate controls — `probeOnStart` ("First WCS / Part"),
-`probeOnChange` ("Subsequent WCS / Part", firing on a genuine WCS change after the first section, and
-offering the same modes minus the two *Current Pos* ones), and `probePause` ("Probe Pause", which gates
-the attach/detach prompts for the **part** probes only and adds no new stops).
+**Origin/probe controls.** Three separate controls, not one: **First WCS / Part**; **Subsequent WCS /
+Part**, which fires on a genuine WCS change after the first section and offers the same modes minus the
+two *Current Pos* ones; and **Probe Pause**, which gates the attach/detach prompts for the **part** probes
+only and adds no new stops.
 
 - Merging the two origin controls was **rejected**: it would apply job-start XY-zeroing to a mid-job WCS
   change.
@@ -282,9 +282,8 @@ the attach/detach prompts for the **part** probes only and adds no new stops).
   > before the job — which is wrong: the register is the one this Setup designates, and the post *selects*
   > it at job start.
 
-**Two properties were both titled "Safe Z".** `spoilboardSafeZClearance`'s is now **"Inter Part Safe Z"**
-(whole mm above the spoilboard); `probeSafeZ` keeps "Safe Z" (the post-probe retract) — and the keys now
-say which is which, that being what the group prefix buys.
+**Two controls were both titled "Safe Z".** The spoilboard one is now **"Inter Part Safe Z"** (whole mm
+above the spoilboard); the post-probe retract keeps **"Safe Z"**.
 
 ---
 
@@ -292,10 +291,10 @@ say which is which, that being what the group prefix buys.
 
 ### Traverse clearance is not the G1→G0 plane
 
-`mapRapidsSafeZ` answers a narrower question — "within *this* operation, is Z high enough to re-emit a
-cut G1 as a G0?" It is operation-scoped and only populated when the hobby group is on, so it is the wrong
-source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance measured
-above the spoilboard base** (`spoilboardSafeZClearance`).
+**"Map: Safe Z to Rapid"** answers a narrower question — "within *this* operation, is Z high enough to
+re-emit a cut G1 as a G0?" It is operation-scoped and only populated when the hobby group is on, so it is
+the wrong source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance
+measured above the spoilboard base** ("Inter Part Safe Z").
 
 **The Inter Part Safe Z cannot be an F360 expression (asked and answered).** `Clearance:40` would parse
 today and is still the wrong source: every F360 height parameter is **per-operation and expressed in that
