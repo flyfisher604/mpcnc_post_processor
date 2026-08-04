@@ -255,10 +255,22 @@ deliberately not copied here, where it would go wrong the first time a guard is 
 
 ## Property / dialog conventions
 
-- **Group order** = the `group:` string, zero-padded to two digits, so `11 - Duet` sorts last. Current:
-  `01 - Job`, `02 - Feeds and Speeds`, `03 - Map G1s to Rapids…`, `04 - Establish Machine Coordinates`,
-  `05 - Establish Spoilboard Reference`, `06 - On WCS / Part / Fixture Changes`, `07 - Tool Changes`,
-  `08 - External Include Files`, `09 - Laser`, `10 - Coolant`, `11 - Duet`.
+- **Group order** = each group's `order:` in `groupDefinitions`, **not** the `group:` string — Post
+  Processor Guide § 5.1.5. A property's `group:` is an opaque **key** into that object; `title:` is what
+  the operator reads. Ours run `100`…`200` in tens, clear of the built-in groups the engine supplies at
+  10–60 (`configuration`, `preferences`, `homePositions`, `multiAxis`, `formats`, `probing`), none of
+  which this post uses. Each key is the token its member properties' keys already carry — `job`, `feeds`,
+  `mapRapids`, `machine`, `spoilboard`, `probe`, `toolChange`, `include`, `laser`, `coolant`, `duet` — so
+  a property filed under the wrong group shows on sight. Titles keep their number **unpadded**:
+  `1 - Job`, `2 - Feeds and Speeds`, `3 - Map G1s to Rapids…`, `4 - Establish Machine Coordinates`,
+  `5 - Establish Spoilboard Reference`, `6 - On WCS / Part / Fixture Changes`, `7 - Tool Changes`,
+  `8 - External Include Files`, `9 - Laser`, `10 - Coolant`, `11 - Duet`.
+  > **Why they were zero-padded, and why the numbers survive.** The `group:` string used to be identity,
+  > sort key and label at once, and the dialog sorted it as text — so `11 - Duet` needed a zero-padded
+  > 01 - Job to sort before it. `order:` does that now. The numbers stay in the titles because the registers, the
+  > README and one `warning()` name groups by number — and because the guide states the group `title:`
+  > **is not displayed in the legacy Post Process dialog**, so a title is not the only thing an operator
+  > might be reading.
 - **Within-group order** = a single-letter key prefix, `<Letter>_<Group>_<Name>`, restarting per group.
   New properties take the next free letter (re-letter following ones if inserting mid-group).
 - **The literal is declared in that same order** (`HReview.md` CR-14), so display order no longer rests

@@ -26,10 +26,10 @@ everything the README puts outside the hobbyist's reach:
 | Area | Controls |
 |---|---|
 | Multiple WCS / multiple parts | `Subsequent WCS / Part`, Replicate jobs, the `Jog to …` per-part modes |
-| Reserved spoilboard base | group `05 - Establish Spoilboard Reference` (all four properties) |
+| Reserved spoilboard base | group `5 - Establish Spoilboard Reference` (all four properties) |
 | Cross-part clearance | `Retract Across Parts`, `Inter Part Safe Z` |
 | Pre-set fixture offsets | both `Use Active WCS …` origin modes |
-| Tool changes | group `07 - Tool Changes` (all eight properties) |
+| Tool changes | group `7 - Tool Changes` (all eight properties) |
 | Manual NC | *Optional stop*, *Display message*, *Orientate spindle* |
 | Machining Extension | probing / Inspection strategies |
 
@@ -348,7 +348,7 @@ operation in the same post is unaffected and still expands to plain `G0`/`G1`.
 
 ## 3. Test register
 
-**✅ 0 PASS · ❌ 0 FAIL · ⬜ 38 UNRUN · ➖ 5 n/a or moved — 43 rows.** Nothing professional has been
+**✅ 0 PASS · ❌ 0 FAIL · ⬜ 40 UNRUN · ➖ 5 n/a or moved — 45 rows.** Nothing professional has been
 verified yet; this is the whole of what the professional side owes. Absorbed from the Beta-2 test plan.
 
 Every row is a delta from the defaults fixed in `conventions.md` → *How to run a test*; the one
@@ -378,8 +378,10 @@ hold it, and the *Expect* must exist in exactly one place.
 | **M6** | First-part `Use Active WCS X0 Y0 Z0` actually reaches `X0 Y0` | milling tool, first section | posted | §3.1 | ⬜ |
 | **H7e** | First-part `Use Active WCS X0 Y0, Probe Z0` on Marlin and RRF | firmware Marlin, then RepRap | posted | §3.2 | ⬜ |
 | **D1** | Labels, groups and field types | the dialog | dialog | §3.3 | ⬜ |
-| **D3** | A saved preset survives the group reorder **and** the group-03 rename | a preset saved before the reorder | dialog | §3.3 | ⬜ |
+| **D3** | A saved preset survives the group reorder, the group-03 rename **and** the `groupDefinitions` keys | a preset saved before the reorder | dialog | §3.3 | ⬜ |
 | **D2** | The property dump is suppressed at Comment Level `Important` and `Off` | Comment Level `Important`, then `Off` | posted | §3.3 | ⬜ |
+| **D4** | The groups are still identifiable in the **legacy** Post Process dialog | the legacy dialog, not an NC Program | dialog | §3.3 | ⬜ |
+| **D5** | The header property dump after the `groupDefinitions` move | GRBL/mm defaults, Comment Level `Info`, diffed against the previous commit | posted | §3.3 | ⬜ |
 | **HR-26** | The base-clearance retract has no tool-0 / jet guard though the base *establish* does | jet tool + multi-WCS + base | posted | §3.4 | ⬜ |
 | **HR-18 (T)** | Tool-change half of the `loadFile()` newline guard | tool-change include whose last byte is not a newline | posted | §3.4 | ⬜ |
 | **HR-3 (C)** | Tool-change half of the GRBL spindle-off prompt | GRBL, manual spindle, a tool change | posted | §3.4 | ⬜ |
@@ -396,7 +398,7 @@ hold it, and the *Expect* must exist in exactly one place.
 | **J1** | First-part origin modes — all six, with a jet tool and with tool 0 | jet tool / tool 0 | posted | §5 | ⬜ |
 | **J2** | Subsequent WCS / Part with a jet tool — the `canProbe` false branches | jet tool, multi-WCS | posted | §5 | ⬜ |
 | **J3** | Spoilboard base with a jet tool — `writeBaseEstablish()` skips the probe | jet tool, base reserved | posted | §5 | ⬜ |
-| **J4** | The laser property group (`09 - Laser`, 7 properties) — **never posted at all** | group 09 on, GRBL, a laser operation | posted | §5 | ⬜ |
+| **J4** | The laser property group (`9 - Laser`, 7 properties) — **never posted at all** | group 09 on, GRBL, a laser operation | posted | §5 | ⬜ |
 | **J5** | Laser/jet × the Phase-4 features | jet + base + Retract Across Parts | posted | §5 | ⬜ |
 | **HR-7** | First-rapid flag survives a tool change | — verified by **P8**'s matrix once Phase 4 lands | — | §2 | ➖ |
 | **HR-8** | Tracked position after post-injected motion | — verified by **P8**'s matrix | — | §2 | ➖ |
@@ -539,7 +541,7 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
 
 ### 3.3 Dialog & defaults audit — needs the dialog, not a posted file
 
-- [ ] **D1 — labels, groups and field types.** Confirm group **`06 - On WCS / Part / Fixture
+- [ ] **D1 — labels, groups and field types.** Confirm group **`6 - On WCS / Part / Fixture
       Changes`** exists (no lingering `Probe / Work Origin`); titles read **First WCS / Part**,
       **Subsequent WCS / Part**, **Probe Pause**, **Probe with G38.2**; the base-establish option
       reads **Pause, Probe Z, Pause**; **First WCS / Part** lists all six modes in order and defaults
@@ -548,19 +550,23 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       `Set … to Current Pos` modes; **Probe X/Y Offset**, group-05 **Inter Part Safe Z** and group-06
       **Safe Z** accept only whole numbers (reject `2.5`) and read as whole mm. Confirm no group shows
       two fields both titled "Safe Z".
-- [ ] **D3 — a saved preset survives the group reorder *and* the group-03 rename.** Open the dialog
-      with a **previously customised preset** loaded. *Get:* groups read `01 - Job`,
-      `02 - Feeds and Speeds`,
-      `03 - Map G1s to Rapids - disable when using full license` (**renamed** by `HReview.md` HR-17 —
+- [ ] **D3 — a saved preset survives the group reorder, the group-03 rename *and* the move to
+      `groupDefinitions` keys.** Open the dialog with a **previously customised preset** loaded.
+      *Get:* groups read `1 - Job`, `2 - Feeds and Speeds`,
+      `3 - Map G1s to Rapids - disable when using full license` (**renamed** by `HReview.md` HR-17 —
       the parenthesised form is gone, so this row now tests a real string change on that group rather
-      than a hypothetical one), `04 - Establish Machine Coordinates`,
-      `05 - Establish Spoilboard Reference`, `06 - On WCS / Part / Fixture Changes`,
-      `07 - Tool Changes`, `08 - External Include Files`, `09 - Laser`, `10 - Coolant`, `11 - Duet`,
-      with **9 / 7 / 4 / 2 / 4 / 10 / 8 / 5 / 7 / 10 / 2** properties (68 total).
-      **Pass — the discriminator is that nothing reset.** Only `group:` strings changed, so every
-      customised value must survive: spot-check Home Before Start, both origin dropdowns, and any
-      nonzero Probe X/Y Offset. A field back at its default means a key changed and the move was done
-      wrong. *(The header half is verified — §4. A posted file cannot distinguish "the preset
+      than a hypothetical one), `4 - Establish Machine Coordinates`,
+      `5 - Establish Spoilboard Reference`, `6 - On WCS / Part / Fixture Changes`,
+      `7 - Tool Changes`, `8 - External Include Files`, `9 - Laser`, `10 - Coolant`, `11 - Duet`,
+      **in that order and none of them collapsed**, with
+      **9 / 7 / 4 / 2 / 4 / 10 / 8 / 5 / 7 / 10 / 2** properties (68 total). The order is now the
+      `order:` field (100…200 in tens), not a text sort of the title, and the titles come from
+      `groupDefinitions` rather than from `group:` itself.
+      **Pass — the discriminator is that nothing reset.** Only `group:` values and group titles
+      changed — no property key, enum `id` or default — so every customised value must survive:
+      spot-check Home Before Start, both origin dropdowns, and any nonzero Probe X/Y Offset. A field
+      back at its default means a key changed and the move was done wrong. *(The header half is **D5**;
+      §4's dump evidence predates the retitle — §7. A posted file cannot distinguish "the preset
       survived" from "the values were re-entered", which is the whole point of this check.)*
       > **CR-14 (landed 2026-08-01, `HReview.md`) strengthens both rows.** The `properties` literal used
       > to *declare* its groups in the order 01, 04, 02, 03, 07, 05, 06, 05, 06, 08…, with
@@ -569,13 +575,34 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       > literal is now declared in the order it is meant to display. **This is a pure move: no key,
       > `group:` string, `id`, title, description or default was touched** (verified by matching
       > sorted-line checksums against `HEAD`), so D3's "nothing reset" discriminator is unaffected and
-      > the 9/7/4/2/4/10/8/5/7/10/2 = 68 counts are unchanged. What it adds is that **D1 now
-      > distinguishes two things it previously could not**: if the dialog still shows the groups out
-      > of numeric order after this, Fusion is not sorting at all and the zero-padding convention in
-      > `conventions.md` is wrong.
+      > the 9/7/4/2/4/10/8/5/7/10/2 = 68 counts are unchanged.
+      >
+      > **What the `groupDefinitions` move settles.** The question CR-14 sharpened — *is Fusion sorting
+      > by the `group:` string at all?* — is now moot rather than answered: `order:` places the groups
+      > explicitly (Post Processor Guide § 5.1.5), so the padding convention it tested is retired. What
+      > D1/D3 must show instead is that `order:` **is** honoured. Groups appearing as 1, 10, 11, 2, 3 …
+      > would mean it is not, and the fallback is to pad the `title:` strings again.
 - [ ] **D2 (remainder) — the property dump is suppressed at Comment Level `Important` and `Off`.**
       The dump's structure and the resolved Safe-Z lines are verified (§4); only the suppression half
       is unrun.
+- [ ] **D4 — the groups are still identifiable in the legacy Post Process dialog.** The Post Processor
+      Guide § 5.1.5 states the group `title:` **is not displayed in the legacy Post Process dialog**.
+      Before the `groupDefinitions` move the label *was* the `group:` string, so that dialog showed
+      `01 - Job` whatever it did with titles; now the string is an opaque key. *Do:* post the same job
+      through the legacy Post Process dialog rather than an NC Program. **Pass:** the 68 properties are
+      still reachable and grouped intelligibly — headings reading `job`, `feeds` … is acceptable;
+      **no headings at all, or 68 properties in one flat list, is a fail.** *(If it fails, the fix is to
+      carry the number in the key — `g01_job` — which sorts and reads in both dialogs.)*
+- [ ] **D5 — the header property dump after the `groupDefinitions` move.** Re-baselines what §4 verified
+      against `H7c.gcode`, whose headings predate the retitle (§7). *Do:* one GRBL/mm factory-default
+      job at Comment Level `Info`, diffed against the same job posted from the previous commit.
+      *Get:* eleven `( Properties -- <title>:)` blocks reading `1 - Job` … `11 - Duet`, **in that
+      order**, 68 property lines, enums as stored ids, `<empty>` for unset strings. **Pass — the
+      discriminator is that the diff contains nothing but the eleven headings**, each shorter by one
+      `0`. Any motion line, any property line or any change of block order is a defect in the move.
+      *(The ordering and the 9/7/4/2/4/10/8/5/7/10/2 counts are already proven by harness against the
+      file's own `group:` assignments — `conventions.md` → *Working method*. What only a post can show
+      is that Fusion's own `getProperty()` still resolves every key and that nothing else moved.)*
 
 ### 3.4 Other outstanding professional checks
 
@@ -789,7 +816,7 @@ and those branches are essentially unexercised.
 - [ ] **J3 — spoilboard base with a jet tool.** `writeBaseEstablish()` skips the probe entirely
       (Debug `probe skipped (tool 0 or jet tool)`), so the base is **never established** on a laser
       job even when reserved. Decide whether that should warn rather than pass silently.
-- [ ] **J4 — the laser property group** (`09 - Laser`, 7 properties): On Vaporize / On Through / On
+- [ ] **J4 — the laser property group** (`9 - Laser`, 7 properties): On Vaporize / On Through / On
       Etch, Marlin mode + pin, GRBL mode, laser coolant — none covered by any row, none appearing in
       the header dump. Plus `11 - Duet` → `B_Duet_LaserMode`.
 - [ ] **J5 — laser/jet × the Phase-4 features.** Whether a reserved base, Retract Across Parts and
@@ -886,6 +913,7 @@ this section when it empties** — Rule 4.
 | Rows | What moved | Effect |
 |---|---|---|
 | **every saved GRBL `.gcode` predating 2026-07-31** | HR-3 — the manual-spindle stop now prompts on GRBL | A default job ends `M0 (MSG Turn OFF spindle)` where it once ended `M5`, and each tool change gains the same prompt. **No row's assertions are affected** — do not read a tail diff as a regression |
+| **§4's two header-dump rows** (`H7c.gcode`, `H7c-a/-b/-c.gcode`) | the `groupDefinitions` move retitled the dump headings | `( Properties -- 03 - Map G1s …)` now reads `3 - Map G1s …`; every group heading is one `0` shorter. **The assertions stand** — one block per group, in dialog order, 68 properties summing 9/7/4/2/4/10/8/5/7/10/2. Delete this row when **D5** re-posts |
 
 ## 8. Owed
 

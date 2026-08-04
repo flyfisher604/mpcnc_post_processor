@@ -152,7 +152,7 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-15 (A)** | Mapping-on changes nothing but one comment | group 03 all **on** | vs `H11c`: **5 lines** differ — timestamp, 3 property values, 1 added comment. No motion | posted | `H15a - GRBL.gcode` | ✅ |
 | **HR-15 (B)** | The level branch is taken, not the fallback | same | that added line is **`( SafeZ retract level: 5.08)`**, not `not defined` | posted | `H15a - GRBL.gcode` | ✅ |
 | **HR-16** | `onClose` traverse ordering | — | spindle-order half fixed (CR-6); Z half → `PReview.md` §5 | — | — | ➖ |
-| **HR-17 (A)** | Property heading no longer double-spaced | any post | `Properties -- 03 - Map G1s to Rapids - disable when using full license:` | posted | six session-1 files vs `H2.gcode` | ✅ |
+| **HR-17 (A)** | Property heading no longer double-spaced | any post | `Properties -- 3 - Map G1s to Rapids - disable when using full license:` — the **single space** is the assertion. The evidence files read `03 -`: the `0` left with the `groupDefinitions` move, which re-baselines under `PReview.md` **D5** | posted | six session-1 files vs `H2.gcode` | ✅ |
 | **HR-17 (B)** | Spindle prompt reads `… RPM` | any manual-spindle post | `Turn ON 7000 RPM` — the **space** is the assertion | posted | same | ✅ |
 | **HR-17 (C)** | Tapping warning single-spaced | tap CAM | no match for `synchronization  rigid`, `tapping  is` or `WARNING:  ` | posted | `Drill_Tap.gcode` | ✅ |
 | **HR-17 (D)** | The two inert tidy-ups changed nothing | defaults | `H11c` vs `H2` differs in **4 lines**; no motion, feed or ordering | posted | `H11c - GRBL.gcode` vs `H2.gcode` | ✅ |
@@ -222,7 +222,7 @@ a `posted` row and stronger than nothing.
 | **Comment levels** | Behaviourally inert — no control flow depends on a comment being emitted. `loadFile()`'s trailing-newline repair is independent of the surrounding `Info` markers, which is why it works at `Important` and `Off` |
 | **`Include Whitespace = off`** | Valid blocks everywhere — `askUser()` and `display_text()` prepend their own separator, and the concatenated forms (`G10L20P1X0Y0Z0`, `G38.2F30Z-10`) are accepted by all three parsers |
 | **Coolant channel bookkeeping** | `setCoolant()` turns both channels off before switching, warns when a tool requests a coolant no channel is configured for, and derives `coolantLevels` from `eCoolant` so the numeric index and the enum ids cannot drift apart |
-| **Property structure** | 68 properties across 11 groups — 9/7/4/2/4/10/8/5/7/10/2 — no gaps or duplicates in the per-group letter prefixes, every one carrying `scope: "post"`. `writeAllProperties()` iterates the object rather than a hand-kept list, so the header dump cannot drift |
+| **Property structure** | 68 properties across 11 groups — 9/7/4/2/4/10/8/5/7/10/2 — no gaps or duplicates in the per-group letter prefixes, every one carrying `scope: "post"`. `writeAllProperties()` iterates the object rather than a hand-kept list, so the header dump cannot drift. Each `group:` is a `groupDefinitions` key whose `order:` the dump sorts on, so dialog order and dump order are the same number rather than two conventions that can disagree |
 
 ---
 

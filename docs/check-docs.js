@@ -371,7 +371,9 @@ function symbolCoverage() {
     // including the only documented signature -- found by perturbation, not by reading.
     { name: 'functions', re: /`([a-zA-Z_][a-zA-Z0-9_]*)\([^`]*\)`/g, skip: JS_BUILTINS },
     { name: 'properties', re: /`([A-Z]_[A-Za-z]+_[A-Za-z]+)`/g, skip: [] },
-    { name: 'groups', re: /`(\d\d - [^`]+)`/g, skip: [] }
+    // One or two digits: the group titles lost their zero-padding when `order:` took over the sorting,
+    // and a `\d\d` pattern would have silently stopped seeing nine of the eleven.
+    { name: 'groups', re: /`(\d{1,2} - [^`]+)`/g, skip: [] }
   ];
 
   var parts = [];
