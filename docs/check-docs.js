@@ -363,17 +363,31 @@ function symbolCoverage() {
   if (text === null) return 'conventions: unreadable';
   var cps = read(CPS);
   if (cps === null) return 'conventions: no ' + CPS;
+  // Property keys are plain camelCase (`probeOnStart`), so nothing recognises them by shape the way
+  // `A_Probe_OnStart` could -- and without a recognizer this class would match ordinary prose words like
+  // `order`, every one of which "resolves" as a substring of the .cps. That is a vacuous pass, not a clean
+  // one. A key begins with its group's key, so the group keys are the recognizer; take them from the
+  // groupDefinitions block, which is the .cps's own list.
+  var groupKeys = [], gm, gre = /^groupDefinitions\.([A-Za-z][A-Za-z0-9]*)\s*=/gm;
+  while ((gm = gre.exec(cps)) !== null) groupKeys.push(gm[1]);
+  var looksLikeProperty = function (name) {
+    for (var i = 0; i < groupKeys.length; i++) {
+      if (name.indexOf(groupKeys[i]) === 0 && name.length > groupKeys[i].length) return true;
+    }
+    return false;
+  };
 
-  // All three classes are delimited with BACKTICKS in this document. Matching quotes instead is what
-  // once made a group-title scan find nothing and report success.
+  // Both classes are delimited with BACKTICKS in this document. Matching quotes instead is what once made
+  // a group-title scan find nothing and report success.
+  //
+  // There was a third class, group titles (`03 - Map G1s …`). It is gone because its subject is: dialog
+  // group order and titles are `groupDefinitions` content, so this document names no group title at all,
+  // and a class that can only ever extract zero is machinery reporting on nothing.
   var classes = [
     // Matches both `name()` and `name(args)`. Requiring empty parens once hid three references,
     // including the only documented signature -- found by perturbation, not by reading.
     { name: 'functions', re: /`([a-zA-Z_][a-zA-Z0-9_]*)\([^`]*\)`/g, skip: JS_BUILTINS },
-    { name: 'properties', re: /`([A-Z]_[A-Za-z]+_[A-Za-z]+)`/g, skip: [] },
-    // One or two digits: the group titles lost their zero-padding when `order:` took over the sorting,
-    // and a `\d\d` pattern would have silently stopped seeing nine of the eleven.
-    { name: 'groups', re: /`(\d{1,2} - [^`]+)`/g, skip: [] }
+    { name: 'properties', re: /`([a-z][A-Za-z0-9]*)`/g, skip: [], keep: looksLikeProperty }
   ];
 
   var parts = [];
@@ -381,6 +395,7 @@ function symbolCoverage() {
     var found = [], m;
     c.re.lastIndex = 0;
     while ((m = c.re.exec(text)) !== null) {
+      if (c.keep && !c.keep(m[1])) continue;
       if (found.indexOf(m[1]) === -1 && c.skip.indexOf(m[1]) === -1) found.push(m[1]);
     }
 

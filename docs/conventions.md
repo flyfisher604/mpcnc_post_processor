@@ -215,7 +215,7 @@ not an axis mask, which is why GRBL can collapse two of them onto one command wi
 | GRBL / FluidNC | `$H` only — one command homes all configured axes |
 
 On GRBL `$H` is all-or-nothing, so XY and XYZ both emit one `$H` (the mode documents intent).
-`B_Machine_PromptBeforeHome` pauses **once before any homing motion**, independent of firmware and axes.
+`machinePromptBeforeHome` pauses **once before any homing motion**, independent of firmware and axes.
 The post does not control homing order. **`$H` is emitted with `writeln()`, not `writeBlock()`** — GRBL
 only recognises `$` as a system command when it is the first character of the line (`HReview.md` CR-1).
 
@@ -255,26 +255,6 @@ deliberately not copied here, where it would go wrong the first time a guard is 
 
 ## Property / dialog conventions
 
-- **Group order** = each group's `order:` in `groupDefinitions`, **not** the `group:` string — Post
-  Processor Guide § 5.1.5. A property's `group:` is an opaque **key** into that object; `title:` is what
-  the operator reads. Ours run `100`…`200` in tens, clear of the built-in groups the engine supplies at
-  10–60 (`configuration`, `preferences`, `homePositions`, `multiAxis`, `formats`, `probing`), none of
-  which this post uses. Each key is the token its member properties' keys already carry — `job`, `feeds`,
-  `mapRapids`, `machine`, `spoilboard`, `probe`, `toolChange`, `include`, `laser`, `coolant`, `duet` — so
-  a property filed under the wrong group shows on sight. Titles keep their number **unpadded**:
-  `1 - Job`, `2 - Feeds and Speeds`, `3 - Map G1s to Rapids…`, `4 - Establish Machine Coordinates`,
-  `5 - Establish Spoilboard Reference`, `6 - On WCS / Part / Fixture Changes`, `7 - Tool Changes`,
-  `8 - External Include Files`, `9 - Laser`, `10 - Coolant`, `11 - Duet`.
-  > **Why they were zero-padded, and why the numbers survive.** The `group:` string used to be identity,
-  > sort key and label at once, and the dialog sorted it as text — so `11 - Duet` needed a zero-padded
-  > 01 - Job to sort before it. `order:` does that now. The numbers stay in the titles because the registers, the
-  > README and one `warning()` name groups by number — and because the guide states the group `title:`
-  > **is not displayed in the legacy Post Process dialog**, so a title is not the only thing an operator
-  > might be reading.
-- **Within-group order** = a single-letter key prefix, `<Letter>_<Group>_<Name>`, restarting per group.
-  New properties take the next free letter (re-letter following ones if inserting mid-group).
-- **The literal is declared in that same order** (`HReview.md` CR-14), so display order no longer rests
-  solely on Fusion sorting. Keep it that way when adding a property.
 - This post uses the **combined-inline** `properties = {}` form, read with `getProperty(properties.key)`
   (an object reference, correct for this form). The split `properties` + `propertyDefinitions` form is the
   *old broken* approach — do not reintroduce it.
@@ -282,14 +262,14 @@ deliberately not copied here, where it would go wrong the first time a guard is 
   > change broke it — the reason v3 exists. Forum threads calling `propertyDefinitions` a "May 2021
   > enhancement" describe that **old** approach, not a newer target, and 403 to automated fetching.
   > Closed as-designed already, as compliance finding F10.
-- **What resets a saved preset:** the **key** is the stored identifier, so renaming or re-lettering a key
-  resets that property to its default, as does changing an enum **`id`** or a boolean→enum conversion.
-  Changing only a `group:` string, a title, an option title, or the declaration *order* does **not**. Every
-  reset is a release-notes item.
+- **What resets a saved preset:** the **key** is the stored identifier, so renaming a key resets that
+  property to its default, as does changing an enum **`id`** or a boolean→enum conversion. Changing only a
+  `group:` string, a title, an option title, `order:`, or the declaration *order* does **not**. Every reset
+  is a release-notes item.
 
-**Origin/probe controls (group `06`).** Three separate controls — `A_Probe_OnStart` ("First WCS / Part"),
-`B_Probe_OnChange` ("Subsequent WCS / Part", firing on a genuine WCS change after the first section, and
-offering the same modes minus the two *Current Pos* ones), and `C_Probe_Pause` ("Probe Pause", which gates
+**Origin/probe controls (group `probe`).** Three separate controls — `probeOnStart` ("First WCS / Part"),
+`probeOnChange` ("Subsequent WCS / Part", firing on a genuine WCS change after the first section, and
+offering the same modes minus the two *Current Pos* ones), and `probePause` ("Probe Pause", which gates
 the attach/detach prompts for the **part** probes only and adds no new stops).
 
 - Merging the two origin controls was **rejected**: it would apply job-start XY-zeroing to a mid-job WCS
@@ -302,8 +282,9 @@ the attach/detach prompts for the **part** probes only and adds no new stops).
   > before the job — which is wrong: the register is the one this Setup designates, and the post *selects*
   > it at job start.
 
-**Two properties were both titled "Safe Z".** Group 05's is now **"Inter Part Safe Z"** (whole mm above
-the spoilboard); group 06's `I_Probe_SafeZ` keeps "Safe Z" (the post-probe retract). Keys unchanged.
+**Two properties were both titled "Safe Z".** `spoilboardSafeZClearance`'s is now **"Inter Part Safe Z"**
+(whole mm above the spoilboard); `probeSafeZ` keeps "Safe Z" (the post-probe retract) — and the keys now
+say which is which, that being what the group prefix buys.
 
 ---
 
@@ -311,10 +292,10 @@ the spoilboard); group 06's `I_Probe_SafeZ` keeps "Safe Z" (the post-probe retra
 
 ### Traverse clearance is not the G1→G0 plane
 
-`C_MapRapids_SafeZ` answers a narrower question — "within *this* operation, is Z high enough to re-emit a
+`mapRapidsSafeZ` answers a narrower question — "within *this* operation, is Z high enough to re-emit a
 cut G1 as a G0?" It is operation-scoped and only populated when the hobby group is on, so it is the wrong
 source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance measured
-above the spoilboard base** (`D_Spoilboard_SafeZClearance`).
+above the spoilboard base** (`spoilboardSafeZClearance`).
 
 **The Inter Part Safe Z cannot be an F360 expression (asked and answered).** `Clearance:40` would parse
 today and is still the wrong source: every F360 height parameter is **per-operation and expressed in that

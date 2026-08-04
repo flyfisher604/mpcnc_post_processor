@@ -44,7 +44,7 @@ comment that names one still resolves.
 | **HR-18** | `loadFile()` left no line break after an include — the next block merges | Medium | Repair in `loadFile()`; `\r` counts as a terminator | ✅ fixed `5b0b94a` |
 | **HR-19** | `M291` doubled space; `()` vs `( )` on empty comments | Cosmetic | `()` **closed as by design** (CR-17b). The `M291` space remains — next sweep | ⬜ open |
 | **HR-20** | Tapping is not really implemented | Medium | → `PReview.md` — manual path now prompts (HR-12); automatic path always emitted `M4` | ➖ moved |
-| **HR-21** | `E_Include_ProbeFile` declared but never read — dead property | Low | Tooltip now says `NOT IMPLEMENTED YET`. Wire into `probeTool()` or delete — undecided | ⬜ open |
+| **HR-21** | `includeProbeFile` declared but never read — dead property | Low | Tooltip now says `NOT IMPLEMENTED YET`. Wire into `probeTool()` or delete — undecided | ⬜ open |
 | **HR-22** | An include file that exists but is **empty** contributes nothing, silently | Medium | **(A)** empty include now announces itself ✅. **(B)** empty Start include leaves no preamble — **closed as by design** 2026-08-01 (CR-7): the include owns the phase | ✅ closed |
 | **HR-23** | A Start/Stop include *replaces* the whole preamble/footer | — | **Designed behaviour.** Filed as a defect and resolved as correct the same day. Lesson: before calling a bypass a defect, ask whether the bypass is the feature | ✅ closed |
 | **HR-24** | `writeWCS(section)` takes a section then consults the global `tool` | Low | Latent (both callers pass `currentSection`). One line: `section.getTool()` — next sweep | ⬜ open |
@@ -136,7 +136,7 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-11 (A)** | Marlin: `M84 S60`, no `M2` | Marlin, defaults | tail `M400` → `M117 Job end` → `M84 **S60**`; **no `M2` anywhere**. `M84 S0` still once, at the top | posted | `H11a.gcode` | ✅ |
 | **HR-11 (B)** | RepRap: `M2` after `M84 S60` | RepRap, defaults | identical tail **plus `M2`**. Present here / absent in (A) is the discriminator | posted | `H11b - RRF.gcode` | ✅ |
 | **HR-11 (C)** | GRBL tail untouched | defaults | `M0 (MSG Turn OFF spindle)` … `M30` → `%`; **no `M84` at all**, no `M2` | posted | `H11c - GRBL.gcode` — ⚠ order restated by CR-6 | ✅ |
-| **HR-11 (D)** | Stop file bypasses the whole stop block | Marlin + `B_Include_StopFile` = `Stop File.gcode` | `M117 Job end`, `M84 S60`, `M2`, `M30` and `*** STOP end ***` **all absent** | posted | `H11d - Marlin.gcode` | ✅ |
+| **HR-11 (D)** | Stop file bypasses the whole stop block | Marlin + `includeStopFile` = `Stop File.gcode` | `M117 Job end`, `M84 S60`, `M2`, `M30` and `*** STOP end ***` **all absent** | posted | `H11d - Marlin.gcode` | ✅ |
 | **HR-11 (S)** | Whether Marlin / RRF honour `M2` | firmware source | Marlin: never implemented (`gcode.cpp` has no `case 2`). RRF: since 3.5.1, runs `stop.g` | source | `gcode.cpp`, `GCodes2.cpp`, RRF changelog | ✅ |
 | **HR-12 (A)** | Prompt on an RPM change between operations | 2-op 1-tool CAM, 12000 → 10000 | `Turn ON 12000 RPM` then `( >>> Spindle Speed: Manual change)` → **`M0 (MSG Set spindle to 10000 RPM clockwise)`** | posted | `Speed Change.gcode` vs `Link.gcode` | ✅ |
 | **HR-12 (A2)** | Two operations at the *same* RPM → one prompt | same CAM, op 2 also 12000 | **one** prompt, no `Manual change` line. Only meaningful posted beside (A) | posted | `Speed Change (No Change).gcode` | ✅ |
@@ -163,15 +163,15 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-18 (U)** | The guard over 6 file endings × 3 comment levels | node | **4 merged blocks → 0**. Terminated files byte-identical. The two `Info` "ok"s pre-fix are the finding in miniature | harness | node | ✅ |
 | **HR-19** | `M291` doubled space; `()` vs `( )` | — | `()` closed by design; `M291` space open, next sweep | — | — | ➖ |
 | **HR-20** | A fuller tapping implementation | — | → `PReview.md` | — | — | ➖ |
-| **HR-21** | `E_Include_ProbeFile` is dead | — | tooltip declares it; wiring undecided | — | — | ➖ |
+| **HR-21** | `includeProbeFile` is dead | — | tooltip declares it; wiring undecided | — | — | ➖ |
 | **HR-26** | Base-clearance retract has no jet guard | — | → `PReview.md` §3.4 | — | — | ➖ |
 | **HR-22 (A)** | An empty include announces itself | a zero-byte include file, Comment Level `Info` | `( --- Custom gcode file is empty, nothing included <path>)`; **absent above `Info`** | harness | node | ✅ |
 | **HR-22 (B)** | An empty Start include leaves no preamble | — | **closed as by design** — the include owns the phase (CR-7) | read | — | ✅ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | `Personal.cps`, group 03 all on, Map Safe Z = `Retract:15` then `15` | **74 conversions → 2** on identical geometry; all three cases fire at 5.08; **all 17,779 genuine cut moves stay `G1`**. Traps: `grep -c '^G0'` under-counts (modal suppression) | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
 | **HW-2 (A)** | HP-5 section boundary: WCS suppression, rapid lifecycle, tracking | 2 ops, 1 tool, 1 WCS, no base | **one `G54` in the whole file**; `( WCS unchanged: 1, not re-selecting)` at section 2; `resetAll()` makes section 2 re-emit full coordinates | posted | `Link.gcode` | ✅ |
 | **HW-2 (B)** | HP-5 boundary: a spindle-speed change | same CAM, `Manual Spindle On/Off` = **false** | `M3 S12000` then `M3 S10000` — two `M3`s, different speeds | posted | ⚠ **file overwritten** — re-post as `HR12-auto - GRBL.gcode` | ✅ |
-| **HW-3** | `Probe Pause = No` | `C_Probe_Pause` = `No` | **neither** prompt. vs `HW4` the diff is exactly **2 lines** | posted | `HW3 - GRBL.gcode` vs `H11c` | ✅ |
-| **HW-4** | `Probe Pause = Before` | `C_Probe_Pause` = `Before` | attach only. The three-rung ladder `H11c`→`HW4`→`HW3` is the result, not any one file | posted | `HW4 - GRBL.gcode` | ✅ |
+| **HW-3** | `Probe Pause = No` | `probePause` = `No` | **neither** prompt. vs `HW4` the diff is exactly **2 lines** | posted | `HW3 - GRBL.gcode` vs `H11c` | ✅ |
+| **HW-4** | `Probe Pause = Before` | `probePause` = `Before` | attach only. The three-rung ladder `H11c`→`HW4`→`HW3` is the result, not any one file | posted | `HW4 - GRBL.gcode` | ✅ |
 | **HW-5** | The HP-1 baseline in one file | `Scale Feedrate` = **true** | vs `HW4`: timestamp, that property, and **feedrates only** — XY cuts/arcs → `F900`, plunges and `G18` arcs → `F180`. No motion, no block added | posted | `HW5 - GRBL.gcode` | ✅ |
 | **HW-6 (A)** | Static regression sweep | `git diff dd8e11d..HEAD` + 3 harnesses + property structure | surface = `loadFile()` + one dialog-only title; 68 properties, no duplicate keys, all 67 `getProperty()` refs resolve | harness + read | node, git | ✅ |
 | **HW-6 (B)** | Posted regression sweep | the six posts below | byte-identical modulo timestamp except posts 5–6 | read | ⚠ **the release sweep rests on no posted file** | ✅ |
@@ -222,7 +222,7 @@ a `posted` row and stronger than nothing.
 | **Comment levels** | Behaviourally inert — no control flow depends on a comment being emitted. `loadFile()`'s trailing-newline repair is independent of the surrounding `Info` markers, which is why it works at `Important` and `Off` |
 | **`Include Whitespace = off`** | Valid blocks everywhere — `askUser()` and `display_text()` prepend their own separator, and the concatenated forms (`G10L20P1X0Y0Z0`, `G38.2F30Z-10`) are accepted by all three parsers |
 | **Coolant channel bookkeeping** | `setCoolant()` turns both channels off before switching, warns when a tool requests a coolant no channel is configured for, and derives `coolantLevels` from `eCoolant` so the numeric index and the enum ids cannot drift apart |
-| **Property structure** | 68 properties across 11 groups — 9/7/4/2/4/10/8/5/7/10/2 — no gaps or duplicates in the per-group letter prefixes, every one carrying `scope: "post"`. `writeAllProperties()` iterates the object rather than a hand-kept list, so the header dump cannot drift. Each `group:` is a `groupDefinitions` key whose `order:` the dump sorts on, so dialog order and dump order are the same number rather than two conventions that can disagree |
+| **Property structure** | 68 properties across 11 groups — 9/7/4/2/4/10/8/5/7/10/2 — every one carrying `scope: "post"`, a key that starts with its own group key, and an `order:` unique within that group. `writeAllProperties()` iterates the object rather than a hand-kept list and sorts on the same `order:` fields the dialog does, so dialog order and dump order are one number rather than two conventions that can disagree |
 
 ---
 

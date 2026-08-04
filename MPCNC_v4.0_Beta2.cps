@@ -126,11 +126,15 @@ groupDefinitions.laser      = {title: "9 - Laser", order: 180};
 groupDefinitions.coolant    = {title: "10 - Coolant", order: 190};
 groupDefinitions.duet       = {title: "11 - Duet", order: 200};
 
+// Each key is `<groupKey><Name>` and carries no sequence -- `order:` below does, 10-spaced. To insert a
+// property mid-group, give it an `order:` between its neighbours and leave every key alone: a key is the
+// identifier Fusion stores a user's setting under, so renaming one resets that setting to its default.
 properties = {
-  A_Job_SelectedFirmware: {
+  jobSelectedFirmware: {
     title      : "CNC Firmware",
     description: "Dialect of GCode to create.",
     group      : "job",
+    order      : 10,
     type       : "enum",
     values: [
       { title: eFirmware.MARLIN, id: eFirmware.MARLIN},
@@ -140,18 +144,20 @@ properties = {
     value: eFirmware.GRBL,
     scope: "post"
   },
-  B_Job_ManualSpindlePowerControl: {
+  jobManualSpindlePowerControl: {
     title      : "Manual Spindle On/Off",
     description: "Enable to manually turn spindle motor on/off.",
     group      : "job",
+    order      : 20,
     type       : "boolean",
     value      : true,
     scope      : "post"
   },
-  C_Job_CommentLevel: {
+  jobCommentLevel: {
     title      : "Comment Level",
     description: "Detail of comments included.",
     group      : "job",
+    order      : 30,
     type       : "enum",
     values: [
       { title: eComment.Off, id: eComment.Off },
@@ -162,149 +168,167 @@ properties = {
     value: eComment.Info,
     scope: "post"
   },
-  D_Job_UseArcs: {
+  jobUseArcs: {
     title      : "Use Arcs",
     description: "Use G2/G3 g-codes fo circular movements.",
     group      : "job",
+    order      : 40,
     type       : "boolean",
     value      : true,
     scope      : "post"
   },
-  E_Job_SequenceNumbers: {
+  jobSequenceNumbers: {
     title      : "Enable Line #s",
     description: "Include line numbers on each line.",
     group      : "job",
+    order      : 50,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
-  F_Job_SequenceNumberStart: {
+  jobSequenceNumberStart: {
     title      : "First Line #",
     description: "First line number used.",
     group      : "job",
+    order      : 60,
     type       : "integer",
     value      : 10,
     scope      : "post"
   },
-  G_Job_SequenceNumberIncrement: {
+  jobSequenceNumberIncrement: {
     title      : "Line # Increment",
     description: "Increase line numbers by this increment.",
     group      : "job",
+    order      : 70,
     type       : "integer",
     value      : 1,
     scope      : "post"
   },
-  H_Job_SeparateWordsWithSpace: {
+  jobSeparateWordsWithSpace: {
     title      : "Include Whitespace",
     description: "Includes whitespace seperation between text.",
     group      : "job",
+    order      : 80,
     type       : "boolean",
     value      : true,
     scope      : "post"
   },
-  I_Job_GoOriginOnFinish: {
+  jobGoOriginOnFinish: {
     title      : "At End Go to 0,0",
     description: "Return to X0 Y0 at gcode end, Z remains unchanged.",
     group      : "job",
+    order      : 90,
     type       : "boolean",
     value      : true,
     scope      : "post"
   },
 
-  A_Feeds_TravelSpeedXY: {
+  feedsTravelSpeedXY: {
     title      : "Travel Speed X/Y",
     description: "High speed for Rapid movements X & Y (mm/min).",
     group      : "feeds",
+    order      : 10,
     type       : "integer",
     value      : 2500,
     scope      : "post"
   },
-  B_Feeds_TravelSpeedZ: {
+  feedsTravelSpeedZ: {
     title      : "Travel Speed Z",
     description: "High speed for Rapid movements Z (mm/min).",
     group      : "feeds",
+    order      : 20,
     type       : "integer",
     value      : 300,
     scope      : "post"
   },
-  C_Feeds_EnforceFeedrate: {
+  feedsEnforceFeedrate: {
     title      : "Enforce Feedrate",
     description: "Feedrate is include on every g-code movement.",
     group      : "feeds",
+    order      : 30,
     type       : "boolean",
     value      : true,
     scope      : "post"
   },
-  D_Feeds_ScaleFeedrate: {
+  feedsScaleFeedrate: {
     title      : "Scale Feedrate",
     description: "Scale feedrates to remain less than X, Y, Z axis maximums.",
     group      : "feeds",
+    order      : 40,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
-  E_Feeds_MaxCutSpeedXY: {
+  feedsMaxCutSpeedXY: {
     title      : "Max XY Cut Speed",
     description: "Limit X or Y feedrate to be less then this value (mm/min).",
     group      : "feeds",
+    order      : 50,
     type       : "integer",
     value      : 900,
     scope      : "post"
   },
-  F_Feeds_MaxCutSpeedZ: {
+  feedsMaxCutSpeedZ: {
     title      : "Max Z Cut Speed",
     description: "Limit Z feedrate to be less then this value (mm/min).",
     group      : "feeds",
+    order      : 60,
     type       : "integer",
     value      : 180,
     scope      : "post"
   },
-  G_Feeds_MaxCutSpeedXYZ: {
+  feedsMaxCutSpeedXYZ: {
     title      : "Max Toolpath Speed",
     description: "Maximum scaled toolpath feedrate (mm/min).",
     group      : "feeds",
+    order      : 70,
     type       : "integer",
     value      : 1000,
     scope      : "post"
   },
 
-  A_MapRapids_RestoreFirstRapids: {
+  mapRapidsRestoreFirstRapids: {
     title      : "First G1 -> G0 Rapid",
     description: "Enable to ensure that the first move of a cut starts with a G0 Rapid.",
     group      : "mapRapids",
+    order      : 10,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
-  B_MapRapids_RestoreRapids: {
+  mapRapidsRestoreRapids: {
     title      : "Map: G1s -> G0 Rapids",
     description: "Enable to convert G1s to G0s Rapids when safe.",
     group      : "mapRapids",
+    order      : 20,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
-  C_MapRapids_SafeZ: {
+  mapRapidsSafeZ: {
     title      : "Map: Safe Z to Rapid",
     description: "Z must be above or equal to this value to be mapped G1s --> G0s; Uses Retract level if defined or 15.",
     group      : "mapRapids",
+    order      : 30,
     type       : "string",
     value      : "Retract:15",
     scope      : "post"
   },
-  D_MapRapids_AllowRapidZ: {
+  mapRapidsAllowRapidZ: {
     title      : "Map: Allow Rapid Z",
     description: "Enable to include vertical G1 retracts and safe descents as rapids.",
     group      : "mapRapids",
+    order      : 40,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
 
-  A_Machine_HomeBeforeStart: {
+  machineHomeBeforeStart: {
     title      : "Home Before Start",
     description: "Home the machine at job start to establish a repeatable machine frame (MCS). None (default): emit no homing -- accept the current position (already homed at the controller, or a power-on 0,0,0). XY: home X and Y (the usual case -- gives XY repeatability and gantry squaring; Z stays on the work-Z probe touch-off). XYZ: also home Z, only if the machine is actually wired to home Z (LowRider switches, or the Marlin movable-plate trick). Per firmware: on GRBL/FluidNC one $H homes every configured axis, so XY and XYZ emit the same $H (the choice just documents intent); on Marlin/RepRap each axis is homed independently (G28 X / G28 Y / G28 Z). Homing gives X/Y repeatability only -- the everyday Z cutting reference is always the work-Z touch-off (see First WCS / Part), never this.",
     group      : "machine",
+    order      : 10,
     type       : "enum",
     values: [
       { title: "None", id: "None" },
@@ -314,19 +338,21 @@ properties = {
     value: "None",
     scope: "post"
   },
-  B_Machine_PromptBeforeHome: {
+  machinePromptBeforeHome: {
     title      : "Prompt Before Home",
     description: "Pause once before any homing motion so the operator can prepare the machine (e.g. place a movable Z-homing plate, or clear the bed). Fires whenever Home Before Start runs homing (any firmware, any axes) -- so it never needs revisiting when the machine changes. No effect when Home Before Start is None.",
     group      : "machine",
+    order      : 20,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
 
-  A_Spoilboard_BaseReserve: {
+  spoilboardBaseReserve: {
     title      : "Reserved WCS",
     description: "Reserve one WCS as a fixed spoilboard base (a stable Z reference for multi-fixture jobs). None (default): feature off, nothing emitted. Otherwise the selected WCS is reserved as the base and no operation may re-establish its origin (see Probe to Set Base). G59.1-G59.3 require RepRap. GRBL/RepRap only -- Marlin has no per-WCS registers, so a base is ignored there.",
     group      : "spoilboard",
+    order      : 10,
     type       : "enum",
     values: [
       { title: "None", id: "None" },
@@ -343,10 +369,11 @@ properties = {
     value: "None",
     scope: "post"
   },
-  B_Spoilboard_BaseEstablish: {
+  spoilboardBaseEstablish: {
     title      : "Probe to Set Base",
     description: "How to establish the reserved spoilboard base's Z at job start. None: skip -- assume the base was set in a previous job (probe-once / run-many), emitting an Info comment. Probe Z: probe the spoilboard into the base WCS (G10 L20 P<n>) with no operator prompt (a fixed/known probe point). Pause, Probe Z, Pause (default): prompt the operator to attach the probe, probe, then prompt to detach -- the manual touch-off. No effect when Reserved WCS is None; ignored on Marlin (no per-WCS registers). Always probed at the current position (0,0 / the job's XY origin) -- the Probe X/Y Offset never applies here.",
     group      : "spoilboard",
+    order      : 20,
     type       : "enum",
     values: [
       { title: "None", id: "None" },
@@ -356,26 +383,29 @@ properties = {
     value: "Pause & Probe Z",
     scope: "post"
   },
-  C_Spoilboard_SafeZAcrossWcs: {
+  spoilboardSafeZAcrossWcs: {
     title      : "Retract Across Parts",
     description: "Multi-fixture safety. On (default): before traversing between operations that use different WCS, the tool retracts to the Safe Z below so it clears fixtures/clamps/other parts, and the job is validated (Guard B) to reject a multi-WCS job that reserves no spoilboard base -- a clearance height is meaningless across WCS whose offsets are only known after probing at runtime. Single-WCS jobs (including a single operation) are unaffected: no extra retract is emitted and the guard does not apply. Off: no cross-WCS retract and no guard. GRBL/RepRap only (Marlin is single-frame; see Guard C).",
     group      : "spoilboard",
+    order      : 30,
     type       : "boolean",
     value      : true,
     scope      : "post"
   },
-  D_Spoilboard_SafeZClearance: {
+  spoilboardSafeZClearance: {
     title      : "Inter Part Safe Z",
     description: "Absolute work-Z height in whole mm, measured above the reserved spoilboard base, that the tool retracts to whenever it must clear everything on the bed. Set it high enough to clear the tallest fixture, clamp, or part in the job. Used at two points: (1) immediately after the spoilboard base is probed at job start -- that retract is made in the base's own frame, so this is the height the tool holds while it travels to the first part's X0 Y0; and (2) before each traverse between parts (a different WCS), when Retract Across Parts is on. Because it is measured above the spoilboard rather than the stock, it is the one clearance that stays valid across parts of differing thickness. Requires a Reserved WCS -- ignored when none is reserved, and on Marlin (no per-WCS registers).",
     group      : "spoilboard",
+    order      : 40,
     type       : "integer",
     value      : 40,
     scope      : "post"
   },
-  A_Probe_OnStart: {
+  probeOnStart: {
     title      : "First WCS / Part",
     description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 at the current position, then probe the stock-top Z -- pre-jog the tool to the part's X0 Y0 before starting (no prompt). Set X0 Y0 Z0 to Current Pos: record the tool's CURRENT position as X0 Y0 Z0 with no probe and no prompt -- pre-jog to the part origin before starting (a manual touch-off, or a jet/laser where Z is set by hand; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Use Active WCS X0 Y0, Probe Z0: use the X0 Y0 already stored in the active WCS's register (a pre-set fixture offset) -- rapid there and probe the stock-top Z, writing Z into that WCS; XY is not re-zeroed. Use Active WCS X0 Y0 Z0: use the full origin already stored in the active WCS -- no re-zero and no probe; the tool moves Z to the Safe Z set below and then rapids to the stored X0 Y0. Note that is a MOVE to Safe Z, not necessarily a retract: Safe Z is an absolute height in the stored frame, so if the tool is parked above it the job starts by descending to it. IMPORTANT -- \"active WCS\" means the register this operation's Fusion Setup designates (its Work Offset: WCS 1 / G54 unless you changed it), which the post SELECTS at job start before doing anything else. It is NOT whatever WCS your sender or controller happened to have active -- the post overwrites that. What the register holds, however, is runtime state left by a prior job or a manual touch-off, and the post cannot read it back to check: the two Use Active WCS modes TRUST those stored values. Jog to X0 Y0, Probe Z0: pause (M0) so you jog the tool to the origin during the run, record X0 Y0, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to the origin during the run, then record X0 Y0 Z0 there, no probe. (Jogging at the pause needs sender/firmware support -- see the README.) On GRBL/RepRap the origin writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent WCS / Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
     group      : "probe",
+    order      : 10,
     type       : "enum",
     values: [
       { title: "Set X0 Y0 to Current Pos, Probe Z0", id: "Current XY & Probe Z" },
@@ -388,10 +418,11 @@ properties = {
     value: "Current XY & Probe Z",
     scope: "post"
   },
-  B_Probe_OnChange: {
+  probeOnChange: {
     title      : "Subsequent WCS / Part",
     description: "Multi-part jobs -- milling several parts/copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...) -- \"active WCS\" below means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS (G10 L20 P<n>); XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X and Z already in its own WCS, from a prior job or set manually). JOG (operator jogs to each part; jogging at the pause needs sender/firmware support) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0 (no probe). The attach/detach prompts around any probe follow Probe Pause. The safe-Z retract on the traverse is separate (see Retract Across Parts). Not supported on Marlin (single G92 origin -- use separate jobs). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
     group      : "probe",
+    order      : 20,
     type       : "enum",
     values: [
       { title: "Use Active WCS X0 Y0, Probe Z0", id: "Probe Z" },
@@ -402,10 +433,11 @@ properties = {
     value: "Probe Z",
     scope: "post"
   },
-  C_Probe_Pause: {
+  probePause: {
     title      : "Probe Pause",
     description: "Operator pauses around each part probe (the first part and each added part) -- the prompts to attach the Z probe (before) and detach it (after). No: no prompts (a fixed/permanent probe). Before: prompt to attach only. Before & After (default): prompt to attach before probing and to detach after -- the manual touch-off. Applies to the part probes in this group only, not the spoilboard base probe (see Probe to Set Base) or the tool-change re-probe.",
     group      : "probe",
+    order      : 30,
     type       : "enum",
     values: [
       { title: "No", id: "No" },
@@ -415,156 +447,175 @@ properties = {
     value: "Before & After",
     scope: "post"
   },
-  D_Probe_OffsetX: {
+  probeOffsetX: {
     title      : "Probe X Offset",
     description: "X distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Subsequent WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin. Does NOT affect the spoilboard base probe (Probe to Set Base), which always touches off at the origin (0,0).",
     group      : "probe",
+    order      : 40,
     type       : "integer",
     value      : 0,
     scope      : "post"
   },
-  E_Probe_OffsetY: {
+  probeOffsetY: {
     title      : "Probe Y Offset",
     description: "Y distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Subsequent WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin. Does NOT affect the spoilboard base probe (Probe to Set Base), which always touches off at the origin (0,0).",
     group      : "probe",
+    order      : 50,
     type       : "integer",
     value      : 0,
     scope      : "post"
   },
-  F_Probe_G382orG28: {
+  probeG382orG28: {
     title      : "Probe with G38.2",
     description: "Probe using G38.2 (On) or G28 (Off). GRBL always uses G38.2 regardless of this setting; RepRap fully supports G38.2 too, so this should be left On there as well. Off (G28) is intended for Marlin builds with no dedicated probe, using the Z homing switch as a substitute reference.",
     group      : "probe",
+    order      : 60,
     type       : "boolean",
     value      : true,
     scope      : "post"
   },
-  G_Probe_G38Target: {
+  probeG38Target: {
     title      : "G38 Target",
     description: "G38 probing's furthest Z position.",
     group      : "probe",
+    order      : 70,
     type       : "integer",
     value      : -10,
     scope      : "post"
   },
-  H_Probe_G38Speed: {
+  probeG38Speed: {
     title      : "G38 Speed",
     description: "G38 probing's speed (mm/min).",
     group      : "probe",
+    order      : 80,
     type       : "integer",
     value      : 30,
     scope      : "post"
   },
-  I_Probe_SafeZ: {
+  probeSafeZ: {
     title      : "Safe Z",
     description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when no spoilboard base is reserved; with a base reserved, the Establish Spoilboard Reference group's Safe Z is used instead). Same syntax as \"Map: Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
     group      : "probe",
+    order      : 90,
     type       : "string",
     value      : "Retract:15",
     scope      : "post"
   },
-  J_Probe_Thickness: {
+  probeThickness: {
     title      : "Plate Thickness",
     description: "Thickness of the probe touchplate.",
     group      : "probe",
+    order      : 100,
     type       : "number",
     value      : 0.8,
     scope      : "post"
   },
 
-  A_ToolChange_Enabled: {
+  toolChangeEnabled: {
     title      : "Tool Changes are Included",
     description: "Tool changes are include in the NC file.",
     group      : "toolChange",
+    order      : 10,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
-  B_ToolChange_InsertCode: {
+  toolChangeInsertCode: {
     title      : "Include Relocation Code",
     description: "Relocate the tool for manual tool changes.",
     group      : "toolChange",
+    order      : 20,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
-  C_ToolChange_X: {
+  toolChangeX: {
     title      : "Tool Change X",
     description: "X location for tool change, in whichever WCS is currently active (plain G0, not machine coordinates).",
     group      : "toolChange",
+    order      : 30,
     type       : "integer",
     value      : 0,
     scope      : "post"
   },
-  D_ToolChange_Y: {
+  toolChangeY: {
     title      : "Tool Change Y",
     description: "Y location for tool change, in whichever WCS is currently active (plain G0, not machine coordinates).",
     group      : "toolChange",
+    order      : 40,
     type       : "integer",
     value      : 0,
     scope      : "post"
   },
-  E_ToolChange_Z: {
+  toolChangeZ: {
     title      : "Tool Change Z",
     description: "Z location for tool change, in whichever WCS is currently active (plain G0, not machine coordinates).",
     group      : "toolChange",
+    order      : 50,
     type       : "integer",
     value      : 40,
     scope      : "post"
   },
-  F_ToolChange_DisableZStepper: {
+  toolChangeDisableZStepper: {
     title      : "Disable Z Stepper",
     description: "Disable Z stepper after reaching tool change location.",
     group      : "toolChange",
+    order      : 60,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
-  G_ToolChange_DoFirstChange: {
+  toolChangeDoFirstChange: {
     title      : "Do First Change",
     description: "Do an initial tool change to load first tool.",
     group      : "toolChange",
+    order      : 70,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
-  H_ToolChange_ProbeAfterChange: {
+  toolChangeProbeAfterChange: {
     title      : "Probe After Tool Change",
     description: "Probe Z at the current location after each tool change.",
     group      : "toolChange",
+    order      : 80,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
 
-  A_Include_StartFile: {
+  includeStartFile: {
     title      : "Start GCode File",
     description: "File with custom Gcode for header/start (in nc folder).",
     group      : "include",
+    order      : 10,
     type       : "string",
     value      : "",
     scope      : "post"
   },
-  B_Include_StopFile: {
+  includeStopFile: {
     title      : "Stop GCode File",
     description: "File with custom Gcode for footer/end (in nc folder).",
     group      : "include",
+    order      : 20,
     type       : "string",
     value      : "",
     scope      : "post"
   },
-  C_Include_ToolFile1: {
+  includeToolFile1: {
     title      : "Tool Change Start",
     description: "File with custom Gcode to start tool change (in nc folder).",
     group      : "include",
+    order      : 30,
     type       : "string",
     value      : "",
     scope      : "post"
   },
-  D_Include_ToolFile2: {
+  includeToolFile2: {
     title      : "Tool Change End",
     description: "File with custom Gcode to end tool change (in nc folder).",
     group      : "include",
+    order      : 40,
     type       : "string",
     value      : "",
     scope      : "post"
@@ -575,43 +626,48 @@ properties = {
   // tool-change re-probe, which makes it part of the Tool Change branch's ordering work.
   // The title and tooltip say so, since a dialog field that advertises a feature and does
   // nothing is worse than no field at all. See HReview.md HR-21.
-  E_Include_ProbeFile: {
+  includeProbeFile: {
     title      : "Tool Change Probe",
     description: "NOT IMPLEMENTED YET. Reserved for a file of custom Gcode to run at the tool-change Z re-probe (in nc folder). Anything entered here is currently ignored -- no file is included and no warning is issued.",
     group      : "include",
+    order      : 50,
     type       : "string",
     value      : "",
     scope      : "post"
   },
 
-  A_Laser_OnVaporize: {
+  laserOnVaporize: {
     title      : "Laser: On - Vaporize",
     description: "Percentage of power to turn on the laser/plasma cutter in vaporize mode.",
     group      : "laser",
+    order      : 10,
     type       : "integer",
     value      : 100,
     scope      : "post"
   },
-  B_Laser_OnThrough: {
+  laserOnThrough: {
     title      : "Laser: On - Through",
     description: "Percentage of power to turn on the laser/plasma cutter in through mode.",
     group      : "laser",
+    order      : 20,
     type       : "integer",
     value      : 80,
     scope      : "post"
   },
-  C_Laser_OnEtch: {
+  laserOnEtch: {
     title      : "Laser: On - Etch",
     description: "Percentage of power to on the laser/plasma cutter in etch mode.",
     group      : "laser",
+    order      : 30,
     type       : "integer",
     value      : 40,
     scope      : "post"
   },
-  D_Laser_MarlinMode: {
+  laserMarlinMode: {
     title      : "Laser: Marlin/Reprap Mode",
     description: "Marlin/Reprap mode of the laser/plasma cutter.",
     group      : "laser",
+    order      : 40,
     type       : "enum",
     values: [
       { title: "Fan - M106 S{PWM}/M107", id: "106" },
@@ -621,18 +677,20 @@ properties = {
     value: "106",
     scope: "post"
   },
-  E_Laser_MarlinPin: {
+  laserMarlinPin: {
     title      : "Laser: Marlin M42 Pin",
     description: "Marlin custom pin number for the laser/plasma cutter.",
     group      : "laser",
+    order      : 50,
     type       : "integer",
     value      : 4,
     scope      : "post"
   },
-  F_Laser_GrblMode: {
+  laserGrblMode: {
     title      : "Laser: GRBL Mode",
     description: "GRBL mode of the laser/plasma cutter.",
     group      : "laser",
+    order      : 60,
     type       : "enum",
     values: [
       { title: "M4 S{PWM}/M5 dynamic power", id: "4" },
@@ -641,10 +699,11 @@ properties = {
     value      : "4",
     scope      : "post"
   },
-  G_Laser_Coolant: {
+  laserCoolant: {
     title      : "Laser: Coolant",
     description: "Force a coolant to be used with the laser.",
     group      : "laser",
+    order      : 70,
     type       : "enum",
     values: [
       { title: eCoolant.Off, id: eCoolant.Off },
@@ -661,10 +720,11 @@ properties = {
     scope      : "post"
   },
 
-  A_Coolant_ChannelAMode: {
+  coolantChannelAMode: {
     title      : "Channel A Mode",
     description: "Enable channel A when tool is set this coolant.",
     group      : "coolant",
+    order      : 10,
     type       : "enum",
     values: [
       { title: eCoolant.Off, id: eCoolant.Off },
@@ -680,10 +740,11 @@ properties = {
     value      : eCoolant.Off,
     scope      : "post"
   },
-  B_Coolant_ChannelBMode: {
+  coolantChannelBMode: {
     title      : "Channel B Mode",
     description: "Enable channel B when tool is set this coolant.",
     group      : "coolant",
+    order      : 20,
     type       : "enum",
     values: [
       { title: eCoolant.Off, id: eCoolant.Off },
@@ -699,10 +760,11 @@ properties = {
     value      : eCoolant.Off,
     scope      : "post"
   },
-  C_Coolant_ChannelAOn: {
+  coolantChannelAOn: {
     title      : "Turn Channel A On",
     description: "GCode to turn On coolant channel A.",
     group      : "coolant",
+    order      : 30,
     type       : "enum",
     values: [
       { title: "Mrln: M42 P6 S255", id: "M42 P6 S255" },
@@ -714,10 +776,11 @@ properties = {
     value      : "M42 P6 S255",
     scope      : "post"
   },
-  D_Coolant_ChannelAOff: {
+  coolantChannelAOff: {
     title      : "Turn Channel A Off",
     description: "Gcode to turn Off coolant channel A.",
     group      : "coolant",
+    order      : 40,
     type       : "enum",
     values: [
       { title: "Mrln: M42 P6 S0", id: "M42 P6 S0" },
@@ -728,10 +791,11 @@ properties = {
     value      : "M42 P6 S0",
     scope      : "post"
   },
-  E_Coolant_ChannelBOn: {
+  coolantChannelBOn: {
     title      : "Turn Channel B On",
     description: "GCode to turn On coolant channel B.",
     group      : "coolant",
+    order      : 50,
     type       : "enum",
     values: [
       { title: "Mrln: M42 P11 S255", id: "M42 P11 S255" },
@@ -743,10 +807,11 @@ properties = {
     value      : "M42 P11 S255",
     scope      : "post"
   },
-  F_Coolant_ChannelBOff: {
+  coolantChannelBOff: {
     title      : "Turn Channel B Off",
     description: "Gcode to turn Off coolant channel B.",
     group      : "coolant",
+    order      : 60,
     type       : "enum",
     values: [
       { title: "Mrln: M42 P11 S0", id: "M42 P11 S0" },
@@ -757,51 +822,57 @@ properties = {
     value      : "M42 P11 S0",
     scope      : "post"
   },
-  G_Coolant_ChannelAOnCustom: {
+  coolantChannelAOnCustom: {
     title      : "Channel A On Custom",
     description: "File with custom GCode to turn ON coolant channel A (in nc folder).",
     group      : "coolant",
+    order      : 70,
     type       : "string",
     value      : "",
     scope      : "post"
   },
-  H_Coolant_ChannelAOffCustom: {
+  coolantChannelAOffCustom: {
     title      : "Channel A Off Custom",
     description: "File with custom GCode to turn OFF coolant channel A (in nc folder).",
     group      : "coolant",
+    order      : 80,
     type       : "string",
     value      : "",
     scope      : "post"
   },
-  I_Coolant_ChannelBOnCustom: {
+  coolantChannelBOnCustom: {
     title      : "Channel B On Custom",
     description: "File with custom GCode to turn ON coolant channel B (in nc folder).",
     group      : "coolant",
+    order      : 90,
     type       : "string",
     value      : "",
     scope      : "post"
   },
-  J_Coolant_ChannelBOffCustom: {
+  coolantChannelBOffCustom: {
     title      : "Channel B Off Custom",
     description: "File with custom GCode to turn OFF coolant channel B (in nc folder).",
     group      : "coolant",
+    order      : 100,
     type       : "string",
     value      : "",
     scope      : "post"
   },
 
-  A_Duet_MillingMode: {
+  duetMillingMode: {
     title      : "Milling Mode",
     description: "GCode  to setup Duet3d into milling mode.",
     group      : "duet",
+    order      : 10,
     type       : "string",
     value      : "M453 P2 I0 R30000 F200",
     scope      : "post"
   },
-  B_Duet_LaserMode: {
+  duetLaserMode: {
     title      : "Laser Mode",
     description: "GCode  to setup Duet3d into laser mode.",
     group      : "duet",
+    order      : 20,
     type       : "string",
     value      : "M452 P2 I0 R255 F200",
     scope      : "post"
@@ -857,9 +928,9 @@ var gUnitModal = createModal({}, gFormat); // modal group 6 // G20-21
 
 // Writes the specified block.
 function writeBlock() {
-  if (getProperty(properties.E_Job_SequenceNumbers)) {
+  if (getProperty(properties.jobSequenceNumbers)) {
     writeWords2("N" + sequenceNumber, arguments);
-    sequenceNumber += getProperty(properties.G_Job_SequenceNumberIncrement);
+    sequenceNumber += getProperty(properties.jobSequenceNumberIncrement);
   } else {
     writeWords(arguments);
   }
@@ -901,8 +972,8 @@ var safeZHeightDefault = 15;
 var safeZHeight;   // resolved height, in the OUTPUT unit
 
 // Parse a Safe-Z expression string -- a bare number, or Feed:/Retract:/Clearance:<fallback> --
-// into { mode, dflt }. Shared by the Map-G1s Safe Z (C_MapRapids_SafeZ) and the probe Safe Z
-// (I_Probe_SafeZ) so both accept identical syntax. Pure: touches no globals, emits no output.
+// into { mode, dflt }. Shared by the Map-G1s Safe Z (mapRapidsSafeZ) and the probe Safe Z
+// (probeSafeZ) so both accept identical syntax. Pure: touches no globals, emits no output.
 function parseSafeZExpr(str) {
   var mode;
   var dflt = 15;
@@ -931,7 +1002,7 @@ function parseSafeZExpr(str) {
 }
 
 function parseSafeZProperty() {
-  var parsed = parseSafeZExpr(getProperty(properties.C_MapRapids_SafeZ));
+  var parsed = parseSafeZExpr(getProperty(properties.mapRapidsSafeZ));
   safeZMode = parsed.mode;
   safeZHeightDefault = parsed.dflt;
 
@@ -941,7 +1012,7 @@ function parseSafeZProperty() {
 
 function safeZforSection(_section)
 {
-  if (getProperty(properties.B_MapRapids_RestoreRapids)) {
+  if (getProperty(properties.mapRapidsRestoreRapids)) {
     // The fallback is a dialog literal, so it is mm and must be converted to the output unit before
     // it can be compared against a coordinate. The F360 level values below are NOT converted --
     // Fusion already reports those in the output unit. Getting this wrong on an inch job made the
@@ -1022,7 +1093,7 @@ function safeZforSection(_section)
         
       case eSafeZ.ERROR:
         safeZHeight = dfltInUnit;
-        writeComment(eComment.Important, " >>> WARNING: " + properties.C_MapRapids_SafeZ.title + " format error: " + safeZHeight);
+        writeComment(eComment.Important, " >>> WARNING: " + properties.mapRapidsSafeZ.title + " format error: " + safeZHeight);
         break;
     }
   }
@@ -1108,15 +1179,15 @@ function describeSafeZ(mode, dflt) {
 }
 
 // ---- Probe Safe Z ----------------------------------------------------------
-// I_Probe_SafeZ ("6 - On WCS / Part / Fixture Changes" > "Safe Z") uses the SAME expression syntax and
-// F360-level resolution as the Map-G1s Safe Z (C_MapRapids_SafeZ), but is a fully independent
+// probeSafeZ ("6 - On WCS / Part / Fixture Changes" > "Safe Z") uses the SAME expression syntax and
+// F360-level resolution as the Map-G1s Safe Z (mapRapidsSafeZ), but is a fully independent
 // property so the two can be tuned separately. "Retract:15" pulls each operation's F360 retract
 // level when defined and absolute, else falls back to 15 mm.
 var probeSafeZMode = eSafeZ.CONST;
 var probeSafeZHeightDefault = 15;   // the parsed literal fallback, in MILLIMETRES (see safeZHeightDefault)
 
 function parseProbeSafeZProperty() {
-  var parsed = parseSafeZExpr(getProperty(properties.I_Probe_SafeZ));
+  var parsed = parseSafeZExpr(getProperty(properties.probeSafeZ));
   probeSafeZMode = parsed.mode;
   probeSafeZHeightDefault = parsed.dflt;
 
@@ -1124,7 +1195,7 @@ function parseProbeSafeZProperty() {
   writeComment(eComment.Debug, " parseProbeSafeZProperty: probeSafeZHeightDefault = " + probeSafeZHeightDefault);
 }
 
-// Resolve I_Probe_SafeZ for the current operation. Returns a height in the output unit -- already
+// Resolve probeSafeZ for the current operation. Returns a height in the output unit -- already
 // unit-correct, so callers must NOT wrap it in propertyMmToUnit(). That now holds on BOTH paths:
 // an F360 level arrives in the output unit, and resolveSafeZHeight() converts the mm fallback. It
 // previously held only for the level path, so an inch job that fell back returned inches-worth of
@@ -1150,7 +1221,7 @@ function roundTo(value, places) {
 
 // Returns true if the rules to convert G1s to G0s are satisfied
 function isSafeToRapid(x, y, z) {
-  if (getProperty(properties.B_MapRapids_RestoreRapids)) {
+  if (getProperty(properties.mapRapidsRestoreRapids)) {
 
     // Compare positions at the output precision (unit-dependent: 3 dp mm / 4 dp inch, the
     // same precision the coordinates are written with). Two positions that format to the
@@ -1189,12 +1260,12 @@ function isSafeToRapid(x, y, z) {
       }
 
       // We include moves of Z up as long as xy are constant
-      else if (getProperty(properties.D_MapRapids_AllowRapidZ) && zUp && xyConstant) {
+      else if (getProperty(properties.mapRapidsAllowRapidZ) && zUp && xyConstant) {
         return true;
       }
 
       // We include moves of Z down as long as xy are constant and z always remains safe
-      else if (getProperty(properties.D_MapRapids_AllowRapidZ) && (!zUp) && xyConstant && curZSafe) {
+      else if (getProperty(properties.mapRapidsAllowRapidZ) && (!zUp) && xyConstant && curZSafe) {
         return true;
       }
     }
@@ -1223,11 +1294,11 @@ function writeCustomCoolantFile(channel, on, file) {
 }
 
 function CoolantA(on) {
-  var coolantText = on ? getProperty(properties.C_Coolant_ChannelAOn) : getProperty(properties.D_Coolant_ChannelAOff);
+  var coolantText = on ? getProperty(properties.coolantChannelAOn) : getProperty(properties.coolantChannelAOff);
 
   if (coolantText == "Use custom") {
-    writeCustomCoolantFile("A", on, on ? getProperty(properties.G_Coolant_ChannelAOnCustom)
-                                       : getProperty(properties.H_Coolant_ChannelAOffCustom));
+    writeCustomCoolantFile("A", on, on ? getProperty(properties.coolantChannelAOnCustom)
+                                       : getProperty(properties.coolantChannelAOffCustom));
     return;
   }
 
@@ -1235,11 +1306,11 @@ function CoolantA(on) {
 }
 
 function CoolantB(on) {
-  var coolantText = on ? getProperty(properties.E_Coolant_ChannelBOn) : getProperty(properties.F_Coolant_ChannelBOff);
+  var coolantText = on ? getProperty(properties.coolantChannelBOn) : getProperty(properties.coolantChannelBOff);
 
   if (coolantText == "Use custom") {
-    writeCustomCoolantFile("B", on, on ? getProperty(properties.I_Coolant_ChannelBOnCustom)
-                                       : getProperty(properties.J_Coolant_ChannelBOffCustom));
+    writeCustomCoolantFile("B", on, on ? getProperty(properties.coolantChannelBOnCustom)
+                                       : getProperty(properties.coolantChannelBOffCustom));
     return;
   }
 
@@ -1284,7 +1355,7 @@ function setCoolant(coolant) {
   var warn = true;
 
   if (coolant != eCoolant.Off) {
-    if (getProperty(properties.A_Coolant_ChannelAMode) == coolant) {
+    if (getProperty(properties.coolantChannelAMode) == coolant) {
       writeComment(eComment.Important, " >>> Coolant Channel A: " + coolant);
       coolantChannelA =  coolant;
       curCoolant = coolant;
@@ -1292,7 +1363,7 @@ function setCoolant(coolant) {
       CoolantA(true);
     }
 
-    if (getProperty(properties.B_Coolant_ChannelBMode) == coolant) {
+    if (getProperty(properties.coolantChannelBMode) == coolant) {
       writeComment(eComment.Important, " >>> Coolant Channel B: " + coolant);
       coolantChannelB =  coolant;
       curCoolant = coolant;
@@ -1315,19 +1386,19 @@ function laserOn(power) {
   if (fw == eFirmware.GRBL) {
     var laser_pwm = power * 10;
 
-    // Number(), not the raw property: F_Laser_GrblMode stores its enum id as a STRING ("4" / "3"),
+    // Number(), not the raw property: laserGrblMode stores its enum id as a STRING ("4" / "3"),
     // and this is the only mFormat.format() call in the file handed anything but a numeric literal.
     // Whether the kernel's format() coerces a numeric string is not something reading can settle,
     // and the cost of it not doing so is that every GRBL laser job emits a malformed laser-on block
     // and the laser never fires. No posted file has ever exercised group 09 -- see PReview.md J4.
-    writeBlock(mFormat.format(Number(getProperty(properties.F_Laser_GrblMode))), sFormat.format(laser_pwm));
+    writeBlock(mFormat.format(Number(getProperty(properties.laserGrblMode))), sFormat.format(laser_pwm));
   }
 
   // Default firmware
   else {
     var laser_pwm = power / 100 * 255;
 
-    switch (getProperty(properties.D_Laser_MarlinMode)) {
+    switch (getProperty(properties.laserMarlinMode)) {
       case "106":
         writeBlock(mFormat.format(106), sFormat.format(laser_pwm));
         break;
@@ -1339,7 +1410,7 @@ function laserOn(power) {
         }
         break;
       case "42":
-        writeBlock(mFormat.format(42), pFormat.format(getProperty(properties.E_Laser_MarlinPin)), sFormat.format(laser_pwm));
+        writeBlock(mFormat.format(42), pFormat.format(getProperty(properties.laserMarlinPin)), sFormat.format(laser_pwm));
         break;
     }
   }
@@ -1353,7 +1424,7 @@ function laserOff() {
 
   // Default
   else {
-    switch (getProperty(properties.D_Laser_MarlinMode)) {
+    switch (getProperty(properties.laserMarlinMode)) {
       case "106":
         writeBlock(mFormat.format(107));
         break;
@@ -1361,7 +1432,7 @@ function laserOff() {
         writeBlock(mFormat.format(5));
         break;
       case "42":
-        writeBlock(mFormat.format(42), pFormat.format(getProperty(properties.E_Laser_MarlinPin)), sFormat.format(0));
+        writeBlock(mFormat.format(42), pFormat.format(getProperty(properties.laserMarlinPin)), sFormat.format(0));
         break;
     }
   }
@@ -1388,10 +1459,10 @@ function collectDistinctOffsets() {
 // triggering feature's name, or null. Cutting *in* the base is fine; only a write is the
 // error. Mirrors the three origin-writing triggers and their firing conditions.
 function baseOriginWriteReason(base) {
-  var onStart = getProperty(properties.A_Probe_OnStart) != "Skip";
-  var onChange = getProperty(properties.B_Probe_OnChange) != "Skip";
-  var reprobe = getProperty(properties.A_ToolChange_Enabled) && getProperty(properties.H_ToolChange_ProbeAfterChange);
-  var doFirstChange = getProperty(properties.G_ToolChange_DoFirstChange);
+  var onStart = getProperty(properties.probeOnStart) != "Skip";
+  var onChange = getProperty(properties.probeOnChange) != "Skip";
+  var reprobe = getProperty(properties.toolChangeEnabled) && getProperty(properties.toolChangeProbeAfterChange);
+  var doFirstChange = getProperty(properties.toolChangeDoFirstChange);
   var n = getNumberOfSections();
   var prevWo, prevTool;
   for (var i = 0; i < n; ++i) {
@@ -1442,8 +1513,8 @@ function validateJob() {
   // destroyed in between. The result is a G38.2 that never contacts, or a part cut a bed-diagonal
   // away from the stock. Legitimate only on a machine whose home corner IS the datum.
   // See docs/HReview.md CR-2.
-  var startMode = getProperty(properties.A_Probe_OnStart);
-  if (getProperty(properties.A_Machine_HomeBeforeStart) != "None" &&
+  var startMode = getProperty(properties.probeOnStart);
+  if (getProperty(properties.machineHomeBeforeStart) != "None" &&
       (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
     warning(localize("\"Home Before Start\" moves the tool to the homing corner before "
       + "\"First WCS / Part\" records the current position as the part origin, so jogging to the "
@@ -1453,7 +1524,7 @@ function validateJob() {
 
   // Post-time half of toolChange()'s suppression warning, so it reaches Fusion's dialog and not
   // only the posted file. See docs/HReview.md CR-3.
-  if (!getProperty(properties.A_ToolChange_Enabled) && countDistinctTools() > 1) {
+  if (!getProperty(properties.toolChangeEnabled) && countDistinctTools() > 1) {
     warning(localize("This job uses more than one tool, but \"Tool Changes are Included\" is off: "
       + "no tool-change code is emitted and every operation runs with the tool already in the "
       + "spindle, at the other tools' feeds and speeds. Enable the \"7 - Tool Changes\" group, or "
@@ -1480,7 +1551,7 @@ function validateJob() {
     // another's. The reserved spoilboard base is that common frame, so require it. A
     // single-WCS job is exempt -- its one work zero is a stable enough reference. (Marlin
     // multi-WCS already errored above via Guard C, so only GRBL/RepRap reach here.)
-    if (getProperty(properties.C_Spoilboard_SafeZAcrossWcs) && collectDistinctOffsets().length > 1) {
+    if (getProperty(properties.spoilboardSafeZAcrossWcs) && collectDistinctOffsets().length > 1) {
       error("Safe-Z across parts requires a base: reserve a spoilboard base (\"Reserved WCS\"), or turn off \"Retract Across Parts\".");
     }
     return; // no base reserved -> Guard A and the slot check are moot
@@ -1509,7 +1580,7 @@ function validateJob() {
 // newly added global is reset by editing one place. See docs/HReview.md CR-13.
 function resetPostState() {
   currentWorkOffset = undefined;          // no work offset emitted yet
-  sequenceNumber = getProperty(properties.F_Job_SequenceNumberStart);
+  sequenceNumber = getProperty(properties.jobSequenceNumberStart);
   forceSectionToStartWithRapid = false;
   sectionComment = undefined;
   machineMode = undefined;
@@ -1530,7 +1601,7 @@ function resetPostState() {
 }
 
 function onOpen() {
-  fw = getProperty(properties.A_Job_SelectedFirmware);
+  fw = getProperty(properties.jobSelectedFirmware);
 
   resetPostState();
 
@@ -1551,7 +1622,7 @@ function onOpen() {
   }
 
   // Configure how the feedrate is formatted
-  if (getProperty(properties.C_Feeds_EnforceFeedrate)) {
+  if (getProperty(properties.feedsEnforceFeedrate)) {
     fOutput = createVariable({ force: true }, fFormat);
   }
 
@@ -1559,7 +1630,7 @@ function onOpen() {
   // other module globals.)
 
   // Set the seperator used between text
-  if (!getProperty(properties.H_Job_SeparateWordsWithSpace)) {
+  if (!getProperty(properties.jobSeparateWordsWithSpace)) {
     setWordSeparator("");
   }
 
@@ -1576,7 +1647,7 @@ function onClose() {
 
   flushMotions();
 
-  if (getProperty(properties.B_Include_StopFile) == "") {
+  if (getProperty(properties.includeStopFile) == "") {
     onCommand(COMMAND_COOLANT_OFF);
 
     // Stop the spindle BEFORE the return traverse, not after. On the default hobbyist configuration
@@ -1592,7 +1663,7 @@ function onClose() {
     // that is the open half of CR-6 and the same line of code as HR-16.
     onCommand(COMMAND_STOP_SPINDLE);
 
-    if (getProperty(properties.I_Job_GoOriginOnFinish)) {
+    if (getProperty(properties.jobGoOriginOnFinish)) {
       rapidMovementsXY(0, 0);
     }
 
@@ -1644,7 +1715,7 @@ function onClose() {
 
     writeComment(eComment.Important, " *** STOP end ***");
   } else {
-    loadFile(getProperty(properties.B_Include_StopFile));
+    loadFile(getProperty(properties.includeStopFile));
     flushMotions();
   }
 
@@ -1693,17 +1764,17 @@ function writeWCS(section) {
     error("Work offset " + workOffset + " is out of range for " + fw + " (GRBL supports G54-G59, RepRap G54-G59.3).");
     return;
   }
-  // How to establish this added part's origin/Z (B_Probe_OnChange = "Subsequent WCS / Part").
-  // Each WCS has its own G10-scoped origin; the first part's is set by A_Probe_OnStart in
+  // How to establish this added part's origin/Z (probeOnChange = "Subsequent WCS / Part").
+  // Each WCS has its own G10-scoped origin; the first part's is set by probeOnStart in
   // writeFirstSection(), so this covers the added parts only (guarded by isTraverse below).
   // Two workflows coexist:
   //   - Pre-set fixture offset (Replicate): "Skip" (use stored X/Z) and "Probe Z" (stored XY,
   //     re-probe Z) -- the post positions to the stored X0 Y0 automatically.
   //   - Jog per-part: "Jog XYZ" / "Jog XY & Probe Z" -- the operator jogs to this part
   //     and the post records the origin there.
-  var onChangeMode = getProperty(properties.B_Probe_OnChange);
+  var onChangeMode = getProperty(properties.probeOnChange);
   var canProbe = (tool.number != 0 && !tool.isJetTool());
-  writeComment(eComment.Debug, " writeWCS: B_Probe_OnChange: " + onChangeMode
+  writeComment(eComment.Debug, " writeWCS: probeOnChange: " + onChangeMode
     + " previousWorkOffset: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset)
     + " canProbe: " + canProbe);
 
@@ -1719,10 +1790,10 @@ function writeWCS(section) {
   //    is on, so this fallback runs for a deliberate no-base / feature-off multi-WCS job.
   var base = getReservedBaseWcs();
   var isTraverse = (previousWorkOffset != undefined);   // a genuine inter-part WCS change
-  var baseRelative = isTraverse && getProperty(properties.C_Spoilboard_SafeZAcrossWcs)
+  var baseRelative = isTraverse && getProperty(properties.spoilboardSafeZAcrossWcs)
                      && base != 0 && base != workOffset;
   writeComment(eComment.Debug, " writeWCS: retract decision -- baseRelative: " + baseRelative
-    + " base: " + base + " C_SafeZAcrossWcs: " + getProperty(properties.C_Spoilboard_SafeZAcrossWcs)
+    + " base: " + base + " C_SafeZAcrossWcs: " + getProperty(properties.spoilboardSafeZAcrossWcs)
     + " isTraverse: " + isTraverse + " workOffset: " + workOffset);
   if (baseRelative) {
     retractThroughBaseClearance();
@@ -1738,7 +1809,7 @@ function writeWCS(section) {
   currentWorkOffset = workOffset;
 
   // The added-part origin/probe action applies only to a genuine WCS change (added parts). The
-  // first section's origin is handled separately by writeWcsOnStart() (A_Probe_OnStart).
+  // first section's origin is handled separately by writeWcsOnStart() (probeOnStart).
   if (!isTraverse) {
     return;
   }
@@ -1805,10 +1876,10 @@ function writeWcsOrigin(wcsNumber, x, y, z) {
 }
 
 // The reserved spoilboard base as a workOffset number (1-6 = G54-G59,
-// 7-9 = G59.1-G59.3), or 0 when the feature is off ("None"). The A_Spoilboard_BaseReserve
+// 7-9 = G59.1-G59.3), or 0 when the feature is off ("None"). The spoilboardBaseReserve
 // enum ids are the numbers directly, so this also validates the raw value.
 function getReservedBaseWcs() {
-  var v = getProperty(properties.A_Spoilboard_BaseReserve);
+  var v = getProperty(properties.spoilboardBaseReserve);
   if (v == "None") return 0;
   return parseInt(v, 10);
 }
@@ -1831,7 +1902,7 @@ function wcsGcode(workOffset) {
 // by transiting THROUGH the base WCS. The base's Z was established at job start
 // (writeBaseEstablish), so it is the one frame where an absolute safe height is meaningful
 // across parts of differing thickness. Selects the base with a plain frame switch -- NOT
-// writeWCS(), so it triggers no B_Probe_OnChange re-probe and writes no origin -- then
+// writeWCS(), so it triggers no probeOnChange re-probe and writes no origin -- then
 // commands the clearance (a real Z move, so this is never an empty base round-trip). LEAVES
 // the base active; the caller selects the destination WCS next. Caller guarantees a base is
 // reserved. See docs/conventions.md "Base WCS is transited, not parked".
@@ -1845,7 +1916,7 @@ function retractThroughBaseClearance() {
     currentWorkOffset = base;
   }
   resetAll();
-  rapidMovementsZ(propertyMmToUnit(getProperty(properties.D_Spoilboard_SafeZClearance)));
+  rapidMovementsZ(propertyMmToUnit(getProperty(properties.spoilboardSafeZClearance)));
   flushMotions();
 }
 
@@ -1969,7 +2040,7 @@ function onSection() {
   // Do a tool change if its the first section and we are doing the first tool change
   // If its not the first section and the tool changed then do a tool change
   if (isFirstSection()) {
-    if (getProperty(properties.G_ToolChange_DoFirstChange))
+    if (getProperty(properties.toolChangeDoFirstChange))
       toolChange();
   } 
   else if (tool.number != getPreviousSection().getTool().number)
@@ -1997,16 +2068,16 @@ function onSection() {
     // Cutter mode used for different cutting power in PWM laser
     switch (currentSection.jetMode) {
       case JET_MODE_THROUGH:
-        cutterOnCurrentPower = getProperty(properties.B_Laser_OnThrough);
+        cutterOnCurrentPower = getProperty(properties.laserOnThrough);
         jetModeStr = "Through";
         break;
       case JET_MODE_ETCHING:
-        cutterOnCurrentPower = getProperty(properties.C_Laser_OnEtch);
+        cutterOnCurrentPower = getProperty(properties.laserOnEtch);
         jetModeStr = "Etching";
         break;
       case JET_MODE_VAPORIZE:
         jetModeStr = "Vaporize";
-        cutterOnCurrentPower = getProperty(properties.A_Laser_OnVaporize);
+        cutterOnCurrentPower = getProperty(properties.laserOnVaporize);
         break;
       default:
         jetModeStr = "*** Unknown ***";
@@ -2016,7 +2087,7 @@ function onSection() {
         // Only the three mapped modes exist in Fusion today, so this guards a future enum value
         // rather than a live failure, which is exactly why it must not be left producing NaN.
         // Through is the conservative middle setting.
-        cutterOnCurrentPower = getProperty(properties.B_Laser_OnThrough);
+        cutterOnCurrentPower = getProperty(properties.laserOnThrough);
         warn = true;
     }
 
@@ -2034,10 +2105,10 @@ function onSection() {
     if (machineMode != currentSection.type) {
       switch (currentSection.type) {
           case TYPE_MILLING:
-              writeBlock(getProperty(properties.A_Duet_MillingMode));
+              writeBlock(getProperty(properties.duetMillingMode));
               break;
           case TYPE_JET:
-              writeBlock(getProperty(properties.B_Duet_LaserMode));
+              writeBlock(getProperty(properties.duetLaserMode));
               break;
       }
     }
@@ -2110,7 +2181,7 @@ function onLinear(x, y, z, feed) {
   // is enabled then the first move to the start of a section will be at the
   // slowest cutting feedrate, generally Z's feedrate.
 
-  if (getProperty(properties.A_MapRapids_RestoreFirstRapids) && (forceSectionToStartWithRapid == true)) {
+  if (getProperty(properties.mapRapidsRestoreFirstRapids) && (forceSectionToStartWithRapid == true)) {
     writeComment(eComment.Important, " First G1 --> G0");
 
     forceSectionToStartWithRapid = false;
@@ -2370,8 +2441,8 @@ function onCommand(command) {
         // added a parameter to force a coolant to be selected for jet tool operations. Note: tool.coolant
         // is not used as F360 doesn't define it.
 
-        if (getProperty(properties.G_Laser_Coolant) != eCoolant.Off) {
-          setCoolant(getProperty(properties.G_Laser_Coolant));
+        if (getProperty(properties.laserCoolant) != eCoolant.Off) {
+          setCoolant(getProperty(properties.laserCoolant));
         }
       }
       else {
@@ -2510,6 +2581,18 @@ function groupOrder(key) {
   return ((def != undefined) && (def.order != undefined)) ? def.order : 9999;
 }
 
+// A property's own `order:` -- the within-group counterpart. Same fallback: an unnumbered property
+// sorts last rather than disappearing into the middle of a group.
+//
+// Unlike the group-level field, property `order:` is NOT in the Post Processor Guide's table of property
+// members; factory grbl.cps uses it regardless (order: 1/2/3 on its sequence-number trio). Depending on
+// it is additive: if the dialog ignores it, the dialog falls back to its own sort and only this dump --
+// which sorts on it directly -- is affected.
+function propertyOrder(key) {
+  var p = properties[key];
+  return ((p != undefined) && (p.order != undefined)) ? p.order : 9999;
+}
+
 function groupTitle(key) {
   var def = groupDefinitions[key];
   return ((def != undefined) && (def.title != undefined)) ? def.title : key;
@@ -2518,9 +2601,10 @@ function groupTitle(key) {
 function writeAllProperties() {
   // Bucket the keys by group, then sort on each group's `order:` -- the same number the dialog sorts
   // on, so the dump keeps reproducing the dialog's order now that `group:` is an opaque key instead
-  // of a sortable padded title. Within a group the single-letter key prefix still does it
-  // lexicographically. A group with no groupDefinitions entry (a typo in a new property's `group:`)
-  // is not dropped: it sorts last and prints its raw key as the heading, so the slip shows up here.
+  // of a sortable padded title. Within a group it is each property's own `order:`, for the same
+  // reason: the key no longer carries the sequence, so nothing else could reproduce it. A group with
+  // no groupDefinitions entry (a typo in a new property's `group:`) is not dropped: it sorts last and
+  // prints its raw key as the heading, so the slip shows up here.
   var byGroup = {};
   var groupNames = [];
   var key;
@@ -2543,7 +2627,10 @@ function writeAllProperties() {
   for (var i = 0; i < groupNames.length; ++i) {
     var name = groupNames[i];
     var keys = byGroup[name];
-    keys.sort();
+    keys.sort(function (a, b) {
+      var d = propertyOrder(a) - propertyOrder(b);
+      return (d != 0) ? d : ((a < b) ? -1 : ((a > b) ? 1 : 0));
+    });
     writeComment(eComment.Info, " ");
     writeComment(eComment.Info, " Properties -- " + groupTitle(name) + ":");
     for (var j = 0; j < keys.length; ++j) {
@@ -2561,7 +2648,7 @@ function writeAllProperties() {
 
 // Values a reviewer needs that are NOT any property's stored value -- either resolved from an
 // expression, converted to output units, or supplied by Fusion rather than the dialog. Without
-// these the dump is misleading: "I_Probe_SafeZ = Retract:15" does not tell you the retract
+// these the dump is misleading: "probeSafeZ = Retract:15" does not tell you the retract
 // actually resolved to 5.08 for this operation.
 function writeResolvedValues() {
   writeComment(eComment.Info, " ");
@@ -2575,17 +2662,17 @@ function writeResolvedValues() {
   var base = getReservedBaseWcs();
   writeComment(eComment.Info, "   Reserved base WCS = " + (base == 0 ? "None" : wcsName(base) + " / P" + base));
   writeComment(eComment.Info, "   Probe XY offset in output units = X" + xyzFormat.format(probeOffsetX()) + " Y" + xyzFormat.format(probeOffsetY()));
-  writeComment(eComment.Info, "   Inter Part Safe Z in output units = " + xyzFormat.format(propertyMmToUnit(getProperty(properties.D_Spoilboard_SafeZClearance))));
+  writeComment(eComment.Info, "   Inter Part Safe Z in output units = " + xyzFormat.format(propertyMmToUnit(getProperty(properties.spoilboardSafeZClearance))));
 }
 
-// Implements A_Machine_HomeBeforeStart: establishes the machine frame (MCS) at job
+// Implements machineHomeBeforeStart: establishes the machine frame (MCS) at job
 // start, once, before anything work-relative. Mode None/XY/XYZ. X/Y homing is what
 // actually gives MCS a repeatable origin (plus gantry squaring); Z homing (mode XYZ),
 // where wired, is included for its own reason (a real endstop, or the Marlin plate-homing
 // trick) -- it is never in service of MCS and never becomes the everyday Z reference,
-// which stays the work-Z touch-off (A_Probe_OnStart / B_Probe_OnChange) regardless.
+// which stays the work-Z touch-off (probeOnStart / probeOnChange) regardless.
 function writeMachineHoming() {
-  var mode = getProperty(properties.A_Machine_HomeBeforeStart);   // "None" | "XY" | "XYZ"
+  var mode = getProperty(properties.machineHomeBeforeStart);   // "None" | "XY" | "XYZ"
   var homeXY = (mode == "XY" || mode == "XYZ");
   var homeZ = (mode == "XYZ");
 
@@ -2599,7 +2686,7 @@ function writeMachineHoming() {
   // Optional single pause before any homing motion -- lets the operator prepare the machine
   // (place a movable Z-homing plate, clear the bed, etc.). Independent of firmware and of
   // which axes home, so it never needs revisiting when the machine changes.
-  if (getProperty(properties.B_Machine_PromptBeforeHome)) {
+  if (getProperty(properties.machinePromptBeforeHome)) {
     writeComment(eComment.Debug, " writeMachineHoming: pausing before homing (Prompt Before Home)");
     askUser("Prepare machine for homing", "Homing", false);
   }
@@ -2639,7 +2726,7 @@ function writeMachineHoming() {
 //   3. writeWCS()            -- select the first section's WCS
 //   4. Start() / start file  -- units, absolute mode, spindle init
 //   5. writeBaseEstablish()  -- probe the reserved spoilboard base (needs 4's units)
-//   6. writeWcsOnStart()     -- A_Probe_OnStart: the initial origin for the WCS from 3
+//   6. writeWcsOnStart()     -- probeOnStart: the initial origin for the WCS from 3
 // Only step 3 (writeWCS) is not intrinsically first-section work -- every section selects
 // its WCS. It lives here because steps 4-6 may write an origin on top of the active WCS,
 // so the WCS must be selected first. That is the deliberate reason WCS selection is split:
@@ -2650,10 +2737,10 @@ function writeFirstSection() {
   writeInformation();
 
   // Establish the machine frame (MCS) before anything work-relative -- home (or
-  // accept the current position) per A_Machine_HomeBeforeStart (None / XY / XYZ).
+  // accept the current position) per machineHomeBeforeStart (None / XY / XYZ).
   writeMachineHoming();
 
-  // Select the WCS before Start()/A_Include_StartFile and writeWcsOnStart() below --
+  // Select the WCS before Start()/includeStartFile and writeWcsOnStart() below --
   // both may set an origin on top of the active WCS, so the WCS must be
   // selected first or the origin would land on the wrong one (either a stale
   // WCS left active by a prior job, or the controller's default).
@@ -2661,10 +2748,10 @@ function writeFirstSection() {
 
   writeComment(eComment.Important, " *** START begin ***");
 
-  if (getProperty(properties.A_Include_StartFile) == "") {
+  if (getProperty(properties.includeStartFile) == "") {
        Start();
   } else {
-    loadFile(getProperty(properties.A_Include_StartFile));
+    loadFile(getProperty(properties.includeStartFile));
   }
 
   // Establish the reserved spoilboard base (if any) before the first section's own
@@ -2677,7 +2764,7 @@ function writeFirstSection() {
   writeComment(eComment.Important, " ");
 }
 
-// Implements A_Spoilboard_BaseReserve / B_Spoilboard_BaseEstablish: at job start, establish the
+// Implements spoilboardBaseReserve / spoilboardBaseEstablish: at job start, establish the
 // reserved spoilboard base WCS's Z by probing (writing G10 L20 P<base>), or -- when
 // establish is off -- just note that a prior job set it. No-op when no base is reserved,
 // so a default (None) job emits nothing here. The base is a per-WCS register concept, so
@@ -2696,7 +2783,7 @@ function writeBaseEstablish() {
     return;
   }
 
-  var mode = getProperty(properties.B_Spoilboard_BaseEstablish);   // "None" | "Probe Z" | "Pause & Probe Z"
+  var mode = getProperty(properties.spoilboardBaseEstablish);   // "None" | "Probe Z" | "Pause & Probe Z"
   if (mode == "None") {
     writeComment(eComment.Info, "   assuming base " + gname + " is already established -- from a prior job or set manually");
     return;
@@ -2734,7 +2821,7 @@ function writeBaseEstablish() {
     probePauseBefore = pause;
     probePauseAfter = pause;
     // Retract to the Inter Part Safe Z, not the probe Safe Z -- see probeTool()'s retractZ note.
-    probeTool(base, propertyMmToUnit(getProperty(properties.D_Spoilboard_SafeZClearance)));
+    probeTool(base, propertyMmToUnit(getProperty(properties.spoilboardSafeZClearance)));
 
     // R1 -- never leave the base active. Restore the operating WCS before anything that depends
     // on it: the first part's origin write / "Use Active WCS" travel (writeWcsOnStart) and the
@@ -2750,15 +2837,15 @@ function writeBaseEstablish() {
   }
 }
 
-// Part-probe XY offset (D_Probe_OffsetX / E_Probe_OffsetY), in output units. The Z-probe
+// Part-probe XY offset (probeOffsetX / probeOffsetY), in output units. The Z-probe
 // touch-point for a PART is its WCS origin plus this offset, so the origin can sit at a
 // corner / off the material while Z is read on the stock top. Applied to the first part
-// (A_Probe_OnStart) and each added part (B_Probe_OnChange) only -- NOT to the spoilboard
+// (probeOnStart) and each added part (probeOnChange) only -- NOT to the spoilboard
 // base probe, which emits no XY move of any kind: it touches off wherever the tool already
 // sits when writeBaseEstablish() runs. See that function's note on what the operator must
 // therefore guarantee.
-function probeOffsetX() { return propertyMmToUnit(getProperty(properties.D_Probe_OffsetX)); }
-function probeOffsetY() { return propertyMmToUnit(getProperty(properties.E_Probe_OffsetY)); }
+function probeOffsetX() { return propertyMmToUnit(getProperty(properties.probeOffsetX)); }
+function probeOffsetY() { return propertyMmToUnit(getProperty(properties.probeOffsetY)); }
 
 // Operator-pause spec the next probeTool() honors: whether to prompt the operator to attach
 // the Z probe (before) and detach it (after). Both default true -- the historical behavior,
@@ -2774,7 +2861,7 @@ var probePauseAfter = true;
 // the reposition is then emitted only when the offset is non-zero, so a zero-offset job stays
 // byte-identical. Added parts pass false -- the tool is over the previous part, so it always
 // travels to the probe point (the bare origin when the offset is zero). Callers guard tool 0 /
-// jet tools. The attach/detach prompts follow C_Probe_Pause. The spoilboard base probe does
+// jet tools. The attach/detach prompts follow probePause. The spoilboard base probe does
 // NOT use this -- it always touches off at the origin, with its own pause setting (see
 // writeBaseEstablish).
 // `zUnknown` (optional, default false) = the caller emitted no absolute Z move before this probe
@@ -2791,7 +2878,7 @@ function partProbe(atOrigin, zUnknown) {
     // motion -- so no absolute Z move can precede it and the file must say so instead, for both the
     // operator and an automated review. Suppressed when an established spoilboard base has already
     // retracted us to a known height (base frame + Inter Part Safe Z), where the warning is false.
-    if (zUnknown && (getReservedBaseWcs() == 0 || getProperty(properties.B_Spoilboard_BaseEstablish) == "None")) {
+    if (zUnknown && (getReservedBaseWcs() == 0 || getProperty(properties.spoilboardBaseEstablish) == "None")) {
       writeComment(eComment.Info, "   Ensuring that Z is safe. Unknown Z for XY move.");
     }
     if (offsetSet) {
@@ -2802,21 +2889,21 @@ function partProbe(atOrigin, zUnknown) {
     rapidMovementsXY(ox, oy);
     flushMotions();
   }
-  // Attach(before)/detach(after) prompts per C_Probe_Pause: No=neither, Before=attach only,
+  // Attach(before)/detach(after) prompts per probePause: No=neither, Before=attach only,
   // Before & After=both (default -- byte-identical to the historical always-prompt behavior).
-  var pause = getProperty(properties.C_Probe_Pause);
+  var pause = getProperty(properties.probePause);
   probePauseBefore = (pause == "Before" || pause == "Before & After");
   probePauseAfter = (pause == "Before & After");
   onCommand(COMMAND_TOOL_MEASURE);
 }
 
-// Implements the A_Probe_OnStart property: establishes the origin for the WCS
+// Implements the probeOnStart property: establishes the origin for the WCS
 // writeWCS() just selected for the first section, scoped to that WCS via
 // writeWcsOrigin() (G10 on GRBL/RepRap, G92 on Marlin).
 function writeWcsOnStart() {
-  var mode = getProperty(properties.A_Probe_OnStart);
+  var mode = getProperty(properties.probeOnStart);
   var canProbe = (tool.number != 0 && !tool.isJetTool());
-  writeComment(eComment.Debug, " writeWcsOnStart: A_Probe_OnStart: " + mode + " wcs: " + currentWorkOffset);
+  writeComment(eComment.Debug, " writeWcsOnStart: probeOnStart: " + mode + " wcs: " + currentWorkOffset);
 
   if (mode == "Skip") {
     // "Use Active WCS X0 Y0 Z0": do nothing to the origin -- use the WCS's full stored offset --
@@ -2881,7 +2968,7 @@ function writeWcsOnStart() {
   if (canProbe) {
     // Z0 is written PROVISIONALLY here, alongside XY: probeTool() overwrites it with the plate
     // thickness a few blocks below, so it never survives into the cut. Its only job is to give
-    // G_Probe_G38Target ("G38 Target") the meaning its title claims -- with Z0 at the tool's
+    // probeG38Target ("G38 Target") the meaning its title claims -- with Z0 at the tool's
     // current height, "G38 Target -10" is a 10 mm travel limit. Written the old way (XY only) the
     // target was an absolute Z evaluated against whatever Z0 a PREVIOUS run persisted into this
     // register, which the post cannot read back: on GRBL the offset survives in EEPROM while an
@@ -2921,7 +3008,7 @@ function writeWcsOnStart() {
 
 // Output a comment
 function writeComment(level, text) { 
-  if (commentLevels.indexOf(level) <= commentLevels.indexOf(getProperty(properties.C_Job_CommentLevel))) {
+  if (commentLevels.indexOf(level) <= commentLevels.indexOf(getProperty(properties.jobCommentLevel))) {
     // Collapse parentheses (comment markers) and newlines to a space so a multi-line
     // value can't split the comment into a second, uncommented (active G-code) line.
     var safeText = sanitizeMessageText(text, "()");
@@ -2946,7 +3033,7 @@ function rapidMovementsXY(_x, _y) {
       error(localize("Radius compensation mode cannot be changed at rapid traversal."));
     }
     else {
-      let f = fOutput.format(propertyMmToUnit(getProperty(properties.A_Feeds_TravelSpeedXY)));
+      let f = fOutput.format(propertyMmToUnit(getProperty(properties.feedsTravelSpeedXY)));
       writeBlock(gMotionModal.format(0), x, y, f);
     }
   }
@@ -2963,7 +3050,7 @@ function rapidMovementsZ(_z) {
       error(localize("Radius compensation mode cannot be changed at rapid traversal."));
     }
     else {
-      let f = fOutput.format(propertyMmToUnit(getProperty(properties.B_Feeds_TravelSpeedZ)));
+      let f = fOutput.format(propertyMmToUnit(getProperty(properties.feedsTravelSpeedZ)));
       writeBlock(gMotionModal.format(0), z, f);
     }
   }
@@ -2986,7 +3073,7 @@ function rapidMovements(_x, _y, _z) {
 // Calculate the feedX, feedY and feedZ components
 
 function limitFeedByXYZComponents(curPos, destPos, feed) {
-  if (!getProperty(properties.D_Feeds_ScaleFeedrate))
+  if (!getProperty(properties.feedsScaleFeedrate))
     return feed;
 
   var xyz = Vector.diff(destPos, curPos);       // Translate the cut so curPos is at 0,0,0
@@ -2994,8 +3081,8 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
   var xyzFeed = Vector.product(dir.abs, feed);  // Determine the effective x,y,z speed on each axis
 
   // Get the max speed for each axis
-  let xyLimit = propertyMmToUnit(getProperty(properties.E_Feeds_MaxCutSpeedXY));
-  let zLimit = propertyMmToUnit(getProperty(properties.F_Feeds_MaxCutSpeedZ));
+  let xyLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedXY));
+  let zLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedZ));
 
   // Normally F360 begins a Section (a milling operation) with a Rapid to move to the beginning of the cut.
   // Rapids use the defined Travel speed and the Post Processor does not depend on the current location.
@@ -3036,7 +3123,7 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
 
   // Limit the new feedrate by the maximum allowable cut speed
 
-  let xyzLimit = propertyMmToUnit(getProperty(properties.G_Feeds_MaxCutSpeedXYZ));
+  let xyzLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedXYZ));
   let newFeed = (xyzFeed.length > xyzLimit) ? xyzLimit : xyzFeed.length;
 
   if (Math.abs(newFeed - feed) > 0.01) {
@@ -3067,12 +3154,12 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
 // either side of it, which is correct rather than a defect: a diagonal G1 is allowed to exceed the
 // per-axis limit precisely because neither axis individually does.
 function limitArcFeed(feed) {
-  if (!getProperty(properties.D_Feeds_ScaleFeedrate)) {
+  if (!getProperty(properties.feedsScaleFeedrate)) {
     return feed;
   }
 
-  var xyLimit = propertyMmToUnit(getProperty(properties.E_Feeds_MaxCutSpeedXY));
-  var zLimit = propertyMmToUnit(getProperty(properties.F_Feeds_MaxCutSpeedZ));
+  var xyLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedXY));
+  var zLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedZ));
 
   // An XY arc sweeps X and Y only. A ZX / YZ arc (GRBL only -- Marlin/RepRap linearize those, and
   // the linearized moves go through limitFeedByXYZComponents() instead) sweeps one linear axis and
@@ -3080,7 +3167,7 @@ function limitArcFeed(feed) {
   var limit = (getCircularPlane() == PLANE_XY) ? xyLimit : ((xyLimit < zLimit) ? xyLimit : zLimit);
 
   // Same final cap the linear path applies to its resolved feed.
-  var xyzLimit = propertyMmToUnit(getProperty(properties.G_Feeds_MaxCutSpeedXYZ));
+  var xyzLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedXYZ));
   if (limit > xyzLimit) {
     limit = xyzLimit;
   }
@@ -3197,7 +3284,7 @@ var lastPromptedSpeed = "";
 var lastPromptedClockwise = true;
 
 function spindleOn(_spindleSpeed, _clockwise) {
-  if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
+  if (getProperty(properties.jobManualSpindlePowerControl)) {
     var rpm = speedFormat.format(_spindleSpeed);
 
     // For manual any positive input speed assumed as enabled. so it's just a flag
@@ -3254,7 +3341,7 @@ function spindleOff() {
   // without ever asking them to switch it off -- and worse, every tool change paused for them to
   // reach into the machine with the same silence. Marlin/RepRap already prompted correctly, so this
   // brings GRBL into line with them and with spindleOn(). See docs/HReview.md HR-3.
-  if (getProperty(properties.B_Job_ManualSpindlePowerControl)) {
+  if (getProperty(properties.jobManualSpindlePowerControl)) {
     // No M5 on this path, mirroring spindleOn(), which emits no M3 under manual control: the post
     // does not command a spindle the operator owns, it asks them.
     if (fw != eFirmware.GRBL) {
@@ -3291,12 +3378,12 @@ function display_text(txt) {
 
   // Default
   else {
-    writeBlock(mFormat.format(117), (getProperty(properties.H_Job_SeparateWordsWithSpace) ? "" : " ") + sanitizeMessageText(txt, "();"));
+    writeBlock(mFormat.format(117), (getProperty(properties.jobSeparateWordsWithSpace) ? "" : " ") + sanitizeMessageText(txt, "();"));
   }
 }
 
 function circular(clockwise, cx, cy, cz, x, y, z, feed) {
-  if (!getProperty(properties.D_Job_UseArcs)) {
+  if (!getProperty(properties.jobUseArcs)) {
     linearize(tolerance);
     return;
   }
@@ -3352,18 +3439,18 @@ function askUser(text, title, allowJog) {
   if (fw == eFirmware.REPRAP) {
     var v1 = " P\"" + sanitizeMessageText(text, "\"") + "\" R\"" + sanitizeMessageText(title, "\"") + "\" S3";
     var v2 = allowJog ? " X1 Y1 Z1" : "";
-    writeBlock(mFormat.format(291), (getProperty(properties.H_Job_SeparateWordsWithSpace) ? "" : " ") + v1 + v2);
+    writeBlock(mFormat.format(291), (getProperty(properties.jobSeparateWordsWithSpace) ? "" : " ") + v1 + v2);
   }
 
   // GRBL, include the message in a comment prefixed with MSG
   else if (fw == eFirmware.GRBL) {
-      writeBlock(mFormat.format(0), (getProperty(properties.H_Job_SeparateWordsWithSpace) ? "" : " ") + "(MSG " + sanitizeMessageText(text, "();") + ")");
+      writeBlock(mFormat.format(0), (getProperty(properties.jobSeparateWordsWithSpace) ? "" : " ") + "(MSG " + sanitizeMessageText(text, "();") + ")");
   }
 
   // Default
   else
   {
-    writeBlock(mFormat.format(0), (getProperty(properties.H_Job_SeparateWordsWithSpace) ? "" : " ") + sanitizeMessageText(text, "();"));
+    writeBlock(mFormat.format(0), (getProperty(properties.jobSeparateWordsWithSpace) ? "" : " ") + sanitizeMessageText(text, "();"));
   }
 }
 
@@ -3376,7 +3463,7 @@ function toolChange() {
   // configuration reached by accident (a second tool added in CAM, group 07 left alone) rather than
   // on purpose, which is exactly why it has to be loud. validateJob() carries the post-time half of
   // the same warning. See docs/HReview.md CR-3.
-  if (!getProperty(properties.A_ToolChange_Enabled)) {
+  if (!getProperty(properties.toolChangeEnabled)) {
     writeComment(eComment.Important, " >>> WARNING: change to T" + tool.number + " " + tool.comment
       + " suppressed -- \"Tool Changes are Included\" is off; the previous tool stays in the spindle");
     return;
@@ -3385,17 +3472,17 @@ function toolChange() {
   writeComment(eComment.Important, " Tool Change Start");
 
   // If there is a custom GCode file for tool changes then include it
-  if (getProperty(properties.C_Include_ToolFile1) != "") {
-    loadFile(getProperty(properties.C_Include_ToolFile1));
+  if (getProperty(properties.includeToolFile1) != "") {
+    loadFile(getProperty(properties.includeToolFile1));
   }
 
   // Are we inserting code to assist with the tool change?
   // If not, then just insert the tool change GCode (M6 <tool number>).
-  if (getProperty(properties.B_ToolChange_InsertCode)) {
+  if (getProperty(properties.toolChangeInsertCode)) {
 
     // Go to tool change position. A manual/dedicated tool-change spot only
     // makes sense as a fixed MACHINE location -- the whole point is that the
-    // operator (or a real ATC) can always reach it. But C_ToolChange_X/3_Y/4_Z
+    // operator (or a real ATC) can always reach it. But toolChangeX/Y/Z
     // are currently emitted as plain G0 words (no G53), i.e. WCS-relative:
     // the actual physical spot would silently drift to wherever THIS job's
     // WCS happens to be zeroed, which differs per workpiece. That's likely a
@@ -3407,7 +3494,7 @@ function toolChange() {
     // reset from a consistent physical position.) Not changed yet -- flagging
     // for a decision before altering behavior.
     flushMotions();
-    onRapid(propertyMmToUnit(getProperty(properties.C_ToolChange_X)), propertyMmToUnit(getProperty(properties.D_ToolChange_Y)), propertyMmToUnit(getProperty(properties.E_ToolChange_Z)));
+    onRapid(propertyMmToUnit(getProperty(properties.toolChangeX)), propertyMmToUnit(getProperty(properties.toolChangeY)), propertyMmToUnit(getProperty(properties.toolChangeZ)));
     flushMotions();
   
     // turn off spindle and coolant
@@ -3415,12 +3502,12 @@ function toolChange() {
     onCommand(COMMAND_STOP_SPINDLE);
 
     // If Marlin then BEEP
-    if ((fw == eFirmware.MARLIN) && !getProperty(properties.B_Job_ManualSpindlePowerControl)) {
+    if ((fw == eFirmware.MARLIN) && !getProperty(properties.jobManualSpindlePowerControl)) {
       writeBlock(mFormat.format(300), sFormat.format(400), pFormat.format(2000));
     }
   
     // Disable Z stepper
-    if (getProperty(properties.F_ToolChange_DisableZStepper)) {
+    if (getProperty(properties.toolChangeDisableZStepper)) {
       askUser("Z stepper will disable; wait for full stop", "Tool change", false);
       writeBlock(mFormat.format(84), 'Z'); // Disable steppers timeout
     }
@@ -3434,15 +3521,15 @@ function toolChange() {
   }
 
   // If there is a custom GCode file for tool changes then include it
-  if (getProperty(properties.D_Include_ToolFile2) != "") {
-    loadFile(getProperty(properties.D_Include_ToolFile2));
+  if (getProperty(properties.includeToolFile2) != "") {
+    loadFile(getProperty(properties.includeToolFile2));
   }
 
     // Run Z probe gcode. Same WCS caveat as the rapid above: this still runs
     // before the new section's WCS is selected, so probeTool() writes into
     // the PREVIOUS section's WCS (via currentWorkOffset), not the one the
     // upcoming section will use.
-  if (getProperty(properties.H_ToolChange_ProbeAfterChange) && tool.number != 0) {
+  if (getProperty(properties.toolChangeProbeAfterChange) && tool.number != 0) {
     onCommand(COMMAND_TOOL_MEASURE);
   }
 
@@ -3468,7 +3555,7 @@ function probeTool(targetWcs, retractZ) {
   writeComment(eComment.Important, " Probe to Zero Z");
   if (probePauseBefore) writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
   writeComment(eComment.Info, "   Do Probing");
-  writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(getProperty(properties.J_Probe_Thickness))));
+  writeComment(eComment.Info, "   Set Z to probe thickness: " + zFormat.format(propertyMmToUnit(getProperty(properties.probeThickness))));
   writeComment(eComment.Info, "   Retract the tool to " + xyzFormat.format(retractZ));
   if (probePauseAfter) writeComment(eComment.Info, "   Ask User to Remove the Z Probe");
 
@@ -3478,20 +3565,20 @@ function probeTool(targetWcs, retractZ) {
   if (fw == eFirmware.GRBL) {
     // refer to http://linuxcnc.org/docs/stable/html/gcode/g-code.html#gcode:g38
     // Note this is not using the optional P parameter available on FluidNC (http://wiki.fluidnc.com/en/config/probe)
-    writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.H_Probe_G38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.G_Probe_G38Target))));
+    writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probeG38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.probeG38Target))));
   }
 
   // Not GRBL
   else {
     // refer http://marlinfw.org/docs/gcode/G038.html
-    if (getProperty(properties.F_Probe_G382orG28)) {
-      writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.H_Probe_G38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.G_Probe_G38Target))));
+    if (getProperty(properties.probeG382orG28)) {
+      writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probeG38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.probeG38Target))));
     } else {
       writeBlock(gFormat.format(28), 'Z');
     }
   }
 
-  writeWcsOrigin(targetWcs, undefined, undefined, propertyMmToUnit(getProperty(properties.J_Probe_Thickness)));
+  writeWcsOrigin(targetWcs, undefined, undefined, propertyMmToUnit(getProperty(properties.probeThickness)));
 
   // LOAD-BEARING, not housekeeping. The G38.2 block above writes its F and Z through the RAW
   // formats (fFormat / zFormat), deliberately: routing them through fOutput / zOutput would let the
