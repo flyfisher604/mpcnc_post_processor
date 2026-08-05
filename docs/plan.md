@@ -12,10 +12,28 @@ thing to change first if you think something new belongs here.
 
 *Written so a fresh session can resume with no other context. Update it when the situation moves.*
 
-**Baseline.** Branch **`v4.0-doc-streamline`**. The last commit to change what the post *emits* is
-**`c73726c`**; everything since is documentation plus one comment-only pass over the `.cps`. **Nothing is
-half-done and nothing is known-broken.** Untracked and deliberate: both `MPCNC_v4.0_Beta*.zip`, and
-`Personal.cps` (a test harness, excluded via `.git/info/exclude` — see `conventions.md`).
+**Baseline.** Branch **`machine-frame-design`**, cut from `PropertyUpdate`. **The machine-frame /
+fixed-Z-reference rework has landed** — `PReview.md` **PR-1 · PR-2 · PR-3** and `HReview.md` **HR-28** —
+and it is **the first change since `c73726c` to alter what the post emits.** Nothing is half-done;
+**nothing is posted.** Untracked and deliberate: both `MPCNC_v4.0_Beta*.zip`, and `Personal.cps` (a test
+harness, excluded via `.git/info/exclude` — see `conventions.md`).
+
+**What that rework did, in one line each.** Group 4 became `X/Y Home` · `Machine Z Home` (machine
+declarations) + `Home at Job Start` (the action), replacing the `None`/`XY`/`XYZ` enum. Group 5 became
+`Fixed Z Reference` — `None` / `Spoilboard` / `Machine Z` — so a homed machine Z is a second
+implementation of the frame the reserved base used to be the only route to; the machine-Z answer emits
+`G53 G0 Z<Travel Machine Z>`, consumes no WCS register and needs no probe. Guard B relaxed to *a* datum of
+either kind; four guards and two warnings added; `Probe to Set Base = None` removed. **This resolves the
+standing "Never `G53`" decision** (`PReview.md` §6): the post addresses the machine frame on exactly the
+axes the operator declares.
+
+**Two things it deliberately did not do.** The **`G53` tool-change park** is `PReview.md` **PR-4** — it
+shares code with §2's Phase 4 reorder and must compose with that design, not pre-empt it. And **both
+review files now exceed their size budgets** (`conventions.md` 530/480, `PReview.md` 979/920, both `WARN`
+not `FAIL`): a Rule-2 pass found nothing *live* had leaked in — the growth is new model, external firmware
+fact and three landed findings — so the open question is whether to raise those two budgets in the
+contracts table or move content out (the `Reference — per-machine settings` table is the one section that
+fails `conventions.md`'s own admission test, and reads as README material).
 
 **Where the record lives.** The hobbyist review (`HR-1`…`HR-27`) and the 2026-08-01 whole-file review
 (`CR-1`…`CR-17`) are one register in `HReview.md`: 44 findings, all fixed, closed by design or moved to
@@ -28,10 +46,11 @@ records a pass, and the Method column matters as much as the state (`conventions
 
 | | Item | Note |
 |---|---|---|
-| 1 | **Post-verify the 14 `CR-` fixes** | The four `⬜` rows in `HReview.md`'s test register, **`CR-REG` first** — the GRBL/mm factory-default regression matters most. `CR-1 (A)` needs `Enable Line #s` on + `Home Before Start = XY`, a combination no configuration in the record has used. Two further posts serve `PReview.md` §3.5 |
+| 0 | **Post-verify the machine-frame rework** | It is unposted, and it changed the dialog and the emitted file. **`PReview.md` REG-MF first** — the GRBL/mm factory-default diff, which must touch only the property dump and one Resolved-Values line. Then **PR-2a** (the feature actually working), **PR-2c** (seven refusals, each leaving no file — the Marlin one proves the guard sits *above* Guard C's early return), and `HReview.md` **HR-28 (A)**. Rows in `PReview.md` §3.6. Two node harnesses stand in meanwhile — 29 guard cases and 12 emission cases, run against the working tree and aborting against `HEAD` — and they prove logic and block shape, never output |
+| 1 | **Post-verify the 14 `CR-` fixes** | The four `⬜` rows in `HReview.md`'s test register, **`CR-REG` first** — the GRBL/mm factory-default regression matters most, and it now folds into REG-MF above. `CR-1 (A)` needs `Enable Line #s` on + `X/Y Home` and `Home at Job Start` on, a combination no configuration in the record has used. Two further posts serve `PReview.md` §3.5 |
 | 2 | **Tidy-up sweep** | `HR-19`'s `M291` doubled space; **HR-21 / CR-15** (wire the dead `Tool Change Probe` property into `probeTool()` — Tool Change branch work — or delete it); **HR-24** (`writeWCS()` should read `section.getTool()`, not the global `tool`). All one-liners, none changing output |
 | 3 | **Dialog-only checks** | **D1** and **D3**'s dialog half (`PReview.md` §3.3). The properties literal is now declared in display order, so if the dialog *still* shows groups out of numeric order, Fusion is not sorting and the zero-padding convention is wrong |
-| 4 | **Open the Tool Change branch** | `PReview.md` §2 — the ordering design and **HR-7/8/9/10/13**, as one unit. Design settled for the ordering half; HR-10 and HR-13 have complete diffs and can go first as warm-up commits |
+| 4 | **Open the Tool Change branch** | `PReview.md` §2 — the ordering design and **HR-7/8/9/10/13**, as one unit, **now plus PR-4**: the `G53` park branch is sanctioned and lands here, with the two decided branches unchanged. Design settled for the ordering half; HR-10 and HR-13 have complete diffs and can go first as warm-up commits |
 | 5 | **The professional review proper** | The pass that produces `PReview.md`'s real content. Needs a multi-part / multi-fixture job to post against |
 | 6 | **Jet / laser workstream** | `PReview.md` §5. **J4 is the priority** — group 09 has never appeared in *any* posted file, and CR-10 landed a fix there sight-unseen. The `CR-10 (A)` row is that post. J5 is a design question before it is a test |
 
@@ -47,7 +66,8 @@ silently. It needs a rotated Setup. Written up in `HReview.md` → *Owed*.
 ## Phase status
 
 - **Phases 1–3 — done & verified.** WCS origin/probe rework to `G10 L20`; `writeWcsOrigin()`; MCS homing;
-  reserved base + establish + Guards A/B/C.
+  reserved base + establish + Guards A/B/C. **Two of these were reworked on `machine-frame-design` and are
+  verified only up to that point** — MCS homing (the enum is gone) and Guard B (relaxed).
 - **Phase 4 — in progress.** All of it has landed except tool-change ordering + base-relative park — design
   settled, written up in `PReview.md` §2. Verification is still owed on the probe XY offset's added-part
   halves and on the multi-part rows generally.

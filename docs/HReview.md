@@ -1,6 +1,6 @@
 # HReview — hobbyist review of `MPCNC_v4.0_Beta2.cps`
 
-The hobbyist-side findings register and test register. **44 findings** — 27 `HR-` from the hobbyist
+The hobbyist-side findings register and test register. **45 findings** — 28 `HR-` from the hobbyist
 review, 17 `CR-` from the 2026-08-01 whole-file review. All are fixed, closed by design, or moved to
 `docs/PReview.md`, except three one-liners awaiting a tidy-up sweep and one unstarted robustness fix
 (HR-27). Nothing is failing.
@@ -16,7 +16,7 @@ the long form on close — is `CLAUDE.md` → *Registers ship with the code*, an
 
 ---
 
-## Findings — HR-1 … HR-27 · CR-1 … CR-17
+## Findings — HR-1 … HR-28 · CR-1 … CR-17
 
 `HR-` came from the hobbyist review; `CR-` from the 2026-08-01 whole-file review driven by the dialog and
 the F360 API. Both registers merged here on the same terms — ids kept, so every commit message and code
@@ -72,6 +72,7 @@ comment that names one still resolves.
 | **CR-17 (d)** | `wcsGcode(0)` returns `G53` against the standing "never `G53`" rule | Cosmetic | **By design** — a pure conversion carries no frame policy, and no caller can pass 0. Same as HR-25 | ✅ closed |
 | **CR-17 (e)** | `sectionComment` printed `undefined`, or inherited the previous operation's name | Cosmetic | Fixed in `onSection()`/`onSectionEnd()` | ✅ fixed `c73726c` |
 | **HR-27** | The two **geometry** guards fire in `onSection()`, not `onOpen()`, so a rejected job can leave a **truncated `.gcode` on disk** | Medium | Guards A/B/C run before any output, so they write no file; multi-axis and HR-6's orientation check do not. A hobbyist who builds a Setup on a model face gets a partial file rather than a clean refusal. Fix: promote both into `validateJob()`. Not started | ⬜ open |
+| **HR-28** | Four `Jog to …` origin modes advertise a capability **GRBL does not have** — the post's default firmware and the hobbyist's usual controller | Med-High | `askUser()` consumes `allowJog` in the **RepRap branch only** (`M291 … X1 Y1 Z1`); the GRBL branch emits a bare `M0` and discards it, and GRBL 1.1 accepts a jog only in Idle or Jog state, which an `M0` hold is not. The job stopped and waited and the operator could not move the machine, with nothing saying why. **Gated, not deleted** — the modes are correct on RepRap. `warnJogAtPauseOnGrbl()` in the file + a `validateJob()` warning; both tooltips now name the limitation | ✅ fixed |
 
 **Open, no fix:** HR-19 (`M291` space), HR-21 / CR-15 (one decision, two ids), HR-24 — a tidy-up sweep of
 one-liners, none changing output today. Plus **HR-27**, which is not a one-liner and is not in that sweep.
@@ -87,9 +88,9 @@ README tells a hobbyist to consider.
 
 ---
 
-## Test register — 88 rows
+## Test register — 89 rows
 
-**✅ 67 PASS · ❌ 0 FAIL · ⬜ 5 UNRUN · ➖ 16 n/a or moved — 88 rows.** Complete by construction: every `H`/`HR`/`HW`
+**✅ 67 PASS · ❌ 0 FAIL · ⬜ 6 UNRUN · ➖ 16 n/a or moved — 89 rows.** Complete by construction: every `H`/`HR`/`HW`
 id has a row, including the ones that belong to another file. **If you move a finding out, leave the
 pointer row behind.** `CR-` ids are exempt — most are cosmetic or by-design closures that were never
 separate tests. `docs/check-docs.js` enforces the tally, the completeness and the exemption.
@@ -179,9 +180,10 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-24** | `writeWCS()` consults the global `tool` | — | latent — both callers pass `currentSection`; next sweep | read | — | ➖ |
 | **HR-25** | `wcsGcode(0)` yields `G53` | — | **closed as by design** (CR-17d) | read | — | ✅ |
 | **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | — | — | ➖ |
-| **CR-REG** | The 14 fixes leave a factory-default job **otherwise unchanged** | GRBL/mm, Comment Level `Info`, all defaults, single operation | `M0 (MSG Turn OFF spindle)` **precedes** `G0 X0 Y0`; the probe comment reads **`Retract the tool to 5.08`**, not `5.080000000000001`; **the header property dump is unchanged** — it was always post-sorted, so CR-14's reorder must not show there | posted | — **owed** | ⬜ |
-| **CR-1 (A)** | `$H` survives line numbering | GRBL, `Home Before Start = XY`, `Enable Line #s` **on** | **`$H` on its own line with no `N` prefix**, while every surrounding block carries one. No configuration in the record has ever combined homing with line numbers — which is why it shipped broken | posted | — **owed** | ⬜ |
-| **CR-2 (A)** | The homing / `Current Pos` warning fires, and the job still posts | homing on + a `Set … to Current Pos` origin mode | the warning names the control by its exact dialog title; **the file still posts**. Negative half: a default job with homing **off** produces no warning | posted | — **owed** | ⬜ |
+| **CR-REG** | The 14 fixes leave a factory-default job **otherwise unchanged** | GRBL/mm, Comment Level `Info`, all defaults, single operation | `M0 (MSG Turn OFF spindle)` **precedes** `G0 X0 Y0`; the probe comment reads **`Retract the tool to 5.08`**, not `5.080000000000001`. **The header dump is no longer the invariant it was** — the machine-frame work adds four properties, removes one and retitles two groups, so the assertion is now *the dump changes only in those places*, and **no motion, command or non-dump comment moves at all** except the one Resolved-Values line `Reserved base WCS = None` → `Fixed Z reference = None` | posted | — **owed** | ⬜ |
+| **CR-1 (A)** | `$H` survives line numbering | GRBL, `X/Y Home` **on** + `Home at Job Start` **on**, `Enable Line #s` **on** | **`$H` on its own line with no `N` prefix**, while every surrounding block carries one. No configuration in the record has ever combined homing with line numbers — which is why it shipped broken | posted | — **owed** | ⬜ |
+| **CR-2 (A)** | The homing / `Current Pos` warning fires, and the job still posts | `Home at Job Start` on + a `Set … to Current Pos` origin mode | the warning names the control by its exact dialog title and now **recommends `Use Active WCS X0 Y0, Probe Z0`**; **the file still posts**. Negative half: a default job with the action **off** produces no warning | posted | — **owed** | ⬜ |
+| **HR-28 (A)** | A `Jog to …` mode on GRBL says so, twice | GRBL, First WCS / Part = `Jog to X0 Y0 Z0` | Fusion shows the post-time `warning()`, **and** the file carries `( >>> WARNING: jogging at this pause is not supported on GRBL …)` immediately **above** the `M0 (MSG Jog to X0 Y0 Z0, then continue)`. *Discriminator: the comment survives at Comment Level `Important`, and the `M0` is unchanged — this gates, it does not delete.* Negative half, and it is the half that proves the gate: the same job on **RepRap** emits `M291 … S3 X1 Y1 Z1` with **no warning of either kind** | posted | — **owed** | ⬜ |
 | **CR-10 (A)** | GRBL laser mode formats its M-code as a number | group 09 on, GRBL, a laser operation | a real M-code number, **never `M NaN`**. Group 09 has never appeared in any posted file — see `PReview.md` **J4**, which this post also serves | posted | — **owed** | ⬜ |
 | **HR-27** | A geometry-rejected job writes **no file at all** | **(a)** a Setup built on a tilted model face, GRBL/mm defaults; **(b)** the same job on an upright Setup | **(a)** the post `error()`s and **no `.gcode` exists on disk** — the discriminator is the *absence of the output file*, not its contents. Today the guard fires in `onSection()` and leaves a **truncated** file ending mid-toolpath, which is the pre-fix discriminator and must stop appearing. **(b)** posts normally and completely, proving the promotion into `validateJob()` did not reject a job it should accept. Shares HR-6 (B)'s dependency — it needs the same rotated Setup, and if Fusion re-expresses `forward` as `Z1` then branch (a) is unreachable and that is itself the HR-6 (B) answer | posted | — **owed** | ⬜ |
 
@@ -222,7 +224,7 @@ a `posted` row and stronger than nothing.
 | **Comment levels** | Behaviourally inert — no control flow depends on a comment being emitted. `loadFile()`'s trailing-newline repair is independent of the surrounding `Info` markers, which is why it works at `Important` and `Off` |
 | **`Include Whitespace = off`** | Valid blocks everywhere — `askUser()` and `display_text()` prepend their own separator, and the concatenated forms (`G10L20P1X0Y0Z0`, `G38.2F30Z-10`) are accepted by all three parsers |
 | **Coolant channel bookkeeping** | `setCoolant()` turns both channels off before switching, warns when a tool requests a coolant no channel is configured for, and derives `coolantLevels` from `eCoolant` so the numeric index and the enum ids cannot drift apart |
-| **Property structure** | 68 properties across 11 groups — 9/7/4/2/4/10/8/5/7/10/2 — every one carrying `scope: "post"`, a key that starts with its own group key, and an `order:` unique within that group. `writeAllProperties()` iterates the object rather than a hand-kept list and sorts on the same `order:` fields the dialog does, so dialog order and dump order are one number rather than two conventions that can disagree |
+| **Property structure** | 72 properties across 11 groups — 9/7/4/4/6/10/8/5/7/10/2 — every one carrying `scope: "post"`, a key that starts with its own group key, and an `order:` unique within that group. `writeAllProperties()` iterates the object rather than a hand-kept list and sorts on the same `order:` fields the dialog does, so dialog order and dump order are one number rather than two conventions that can disagree |
 
 ---
 

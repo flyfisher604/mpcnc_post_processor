@@ -117,8 +117,8 @@ if (typeof groupDefinitions != "object") {
 groupDefinitions.job        = {title: "1 - Job", order: 100};
 groupDefinitions.feeds      = {title: "2 - Feeds and Speeds", order: 110};
 groupDefinitions.mapRapids  = {title: "3 - Map G1s to Rapids - disable when using full license", order: 120};
-groupDefinitions.machine    = {title: "4 - Establish Machine Coordinates", order: 130};
-groupDefinitions.spoilboard = {title: "5 - Establish Spoilboard Reference", order: 140};
+groupDefinitions.machine    = {title: "4 - Machine Frame", order: 130};
+groupDefinitions.spoilboard = {title: "5 - Fixed Z Reference", order: 140};
 groupDefinitions.probe      = {title: "6 - On WCS / Part / Fixture Changes", order: 150};
 groupDefinitions.toolChange = {title: "7 - Tool Changes", order: 160};
 groupDefinitions.include    = {title: "8 - External Include Files", order: 170};
@@ -324,35 +324,62 @@ properties = {
     scope      : "post"
   },
 
-  machineHomeBeforeStart: {
-    title      : "Home Before Start",
-    description: "Home the machine at job start to establish a repeatable machine frame (MCS). None (default): emit no homing -- accept the current position (already homed at the controller, or a power-on 0,0,0). XY: home X and Y (the usual case -- gives XY repeatability and gantry squaring; Z stays on the work-Z probe touch-off). XYZ: also home Z, only if the machine is actually wired to home Z (LowRider switches, or the Marlin movable-plate trick). Per firmware: on GRBL/FluidNC one $H homes every configured axis, so XY and XYZ emit the same $H (the choice just documents intent); on Marlin/RepRap each axis is homed independently (G28 X / G28 Y / G28 Z). Homing gives X/Y repeatability only -- the everyday Z cutting reference is always the work-Z touch-off (see First WCS / Part), never this.",
+  machineHomeXY: {
+    title      : "X/Y Home",
+    description: "DECLARE that this machine can home X and Y -- a fact about the machine, set once and never revisited, not an instruction to home anything (that is Home at Job Start). Off (default): no X/Y endstops, or they are not trusted; machine zero is wherever the controller was last reset. On: X and Y home to endstops, so a work offset stored in a G54-G59 register points at the same physical place across power cycles. Two features read this and nothing else does: the machine-frame Fixed Z Reference requires it, and the post warns when a job trusts a STORED work offset without it. Homing gives X/Y repeatability only -- the everyday Z cutting reference is always the work-Z touch-off (see First WCS / Part), never this.",
     group      : "machine",
     order      : 10,
-    type       : "enum",
-    values: [
-      { title: "None", id: "None" },
-      { title: "XY", id: "XY" },
-      { title: "XYZ", id: "XYZ" }
-    ],
-    value: "None",
-    scope: "post"
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
   },
-  machinePromptBeforeHome: {
-    title      : "Prompt Before Home",
-    description: "Pause once before any homing motion so the operator can prepare the machine (e.g. place a movable Z-homing plate, or clear the bed). Fires whenever Home Before Start runs homing (any firmware, any axes) -- so it never needs revisiting when the machine changes. No effect when Home Before Start is None.",
+  machineHomeZ: {
+    title      : "Machine Z Home",
+    description: "DECLARE that this machine can home Z -- again a machine fact, not an action. Off (default): no Z endstop, the usual case; Z is established only by the work-Z touch-off. On: Z homes to a real endstop (LowRider switches) or to the Marlin movable-plate trick, so the machine has a Z frame that does not move with stock thickness. That is what makes Fixed Z Reference = Machine Z available -- and it is the only thing this declaration unlocks: a homed machine Z is a TRAVEL datum, never the cutting reference.",
     group      : "machine",
     order      : 20,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
+  machineHomeAtStart: {
+    title      : "Home at Job Start",
+    description: "The ACTION -- emit homing at job start for whichever axes are declared above. Off (default): emit no homing; accept the current position (already homed at the controller, or a power-on 0,0,0). This is a property of the JOB, which is why it is separate from the two declarations: a machine whose endstops exist can still be homed once at the controller and left alone for the rest of the session. Per firmware: on GRBL/FluidNC one $H homes every axis THAT BUILD was compiled to home (HOMING_CYCLE_0/1/2 is compile-time and the per-axis $HX/$HY/$HZ commands are off by default), so the declarations above are bookkeeping there rather than emission; FluidNC exposes single-axis homing as configuration, and on Marlin/RepRap each axis is homed independently (G28 X / G28 Y / G28 Z). Required when Fixed Z Reference = Machine Z: an absolute machine-frame move must be measured against a frame this job established, not one a previous power cycle left behind.",
+    group      : "machine",
+    order      : 30,
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
+  },
+  machinePromptBeforeHome: {
+    title      : "Prompt Before Home",
+    description: "Pause once before any homing motion so the operator can prepare the machine (e.g. place a movable Z-homing plate, or clear the bed). Fires whenever Home at Job Start runs homing (any firmware, any axes) -- so it never needs revisiting when the machine changes. No effect when Home at Job Start is off.",
+    group      : "machine",
+    order      : 40,
+    type       : "boolean",
+    value      : false,
+    scope      : "post"
+  },
 
-  spoilboardBaseReserve: {
-    title      : "Reserved WCS",
-    description: "Reserve one WCS as a fixed spoilboard base (a stable Z reference for multi-fixture jobs). None (default): feature off, nothing emitted. Otherwise the selected WCS is reserved as the base and no operation may re-establish its origin (see Probe to Set Base). G59.1-G59.3 require RepRap. GRBL/RepRap only -- Marlin has no per-WCS registers, so a base is ignored there.",
+  spoilboardFixedZRef: {
+    title      : "Fixed Z Reference",
+    description: "The job's fixed Z reference: a frame whose Z0 does NOT move with stock thickness, and therefore the only frame in which one clearance height is meaningful across parts of differing thickness. Multi-part jobs need one; single-part jobs do not. None (default): no fixed reference -- Retract Across Parts is unavailable on a multi-WCS job. Spoilboard: reserve a WCS and probe the spoilboard into it; the clearance is Inter Part Safe Z, measured above that surface. Sub-questions are Reserved WCS and Probe to Set Base below. GRBL/RepRap only -- Marlin has no per-WCS registers. Machine Z: use the machine's own homed Z frame; the clearance is Travel Machine Z below, an absolute machine coordinate emitted as G53 G0 Z. Consumes NO WCS register and needs no probe, but requires Machine Z Home AND Home at Job Start declared in group 4 -- the frame an absolute move trusts must be one this job established. Not available on Marlin, where G53 is a build option that is off by default.",
     group      : "spoilboard",
     order      : 10,
+    type       : "enum",
+    values: [
+      { title: "None", id: "None" },
+      { title: "Spoilboard - probed into a reserved WCS", id: "Spoilboard" },
+      { title: "Machine Z - homed", id: "Machine Z" }
+    ],
+    value: "None",
+    scope: "post"
+  },
+  spoilboardBaseReserve: {
+    title      : "Reserved WCS",
+    description: "Which WCS to reserve as the spoilboard base -- a sub-question of Fixed Z Reference = Spoilboard, and ignored under any other answer. The selected WCS is reserved and no operation may re-establish its origin (see Probe to Set Base); assigning a part to it is Guard A. G59.1-G59.3 require RepRap. Note that reserving a base spends one of GRBL's six registers, which is the cost the Machine Z answer avoids.",
+    group      : "spoilboard",
+    order      : 20,
     type       : "enum",
     values: [
       { title: "None", id: "None" },
@@ -371,12 +398,11 @@ properties = {
   },
   spoilboardBaseEstablish: {
     title      : "Probe to Set Base",
-    description: "How to establish the reserved spoilboard base's Z at job start. None: skip -- assume the base was set in a previous job (probe-once / run-many), emitting an Info comment. Probe Z: probe the spoilboard into the base WCS (G10 L20 P<n>) with no operator prompt (a fixed/known probe point). Pause, Probe Z, Pause (default): prompt the operator to attach the probe, probe, then prompt to detach -- the manual touch-off. No effect when Reserved WCS is None; ignored on Marlin (no per-WCS registers). Always probed at the current position (0,0 / the job's XY origin) -- the Probe X/Y Offset never applies here.",
+    description: "How to establish the reserved spoilboard base's Z at job start. Probe Z: probe the spoilboard into the base WCS (G10 L20 P<n>) with no operator prompt (a fixed/known probe point). Pause, Probe Z, Pause (default): prompt the operator to attach the probe, probe, then prompt to detach -- the manual touch-off. Ignored unless Fixed Z Reference = Spoilboard, and on Marlin (no per-WCS registers). Always probed at the current position (0,0 / the job's XY origin) -- the Probe X/Y Offset never applies here, so park the tool over BARE spoilboard: whatever is under it becomes the base's Z0.",
     group      : "spoilboard",
-    order      : 20,
+    order      : 30,
     type       : "enum",
     values: [
-      { title: "None", id: "None" },
       { title: "Probe Z", id: "Probe Z" },
       { title: "Pause, Probe Z, Pause", id: "Pause & Probe Z" }
     ],
@@ -385,25 +411,34 @@ properties = {
   },
   spoilboardSafeZAcrossWcs: {
     title      : "Retract Across Parts",
-    description: "Multi-fixture safety. On (default): before traversing between operations that use different WCS, the tool retracts to the Safe Z below so it clears fixtures/clamps/other parts, and the job is validated (Guard B) to reject a multi-WCS job that reserves no spoilboard base -- a clearance height is meaningless across WCS whose offsets are only known after probing at runtime. Single-WCS jobs (including a single operation) are unaffected: no extra retract is emitted and the guard does not apply. Off: no cross-WCS retract and no guard. GRBL/RepRap only (Marlin is single-frame; see Guard C).",
+    description: "Multi-fixture safety. On (default): before traversing between operations that use different WCS, the tool retracts to a clearance measured in the job's fixed Z reference so it clears fixtures/clamps/other parts, and the job is validated (Guard B) to reject a multi-WCS job that has no fixed Z reference at all -- a clearance height is meaningless across WCS whose offsets are only known after probing at runtime. Which height is used follows Fixed Z Reference: Spoilboard uses Inter Part Safe Z below, Machine Z uses Travel Machine Z below. Single-WCS jobs (including a single operation) are unaffected: no extra retract is emitted and the guard does not apply. Off: no cross-WCS retract and no guard. GRBL/RepRap only (Marlin is single-frame; see Guard C).",
     group      : "spoilboard",
-    order      : 30,
+    order      : 40,
     type       : "boolean",
     value      : true,
     scope      : "post"
   },
   spoilboardSafeZClearance: {
     title      : "Inter Part Safe Z",
-    description: "Absolute work-Z height in whole mm, measured above the reserved spoilboard base, that the tool retracts to whenever it must clear everything on the bed. Set it high enough to clear the tallest fixture, clamp, or part in the job. Used at two points: (1) immediately after the spoilboard base is probed at job start -- that retract is made in the base's own frame, so this is the height the tool holds while it travels to the first part's X0 Y0; and (2) before each traverse between parts (a different WCS), when Retract Across Parts is on. Because it is measured above the spoilboard rather than the stock, it is the one clearance that stays valid across parts of differing thickness. Requires a Reserved WCS -- ignored when none is reserved, and on Marlin (no per-WCS registers).",
+    description: "Absolute work-Z height in whole mm, measured above the RESERVED SPOILBOARD BASE, that the tool retracts to whenever it must clear everything on the bed. Set it high enough to clear the tallest fixture, clamp, or part in the job. Used at two points: (1) immediately after the spoilboard base is probed at job start -- that retract is made in the base's own frame, so this is the height the tool holds while it travels to the first part's X0 Y0; and (2) before each traverse between parts (a different WCS), when Retract Across Parts is on. Because it is measured above the spoilboard rather than the stock, it is the one clearance that stays valid across parts of differing thickness. Read only when Fixed Z Reference = Spoilboard -- the Machine Z answer uses Travel Machine Z instead and never consults this.",
     group      : "spoilboard",
-    order      : 40,
+    order      : 50,
     type       : "integer",
     value      : 40,
     scope      : "post"
   },
+  spoilboardTravelMachineZ: {
+    title      : "Travel Machine Z",
+    description: "The ABSOLUTE MACHINE Z, signed, in mm, that the tool holds while travelling between parts -- emitted as G53 G0 Z<n>. Read only when Fixed Z Reference = Machine Z; leave empty otherwise, and note that empty is the only way to say unset, which is why this field is a string rather than a number. Obtain it once per machine: home, jog to a height that visibly clears every fixture, clamp and part on the bed, and read Z off the sender's DRO. There is no touch-off and no arithmetic -- this is the number the move needs, converted only from mm to the job's output units, and it is echoed in the file's Resolved Values block in those units so it can be checked before the machine moves. The sign is whatever your controller assigns at its home switch, which on GRBL is a compile-time choice (HOMING_FORCE_SET_ORIGIN) that no post can infer -- but a reading taken off the DRO is already in the controller's own frame, so there is no sign to reason about. THIS NUMBER BELONGS TO THE MACHINE, NOT TO THE JOB. It is the only absolute machine coordinate this post emits, so unlike every other height in this dialog it does NOT stay correct when a Setup is copied or a design is shared -- re-read it on any machine that is not the one it was measured on. A wrong value sends the tool to a wrong absolute height at travel speed.",
+    group      : "spoilboard",
+    order      : 60,
+    type       : "string",
+    value      : "",
+    scope      : "post"
+  },
   probeOnStart: {
     title      : "First WCS / Part",
-    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 at the current position, then probe the stock-top Z -- pre-jog the tool to the part's X0 Y0 before starting (no prompt). Set X0 Y0 Z0 to Current Pos: record the tool's CURRENT position as X0 Y0 Z0 with no probe and no prompt -- pre-jog to the part origin before starting (a manual touch-off, or a jet/laser where Z is set by hand; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Use Active WCS X0 Y0, Probe Z0: use the X0 Y0 already stored in the active WCS's register (a pre-set fixture offset) -- rapid there and probe the stock-top Z, writing Z into that WCS; XY is not re-zeroed. Use Active WCS X0 Y0 Z0: use the full origin already stored in the active WCS -- no re-zero and no probe; the tool moves Z to the Safe Z set below and then rapids to the stored X0 Y0. Note that is a MOVE to Safe Z, not necessarily a retract: Safe Z is an absolute height in the stored frame, so if the tool is parked above it the job starts by descending to it. IMPORTANT -- \"active WCS\" means the register this operation's Fusion Setup designates (its Work Offset: WCS 1 / G54 unless you changed it), which the post SELECTS at job start before doing anything else. It is NOT whatever WCS your sender or controller happened to have active -- the post overwrites that. What the register holds, however, is runtime state left by a prior job or a manual touch-off, and the post cannot read it back to check: the two Use Active WCS modes TRUST those stored values. Jog to X0 Y0, Probe Z0: pause (M0) so you jog the tool to the origin during the run, record X0 Y0, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to the origin during the run, then record X0 Y0 Z0 there, no probe. (Jogging at the pause needs sender/firmware support -- see the README.) On GRBL/RepRap the origin writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent WCS / Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
+    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 at the current position, then probe the stock-top Z -- pre-jog the tool to the part's X0 Y0 before starting (no prompt). Set X0 Y0 Z0 to Current Pos: record the tool's CURRENT position as X0 Y0 Z0 with no probe and no prompt -- pre-jog to the part origin before starting (a manual touch-off, or a jet/laser where Z is set by hand; when machine homing or a spoilboard base is enabled they move the tool last, so \"current position\" is that point). Use Active WCS X0 Y0, Probe Z0: use the X0 Y0 already stored in the active WCS's register (a pre-set fixture offset) -- rapid there and probe the stock-top Z, writing Z into that WCS; XY is not re-zeroed. Use Active WCS X0 Y0 Z0: use the full origin already stored in the active WCS -- no re-zero and no probe; the tool moves Z to the Safe Z set below and then rapids to the stored X0 Y0. Note that is a MOVE to Safe Z, not necessarily a retract: Safe Z is an absolute height in the stored frame, so if the tool is parked above it the job starts by descending to it. IMPORTANT -- \"active WCS\" means the register this operation's Fusion Setup designates (its Work Offset: WCS 1 / G54 unless you changed it), which the post SELECTS at job start before doing anything else. It is NOT whatever WCS your sender or controller happened to have active -- the post overwrites that. What the register holds, however, is runtime state left by a prior job or a manual touch-off, and the post cannot read it back to check: the two Use Active WCS modes TRUST those stored values. Jog to X0 Y0, Probe Z0: pause (M0) so you jog the tool to the origin during the run, record X0 Y0, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to the origin during the run, then record X0 Y0 Z0 there, no probe. THE TWO JOG MODES DO NOT WORK ON GRBL, the default firmware: only RepRap has a genuine jog-at-pause (M291 ... X1 Y1 Z1), and GRBL 1.1 accepts a jog command only in its Idle or Jog states, which an M0 hold is not. The post warns and says so in the file when a Jog mode is chosen on GRBL. On GRBL/RepRap the origin writes into that WCS's own offset (G10 L20 P<n>); Marlin uses G92. To mill additional parts/copies, see \"Subsequent WCS / Part\"; to mill one part from multiple datums/references or a flip, run separate jobs.",
     group      : "probe",
     order      : 10,
     type       : "enum",
@@ -420,7 +455,7 @@ properties = {
   },
   probeOnChange: {
     title      : "Subsequent WCS / Part",
-    description: "Multi-part jobs -- milling several parts/copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...) -- \"active WCS\" below means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS (G10 L20 P<n>); XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X and Z already in its own WCS, from a prior job or set manually). JOG (operator jogs to each part; jogging at the pause needs sender/firmware support) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0 (no probe). The attach/detach prompts around any probe follow Probe Pause. The safe-Z retract on the traverse is separate (see Retract Across Parts). Not supported on Marlin (single G92 origin -- use separate jobs). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
+    description: "Multi-part jobs -- milling several parts/copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...) -- \"active WCS\" below means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS (G10 L20 P<n>); XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X and Z already in its own WCS, from a prior job or set manually). JOG (operator jogs to each part; RepRap only in practice -- GRBL 1.1 accepts a jog command only in its Idle or Jog states, and an M0 hold is neither, so the post warns and says so in the file) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0 (no probe). The attach/detach prompts around any probe follow Probe Pause. The safe-Z retract on the traverse is separate (see Retract Across Parts). Not supported on Marlin (single G92 origin -- use separate jobs). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
     group      : "probe",
     order      : 20,
     type       : "enum",
@@ -467,7 +502,7 @@ properties = {
   },
   probeG382orG28: {
     title      : "Probe with G38.2",
-    description: "Probe using G38.2 (On) or G28 (Off). GRBL always uses G38.2 regardless of this setting; RepRap fully supports G38.2 too, so this should be left On there as well. Off (G28) is intended for Marlin builds with no dedicated probe, using the Z homing switch as a substitute reference.",
+    description: "Probe using G38.2 (On) or G28 (Off). This setting is read on Marlin and RepRap only -- GRBL always uses G38.2 whatever it says, and G38.2 is what a GRBL job always gets. On Marlin, Off (G28) is for a build with G38_PROBE_TARGET not compiled in, which uses the Z homing switch as a substitute reference. On RepRap the answer is version-bound: leave it On for RRF later than 3.1.1, but note that up to and including RRF 3.1.1 the G38.2 target is interpreted as MACHINE coordinates while this post emits a work-frame target, so On probes to the wrong physical Z there and Off is the safer answer.",
     group      : "probe",
     order      : 60,
     type       : "boolean",
@@ -494,7 +529,7 @@ properties = {
   },
   probeSafeZ: {
     title      : "Safe Z",
-    description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when no spoilboard base is reserved; with a base reserved, the Establish Spoilboard Reference group's Safe Z is used instead). Same syntax as \"Map: Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
+    description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when the job has no fixed Z reference; with one, that group's clearance -- Inter Part Safe Z or Travel Machine Z -- is used instead). Same syntax as \"Map: Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
     group      : "probe",
     order      : 90,
     type       : "string",
@@ -1514,12 +1549,56 @@ function validateJob() {
   // away from the stock. Legitimate only on a machine whose home corner IS the datum.
   // See docs/HReview.md CR-2.
   var startMode = getProperty(properties.probeOnStart);
-  if (getProperty(properties.machineHomeBeforeStart) != "None" &&
+  var changeMode = getProperty(properties.probeOnChange);
+  var homedXY = getProperty(properties.machineHomeXY);
+  if (getProperty(properties.machineHomeAtStart) &&
       (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
-    warning(localize("\"Home Before Start\" moves the tool to the homing corner before "
+    // Reworded as advice rather than prohibition: with X/Y declared homed, a stored fixture offset
+    // in the active WCS is repeatable across power cycles, so it is a better first-part answer than
+    // the pre-jog this configuration destroys -- naming it costs a clause and saves a round trip.
+    warning(localize("\"Home at Job Start\" moves the tool to the homing corner before "
       + "\"First WCS / Part\" records the current position as the part origin, so jogging to the "
-      + "part before starting the job has no effect. Choose a \"Use Active WCS ...\" or "
-      + "\"Jog to ...\" mode, or set \"Home Before Start\" to None."));
+      + "part before starting the job has no effect. On a homed machine the stored offset in the "
+      + "active WCS is repeatable, so \"Use Active WCS X0 Y0, Probe Z0\" is the natural first-part "
+      + "mode here; a \"Jog to ...\" mode also works. Otherwise turn off \"Home at Job Start\"."));
+  }
+
+  // A G54-G59 register holds an offset from MACHINE zero, and homing never touches those registers
+  // -- it makes them meaningful. Unhomed, machine zero is wherever the controller was last reset:
+  // still fixed for THAT power cycle, so offsets created during this run stay consistent with each
+  // other and with the bed, and a multi-part job built that way works. What breaks is trusting a
+  // STORED offset, which a power cycle silently invalidated. Hence the mode split below, and hence
+  // this must NOT fire on the "Jog to ..." modes, where every origin is created this run: a false
+  // positive there would reject the legitimate no-endstop multi-part job the post exists for.
+  // Note the default subsequent mode ("Probe Z") uses the stored XY, so this is reachable without
+  // any deliberate choice on a multi-part job. See docs/conventions.md "Coordinate model".
+  if (!homedXY) {
+    var storedOffsetControls = [];
+    if (startMode == "Probe Z" || startMode == "Skip") {
+      storedOffsetControls.push("\"First WCS / Part\"");
+    }
+    if ((changeMode == "Probe Z" || changeMode == "Skip") && collectDistinctOffsets().length > 1) {
+      storedOffsetControls.push("\"Subsequent WCS / Part\"");
+    }
+    if (storedOffsetControls.length > 0) {
+      warning(localize(storedOffsetControls.join(" and ") + " trust the origin already stored in a "
+        + "work offset register, but \"X/Y Home\" is not declared. A stored offset is measured from "
+        + "machine zero, which moves at every controller reset or power cycle when nothing homes -- "
+        + "so an offset written by an earlier job now points somewhere else, and the post cannot "
+        + "read the register back to check. Declare \"X/Y Home\" on a machine with X/Y endstops, or "
+        + "choose a mode that establishes the origin during this run."));
+    }
+  }
+
+  // E2 -- the post-time half of warnJogAtPauseOnGrbl(). See that function for the source read.
+  if (fw == eFirmware.GRBL &&
+      (startMode == "Jog XY & Probe Z" || startMode == "Jog XYZ" ||
+       changeMode == "Jog XY & Probe Z" || changeMode == "Jog XYZ")) {
+    warning(localize("A \"Jog to ...\" origin mode is selected, but GRBL cannot jog at the pause "
+      + "it produces: the post emits M0, and GRBL 1.1 accepts a jog command only in its Idle or Jog "
+      + "states. The job will stop and wait, and the operator will be unable to move the machine "
+      + "without resetting the program. These modes are supported on RepRap. On GRBL, position the "
+      + "tool before starting and use a \"Set ... to Current Pos\" or \"Use Active WCS ...\" mode."));
   }
 
   // Post-time half of toolChange()'s suppression warning, so it reaches Fusion's dialog and not
@@ -1532,6 +1611,67 @@ function validateJob() {
   }
 
   // --- Guards --------------------------------------------------------------------------------
+  // The fixed-Z-reference guards run FIRST, above Guard C's Marlin branch, and the placement is
+  // load-bearing: that branch returns as soon as its own test is done, so a guard written below it
+  // is unreachable on exactly the firmware it was written to exclude.
+  var fixedZ = getFixedZReference();
+  var reservedRaw = getProperty(properties.spoilboardBaseReserve);
+
+  // The two answers must agree. "Reserved WCS" is a sub-question of the spoilboard answer, so
+  // either combination below is a configuration whose intent cannot be read -- and the failure
+  // mode of guessing is silent in both directions: a base named under another answer would simply
+  // never be probed, and the spoilboard answer with no register named would establish nothing.
+  if (fixedZ == "Spoilboard" && reservedRaw == "None") {
+    error("\"Fixed Z Reference\" is the spoilboard answer but no \"Reserved WCS\" is chosen -- pick the WCS to reserve as the base, or set \"Fixed Z Reference\" to None.");
+    return;
+  }
+  if (fixedZ != "Spoilboard" && reservedRaw != "None") {
+    error("\"Reserved WCS\" names " + wcsName(parseInt(reservedRaw, 10)) + " but \"Fixed Z Reference\" is not the spoilboard answer, so the base would never be probed -- set \"Fixed Z Reference\" to the spoilboard answer, or set \"Reserved WCS\" to None.");
+    return;
+  }
+
+  if (fixedZ == "Machine Z") {
+    // Guard C EXTENDED, not inherited. Today's Guard C excludes Marlin from MULTI-WCS work because
+    // Marlin is single-frame. A machine-frame feature needs a different exclusion: G53 on Marlin is
+    // a build option that is OFF by default -- Marlin/src/gcode/gcode.cpp (2.1.x) gates
+    // "case 53: G53();" inside #if ENABLED(CNC_COORDINATE_SYSTEMS), alongside G54-G59. A
+    // SINGLE-WCS Marlin job is single-frame, passes Guard C's own test, and still cannot execute
+    // the move. The two exclusions overlap and neither contains the other.
+    if (fw == eFirmware.MARLIN) {
+      error("\"Fixed Z Reference\" = the machine-Z answer requires G53, which is a build option on Marlin (CNC_COORDINATE_SYSTEMS) and off by default -- use the spoilboard answer, or None.");
+      return;
+    }
+    if (!getProperty(properties.machineHomeZ)) {
+      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Machine Z Home\" -- declare that this machine homes Z, or choose another fixed Z reference.");
+      return;
+    }
+    // The declaration alone is not enough HERE, though it is everywhere else. "Machine Z Home" on
+    // with "Home at Job Start" off is the state the capability/action split exists to express --
+    // and it is exactly the stale-frame case that "Probe to Set Base = None" was removed for, one
+    // frame further out: after a power cycle the machine frame moved and the declaration did not.
+    // It is worse than that case, because the stale frame drives an absolute RAPID rather than a
+    // clearance, and only GRBL stops it -- with homing enabled GRBL comes up in Alarm and refuses
+    // all motion until homed, while Marlin and RRF have no equivalent lock and simply run the move
+    // at a height measured from a machine zero that has moved. So when this is the datum, the job
+    // homes: the frame the file trusts is one the file established.
+    if (!getProperty(properties.machineHomeAtStart)) {
+      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Home at Job Start\" -- an absolute machine-frame move must be measured against a frame this job established, not one a previous power cycle left behind.");
+      return;
+    }
+    if (parseTravelMachineZ() == undefined) {
+      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Travel Machine Z\" -- home the machine, jog to a height that clears every fixture and part, and enter the Z the sender's DRO reports, in mm.");
+      return;
+    }
+    // Decision 2: the machine-frame unlock requires declared homed XY. Not because the Z-only move
+    // needs it -- it does not -- but because the multi-part workflow this clearance exists to serve
+    // moves between stored work offsets, and those are repeatable only against a homed machine
+    // zero. The requirement is stated once, here; usesMachineZDatum() carries no trace of it.
+    if (!homedXY) {
+      error("\"Fixed Z Reference\" = the machine-Z answer requires \"X/Y Home\" -- the multi-part traverses it serves move between stored work offsets, which are repeatable only on a machine with a homed X/Y zero.");
+      return;
+    }
+  }
+
   // Guard C -- Marlin is single-frame: a job using more than one distinct work offset
   // is silently wrong on it. The reserved base is a per-WCS-register concept that does
   // not apply to Marlin (warned at establish time), so its guards are skipped here.
@@ -1544,15 +1684,19 @@ function validateJob() {
 
   var base = getReservedBaseWcs();
   if (base == 0) {
-    // Guard B -- safe-Z across WCS needs a base. When the cross-WCS safe-Z retract is
-    // enabled and the job spans more than one work offset, there is no frame in which a
-    // single clearance height is meaningful across those WCS: their offsets are only
-    // established by probing at runtime, so the post can't relate one WCS's Z to
-    // another's. The reserved spoilboard base is that common frame, so require it. A
-    // single-WCS job is exempt -- its one work zero is a stable enough reference. (Marlin
-    // multi-WCS already errored above via Guard C, so only GRBL/RepRap reach here.)
-    if (getProperty(properties.spoilboardSafeZAcrossWcs) && collectDistinctOffsets().length > 1) {
-      error("Safe-Z across parts requires a base: reserve a spoilboard base (\"Reserved WCS\"), or turn off \"Retract Across Parts\".");
+    // Guard B -- safe-Z across WCS needs A FIXED Z REFERENCE, of either kind. When the cross-WCS
+    // safe-Z retract is enabled and the job spans more than one work offset, there is no frame in
+    // which a single clearance height is meaningful across those WCS: their offsets are only
+    // established by probing at runtime, so the post can't relate one WCS's Z to another's. A
+    // fixed Z reference is that common frame. Relaxed from "requires a reserved base": a homed
+    // machine Z is the same frame by another implementation, and requiring the base was rejecting
+    // multi-WCS jobs on machines whose machine Z would serve perfectly -- and charging them a WCS
+    // register, of which GRBL has six, to do it. A single-WCS job is exempt: its one work zero is
+    // a stable enough reference. (Marlin multi-WCS already errored above via Guard C, so only
+    // GRBL/RepRap reach here; the machine-Z answer already errored on Marlin too.)
+    if (!usesMachineZDatum() && getProperty(properties.spoilboardSafeZAcrossWcs)
+        && collectDistinctOffsets().length > 1) {
+      error("Safe-Z across parts requires a fixed Z reference: set \"Fixed Z Reference\" to the spoilboard answer (and reserve a WCS) or to the machine-Z answer, or turn off \"Retract Across Parts\".");
     }
     return; // no base reserved -> Guard A and the slot check are moot
   }
@@ -1782,20 +1926,27 @@ function writeWCS(section) {
   // may be unknown, so an absolute Z move there would be unsafe. This fires on EVERY inter-part
   // traverse (any genuine WCS change) so we always reposition / let the operator jog / probe
   // from a known-clear height:
-  //  - Base reserved + "Retract Across Parts" on: transit through the spoilboard base and clear
-  //    to the base's Safe Z -- a stable height above the spoilboard that clears fixtures across
-  //    parts of differing thickness (retractThroughBaseClearance()).
+  //  - Fixed Z Reference = Machine Z + "Retract Across Parts" on: one G53 G0 Z<Travel Machine Z>.
+  //    No frame switch and no register consumed -- the machine frame is already fixed relative to
+  //    the bed, which is the property the spoilboard base was reserved to buy.
+  //  - Fixed Z Reference = Spoilboard + "Retract Across Parts" on: transit through the base and
+  //    clear to the base's Safe Z -- a stable height above the spoilboard that clears fixtures
+  //    across parts of differing thickness (retractThroughBaseClearance()).
   //  - Otherwise: retract to the probe Safe Z in the OUTGOING part's frame (whose Z is
-  //    established). Guard B blocks the risky no-base multi-WCS case up front when the feature
-  //    is on, so this fallback runs for a deliberate no-base / feature-off multi-WCS job.
+  //    established). Guard B blocks the risky no-datum multi-WCS case up front when the feature
+  //    is on, so this fallback runs for a deliberate no-datum / feature-off multi-WCS job.
   var base = getReservedBaseWcs();
   var isTraverse = (previousWorkOffset != undefined);   // a genuine inter-part WCS change
-  var baseRelative = isTraverse && getProperty(properties.spoilboardSafeZAcrossWcs)
-                     && base != 0 && base != workOffset;
-  writeComment(eComment.Debug, " writeWCS: retract decision -- baseRelative: " + baseRelative
+  var crossPart = isTraverse && getProperty(properties.spoilboardSafeZAcrossWcs);
+  var machineFrame = crossPart && usesMachineZDatum();
+  var baseRelative = crossPart && base != 0 && base != workOffset;
+  writeComment(eComment.Debug, " writeWCS: retract decision -- fixedZRef: " + getFixedZReference()
+    + " machineFrame: " + machineFrame + " baseRelative: " + baseRelative
     + " base: " + base + " C_SafeZAcrossWcs: " + getProperty(properties.spoilboardSafeZAcrossWcs)
     + " isTraverse: " + isTraverse + " workOffset: " + workOffset);
-  if (baseRelative) {
+  if (machineFrame) {
+    writeMachineTravelZ("Retract to the travel height in the machine frame before traverse");
+  } else if (baseRelative) {
     retractThroughBaseClearance();
   } else if (isTraverse) {
     writeComment(eComment.Info, "   Retract to Safe Z before WCS change");
@@ -1836,12 +1987,14 @@ function writeWCS(section) {
     }
   } else if (onChangeMode == "Jog XYZ") {
     // Jog: the operator jogs to this part's origin; record that position as X0 Y0 Z0, no probe.
+    warnJogAtPauseOnGrbl();
     askUser("Jog to X0 Y0 Z0, then continue", "Set origin", true);
     writeComment(eComment.Info, "   Set current position to 0,0,0");
     writeWcsOrigin(currentWorkOffset, 0, 0, 0);
   } else if (onChangeMode == "Jog XY & Probe Z") {
     // Jog: the operator jogs to this part's X0 Y0 (staying clear in Z); record X0 Y0 here,
     // then probe Z. partProbe(true) -- the tool is at the origin after the jog.
+    warnJogAtPauseOnGrbl();
     askUser("Jog to X0 Y0 above Z0, probe", "Set origin", true);
     writeComment(eComment.Info, "   Set current X,Y position to 0,0");
     writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
@@ -1875,13 +2028,63 @@ function writeWcsOrigin(wcsNumber, x, y, z) {
   }
 }
 
+// The job's FIXED Z REFERENCE -- "None" | "Spoilboard" | "Machine Z". See
+// docs/conventions.md "Fixed Z reference": the concept is a frame whose Z0 does not move with
+// stock thickness, and the two answers are two implementations of that one frame, not two
+// features. Every consumer below asks this question rather than asking whether a base is reserved.
+function getFixedZReference() {
+  return getProperty(properties.spoilboardFixedZRef);
+}
+
+// True when the fixed Z reference is the machine's own homed Z frame, addressed with G53.
+// Deliberately does NOT test "X/Y Home": a Z-only G53 move needs machine Z to be trustworthy and
+// nothing else. The homed-XY requirement sits on the multi-part workflow the clearance serves, not
+// on the move, so it is enforced once in validateJob() and never carried in the emission path.
+function usesMachineZDatum() {
+  return getFixedZReference() == "Machine Z";
+}
+
 // The reserved spoilboard base as a workOffset number (1-6 = G54-G59,
-// 7-9 = G59.1-G59.3), or 0 when the feature is off ("None"). The spoilboardBaseReserve
-// enum ids are the numbers directly, so this also validates the raw value.
+// 7-9 = G59.1-G59.3), or 0 when the spoilboard is not the job's fixed Z reference. The
+// spoilboardBaseReserve enum ids are the numbers directly, so this also validates the raw value.
+// Gated on the Fixed Z Reference answer, which is what makes "Reserved WCS" a sub-question rather
+// than a second, independent switch -- validateJob() refuses the two inconsistent combinations
+// outright, so no configuration reaches here with a base named but silently dropped.
 function getReservedBaseWcs() {
+  if (getFixedZReference() != "Spoilboard") return 0;
   var v = getProperty(properties.spoilboardBaseReserve);
   if (v == "None") return 0;
   return parseInt(v, 10);
+}
+
+// "Travel Machine Z" as a Number in MILLIMETRES, or undefined when the field is empty or does not
+// parse as a signed decimal.
+//
+// It is a STRING property, not a numeric one, and that is forced rather than chosen: Fusion's
+// property schema gives a numeric field no way to be unset -- it always holds a value -- so "empty"
+// is not expressible there and every sentinel is a real height in a signed machine frame, 0 very
+// much included. Empty meaning unset follows the "Safe Z" precedent of a parsed string property.
+function parseTravelMachineZ() {
+  var raw = getProperty(properties.spoilboardTravelMachineZ);
+  if (typeof raw != "string") return undefined;
+  var s = raw.replace(/^\s+|\s+$/g, "");
+  if (!(/^[-+]?\d+(\.\d+)?$/.test(s))) return undefined;   // also rejects "" -- unset
+  return Number(s);
+}
+
+// The same height in OUTPUT units, ready to emit. Callers must not wrap it again. Only reached
+// when the Machine Z datum is selected, which validateJob() refuses unless the field parses.
+function travelMachineZ() {
+  return propertyMmToUnit(parseTravelMachineZ());
+}
+
+// True when the job ESTABLISHES its fixed Z reference during the preamble, so an absolute Z move is
+// meaningful before any part's own origin exists. Both implementations qualify and neither is
+// available on Marlin. This is the condition partProbe()'s "Unknown Z for XY move." warning is the
+// negation of -- with a fixed reference established, the first section's arrival happens at a known
+// clear height and the warning would be false.
+function fixedZEstablishedAtStart() {
+  return usesMachineZDatum() || getReservedBaseWcs() != 0;
 }
 
 // Human-readable G-code name for a workOffset number, for comments/errors.
@@ -1896,6 +2099,35 @@ function wcsGcode(workOffset) {
   if (workOffset <= 6) return 53 + workOffset;
   if (fw == eFirmware.REPRAP && workOffset <= 9) return 59 + (workOffset - 6) / 10;
   return undefined;
+}
+
+// The ONE machine-frame move this post emits: a rapid to the declared "Travel Machine Z",
+// addressed absolutely with G53. Available only under Fixed Z Reference = Machine Z, whose guards
+// in validateJob() have already established that the machine homes Z, that this job homed it, that
+// the height parses, and that the firmware is not Marlin.
+//
+// Two conditions come from G53's own definition rather than from anything here:
+//   - G53 "is not modal and must be programmed on each line" (LinuxCNC G-code reference; RRF states
+//     the same), so every block needing the machine frame carries its own G53. Nothing may be
+//     appended to this block later, and a future X/Y park must be a SECOND G53 block, not a
+//     three-axis diagonal.
+//   - "It is an error if G53 is used without G0 or G1 being active", so the G0 is written through
+//     gFormat, NOT gMotionModal: the modal would suppress the word exactly when G0 is already
+//     active -- the common case, and the one that would post an invalid block.
+//
+// resetAll() and gMotionModal.reset() after it, because the tracked X/Y/Z/F and the tracked motion
+// mode are all work-frame bookkeeping that a machine-frame move invalidates: without the reset the
+// next absolute work-frame Z could be modal-suppressed against a number that no longer describes
+// where the tool is.
+function writeMachineTravelZ(reason) {
+  var z = travelMachineZ();
+  writeComment(eComment.Info, "   " + reason + " -- machine Z " + xyzFormat.format(z));
+  resetAll();
+  writeBlock(gFormat.format(53), gFormat.format(0), zFormat.format(z),
+    fFormat.format(propertyMmToUnit(getProperty(properties.feedsTravelSpeedZ))));
+  resetAll();
+  gMotionModal.reset();
+  flushMotions();
 }
 
 // Retract to the base's "Safe Z" height measured above the reserved spoilboard base,
@@ -2660,26 +2892,56 @@ function writeResolvedValues() {
   writeComment(eComment.Info, "   Map SafeZ = " + describeSafeZ(safeZMode, safeZHeightDefault));
   writeComment(eComment.Info, "   Probe SafeZ = " + describeSafeZ(probeSafeZMode, probeSafeZHeightDefault));
   var base = getReservedBaseWcs();
-  writeComment(eComment.Info, "   Reserved base WCS = " + (base == 0 ? "None" : wcsName(base) + " / P" + base));
+  writeComment(eComment.Info, "   Fixed Z reference = " + getFixedZReference()
+    + (base == 0 ? "" : " -- reserved base " + wcsName(base) + " / P" + base));
   writeComment(eComment.Info, "   Probe XY offset in output units = X" + xyzFormat.format(probeOffsetX()) + " Y" + xyzFormat.format(probeOffsetY()));
   writeComment(eComment.Info, "   Inter Part Safe Z in output units = " + xyzFormat.format(propertyMmToUnit(getProperty(properties.spoilboardSafeZClearance))));
+  // Echoed only under the answer that reads it, and echoed at all because it is the last line of
+  // defence against a mistyped absolute machine height: the operator can read back, in the units
+  // the G53 block will actually carry, the number the tool is about to travel to. A G53 move is
+  // interpreted in the active G20/G21 units -- "G53 G0 Z-12" in an inch file means -12 INCHES --
+  // and GRBL's $13 can switch position REPORTING to inches too, so the number read off the DRO may
+  // not have been mm either. The dialog is mm by contract; this line is where that lands.
+  if (usesMachineZDatum()) {
+    writeComment(eComment.Info, "   Travel Machine Z in output units = " + xyzFormat.format(travelMachineZ()));
+  }
 }
 
-// Implements machineHomeBeforeStart: establishes the machine frame (MCS) at job
-// start, once, before anything work-relative. Mode None/XY/XYZ. X/Y homing is what
-// actually gives MCS a repeatable origin (plus gantry squaring); Z homing (mode XYZ),
-// where wired, is included for its own reason (a real endstop, or the Marlin plate-homing
-// trick) -- it is never in service of MCS and never becomes the everyday Z reference,
-// which stays the work-Z touch-off (probeOnStart / probeOnChange) regardless.
+// Implements the group-4 machine-frame controls: establishes the machine frame (MCS) at job start,
+// once, before anything work-relative.
+//
+// Capability and action are SEPARATE properties, and only the action is emitted here. "X/Y Home"
+// and "Machine Z Home" are declarations -- facts about the machine, set once -- read by
+// validateJob() and by the Machine Z fixed reference; "Home at Job Start" is the job's decision to
+// act on them. The enum they replaced collected an operation where every consumer needed a
+// capability: it emitted G28 Z for mode XYZ and then discarded the fact that the machine HAS a
+// homed Z, so an operator whose machine had a perfectly good fixed Z frame was still required to
+// reserve a WCS register and probe a spoilboard to reconstruct it. The split also expresses a state
+// the enum could not -- Z endstops exist and were homed at the controller, but do not home them in
+// this job.
+//
+// What homing is FOR is unchanged: X/Y homing gives MCS a repeatable origin (plus gantry squaring),
+// and Z homing, where wired, gives a travel datum. Neither ever becomes the everyday CUTTING
+// reference, which stays the work-Z touch-off (probeOnStart / probeOnChange) regardless.
 function writeMachineHoming() {
-  var mode = getProperty(properties.machineHomeBeforeStart);   // "None" | "XY" | "XYZ"
-  var homeXY = (mode == "XY" || mode == "XYZ");
-  var homeZ = (mode == "XYZ");
+  var homeXY = getProperty(properties.machineHomeXY);
+  var homeZ = getProperty(properties.machineHomeZ);
+  var atStart = getProperty(properties.machineHomeAtStart);
 
-  writeComment(eComment.Debug, " writeMachineHoming: entry fw: " + fw + " mode: " + mode);
+  writeComment(eComment.Debug, " writeMachineHoming: entry fw: " + fw + " X/Y Home: " + homeXY
+    + " Machine Z Home: " + homeZ + " Home at Job Start: " + atStart);
 
-  if (mode == "None") {
-    writeComment(eComment.Debug, " writeMachineHoming: None -- current position accepted as zero, no motion");
+  if (!atStart) {
+    writeComment(eComment.Debug, " writeMachineHoming: Home at Job Start off -- current position accepted as zero, no motion");
+    return;
+  }
+
+  // Asking for the action with nothing declared homeable is a configuration that cannot be
+  // satisfied, not a no-op worth passing over in silence: the operator believes the job homes.
+  // Not an error() -- it costs no safety on its own, and the guards refuse the case where it does.
+  if (!homeXY && !homeZ) {
+    writeComment(eComment.Important, " >>> WARNING: \"Home at Job Start\" is on but neither \"X/Y Home\""
+      + " nor \"Machine Z Home\" is declared -- nothing was homed");
     return;
   }
 
@@ -2692,9 +2954,17 @@ function writeMachineHoming() {
   }
 
   if (fw == eFirmware.GRBL) {
-    // $H is all-or-nothing on stock GRBL/FluidNC -- one $H homes every configured axis, so
-    // XY and XYZ are identical here; the mode only documents which axes the user expects.
-    writeComment(eComment.Debug, " writeMachineHoming: GRBL/FluidNC, emitting single combined $H (mode " + mode + ")");
+    // On stock GRBL the capability split is BOOKKEEPING, NOT EMISSION, and the post cannot pretend
+    // otherwise: which axes $H homes is fixed at COMPILE time by HOMING_CYCLE_0/1/2 in
+    // grbl/config.h (default Z first, then X|Y), and the per-axis $HX/$HY/$HZ commands sit behind
+    // HOMING_SINGLE_AXIS_COMMANDS, which is disabled by default. So one $H is all this can emit,
+    // and there is nothing to corroborate the declaration against either. (A no-Z-endstop machine
+    // running GRBL has necessarily already recompiled its homing cycle -- the stock default would
+    // try Z first.) FluidNC is the exception: it exposes single-axis homing as configuration, so
+    // $HX / $HZ are available there without a rebuild, and this post's treating FluidNC as GRBL
+    // throughout is what costs the distinction. See docs/conventions.md "Machine frame".
+    writeComment(eComment.Debug, " writeMachineHoming: GRBL/FluidNC, emitting single combined $H"
+      + " (declared X/Y: " + homeXY + " Z: " + homeZ + " -- the build's homing cycle decides)");
     // writeln(), NOT writeBlock(). writeBlock() prefixes an N word when "Enable Line #s" is on, and
     // GRBL only recognises a $ system command when $ is the first character of the line -- "N10 $H"
     // is handed to the g-code parser instead, which has no word letter $, so the controller errors
@@ -2725,7 +2995,7 @@ function writeMachineHoming() {
 //                               work-relative
 //   3. writeWCS()            -- select the first section's WCS
 //   4. Start() / start file  -- units, absolute mode, spindle init
-//   5. writeBaseEstablish()  -- probe the reserved spoilboard base (needs 4's units)
+//   5. writeFixedZReference() -- establish the job's fixed Z reference (needs 4's units)
 //   6. writeWcsOnStart()     -- probeOnStart: the initial origin for the WCS from 3
 // Only step 3 (writeWCS) is not intrinsically first-section work -- every section selects
 // its WCS. It lives here because steps 4-6 may write an origin on top of the active WCS,
@@ -2736,8 +3006,8 @@ function writeFirstSection() {
   // Write out the information block at the beginning of the file
   writeInformation();
 
-  // Establish the machine frame (MCS) before anything work-relative -- home (or
-  // accept the current position) per machineHomeBeforeStart (None / XY / XYZ).
+  // Establish the machine frame (MCS) before anything work-relative -- home the declared axes
+  // (or accept the current position) per the group-4 controls.
   writeMachineHoming();
 
   // Select the WCS before Start()/includeStartFile and writeWcsOnStart() below --
@@ -2754,9 +3024,9 @@ function writeFirstSection() {
     loadFile(getProperty(properties.includeStartFile));
   }
 
-  // Establish the reserved spoilboard base (if any) before the first section's own
-  // origin -- both after Start() so absolute positioning/units are set for the probe.
-  writeBaseEstablish();
+  // Establish the job's fixed Z reference (if any) before the first section's own origin --
+  // both after Start() so absolute positioning/units are set for the probe or the G53 move.
+  writeFixedZReference();
 
   writeWcsOnStart();
 
@@ -2764,11 +3034,41 @@ function writeFirstSection() {
   writeComment(eComment.Important, " ");
 }
 
-// Implements spoilboardBaseReserve / spoilboardBaseEstablish: at job start, establish the
-// reserved spoilboard base WCS's Z by probing (writing G10 L20 P<base>), or -- when
-// establish is off -- just note that a prior job set it. No-op when no base is reserved,
-// so a default (None) job emits nothing here. The base is a per-WCS register concept, so
-// it is skipped with a warning on Marlin (single global frame, no P<n> registers).
+// Step 5 of writeFirstSection(): establish the job's fixed Z reference, in whichever of its two
+// implementations the operator chose. Both leave the tool holding a height that clears everything
+// on the bed, measured in a frame that does not move with stock thickness -- which is the whole
+// point of the concept and the reason this runs before the first part's own origin: whatever this
+// leaves the tool at is the height the travel to the first part's X0 Y0 starts from.
+//
+// This is what lifts a hard limit the post used to carry. With no fixed reference there is no
+// established frame at job start at all, so the first section's arrival cannot be made safe and
+// gets an Info comment instead of a move (partProbe()'s zUnknown path). A declared machine Z IS an
+// established frame at job start, so that path now emits a real absolute Z on a machine that
+// declares one -- a safety improvement, not a convenience. See docs/conventions.md
+// "Why the first section's arrival is asymmetric".
+function writeFixedZReference() {
+  var ref = getFixedZReference();
+  writeComment(eComment.Debug, " writeFixedZReference: " + ref);
+
+  if (ref == "Spoilboard") {
+    writeBaseEstablish();
+  } else if (ref == "Machine Z") {
+    if (fw == eFirmware.MARLIN) {
+      // Unreachable via the dialog -- validateJob() refuses this combination before any output.
+      // Kept so the function is safe to call from anywhere, not because a job can arrive here.
+      writeComment(eComment.Important, " >>> WARNING: Fixed Z Reference = Machine Z ignored on Marlin");
+      return;
+    }
+    writeComment(eComment.Important, " Establish fixed Z reference -- homed machine Z");
+    writeMachineTravelZ("Move to the travel height in the machine frame");
+  }
+}
+
+// The SPOILBOARD implementation of the fixed Z reference (spoilboardBaseReserve /
+// spoilboardBaseEstablish): at job start, establish the reserved base WCS's Z by probing (writing
+// G10 L20 P<base>). Called only from writeFixedZReference(), and a no-op when no base is reserved,
+// so a default job emits nothing here. The base is a per-WCS register concept, so it is skipped
+// with a warning on Marlin (single global frame, no P<n> registers).
 function writeBaseEstablish() {
   var base = getReservedBaseWcs();
   if (base == 0) {
@@ -2783,11 +3083,15 @@ function writeBaseEstablish() {
     return;
   }
 
-  var mode = getProperty(properties.spoilboardBaseEstablish);   // "None" | "Probe Z" | "Pause & Probe Z"
-  if (mode == "None") {
-    writeComment(eComment.Info, "   assuming base " + gname + " is already established -- from a prior job or set manually");
-    return;
-  }
+  // "Probe to Set Base" no longer offers a "None -- assume a prior job set it" option, and its
+  // removal is a defect fix rather than a simplification. That base Z0 is an offset from MACHINE
+  // zero, so on a machine with no Z home a controller reset or power cycle invalidated it
+  // SILENTLY: machine zero moved, the register did not, and the tool then descended to a clearance
+  // wrong by however far it drifted with nothing in the file saying so. Its one durable use -- a
+  // machine that homes Z -- now has a strictly better answer in Fixed Z Reference = Machine Z,
+  // which consumes no register, needs no probe, and cannot go stale in the same way because the
+  // job homes. See docs/PReview.md E1.
+  var mode = getProperty(properties.spoilboardBaseEstablish);   // "Probe Z" | "Pause & Probe Z"
 
   if (tool.number != 0 && !tool.isJetTool()) {
     // OPERATOR PRECONDITION -- the base is probed WHEREVER THE TOOL ALREADY SITS. No XY move is
@@ -2876,9 +3180,13 @@ function partProbe(atOrigin, zUnknown) {
     resetAll();
     // The rapid below is at an unknown height and, on the first-part path, is the program's first
     // motion -- so no absolute Z move can precede it and the file must say so instead, for both the
-    // operator and an automated review. Suppressed when an established spoilboard base has already
-    // retracted us to a known height (base frame + Inter Part Safe Z), where the warning is false.
-    if (zUnknown && (getReservedBaseWcs() == 0 || getProperty(properties.spoilboardBaseEstablish) == "None")) {
+    // operator and an automated review. Suppressed when the job's fixed Z reference was established
+    // in the preamble and has already left the tool at a known-clear height: a probed spoilboard
+    // base (base frame + Inter Part Safe Z), or a homed machine Z (G53 G0 Z<Travel Machine Z>).
+    // Either way the warning would be false, and on the machine-Z route the arrival is a real
+    // absolute move rather than a comment -- the one path in the post that deliberately emitted no
+    // absolute Z now has a case where it does not have to.
+    if (zUnknown && !fixedZEstablishedAtStart()) {
       writeComment(eComment.Info, "   Ensuring that Z is safe. Unknown Z for XY move.");
     }
     if (offsetSet) {
@@ -2954,6 +3262,7 @@ function writeWcsOnStart() {
     var jogMsg = (mode == "Jog XYZ")
       ? "Jog to X0 Y0 Z0, then continue"
       : "Jog to X0 Y0 above Z0, probe";
+    warnJogAtPauseOnGrbl();
     askUser(jogMsg, "Set origin", true);
   }
 
@@ -3434,6 +3743,27 @@ function circular(clockwise, cx, cy, cz, x, y, z, feed) {
   }
 }
 
+// The in-file half of E2: the four "Jog to ..." origin modes cannot work on GRBL, which is this
+// post's default firmware and the hobbyist's usual controller. askUser()'s allowJog flag is
+// consumed in the RepRap branch ONLY, where it appends "X1 Y1 Z1" to M291 -- RRF's genuine
+// jog-during-message flag; the GRBL branch emits a bare M0 with a (MSG ...) comment and discards
+// the parameter. And on GRBL 1.1 that M0 is precisely the wrong state: "A jog command will only be
+// accepted when Grbl is in either the 'Idle' or 'Jog' states" (Grbl v1.1 Jogging, gnea/grbl wiki).
+// So the pause happens, the operator cannot jog at it, and nothing said so.
+//
+// A warning rather than a deletion: the modes are correct on RepRap, where M291 ... X1 Y1 Z1 is a
+// real jog-at-pause, and deleting them would remove a working professional workflow.
+// validateJob() carries the post-time half so it also reaches Fusion's dialog. Called at the jog
+// dispatch sites rather than inside askUser(), which also serves prompts that are not jog modes.
+function warnJogAtPauseOnGrbl() {
+  if (fw != eFirmware.GRBL) {
+    return;
+  }
+  writeComment(eComment.Important, " >>> WARNING: jogging at this pause is not supported on GRBL --"
+    + " M0 holds the controller in a state that refuses jog commands. Position the tool before"
+    + " starting the job, or choose a \"Use Active WCS ...\" mode.");
+}
+
 function askUser(text, title, allowJog) {
   // Firmware is RepRap?
   if (fw == eFirmware.REPRAP) {
@@ -3482,17 +3812,24 @@ function toolChange() {
 
     // Go to tool change position. A manual/dedicated tool-change spot only
     // makes sense as a fixed MACHINE location -- the whole point is that the
-    // operator (or a real ATC) can always reach it. But toolChangeX/Y/Z
-    // are currently emitted as plain G0 words (no G53), i.e. WCS-relative:
-    // the actual physical spot would silently drift to wherever THIS job's
-    // WCS happens to be zeroed, which differs per workpiece. That's likely a
-    // bug, not intended behavior -- this should probably be a G53 move
-    // instead, so it lands at the same physical spot regardless of which WCS
-    // is active. (G53 doesn't need true limit-switch homing to be internally
-    // consistent -- GRBL/RepRap track machine position by step-counting from
-    // the controller's last reset/power-up, so it just needs the operator to
-    // reset from a consistent physical position.) Not changed yet -- flagging
-    // for a decision before altering behavior.
+    // operator (or a real ATC) can always reach it. But toolChangeX/Y/Z are
+    // emitted as plain G0 words (no G53), i.e. WCS-relative: the physical spot
+    // silently drifts to wherever THIS job's WCS happens to be zeroed, which
+    // differs per workpiece. That is a bug, not intended behavior.
+    //
+    // THE DECISION IT WAS FLAGGED FOR IS SETTLED: the post does address the
+    // machine frame, on exactly the axes the operator declares (group 4) and
+    // nowhere else -- see writeMachineTravelZ() and docs/conventions.md
+    // "Fixed Z reference". So the third park branch this comment argues for is
+    // now sanctioned: with "X/Y Home" and "Machine Z Home" declared, park with
+    // G53 G0 Z<n> then G53 G0 X<n> Y<n> -- two blocks, retract first, each
+    // carrying its own G53, because G53 is not modal and because a single
+    // three-axis G53 block would be the diagonal this post splits its rapids to
+    // avoid. WHAT IS NOT SETTLED IS THE ORDERING AROUND IT, so the branch does
+    // not land here: it shares this code with the Phase 4 tool-change reorder
+    // and its two decided branches (base reserved -> park relative to the base;
+    // no base -> plain G0 in the current WCS). See docs/PReview.md section 2 --
+    // this must compose with that design, not replace or pre-empt it.
     flushMotions();
     onRapid(propertyMmToUnit(getProperty(properties.toolChangeX)), propertyMmToUnit(getProperty(properties.toolChangeY)), propertyMmToUnit(getProperty(properties.toolChangeZ)));
     flushMotions();

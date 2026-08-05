@@ -182,48 +182,92 @@ in `writeFirstSection()`:
   assertion, which is why the *defaults* establish an origin rather than rely on one.
 - **Homing does not change a WCS — it makes one trustworthy.** `G54`–`G59` hold offsets from machine zero
   and `$H` never touches those registers. On a homed machine a stored offset points at the same physical
-  place across power cycles; with no endstops, machine zero is wherever the controller was last reset. So
-  `Home Before Start = None` + `Use Active WCS X0 Y0` after a power cycle is quietly unsound, and worth a
-  warning independent of anything else.
+  place across power cycles; with no endstops machine zero is wherever the controller was last reset —
+  still fixed for *that* power cycle, so origins **created** during a run stay mutually consistent and a
+  no-endstop multi-part job is sound. Only a **stored** offset goes bad, which is the whole of why the
+  guard is mode-sensitive rather than blanket.
 - Undefendable by any post: an operator typing `G55` into the console *mid-run*. Out of scope.
 
-## Reserved spoilboard base
+## Fixed Z reference — *the model; one concept, two implementations*
 
-For multi-fixture jobs one WCS can be reserved as a **spoilboard base** — a *fixed-surface* zero,
-independent of stock thickness. It is the one frame in which a safe height is meaningful across parts of
-differing thickness, which is why the cross-part safe-Z feature requires it (Guard B).
+A **fixed Z reference** is a frame whose Z0 does not move with stock thickness — the only frame in which
+one clearance height is meaningful across parts of differing thickness, which is why the cross-part safe-Z
+feature requires one (Guard B). A machine can have one two ways, and they are one dialog question:
 
-Ignored on Marlin (warned) — it has no per-WCS registers to reserve.
+| Answer | The frame | The clearance | Costs |
+|---|---|---|---|
+| **Spoilboard** | a probed surface in a reserved WCS | `Inter Part Safe Z`, above that surface | one WCS register — GRBL has six — plus a probe cycle |
+| **Machine Z** | the machine's own homed Z | `Travel Machine Z`, an absolute machine coordinate | a per-machine number read off a DRO |
 
-**The base probe emits no XY move — the park position is an operator precondition**, and this is why the
-probe XY offset never applies to the base. The base establish runs before any origin is established, so
-there is no frame in which an XY target could be trusted. The consequence is real and silent: **whatever
-is under the tool becomes the base's Z0**, so parking over the stock records the stock top as "the
-spoilboard" and every clearance derived from it is short by the stock thickness. **Mitigation is
-documentation, not code** — the durable fix is unbuilt, in `PReview.md` §6.
+> **Rejected: exposing only the spoilboard** — the shipped design, which *rejected* multi-WCS jobs on
+> machines whose homed Z would have served, Guard B refusing for want of a base while the operator had
+> already declared the machine homes Z and the post had discarded the fact.
+
+**Spoilboard — the base probe emits no XY move, so the park position is an operator precondition**, which
+is why the probe XY offset never applies to the base: the establish runs before any origin exists, so no
+XY target could be trusted. The consequence is real and silent — **whatever is under the tool becomes the
+base's Z0**, so parking over the stock records the stock top as "the spoilboard" and every clearance from
+it is short by the stock thickness. **Mitigation is documentation, not code**; the durable fix is unbuilt,
+in `PReview.md` §6. Ignored on Marlin (warned), which has no registers to reserve.
 
 > **Rejected: giving the base an XY origin.** The base stays a Z-only reference.
 
+**Machine Z — one absolute height, collected, never derived.** A height read off the DRO *after* homing is
+already in the controller's own frame, which is what makes it immune to everything below. Units are not
+immune the same way: a `G53` move is read in the active `G20`/`G21`, and GRBL's `$13` can report position
+in inches — hence the mm contract and the header echo.
+
+> **Rejected: an enum naming where the Z switch sits** (top of travel / at the bed). It cannot pin the
+> sign it exists to pin: switch position and the machine value assigned there are independent, and on GRBL
+> the second is not even a runtime choice — `HOMING_FORCE_SET_ORIGIN` (`grbl/config.h`) exists to *"force
+> Grbl to always set the machine origin at the homed location despite switch orientation"*, and at its
+> default Grbl zeroes into negative space whatever the switch orientation. Compile-time, so no `$` query
+> exposes it. (Marlin: `Z_HOME_DIR` + `Z_MIN_POS`/`Z_MAX_POS`.)
+> **Rejected: any reference + delta pair** (`Spoilboard Machine Z`, or `Machine Z at Home`, plus a signed
+> offset) — a sum the operator computes and trusts, where one field is a height they jogged to and *saw*
+> clear. The second also shows the delta cannot hold one meaning: on a top-of-travel machine its best
+> value is zero, on a plate-at-the-bed machine it *is* the spoilboard clearance.
+
+**Transplant, not typing, is the hazard with no precedent here.** Every other dangerous height in the
+dialog is WCS-relative and self-correcting — point it at another machine and it is still measured from
+*that* machine's work zero. This is the post's only absolute machine coordinate, so it is the first number
+a copied Setup or a shared design makes **wrong** rather than merely different.
+
 ## Machine frame (homing / MCS)
 
-**Per-axis granularity was dropped** — the modes (**None** / **XY** / **XYZ**) document operator intent,
-not an axis mask, which is why GRBL can collapse two of them onto one command without losing anything.
+**Capability and action are separate declarations** — `X/Y Home` and `Machine Z Home` (facts about the
+machine) versus `Home at Job Start` (a decision about this job), which is a state the enum they replaced
+could not express: *homed at the controller, do not home here*.
 
-| Firmware | Command |
+> **Superseded, kept because it is the plausible wrong answer.** The `None`/`XY`/`XYZ` enum was justified
+> as documenting *operator intent, not an axis mask*. Intent is not what any consumer needs — the
+> machine-Z reference and every stored-offset guard need what is **true of the machine**, and the enum's
+> `XYZ` answer emitted `G28 Z` and then threw that fact away.
+
+| Firmware | What the post can emit |
 |---|---|
-| Marlin / RRF | `G28 X` / `G28 Y` (XY) then `G28 Z` (XYZ) — independent per axis |
-| GRBL / FluidNC | `$H` only — one command homes all configured axes |
+| Marlin / RRF | `G28 X` / `G28 Y` / `G28 Z` — genuinely independent per axis |
+| GRBL | one `$H`. Which axes it homes is **compile-time** (`HOMING_CYCLE_0/1/2`, default Z then X\|Y) and `$HX`/`$HY`/`$HZ` sit behind `HOMING_SINGLE_AXIS_COMMANDS`, **off by default** |
+| FluidNC | single-axis homing is a **configuration** option, so `$HX`/`$HZ` need no rebuild |
 
-On GRBL `$H` is all-or-nothing, so XY and XYZ both emit one `$H` (the mode documents intent).
-**"Prompt Before Home"** pauses **once before any homing motion**, independent of firmware and axes.
-The post does not control homing order. **`$H` is emitted with `writeln()`, not `writeBlock()`** — GRBL
-only recognises `$` as a system command when it is the first character of the line (`HReview.md` CR-1).
+So **on GRBL the split is bookkeeping, not emission** — the post can neither emit per-axis homing there
+nor corroborate the declaration. FluidNC could; this post treats FluidNC as GRBL throughout, and that is
+the one place the conflation costs something real. **"Prompt Before Home"** pauses **once before any
+homing motion**, independent of firmware and axes; the post does not control homing order. **`$H` uses
+`writeln()`, not `writeBlock()`** — GRBL recognises `$` only as the line's first character (CR-1).
+
+**Declaring the machine frame is a trust assertion**, the same species as `Use Active WCS`: the post
+commands the frame and can never read back where it is. One place that honesty is not enough — when the
+declared frame becomes the **datum for an absolute move**, the job must *establish* it, so
+`Fixed Z Reference = Machine Z` requires `Home at Job Start` and not merely the declaration. Firmware
+forces it: with homing enabled **GRBL comes up in Alarm and refuses all motion until homed**, so a stale
+declared frame cannot execute there, while Marlin and RRF have no such lock and simply run the move
+against a machine zero that has moved.
 
 ## Firmware capabilities
 
-Settled by reading each firmware's own source and changelog rather than by testing on a machine. **Do the
-source read *before* filing a question as needing hardware** — the `M2` question was filed as needing a
-controller and then closed from source. Cite the file and version when adding here.
+Settled by reading each firmware's own source and changelog rather than by testing on a machine. Cite the
+file and version when adding here.
 
 - Marlin — `MarlinFirmware/Marlin`, `Marlin/src/gcode/gcode.h` + `gcode.cpp`
 - RepRapFirmware — `Duet3D/RepRapFirmware`, `src/GCodes/GCodes2.cpp`, plus the RRF wiki changelog
@@ -240,6 +284,23 @@ into plain `G0`/`G1`/`G4` is correct and needs no revisiting.
 
 Two more settled the same way: **Marlin has never implemented `M2`** (RRF gained it in 3.5.1, with a
 `stop.g` interaction), and **GRBL, Marlin and RRF all accept a bare `\r`** as a block terminator.
+
+Four more settled while designing the machine frame. Each **refutes** something believed at the time, and
+each is a place a one-dialect assumption would have shipped a wrong motion:
+
+| Question | Answer |
+|---|---|
+| `G53` per firmware | GRBL 1.1 supports it (above). **Marlin gates `case 53:` behind `CNC_COORDINATE_SYSTEMS`, off by default** (`gcode.cpp` 2.1.x) — so a *single-WCS* Marlin job passes Guard C and still cannot execute the move: that exclusion is separate, not inherited. It is also **not modal — program it on every line**, and an error without `G0`/`G1` active (LinuxCNC; RRF the same), so a split Z-then-XY move carries `G53` twice |
+| `G30` to store a park height | **Dead on all three.** GRBL/LinuxCNC: bare `G30` moves **X and Y too**, and `G30 Z<n>` rapids first to that Z *in the current WCS, offsets included*. Marlin and RRF: `G30` is a **single Z probe** — a plunge. Same trap `G80`–`G83` sets above |
+| Jogging at an `M0` pause | **Not possible on GRBL** — *"a jog command will only be accepted when Grbl is in either the 'Idle' or 'Jog' states"* (Grbl v1.1 Jogging), and `M0` is neither. Only RRF has a real jog-at-pause (`M291 … X1 Y1 Z1`) |
+| `G38.2` target frame | **Version-bound on RRF.** `G38.x` on Duet 2+ / RRF 3+, and **up to RRF 3.1.1 the target is machine coordinates**, user coordinates after. This post emits a work-frame target, so leaving it On below 3.1.2 probes to the wrong physical Z |
+
+> **The lesson, twice over — and it is why *do the source read before filing a question as needing
+> hardware* is a rule here.** (`M2` was filed as needing a controller, then closed from source.) All four
+> above were answerable from sources already cited, and filing them as open cost a design decision
+> (`G30`) that had no business surviving. And **both errors were outside GRBL**: a FluidNC conflation and
+> the RRF version bound, the second of which would have produced a wrong physical motion. GRBL is not the
+> coverage that is short.
 
 ## Validation guards — a rejected job can still leave a file
 
@@ -336,24 +397,35 @@ gets. Un-suppressing it where it sits does **not** work:
 - **Blast radius.** With `isTraverse` true on the first section, the fallback fires on *every* job.
 
 The resolution keeps the intent and fixes the placement: the first section's safe arrival happens **after**
-the base establish, in the base's frame. That exposes a hard limit — **with no base reserved there is no
-established frame at job start at all**, so no retract can be made safe there. That case gets an Info
-comment instead (`Ensuring that Z is safe. Unknown Z for XY move.`), on the one path that deliberately
-emits no absolute Z move.
+the fixed Z reference is established, in that reference's frame. That exposed a hard limit — **with no
+fixed reference there is no established frame at job start at all**, so no retract can be made safe there.
+That case gets an Info comment instead (`Ensuring that Z is safe. Unknown Z for XY move.`), on the one path
+that deliberately emits no absolute Z move.
+
+**The machine-Z answer lifts the limit rather than working around it.** A declared, homed machine Z *is* an
+established frame at job start, so on such a machine the arrival emits a real `G53 G0 Z<Travel Machine Z>`
+and the comment is suppressed exactly as an established base suppresses it. The limit stands only where it
+is still true: a job that declares no fixed reference at all.
 
 ## Reference — per-machine settings
 
-| Machine / firmware | Home Before Start | Prompt Before Home | Reserved base | Operator does |
-|---|---|---|---|---|
-| LowRider (Marlin or FluidNC) | `XYZ` if Z endstops fitted, else `XY` | Off | `G59` if multi-fixture, else `None` | homes X/Y; work-Z touched off with the plate either way |
-| MPCNC + FluidNC, X/Y switches | `XY` | Off | `G59` if multi-fixture | homes X/Y; machine Z n/a, Z set by the work plate |
-| MPCNC + Marlin, plate as Z-endstop | `XYZ` | On | `G59` if multi-fixture | homes X/Y; at the pause places the movable plate, then Z homes to it |
-| MPCNC, no switches | `None` | Off | `G59` if multi-fixture | parks X/Y by hand as zero; Z set by the work plate |
-| Single-part job (any machine) | per row above | per row above | `None` | one WCS zeroed to the part; no base |
+Group 4 is `X/Y Home` / `Machine Z Home` (declarations) + `Home at Job Start` (the action); group 5 is
+`Fixed Z Reference` and its clearance.
 
-> **Note the interaction** (`HReview.md` CR-2): any row above with homing on must **not** use a
-> `Set … to Current Pos` origin mode — homing moves the tool, and the origin would be recorded at the
-> endstop corner. `validateJob()` now warns.
+| Machine / firmware | X/Y · Z declared | Home at start | Prompt | Fixed Z Reference (multi-fixture) | Operator does |
+|---|---|---|---|---|---|
+| LowRider (Marlin or FluidNC) | on · on if Z endstops fitted | on | Off | `Machine Z` where Z is declared, else `Spoilboard` `G59` | homes X/Y; work-Z touched off with the plate either way |
+| MPCNC + FluidNC, X/Y switches | on · off | on | Off | `Spoilboard` `G59` | homes X/Y; machine Z n/a, Z set by the work plate |
+| MPCNC + Marlin, plate as Z-endstop | on · on | on | On | `Spoilboard` `G59` — `G53` is a Marlin build option | homes X/Y; at the pause places the movable plate, then Z homes to it |
+| MPCNC, no switches | off · off | off | Off | `Spoilboard` `G59` | parks X/Y by hand as zero; Z set by the work plate |
+| Single-part job (any machine) | per row above | per row above | per row above | `None` | one WCS zeroed to the part; no fixed reference needed |
+
+> **Two interactions the rows do not show.** (1) `HReview.md` CR-2 — any row with `Home at Job Start` on
+> must **not** use a `Set … to Current Pos` origin mode: homing moves the tool and the origin would be
+> recorded at the endstop corner. On a homed machine `Use Active WCS X0 Y0, Probe Z0` is the natural
+> answer instead, which is what the warning now says. (2) A stored work offset is repeatable only against
+> a homed machine zero, so the two `Use Active WCS …` modes warn when `X/Y Home` is not declared — and
+> deliberately do **not** warn on the `Jog to …` modes, where every origin is created during that run.
 
 ---
 
