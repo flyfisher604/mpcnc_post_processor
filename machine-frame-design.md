@@ -104,8 +104,14 @@ everything (clearances negative) while an MPCNC homing down onto touch paint put
 
 - **Where the switch is** — top of travel, or at the bed.
 - **What machine-coordinate value the controller assigns at that switch.** This is a configuration
-  choice, not a consequence of the switch position: GRBL's homing-direction mask `$23` with max
-  travel `$130`–`$132`; Marlin's `Z_HOME_DIR` with `Z_MIN_POS` / `Z_MAX_POS`.
+  choice, not a consequence of the switch position — and on GRBL it is not even a *runtime* choice.
+  `grbl/config.h` carries **`HOMING_FORCE_SET_ORIGIN`**, whose whole purpose is to *"force Grbl to
+  always set the machine origin at the homed location despite switch orientation"*; with it left at
+  the default, Grbl sets the origin in negative space **regardless of where the switch sits**. It is
+  compile-time, so no `$` query exposes it and no operator can report it without reading their own
+  build. (`$23` sets the homing *direction*; `$130`–`$132` are documented as used only by the
+  soft-limit feature. Neither settles the datum — the pair cited in an earlier draft was the weaker
+  evidence.) Marlin's equivalent is `Z_HOME_DIR` with `Z_MIN_POS` / `Z_MAX_POS`.
 
 So a machine that homes at the top can end up with Z0 *at the top* and a negative work space, or with
 Z0 *at the bed* and home reported as a large positive number. An enum naming the switch position
@@ -135,27 +141,41 @@ not actually need.
 
 | Property | Type | Meaning |
 |---|---|---|
-| **`Travel Machine Z`** | signed number, mm; empty = unset | The machine Z the tool holds while travelling between parts. Obtained once per machine: home, jog to a height that visibly clears every fixture and part, read Z off the sender's DRO. |
+| **`Travel Machine Z`** | signed mm — a **string** property, so that unset is expressible; see §5.2 | The machine Z the tool holds while travelling between parts. Obtained once per machine: home, jog to a height that visibly clears every fixture and part, read Z off the sender's DRO. |
 
 ```
-emitted = G53 G0 Z<travelMachineZ>
+emitted = G53 G0 Z<travelMachineZ converted to output units>
 ```
 
 That is the whole derivation. No datum, no delta, no sign to reason about, and **no touch-off of any
 kind** — the operator reads a number off a position they have physically jogged to and looked at.
 
+**Two conditions the emission inherits**, both from the `G53` definition rather than from this design.
+`G53` *"is not modal and must be programmed on each line"* (LinuxCNC G-code reference; RepRapFirmware
+states the same), so a move split into `Z` then `X Y` needs `G53` on **both** blocks. And *"it is an
+error if `G53` is used without `G0` or `G1` being active"* — the motion word may be modal, but the
+design should not depend on that.
+
 Five properties worth stating:
 
-- **One field, not two**, and it is the number the move needs verbatim. Nothing is computed from it,
-  so there is no arithmetic step to get wrong.
+- **One field, not two**, and it is the number the move needs — subject only to the mm→output-unit
+  conversion every dimension in this dialog already gets. Nothing is *derived* from it: no datum, no
+  delta, no sum. The unit conversion is the one arithmetic step, and it is the same one `Inter Part
+  Safe Z` and the probe offsets pass through today.
 - **Its evidence is better than arithmetic.** With `Spoilboard Machine Z + Inter Part Safe Z` the
   operator computed a height and trusted the sum; here they *jogged to the height and saw it clear.*
-- **Immune to the firmware convention question of §3.** Whatever GRBL, Marlin or RRF assigns at the
-  switch, a reading taken off the DRO is already in the controller's own frame.
+- **Immune to the *sign* convention of §3, not to units.** Whatever GRBL, Marlin or RRF assigns at the
+  switch, a reading taken off the DRO is already in the controller's own frame — that is the whole
+  point, and §3's compile-time trap cannot touch it. Units are a separate question and are **not**
+  immune: a `G53` move is interpreted in the active `G20`/`G21` units, so `G53 G0 Z-12` in an inch
+  file means −12 **inches**; and GRBL's `$13` switches position *reporting* to inches, so the number
+  the operator reads may not be mm either. Hence the conversion above, the mm in the tooltip, and the
+  echo below.
 - **Stock-thickness independent**, which was the entire point of preferring the spoilboard over the
   stock top. An absolute machine Z has that property natively.
 - **Checkable before the machine moves.** `writeResolvedValues()` already prints resolved heights into
-  the header block, so the emitted absolute machine Z can be echoed and read back.
+  the header block **in output units** — the form it uses for `Inter Part Safe Z` — so the emitted
+  absolute machine Z can be echoed and read back in exactly the units the `G53` block will carry.
 
 Under this scheme `Inter Part Safe Z` is **not used at all** when `Fixed Z Reference = Machine Z`; it
 remains the height for the spoilboard-WCS answer, where it keeps its current meaning. One height
@@ -173,14 +193,29 @@ control per datum, each measured in its own frame, and the tooltip of each says 
   so the delta's best value is zero; on a **plate-at-the-bed** machine, home ≈ the spoilboard, so the
   delta *is* `Inter Part Safe Z`. Two machines, two unrelated meanings for one field — a field that
   should not exist.
-- **`G30` predefined position — zero fields.** GRBL 1.1 supports `G28/G30(.1)` (`conventions.md` →
-  *Firmware capabilities*), so the operator could jog to a safe height once and store it in the
-  controller with `G30.1`; the post would then emit `G30 Z` and hold no number at all. Genuinely
-  elegant, and **not rejected on merit — deferred on evidence.** It needs a source read on `G30` axis-word
-  behaviour across all three firmwares (§10), it is controller EEPROM state the post can neither read
-  nor verify, and it is opaque to an operator reading the g-code, where `G53 G0 Z-12` is self-describing.
-  If the source read comes back clean it deserves reconsideration as an *option* alongside the number,
-  not as a replacement for it.
+- **`G30` predefined position — "zero fields". Rejected; the source read came back dirty on all three
+  firmwares.** The idea was that the operator stores a safe height in the controller once with
+  `G30.1`, and the post emits `G30 Z` and holds no number at all. It fails three ways, and any one of
+  them is fatal:
+  - **GRBL / LinuxCNC dialect.** *"`G30 axes` — makes a rapid move to the position specified by axes
+    including any offsets, then will make a rapid move to the absolute position of the values in
+    parameters 5181-5189 for all axes specified. Any axis not specified will not move."* (LinuxCNC
+    G-code reference; `gnea/grbl`, `grbl/gcode.c`, `NON_MODAL_GO_HOME_0/1`, whose intermediate move is
+    `if (axis_words) { mc_line(gc_block.values.xyz, pl_data); }` under the comment *"Move only the
+    axes specified in secondary move."*) So a **bare `G30` moves X and Y as well as Z** — not a
+    clearance move at all — while **`G30 Z<n>` requires a number**, which is not a zero-field option,
+    and rapids *first* to that Z **in the current WCS, including its offsets**. That intermediate move
+    is in precisely the frame §3.6 exists to stop trusting.
+  - **Marlin 2.x.** `Marlin/src/gcode/gcode.cpp` (2.1.x): `#if HAS_BED_PROBE` → `case 30: G30();
+    break;   // G30: Single Z probe`. `G30` is a **probing plunge**, not a park. There is no `G30.1`.
+  - **RepRapFirmware.** The RepRap G-code dictionary lists `G30` as **"Single Z-Probe"**, supported in
+    RRF — the same collision.
+
+  On top of which it was always controller EEPROM state the post can neither read nor verify, and
+  opaque to an operator reading the g-code where `G53 G0 Z-12` is self-describing. **The elegance was
+  an artefact of assuming one dialect** — `conventions.md` → *Firmware capabilities* already records
+  the same trap for `G80`–`G83`, where the RepRap dialect reassigns the numbers to bed probing. Same
+  failure, one section further on.
 - **The `Z Home` arrangement enum.** §3, above. It cannot pin the sign it exists to pin.
 
 ### 3.4 The residual hazard, stated plainly
@@ -195,6 +230,15 @@ Two things reduce it relative to the two-field scheme, and neither eliminates it
 from a position the operator jogged to and inspected, and there is no sum in which a sign error can
 hide. The header echo is the last line of defence.
 
+**The second hazard is transplant, not typing, and it is the one with no precedent in this dialog.**
+`Travel Machine Z` is a fact about *a machine*, held in a dialog whose values travel with the Fusion
+document. Copy a Setup, share a design, post someone else's file on your own machine, and the number
+arrives with it — correct for a machine that is not this one. Every other dangerous height in this
+dialog is WCS-relative and therefore self-correcting: point it at a different machine and it is still
+measured from that machine's work zero. This is **the first absolute machine-frame number the post
+would ever emit**, so it is also the first that a transplant makes wrong rather than merely different.
+The tooltip must say the number belongs to the machine, not to the job.
+
 ### 3.5 The touch-paint machine is not made safer, only cheaper
 
 An MPCNC with the touch plate wired to both the home and probe inputs homes Z onto **whatever the
@@ -204,6 +248,13 @@ already incorporates whatever Z0 the homing produced — but it does not vanish:
 re-homed against a differently-placed plate and the stored number is not re-read, the height is wrong.
 The machine-Z route removes a WCS register and a probe cycle from that machine's workflow. It does not
 make the machine's Z0 trustworthy, and this document does not claim it does.
+
+**And the failure is loud on one firmware only.** With homing enabled, GRBL comes up in **Alarm and
+refuses all motion until the machine is homed**, so the worst case — a declared machine Z that belongs
+to a previous power cycle — cannot execute there: the job stops before the first move. Marlin and RRF
+have no equivalent lock, so the same misconfiguration on those firmwares simply *runs*, at a height
+measured from a machine zero that has moved. That asymmetry is why §5.2 requires the homing action and
+not merely the declaration.
 
 ### 3.6 A hard limit this lifts
 
@@ -289,27 +340,69 @@ were homed at the controller, but do not home them in this job.*
 Emission is unchanged in shape: GRBL/FluidNC one `$H` via `writeln()` — never `writeBlock()`, per
 `HReview.md` CR-1 — and Marlin/RRF `G28 X` / `G28 Y` / `G28 Z` per declared axis.
 
+**On stock GRBL the split is bookkeeping, not emission — say so rather than implying otherwise.**
+Which axes `$H` homes is fixed at **compile time** by `HOMING_CYCLE_0/1/2` in `grbl/config.h` (default
+`Z` first, then `X|Y`), and the per-axis commands `$HX` / `$HY` / `$HZ` sit behind
+`HOMING_SINGLE_AXIS_COMMANDS`, which is **disabled by default**. Two consequences: the post can neither
+emit per-axis homing there nor *corroborate* the declaration against anything; and a no-Z-endstop
+machine running GRBL has already had its homing cycle recompiled, because the stock default would try
+Z first. **FluidNC is the exception** — it exposes single-axis homing as a per-axis configuration
+option, so `$HX` / `$HZ` are available without a rebuild. The post treats FluidNC as GRBL throughout,
+and this is the one place in the design where that conflation costs something real: on FluidNC the
+capability/action split could actually emit what it declares.
+
 **Declaring the machine frame is a trust assertion**, the same species as `Use Active WCS`: the post
 commands the frame and can never read back where it is. The existing model already carries that
 vocabulary — *"selection is deterministic, origin is trusted"* — so the declaration needs no new
-justification machinery, only the same honesty about what it is.
+justification machinery, only the same honesty about what it is. What §5.2 adds is the one place that
+honesty is not enough: when the declared frame becomes a **datum for an absolute move**, the job must
+establish it rather than assert it.
 
 ### 5.2 Group 5 → `5 - Fixed Z Reference`
 
 | Property | Change |
 |---|---|
-| `Fixed Z Reference` **(new)** | enum `None` / `Spoilboard (probed into a reserved WCS)` / `Machine Z (homed)`; default `None` |
-| `Travel Machine Z` **(new)** | signed mm, empty by default; read only under the `Machine Z` answer. §3.2 |
+| `Fixed Z Reference` **(new)** | enum `None` / `Spoilboard (probed into a reserved WCS)` / `Machine Z (homed)`; default `None`. The `Machine Z` answer **requires `Home at Job Start`** — see below |
+| `Travel Machine Z` **(new)** | signed mm, empty by default; read only under the `Machine Z` answer. §3.2. **Type `string`, parsed** — see below |
 | `Reserved WCS` | unchanged; now explicitly a sub-question of the spoilboard answer |
 | `Probe to Set Base` | see **E1** |
 | `Retract Across Parts` | unchanged control, **relaxed guard** — satisfied by either datum |
 | `Inter Part Safe Z` | unchanged whole-mm integer; tooltip names which datum it is measured in |
 
+**`Machine Z` requires the homing *action*, not just the declaration.** `Machine Z Home` on with `Home
+at Job Start` off is the state §5.1 was written to express — and it is exactly the stale-frame case E1
+rejects `Probe to Set Base = None` for: after a power cycle the frame moved and the declaration did
+not. Here it is worse than E1's case, because the stale frame drives an **absolute rapid** rather than
+a clearance, and §3.5 shows two of the three firmwares execute it silently. So when `Fixed Z Reference
+= Machine Z`, the job homes: the frame the file trusts is one the file established.
+
+> **Rejected: warn instead of require.** It preserves §5.1's *"declared but not homed this job"* state
+> for the datum case, at the price of leaving in the dialog the exact footgun E1 asks to have removed —
+> one frame further from the operator, and on Marlin/RRF with nothing to stop it. The state survives
+> everywhere else; it simply cannot be the basis of an absolute move.
+
+**`Travel Machine Z` cannot be a numeric property.** Fusion's property-definition schema (`id`,
+`title`, `description`, `group`, `type`, `range`, `scope`; types `enum` / `spatial` / `angle` /
+`number` / `integer` / `boolean` / `file` / `folder`) has no way for a numeric field to be *unset* —
+it always holds a value, so "empty" is not expressible and a sentinel like `0` is a real height. It
+follows the `Safe Z` precedent instead: a **string** property, parsed, with empty meaning unset. That
+is what §9's *"`Travel Machine Z` empty → `error()`"* guard reads.
+
+*(The same schema is why this section opens with "no conditional visibility": there is no visibility or
+enablement field to use. The `"ignored when …"` tooltip convention is not a workaround, it is the
+whole mechanism.)*
+
 ### 5.3 What group 7 inherits
 
-The tool-change park gains the branch that is obviously right — a fixed physical spot, `G53 G0 X Y Z`,
-available when `X/Y Home` and `Machine Z Home` are declared — and the *"likely a bug"* comment at
-`:3486` resolves rather than being deleted unanswered.
+The tool-change park gains the branch that is obviously right — a fixed physical spot in the machine
+frame, available when `X/Y Home` and `Machine Z Home` are declared — and the *"likely a bug"* comment
+at `:3486` resolves rather than being deleted unanswered.
+
+**Two blocks, not one, and `G53` on each.** `G53` *"is not modal and must be programmed on each line"*
+(LinuxCNC; RepRapFirmware says the same), so a single `G53 G0 X Y Z` would be both a three-axis
+diagonal — which this post splits and orders precisely so it never drags through the part — and, once
+split, a second block that silently loses its machine frame. The park is `G53 G0 Z<n>` then `G53 G0
+X<n> Y<n>`, retract first, each carrying its own `G53` and an active `G0`.
 
 **This must compose with `PReview.md` §2's settled Phase 4 park design, not replace it.** That design
 decided two branches (base reserved → park relative to the base; no base → plain `G0` in the current
@@ -350,9 +443,10 @@ release-notes item.
 jog-during-message flag. The GRBL branch emits a bare `M0` with a `(MSG …)` comment and **discards the
 parameter entirely.** The Marlin/default branch discards it too.
 
-On GRBL 1.1, `M0` puts the controller into a hold state, and `$J=` jog commands are accepted only from
-Idle/Jog — so the operator cannot jog at the pause without resetting the program. *(Confirm from the
-GRBL wiki's jogging page before writing the warning text — see §8. No controller is needed.)*
+On GRBL 1.1, `M0` puts the controller into a hold state, and the jogging documentation is explicit:
+*"A jog command will only be accepted when Grbl is in either the 'Idle' or 'Jog' states."* (Grbl v1.1
+Jogging, `gnea/grbl` wiki.) So the operator cannot jog at the pause without resetting the program.
+**Settled from source — no controller and no further read is needed to write the warning text.**
 
 `conventions.md` already half-knows this — *"both defaults are no-prompt modes because jogging at a
 pause isn't universally supported"* — but **four dialog options** across `probeOnStart` and
@@ -380,11 +474,18 @@ Rejected in §3 before it shipped. Recorded because it is the plausible wrong an
   branch that emits `G38.2` **unconditionally**, without consulting the property. To be exact about
   what is ignored: **GRBL ignores the *setting*, not the command.** `G38.2` is fully supported on GRBL
   1.1 — `conventions.md` → *Firmware capabilities* lists `G38.2–G38.5` in its supported set — and is
-  what a GRBL job always gets. The property's `Off` (`G28 Z`) path is only defensible on a Marlin build
-  with no dedicated probe, using the Z homing switch as a substitute; on RepRap it should be left On,
-  since RRF supports `G38.2` too. So the control is *useful* on one firmware of three, but it is
-  readable on two, and a RepRap user who turns it off gets `G28 Z` — worth a tooltip that says which
-  firmware it is for, not the removal an earlier draft of this document implied.
+  what a GRBL job always gets. The property's `Off` (`G28 Z`) path is defensible on a Marlin build
+  **without `G38_PROBE_TARGET` compiled in** — `Marlin/src/gcode/gcode.cpp` gates `case 38:` behind it,
+  so `G38.2` is a build option there, not a given — using the Z homing switch as a substitute.
+  **The RepRap half of this needs a version bound, and an earlier draft of this observation was wrong
+  without one.** Duet's documentation: `G38.x` is supported on **Duet 2 and later** in **RRF 3 and
+  later**, and *up to RRF 3.1.1 the `G38.2` target coordinates are expected to be **machine
+  coordinates**; after 3.1.1 they are user coordinates.* This post emits a **work-frame** Z target, so
+  on RRF ≤ 3.1.1 leaving the property On probes to a machine-frame Z — a wrong physical motion, and a
+  worse outcome than the `G28 Z` fallback. Leave it On on RRF **> 3.1.1**; below that the control is
+  not the operator's real problem. So: *useful* on one firmware of three, *readable* on two,
+  *version-bound* on one — worth a tooltip that says which firmware and which version it is for, not
+  the removal an earlier draft of this document implied.
 - **`Prompt Before Home` is inert when homing is off.** Already documented; no change.
 - **`Tool Change Probe` (`includeProbeFile`) is still declared and never read** — `HReview.md` HR-21 /
   CR-15, already tracked. Named here only so this review is not read as having missed it.
@@ -456,37 +557,57 @@ no endstops. Every item below is a requirement, not an aspiration.
 | | Rule | Status |
 |---|---|---|
 | **Guard B** | multi-WCS + `Retract Across Parts` requires **a** fixed Z datum — either kind | relaxed |
-| new | `Fixed Z Reference = Machine Z` with `Machine Z Home` off, or `Travel Machine Z` empty → `error()` | new |
+| new | `Fixed Z Reference = Machine Z` with `Machine Z Home` off, **or `Home at Job Start` off** (§5.2), or `Travel Machine Z` empty → `error()` | new |
 | new | machine-frame features (`G53` park, machine-Z datum) require `X/Y Home` → `error()` | new |
 | new | multi-WCS trusting **stored** offsets with `X/Y Home` off → `warning()`. **Must not fire on the `Jog …` modes** (§4.1) | new |
 | new | a `Jog …` mode selected on GRBL → `warning()` + Important comment (**E2**) | new |
 | **CR-2** | homing + a `Set … to Current Pos` origin mode | unchanged; advice reworded |
 | **Guard A** | no redefine of the reserved base | unchanged |
-| **Guard C** | Marlin is single-frame, so machine-frame features are GRBL/RRF only — same shape as today's base features | unchanged |
+| **Guard C** | machine-frame features are GRBL/RRF only — but the *reason* is not the one Guard C already tests | **extended** |
 
-Placement matters: `conventions.md` → *Validation guards* records that a guard in `onOpen()` refuses
-before any output and leaves **no file**, while a guard in `onSection()` leaves a **truncated
-`.gcode`**. All of the above are configuration guards and belong in `validateJob()`, i.e. `onOpen()`.
+**Why Guard C is extended and not inherited.** Today's Guard C excludes Marlin from *multi-WCS* work,
+because Marlin is single-frame. A machine-frame feature needs a different exclusion: `G53` on Marlin is
+a **build option, off by default** — `Marlin/src/gcode/gcode.cpp` (2.1.x) gates `case 53: G53();`
+inside `#if ENABLED(CNC_COORDINATE_SYSTEMS)`, alongside `G54`–`G59`. A **single-WCS** Marlin job is
+single-frame, passes the existing test, and still cannot execute the move. The two exclusions overlap;
+neither contains the other.
+
+Placement matters twice over. `conventions.md` → *Validation guards* records that a guard in
+`onOpen()` refuses before any output and leaves **no file**, while a guard in `onSection()` leaves a
+**truncated `.gcode`**. All of the above are configuration guards and belong in `validateJob()`, i.e.
+`onOpen()`. And within `validateJob()`, the machine-frame guards must run where the Marlin path
+reaches them — the Marlin branch returns early once its own test is done, so a guard written below it
+is unreachable on exactly the firmware it was written to exclude. One exception: E2's *Important
+comment in the file* is output, not validation, and cannot be emitted from `onOpen()` at all; only its
+`warning()` half belongs here.
 
 ---
 
 ## 10. Firmware questions, to be settled from source
 
 No controller is available, so each is a source read with file and version cited, per `CLAUDE.md`.
-**None blocks the design** — `Travel Machine Z` (§3.2) is convention-independent — but each must be
-answered before the corresponding code is written.
+**None blocks the design** — `Travel Machine Z` (§3.2) is convention-independent.
 
-| Question | Source | Drives |
-|---|---|---|
-| GRBL `M0` hold state vs `$J=` jogging | GRBL 1.1 wiki, jogging page | E2's warning text |
-| `G53` on Marlin 2.x — unconditional, or build-gated? | `MarlinFirmware/Marlin`: `Marlin/src/gcode/gcode.cpp`, `Configuration_adv.h` | whether Marlin needs an explicit exclusion beyond Guard C |
-| `G53` on RepRapFirmware | `Duet3D/RepRapFirmware`: `src/GCodes/GCodes2.cpp`, plus the wiki changelog | RRF support for the park and the datum |
-| GRBL `$H` with a partial axis config — does a machine with only X/Y endstops home cleanly? | GRBL wiki / FluidNC wiki | whether `X/Y Home` alone is emittable |
-| `G30` / `G30.1` axis-word behaviour on all three — does `G30 Z` move Z alone to the stored position? | GRBL wiki; `MarlinFirmware/Marlin`; `Duet3D/RepRapFirmware` | whether the zero-field option of §3.3 is viable |
-| **GRBL `G53` — already answered** | `conventions.md` → *Firmware capabilities* records `G53` in GRBL 1.1's supported set | no work |
+**Five of the six questions this section originally listed have been answered, in one pass of reading
+and with no hardware.** They are recorded here as answers rather than deleted, because each one changed
+something above.
 
-Marlin is already excluded from multi-WCS work by Guard C, so the Marlin read most likely confirms an
-existing exclusion — but per `conventions.md` it must be **read, not assumed**.
+| Question | Answer, and where it landed |
+|---|---|
+| GRBL `M0` hold state vs `$J=` jogging | **Answered.** *"A jog command will only be accepted when Grbl is in either the 'Idle' or 'Jog' states"* — Grbl v1.1 Jogging. E2 stands; §6 carries the quote |
+| `G53` on Marlin 2.x — unconditional, or build-gated? | **Build-gated.** `#if ENABLED(CNC_COORDINATE_SYSTEMS)` in `Marlin/src/gcode/gcode.cpp` (2.1.x). Guard C is *extended*, not inherited — §9 |
+| `G30` / `G30.1` axis-word behaviour on all three | **Answered, and it kills the option.** Bare `G30` moves all axes; `G30 Z<n>` takes a number and rapids through the work frame first; `G30` is a *single Z probe* on Marlin and RRF — §3.3 |
+| GRBL `$H` with a partial axis config | **Answered.** `HOMING_CYCLE_0/1/2` is compile-time and `HOMING_SINGLE_AXIS_COMMANDS` is off by default, so `$H` homes what that build was compiled for and the post can neither emit nor verify per-axis; FluidNC can — §5.1 |
+| GRBL `G53` | **Already answered** — `conventions.md` → *Firmware capabilities* records `G53` in GRBL 1.1's supported set |
+| **`G53` on RepRapFirmware — still open** | RRF documents `G53` as *"not modal and must be programmed on each line"*, which is what §3.2 and §5.3 assume. What remains unread is the **version floor** and the tool-change park's `X`/`Y` behaviour: `Duet3D/RepRapFirmware`, `src/GCodes/GCodes2.cpp`, plus the wiki changelog |
+
+> **Two lessons from answering them, both worth keeping.** First: every one of these was answerable
+> from the sources this document already cited — filing them as open questions cost a design decision
+> (`G30`) that had no business surviving to §3.3. `conventions.md` says it directly: *do the source
+> read **before** filing a question as needing hardware.* Second: **both errors were outside GRBL.**
+> The claims in this document were tested hardest against the default firmware, and what failed was a
+> FluidNC conflation (§5.1) and an RRF version bound (§6) — the second of which would have produced a
+> wrong physical motion. GRBL is not the coverage that is short.
 
 ---
 
