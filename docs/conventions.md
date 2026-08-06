@@ -16,7 +16,7 @@ Each file has a fixed job.
 |---|---|---|---|
 | `CLAUDE.md` | Imperatives that change how a session works: read order, show-a-diff, `node --check`, the register rule, commit convention, what to leave alone | Rationale, history, design, anything that fires only once you are deep in one function | **≤ 60 lines** — it loads in full every session |
 | `plan.md` | The checkpoint (baseline, what is true now, **what is left in order**, live risks), phase status, pointers to completed reviews | Design write-ups, findings, test rows, resolved decisions, open questions, backlog detail | **≤ 120 lines** |
-| `conventions.md` | Three things — **the model** (coordinate model, base/frame, stance), **the conventions** (property & dialog rules), **the method** (how to run a test, harness, tooling) — plus external firmware facts and these contracts | Status of anything, what is next, unbuilt design | **≤ 480 lines** — an overrun means something live has leaked in. It is also the file the volatile ones drain *into*, so it absorbs before it trims. Do not raise it for content that is merely longer |
+| `conventions.md` | Three things — **the model** (frames, stance), **the conventions** (property & dialog rules), **the method** (how to run a test, harness, tooling) — plus external firmware facts and these contracts | Status of anything, what is next, unbuilt design | **≤ 480 lines** — an overrun means something live has leaked in. It is also the file the volatile ones drain *into*, so it absorbs before it trims. Do not raise it for content that is merely longer |
 | `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 300 lines** — a register grows one line per row |
 | `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | **≤ 920 lines, and falling.** §2's long form and §3's expansions are unbuilt design and unrun rows; both retire on build. The §3 index table is permanent, everything under it is not |
 | `README.md` | User-facing usage only. Its `doc-sync` marker records the ref it last synced to | Anything developer-facing | — |
@@ -44,8 +44,11 @@ already states; keep the steps that make a non-derivable argument stand up.
 the first test, and the post holds several hundred of them. A design fact needs a second warrant — it is
 either **the model** or **a trap**:
 
-- **The model** — the shared vocabulary the rest of this file is unreadable without: what a WCS, the base
-  frame and a transit *are*. *Coordinate model* is that section, and it does not grow.
+- **The model** — the shared vocabulary the rest of this file is unreadable without: what a WCS, the fixed
+  Z reference and a transit *are*. ***Frames*** is that section, and it grows only when the post gains a
+  frame — which has happened once, when a homed machine Z became a second implementation of the fixed Z
+  reference. It absorbed *Coordinate model*, *Reserved spoilboard base* and *Machine frame*, which were
+  three sections stating one trust rule three times.
 - **A trap** — someone reached the wrong answer, or the wrong answer would fail **silently**. Every trap
   names its evidence: a finding id, a *Rejected*, or a *Superseded*. A section that cannot name one has
   stopped earning its place.
@@ -152,13 +155,12 @@ FluidNC <http://wiki.fluidnc.com/> · Duet/RRF <https://docs.duet3d.com/User_man
 
 ---
 
-## Coordinate model — *the model; every other section reads against this one*
+## Frames — *the model; every other section reads against this one*
 
 Production controls keep three references separate: **MCS** (`G53`), **WCS** (`G54`–`G59`, `G59.1`–`G59.3`
-on RepRap), and **TLO** (`G43`). Most V1E machines have none fully, hence the work-relative stance.
-
-**There is no tool-length system at all** — no TLO, no tool setter — so a work-Z re-probe after each tool
-change is the substitute, and **X/Y is never probed**.
+on RepRap), and **TLO** (`G43`). Most V1E machines have none fully, hence the work-relative stance. **There
+is no tool-length system at all** — no TLO, no tool setter — so a work-Z re-probe after each tool change is
+the substitute, and **X/Y is never probed**.
 
 - **Persistence:** WCS origins are written with `G10 L20 P<n>` on GRBL/RepRap — scoped to that WCS's own
   register. `P` maps 1:1 to Fusion's `workOffset` (P1–P6 = G54–G59; P7–P9 = G59.1–G59.3, RepRap only).
@@ -166,33 +168,64 @@ change is the substitute, and **X/Y is never probed**.
   than one distinct work offset is a hard error (Guard C).
 - **`workOffset 0`** is Fusion's "default / unset", **not** a request for `G53`; it aliases to WCS 1 /
   `G54`, and must alias identically everywhere, or two paths disagree about which frame a section is in.
-
-**The post asserts the WCS selection; it never inherits it.** This is the justification for the ordering
-in `writeFirstSection()`:
-
-- Fusion **always** supplies a work offset per section, so the post always has a design-time answer.
-- `currentWorkOffset` is **not** machine state. `onOpen()` sets it `undefined` — "no work offset emitted
-  yet". Because it starts undefined the suppression cannot match on the first section, so section 1
-  **unconditionally emits its select**, overwriting whatever the sender left modal. From then on the post
-  is the only thing changing the selection. This is exactly why `writeWCS()` runs before `Start()`, the
-  base establish and `writeWcsOnStart()`.
-- **The distinction that matters:** the post always knows *which* frame is active (it commanded it); it
-  never knows *where* that frame is. Register contents are controller-side runtime state and cannot be
-  read back. So **selection is deterministic, origin is trusted** — every "Use Active WCS" mode is a trust
-  assertion, which is why the *defaults* establish an origin rather than rely on one.
-- **Homing does not change a WCS — it makes one trustworthy.** `G54`–`G59` hold offsets from machine zero
-  and `$H` never touches those registers. On a homed machine a stored offset points at the same physical
-  place across power cycles; with no endstops machine zero is wherever the controller was last reset —
-  still fixed for *that* power cycle, so origins **created** during a run stay mutually consistent and a
-  no-endstop multi-part job is sound. Only a **stored** offset goes bad, which is the whole of why the
-  guard is mode-sensitive rather than blanket.
 - Undefendable by any post: an operator typing `G55` into the console *mid-run*. Out of scope.
 
-## Fixed Z reference — *the model; one concept, two implementations*
+### Selection is deterministic, origin is trusted
 
-A **fixed Z reference** is a frame whose Z0 does not move with stock thickness — the only frame in which
-one clearance height is meaningful across parts of differing thickness, which is why the cross-part safe-Z
-feature requires one (Guard B). A machine can have one two ways, and they are one dialog question:
+**The post commands a frame and can never read back where it is** — register contents are controller-side
+runtime state and there is no query. So it always knows *which* frame is active, and never *where*.
+
+**It asserts the WCS selection and never inherits it**, which justifies `writeFirstSection()`'s ordering:
+Fusion always supplies a work offset per section, so there is always a design-time answer, and
+`currentWorkOffset` is **not** machine state — `onOpen()` sets it `undefined`, so the suppression cannot
+match on the first section, section 1 **unconditionally emits its select** over whatever the sender left
+modal, and thereafter the post alone changes the selection. Hence `writeWCS()` before `Start()`, the
+fixed-Z establish and `writeWcsOnStart()`.
+
+Everything unreadable is therefore a **trust assertion**, and there are two: **a stored WCS origin** (every
+`Use Active WCS` mode — which is why the *defaults* establish an origin rather than rely on one) and **a
+declared machine frame** (the group-4 declarations, the same species).
+
+**Homing does not change a WCS — it makes one trustworthy.** `G54`–`G59` hold offsets from machine zero and
+`$H` never touches those registers. Unhomed, machine zero is wherever the controller was last reset — still
+fixed for *that* power cycle, so origins **created** during a run stay mutually consistent and a no-endstop
+multi-part job is sound. Only a **stored** offset goes bad, which is the whole of why that guard is
+mode-sensitive rather than blanket.
+
+**The one place a trust assertion is not enough:** when a declared frame becomes the **datum for an
+absolute move**, the job must *establish* it — so `Fixed Z Reference = Machine Z` requires `Home at Job
+Start`, not merely the declaration. Firmware forces it: with homing enabled **GRBL comes up in Alarm and
+refuses all motion until homed**, so a stale declared frame cannot execute there, while Marlin and RRF have
+no such lock and run the move against a machine zero that has moved.
+
+### The machine frame — capability, then action
+
+`X/Y Home` and `Machine Z Home` are **facts about the machine**; `Home at Job Start` is **a decision about
+this job**. Separating them expresses a state the enum they replaced could not: *homed at the controller,
+do not home here*.
+
+> **Superseded, kept because it is the plausible wrong answer.** The `None`/`XY`/`XYZ` enum was justified as
+> documenting *operator intent, not an axis mask*. Intent is not what any consumer needs — the machine-Z
+> reference and every stored-offset guard need what is **true of the machine**, and the enum's `XYZ` answer
+> emitted `G28 Z` and then threw that fact away.
+
+| Firmware | What the post can emit |
+|---|---|
+| Marlin / RRF | `G28 X` / `G28 Y` / `G28 Z` — genuinely independent per axis |
+| GRBL | one `$H`. Which axes it homes is **compile-time** (`HOMING_CYCLE_0/1/2`, default Z then X\|Y) and `$HX`/`$HY`/`$HZ` sit behind `HOMING_SINGLE_AXIS_COMMANDS`, **off by default** |
+| FluidNC | single-axis homing is a **configuration** option, so `$HX`/`$HZ` need no rebuild |
+
+So **on GRBL the split is bookkeeping, not emission** — the post can neither emit per-axis homing nor
+corroborate the declaration. FluidNC could, and this post treats FluidNC as GRBL throughout: the one place
+that conflation costs something real. **"Prompt Before Home"** pauses **once before any homing motion**,
+whatever the firmware and axes; the post does not control homing order. **`$H` uses `writeln()`, not
+`writeBlock()`** — GRBL recognises `$` only as the line's first character (CR-1).
+
+### The fixed Z reference — one concept, two implementations
+
+A frame whose Z0 does not move with stock thickness — the only frame in which one clearance height is
+meaningful across parts of differing thickness, which is why the cross-part safe-Z feature requires one
+(Guard B). A machine can have one two ways, and they are one dialog question:
 
 | Answer | The frame | The clearance | Costs |
 |---|---|---|---|
@@ -202,67 +235,33 @@ feature requires one (Guard B). A machine can have one two ways, and they are on
 > **Rejected: exposing only the spoilboard** — the shipped design, which *rejected* multi-WCS jobs on
 > machines whose homed Z would have served, Guard B refusing for want of a base while the operator had
 > already declared the machine homes Z and the post had discarded the fact.
+> **Rejected: giving the base an XY origin.** The base stays a Z-only reference.
 
-**Spoilboard — the base probe emits no XY move, so the park position is an operator precondition**, which
-is why the probe XY offset never applies to the base: the establish runs before any origin exists, so no
-XY target could be trusted. The consequence is real and silent — **whatever is under the tool becomes the
+**Spoilboard — the base probe emits no XY move, so the park position is an operator precondition**, and
+that is why the probe XY offset never applies to it: the establish runs before any origin exists, so no XY
+target could be trusted. The consequence is real and silent — **whatever is under the tool becomes the
 base's Z0**, so parking over the stock records the stock top as "the spoilboard" and every clearance from
 it is short by the stock thickness. **Mitigation is documentation, not code**; the durable fix is unbuilt,
 in `PReview.md` §6. Ignored on Marlin (warned), which has no registers to reserve.
 
-> **Rejected: giving the base an XY origin.** The base stays a Z-only reference.
-
 **Machine Z — one absolute height, collected, never derived.** A height read off the DRO *after* homing is
-already in the controller's own frame, which is what makes it immune to everything below. Units are not
-immune the same way: a `G53` move is read in the active `G20`/`G21`, and GRBL's `$13` can report position
-in inches — hence the mm contract and the header echo.
+already in the controller's own frame, which is what makes it immune to everything below. Units are not: a
+`G53` move is read in the active `G20`/`G21` and GRBL's `$13` can report position in inches — hence the mm
+contract and the header echo. And **transplant, not typing, is its hazard with no precedent here**: every
+other dangerous height in the dialog is WCS-relative and self-correcting, still measured from whatever
+machine it lands on, while this is the post's only absolute machine coordinate and therefore the first
+number a copied Setup or a shared design makes **wrong** rather than merely different.
 
-> **Rejected: an enum naming where the Z switch sits** (top of travel / at the bed). It cannot pin the
-> sign it exists to pin: switch position and the machine value assigned there are independent, and on GRBL
-> the second is not even a runtime choice — `HOMING_FORCE_SET_ORIGIN` (`grbl/config.h`) exists to *"force
-> Grbl to always set the machine origin at the homed location despite switch orientation"*, and at its
-> default Grbl zeroes into negative space whatever the switch orientation. Compile-time, so no `$` query
-> exposes it. (Marlin: `Z_HOME_DIR` + `Z_MIN_POS`/`Z_MAX_POS`.)
+> **Rejected: an enum naming where the Z switch sits** (top of travel / at the bed). It cannot pin the sign
+> it exists to pin: switch position and the machine value assigned there are independent, and on GRBL the
+> second is not even a runtime choice — `HOMING_FORCE_SET_ORIGIN` (`grbl/config.h`) exists to *"force Grbl
+> to always set the machine origin at the homed location despite switch orientation"*, and at its default
+> Grbl zeroes into negative space whatever the switch orientation. Compile-time, so no `$` query exposes
+> it. (Marlin: `Z_HOME_DIR` + `Z_MIN_POS`/`Z_MAX_POS`.)
 > **Rejected: any reference + delta pair** (`Spoilboard Machine Z`, or `Machine Z at Home`, plus a signed
 > offset) — a sum the operator computes and trusts, where one field is a height they jogged to and *saw*
-> clear. The second also shows the delta cannot hold one meaning: on a top-of-travel machine its best
-> value is zero, on a plate-at-the-bed machine it *is* the spoilboard clearance.
-
-**Transplant, not typing, is the hazard with no precedent here.** Every other dangerous height in the
-dialog is WCS-relative and self-correcting — point it at another machine and it is still measured from
-*that* machine's work zero. This is the post's only absolute machine coordinate, so it is the first number
-a copied Setup or a shared design makes **wrong** rather than merely different.
-
-## Machine frame (homing / MCS)
-
-**Capability and action are separate declarations** — `X/Y Home` and `Machine Z Home` (facts about the
-machine) versus `Home at Job Start` (a decision about this job), which is a state the enum they replaced
-could not express: *homed at the controller, do not home here*.
-
-> **Superseded, kept because it is the plausible wrong answer.** The `None`/`XY`/`XYZ` enum was justified
-> as documenting *operator intent, not an axis mask*. Intent is not what any consumer needs — the
-> machine-Z reference and every stored-offset guard need what is **true of the machine**, and the enum's
-> `XYZ` answer emitted `G28 Z` and then threw that fact away.
-
-| Firmware | What the post can emit |
-|---|---|
-| Marlin / RRF | `G28 X` / `G28 Y` / `G28 Z` — genuinely independent per axis |
-| GRBL | one `$H`. Which axes it homes is **compile-time** (`HOMING_CYCLE_0/1/2`, default Z then X\|Y) and `$HX`/`$HY`/`$HZ` sit behind `HOMING_SINGLE_AXIS_COMMANDS`, **off by default** |
-| FluidNC | single-axis homing is a **configuration** option, so `$HX`/`$HZ` need no rebuild |
-
-So **on GRBL the split is bookkeeping, not emission** — the post can neither emit per-axis homing there
-nor corroborate the declaration. FluidNC could; this post treats FluidNC as GRBL throughout, and that is
-the one place the conflation costs something real. **"Prompt Before Home"** pauses **once before any
-homing motion**, independent of firmware and axes; the post does not control homing order. **`$H` uses
-`writeln()`, not `writeBlock()`** — GRBL recognises `$` only as the line's first character (CR-1).
-
-**Declaring the machine frame is a trust assertion**, the same species as `Use Active WCS`: the post
-commands the frame and can never read back where it is. One place that honesty is not enough — when the
-declared frame becomes the **datum for an absolute move**, the job must *establish* it, so
-`Fixed Z Reference = Machine Z` requires `Home at Job Start` and not merely the declaration. Firmware
-forces it: with homing enabled **GRBL comes up in Alarm and refuses all motion until homed**, so a stale
-declared frame cannot execute there, while Marlin and RRF have no such lock and simply run the move
-against a machine zero that has moved.
+> clear. The second also shows the delta cannot hold one meaning: on a top-of-travel machine its best value
+> is zero, on a plate-at-the-bed machine it *is* the spoilboard clearance.
 
 ## Firmware capabilities
 

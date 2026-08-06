@@ -906,7 +906,7 @@ single run — those are separate jobs, and remain future work.
 > probe point, tool-change park (§2), cross-part retract — be decided together. **They were, with PR-1 /
 > PR-2:** the post addresses the machine frame on **exactly the axes the operator declares** and nowhere
 > else. The cross-part retract is built; the park is PR-4, waiting on §2; only this item is still a
-> sketch. `conventions.md` → *Fixed Z reference* holds the durable half.
+> sketch. `conventions.md` → *Frames* holds the durable half.
 
 The base probes wherever the tool is parked, defended only by an operator precondition. The durable fix is
 an explicit **probe point in machine coordinates** — `G53 G0 X<n> Y<n>` before the `G38.2` — so the

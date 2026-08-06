@@ -1571,7 +1571,7 @@ function validateJob() {
   // this must NOT fire on the "Jog to ..." modes, where every origin is created this run: a false
   // positive there would reject the legitimate no-endstop multi-part job the post exists for.
   // Note the default subsequent mode ("Probe Z") uses the stored XY, so this is reachable without
-  // any deliberate choice on a multi-part job. See docs/conventions.md "Coordinate model".
+  // any deliberate choice on a multi-part job. See docs/conventions.md "Frames".
   if (!homedXY) {
     var storedOffsetControls = [];
     if (startMode == "Probe Z" || startMode == "Skip") {
@@ -2029,7 +2029,7 @@ function writeWcsOrigin(wcsNumber, x, y, z) {
 }
 
 // The job's FIXED Z REFERENCE -- "None" | "Spoilboard" | "Machine Z". See
-// docs/conventions.md "Fixed Z reference": the concept is a frame whose Z0 does not move with
+// docs/conventions.md "Frames": the concept is a frame whose Z0 does not move with
 // stock thickness, and the two answers are two implementations of that one frame, not two
 // features. Every consumer below asks this question rather than asking whether a base is reserved.
 function getFixedZReference() {
@@ -2962,7 +2962,7 @@ function writeMachineHoming() {
     // running GRBL has necessarily already recompiled its homing cycle -- the stock default would
     // try Z first.) FluidNC is the exception: it exposes single-axis homing as configuration, so
     // $HX / $HZ are available there without a rebuild, and this post's treating FluidNC as GRBL
-    // throughout is what costs the distinction. See docs/conventions.md "Machine frame".
+    // throughout is what costs the distinction. See docs/conventions.md "Frames".
     writeComment(eComment.Debug, " writeMachineHoming: GRBL/FluidNC, emitting single combined $H"
       + " (declared X/Y: " + homeXY + " Z: " + homeZ + " -- the build's homing cycle decides)");
     // writeln(), NOT writeBlock(). writeBlock() prefixes an N word when "Enable Line #s" is on, and
@@ -3820,7 +3820,7 @@ function toolChange() {
     // THE DECISION IT WAS FLAGGED FOR IS SETTLED: the post does address the
     // machine frame, on exactly the axes the operator declares (group 4) and
     // nowhere else -- see writeMachineTravelZ() and docs/conventions.md
-    // "Fixed Z reference". So the third park branch this comment argues for is
+    // "Frames". So the third park branch this comment argues for is
     // now sanctioned: with "X/Y Home" and "Machine Z Home" declared, park with
     // G53 G0 Z<n> then G53 G0 X<n> Y<n> -- two blocks, retract first, each
     // carrying its own G53, because G53 is not modal and because a single
