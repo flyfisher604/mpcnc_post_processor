@@ -284,8 +284,16 @@ emits no absolute Z move.
 2. **The machine-frame unlock requires declared homed XY.** See §4.1 — the reasoning is sharper than
    "moving between WCS needs it," and the exception matters.
 
-3. **A machine that declares nothing homed posts byte-identical output to today.** Non-negotiable;
-   §7 is the requirement list.
+3. **A machine that declares nothing homed changes no motion, no command and no non-dump comment.**
+   Non-negotiable; §7 is the requirement list.
+
+   > **Corrected on build — this said *byte-identical output*, and that was not achievable.** Adding
+   > four properties necessarily changes the header property dump, which lists every one of them;
+   > the rule as written could only have been satisfied by not adding the fields. It was also
+   > already dead: `conventions.md` → *Context and stance* records that the byte-identical-default
+   > guarantee went when the dump shipped (**HR-1**, CR-6), and that a default-output change is a
+   > decision to be argued rather than a line that cannot be crossed. **The invariant that survives
+   > is the one worth checking** — the dump may change *and nothing else may*.
 
 ### 4.1 Why homed XY is required, and the one case where it is not
 
@@ -537,7 +545,11 @@ no endstops. Every item below is a requirement, not an aspiration.
 
 1. **Every new field defaults to off or empty** — `X/Y Home` off, `Machine Z Home` off, `Home at Job
    Start` off, `Fixed Z Reference = None`, `Travel Machine Z` empty — so the factory-default job
-   emits **byte-identical output**. Verified by posting, diffed against the pre-change build.
+   **emits no motion, command or comment it did not emit before**, the header property dump
+   excepted. Verified by posting, diffed against the pre-change build: the diff may touch the dump
+   (four properties added, one removed, two group headings retitled) and the one Resolved-Values
+   line that renames, and **nothing else may move**. See decision 3 in §4 for why the original
+   *byte-identical* wording was struck rather than kept as an aspiration.
 2. **No new field is required to post, and no new guard can error a default job.** Every guard in §9
    fires only after a deliberate declaration.
 3. **The dangerous number is three deliberate acts away.** `Travel Machine Z` is inert unless
@@ -624,8 +636,8 @@ Sequencing notes, not a schedule — the ordered list of work lives in `docs/pla
   fixed-Z-datum concept (two implementations of one frame) and the machine-frame trust assertion, under
   *Coordinate model* / *Machine frame*. Until then it stays here: that file's contract forbids unbuilt
   design.
-- **Test rows a build would need**, in the shape `PReview.md` §3 uses: a default job proving
-  byte-identical output (§8.1); a homed-XYZ multi-WCS job with no reserved base, proving Guard B's
+- **Test rows a build would need**, in the shape `PReview.md` §3 uses: a default job proving the
+  diff is confined to the property dump (§8.1); a homed-XYZ multi-WCS job with no reserved base, proving Guard B's
   relaxation and one `G53 G0 Z<travelMachineZ>` per traverse, echoed in the header; the first section's
   arrival emitting a real absolute Z instead of the `Unknown Z for XY move.` comment (§3.6); each new guard's
   refusal; a `Jog …` mode on GRBL proving E2's warning; and a `G53` park proving it lands at the same
