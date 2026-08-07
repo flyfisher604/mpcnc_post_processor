@@ -226,8 +226,11 @@ machine-Z datum needs Z and the stored-offset warning needs X/Y, and **neither i
 
 So **on GRBL the split is bookkeeping, not emission** — the post can neither emit per-axis homing nor
 corroborate the declaration. FluidNC could, and this post treats FluidNC as GRBL throughout: the one place
-that conflation costs something real. **"Prompt Before Home"** pauses **once before any homing motion**,
-whatever the firmware and axes; the post does not control homing order. **`$H` uses `writeln()`, not
+that conflation costs something real. **The action is one enum, `Home at Job Start` = `Off` / `Home` /
+`Pause, then Home`**, and its pause is **one stop before any homing motion**, whatever the firmware and
+axes; the post does not control homing order. That pause was a second boolean until it was folded in —
+unlike the axis declaration, **this merge deleted a state rather than renaming one**: "prompt" was inert
+whenever homing was off, so two booleans offered four settings of which only three did anything. **`$H` uses `writeln()`, not
 `writeBlock()`** — GRBL recognises `$` only as the line's first character (CR-1).
 
 ### The fixed Z reference — one concept, two implementations
@@ -438,18 +441,21 @@ is still true: a job that declares no fixed reference at all.
 
 ## Reference — per-machine settings
 
-Group 4 is `Axises Homed and Trusted` (the declaration) + `Home at Job Start` (the action); group 5 is
-`Fixed Z Reference` and the one clearance it gives a frame to.
+Group 4 is `Axises Homed and Trusted` (the declaration) + `Home at Job Start` (the action, including its
+optional pause) + `At End Park At`; group 5 is `Fixed Z Reference` and the one clearance it gives a frame
+to. The park sits in group 4 rather than group 1 because what it *addresses* is the machine frame and it
+is guarded on the declaration — the same reason the action lives there, and the reason its key is
+`machineParkAtEnd`.
 
-| Machine / firmware | Axises Homed and Trusted | Home at start | Prompt | Fixed Z Reference (multi-fixture) | Operator does |
-|---|---|---|---|---|---|
-| LowRider (Marlin or FluidNC) | `XYZ` if Z endstops fitted, else `XY Only` | on | Off | `Machine Z` where Z is declared, else `Spoilboard` `G59` | homes X/Y; work-Z touched off with the plate either way |
-| MPCNC + FluidNC, X/Y switches | `XY Only` | on | Off | `Spoilboard` `G59` | homes X/Y; machine Z n/a, Z set by the work plate |
-| MPCNC + Marlin, plate as Z-endstop | `XYZ` | on | On | `Spoilboard` `G59` — `G53` is a Marlin build option | homes X/Y; at the pause places the movable plate, then Z homes to it |
-| MPCNC, no switches | `None` | off | Off | `Spoilboard` `G59` | parks X/Y by hand as zero; Z set by the work plate |
-| Single-part job (any machine) | per row above | per row above | per row above | `None` | one WCS zeroed to the part; no fixed reference needed |
+| Machine / firmware | Axises Homed and Trusted | Home at Job Start | Fixed Z Reference (multi-fixture) | Operator does |
+|---|---|---|---|---|
+| LowRider (Marlin or FluidNC) | `XYZ` if Z endstops fitted, else `XY Only` | `Home` | `Machine Z` where Z is declared, else `Spoilboard` `G59` | homes X/Y; work-Z touched off with the plate either way |
+| MPCNC + FluidNC, X/Y switches | `XY Only` | `Home` | `Spoilboard` `G59` | homes X/Y; machine Z n/a, Z set by the work plate |
+| MPCNC + Marlin, plate as Z-endstop | `XYZ` | `Pause, then Home` | `Spoilboard` `G59` — `G53` is a Marlin build option | homes X/Y; at the pause places the movable plate, then Z homes to it |
+| MPCNC, no switches | `None` | `Off` | `Spoilboard` `G59` | parks X/Y by hand as zero; Z set by the work plate |
+| Single-part job (any machine) | per row above | per row above | `None` | one WCS zeroed to the part; no fixed reference needed |
 
-> **Two interactions the rows do not show.** (1) `HReview.md` CR-2 — any row with `Home at Job Start` on
+> **Two interactions the rows do not show.** (1) `HReview.md` CR-2 — any row whose `Home at Job Start` is not `Off`
 > must **not** use a `Set … to Current Pos` origin mode: homing moves the tool and the origin would be
 > recorded at the endstop corner. On a homed machine `Use Active WCS X0 Y0, Probe Z0` is the natural
 > answer instead, which is what the warning now says. (2) A stored work offset is repeatable only against

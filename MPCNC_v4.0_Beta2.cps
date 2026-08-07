@@ -213,20 +213,6 @@ properties = {
     value      : true,
     scope      : "post"
   },
-  jobGoOriginOnFinish: {
-    title      : "At End Park At",
-    description: "Where the tool parks when the job ends. Off: leave it where the last operation finished. Work X0 Y0 (default, and what this control has always done): rapid to X0 Y0 in the WCS the LAST operation used -- unambiguous on a single-part job, but on a multi-part job that is the last fixture's corner, and which fixture that is follows Fusion's operation order rather than anything you chose. Machine X0 Y0: the machine's own homing corner -- one park point for every job whatever its structure. It requires Axises Homed and Trusted to include X/Y, and HOW it is reached differs by firmware, as does what else it needs. On GRBL and RepRap it is a rapid, G53 G0 X0 Y0, which ADDRESSES a machine frame this job must already have established -- so it also requires Home at Job Start. On Marlin, where G53 is a build option (CNC_COORDINATE_SYSTEMS) that is off by default, it is G28 X Y instead: this RE-ESTABLISHES the frame rather than addressing it, so it needs no build option and no prior homing, but it is a homing cycle and not a rapid -- slower, onto the endstops, and a larger motion. Note that on Marlin work X0 Y0 and machine X0 Y0 are NOT the same place once a job starts: the part origin is written with G92 at wherever the tool happened to be, and the post cannot read that position back to undo it. Under either machine route, a job that has a Fixed Z Reference retracts to Inter Part Travel Z before traversing; a job with no fixed reference has no frame in which an absolute retract is meaningful and travels at the current Z.",
-    group      : "job",
-    order      : 90,
-    type       : "enum",
-    values: [
-      { title: "Off",           id: "Off" },
-      { title: "Work X0 Y0",    id: "Work" },
-      { title: "Machine X0 Y0", id: "Machine" }
-    ],
-    value: "Work",
-    scope: "post"
-  },
 
   feedsTravelSpeedXY: {
     title      : "Travel Speed X/Y",
@@ -346,26 +332,37 @@ properties = {
   },
   machineHomeAtStart: {
     title      : "Home at Job Start",
-    description: "The ACTION -- emit homing at job start for whichever axes are declared above. Off (default): emit no homing; accept the current position (already homed at the controller, or a power-on 0,0,0). This is a property of the JOB, which is why it is separate from the declaration: a machine whose endstops exist can still be homed once at the controller and left alone for the rest of the session. Per firmware: on GRBL/FluidNC one $H homes every axis THAT BUILD was compiled to home (HOMING_CYCLE_0/1/2 is compile-time and the per-axis $HX/$HY/$HZ commands are off by default), so the declaration above is bookkeeping there rather than emission; FluidNC exposes single-axis homing as configuration, and on Marlin/RepRap each axis is homed independently (G28 X / G28 Y / G28 Z). Required when Fixed Z Reference = Machine Z: an absolute machine-frame move must be measured against a frame this job established, not one a previous power cycle left behind.",
+    description: "The ACTION -- whether this job homes the axes declared above, and whether it pauses first. Off (default): emit no homing; accept the current position, whether that is a machine already homed at the controller or a power-on 0,0,0. Home: home at job start with no pause. Pause, then Home: stop once (M0) before ANY homing motion so the operator can prepare the machine -- place a movable Z-homing plate, clear the bed -- then home. The pause is a single stop whatever the firmware and however many axes home, so it never needs revisiting when the machine changes. THIS IS A PROPERTY OF THE JOB, which is why it is separate from the declaration above: a machine whose endstops exist can still be homed once at the controller and left alone for the rest of the session. Per firmware: on GRBL/FluidNC one $H homes every axis THAT BUILD was compiled to home (HOMING_CYCLE_0/1/2 is compile-time and the per-axis $HX/$HY/$HZ commands are off by default), so the declaration above is bookkeeping there rather than emission; FluidNC exposes single-axis homing as configuration, and on Marlin/RepRap each axis is homed independently (G28 X / G28 Y / G28 Z). Must not be Off when Fixed Z Reference = Machine Z: an absolute machine-frame move must be measured against a frame this job established, not one a previous power cycle left behind.",
     group      : "machine",
     order      : 30,
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
+    type       : "enum",
+    values: [
+      { title: "Off",                id: "Off" },
+      { title: "Home",               id: "Home" },
+      { title: "Pause, then Home",   id: "Pause & Home" }
+    ],
+    value: "Off",
+    scope: "post"
   },
-  machinePromptBeforeHome: {
-    title      : "Prompt Before Home",
-    description: "Pause once before any homing motion so the operator can prepare the machine (e.g. place a movable Z-homing plate, or clear the bed). Fires whenever Home at Job Start runs homing (any firmware, any axes) -- so it never needs revisiting when the machine changes. No effect when Home at Job Start is off.",
+
+  machineParkAtEnd: {
+    title      : "At End Park At",
+    description: "Where the tool parks when the job ends. Off: leave it where the last operation finished. Work X0 Y0 (default, and what this control has always done): rapid to X0 Y0 in the WCS the LAST operation used -- unambiguous on a single-part job, but on a multi-part job that is the last fixture's corner, and which fixture that is follows Fusion's operation order rather than anything you chose. Machine X0 Y0: the machine's own homing corner -- one park point for every job whatever its structure. It requires Axises Homed and Trusted to include X/Y, and HOW it is reached differs by firmware, as does what else it needs. On GRBL and RepRap it is a rapid, G53 G0 X0 Y0, which ADDRESSES a machine frame this job must already have established -- so it also requires Home at Job Start to be Home or Pause, then Home. On Marlin, where G53 is a build option (CNC_COORDINATE_SYSTEMS) that is off by default, it is G28 X Y instead: this RE-ESTABLISHES the frame rather than addressing it, so it needs no build option and no prior homing, but it is a homing cycle and not a rapid -- slower, onto the endstops, and a larger motion. On Marlin it is therefore the one machine-frame feature that works with Home at Job Start left Off. Note that on Marlin work X0 Y0 and machine X0 Y0 are NOT the same place once a job starts: the part origin is written with G92 at wherever the tool happened to be, and the post cannot read that position back to undo it. Under either machine route, a job that has a Fixed Z Reference retracts to Inter Part Travel Z before traversing; a job with no fixed reference has no frame in which an absolute retract is meaningful and travels at the current Z.",
     group      : "machine",
-    order      : 40,
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
+    order      : 50,
+    type       : "enum",
+    values: [
+      { title: "Off",           id: "Off" },
+      { title: "Work X0 Y0",    id: "Work" },
+      { title: "Machine X0 Y0", id: "Machine" }
+    ],
+    value: "Work",
+    scope: "post"
   },
 
   spoilboardFixedZRef: {
     title      : "Fixed Z Reference",
-    description: "The job's fixed Z reference: a frame whose Z0 does NOT move with stock thickness, and therefore the only frame in which one clearance height is meaningful across parts of differing thickness. Multi-part jobs need one; single-part jobs do not. THIS ANSWER ALSO DECIDES WHICH FRAME Inter Part Travel Z BELOW IS MEASURED IN, so re-read that height whenever this changes. None (default): no fixed reference -- Retract Across Parts is unavailable on a multi-WCS job, and Inter Part Travel Z is ignored. Spoilboard: reserve a WCS and probe the spoilboard into it; Inter Part Travel Z is then a height above that surface. Sub-questions are Reserved WCS and Probe to Set Base below. GRBL/RepRap only -- Marlin has no per-WCS registers. Machine Z: use the machine's own homed Z frame; Inter Part Travel Z is then an absolute machine coordinate emitted as G53 G0 Z. Consumes NO WCS register and needs no probe, but requires Axises Homed and Trusted to include Z AND Home at Job Start, in group 4 -- the frame an absolute move trusts must be one this job established. Not available on Marlin, where G53 is a build option that is off by default.",
+    description: "The job's fixed Z reference: a frame whose Z0 does NOT move with stock thickness, and therefore the only frame in which one clearance height is meaningful across parts of differing thickness. Multi-part jobs need one; single-part jobs do not. THIS ANSWER ALSO DECIDES WHICH FRAME Inter Part Travel Z BELOW IS MEASURED IN, so re-read that height whenever this changes. None (default): no fixed reference -- Retract Across Parts is unavailable on a multi-WCS job, and Inter Part Travel Z is ignored. Spoilboard: reserve a WCS and probe the spoilboard into it; Inter Part Travel Z is then a height above that surface. Sub-questions are Reserved WCS and Probe to Set Base below. GRBL/RepRap only -- Marlin has no per-WCS registers. Machine Z: use the machine's own homed Z frame; Inter Part Travel Z is then an absolute machine coordinate emitted as G53 G0 Z. Consumes NO WCS register and needs no probe, but requires Axises Homed and Trusted to include Z AND Home at Job Start not Off, both in group 4 -- the frame an absolute move trusts must be one this job established. Not available on Marlin, where G53 is a build option that is off by default.",
     group      : "spoilboard",
     order      : 10,
     type       : "enum",
@@ -1544,7 +1541,7 @@ function validateJob() {
   var startMode = getProperty(properties.probeOnStart);
   var changeMode = getProperty(properties.probeOnChange);
   var homedXY = machineHomesXY();
-  if (getProperty(properties.machineHomeAtStart) &&
+  if (homesAtJobStart() &&
       (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
     // Reworded as advice rather than prohibition: with X/Y declared homed, a stored fixture offset
     // in the active WCS is repeatable across power cycles, so it is a better first-part answer than
@@ -1553,7 +1550,7 @@ function validateJob() {
       + "\"First WCS / Part\" records the current position as the part origin, so jogging to the "
       + "part before starting the job has no effect. On a homed machine the stored offset in the "
       + "active WCS is repeatable, so \"Use Active WCS X0 Y0, Probe Z0\" is the natural first-part "
-      + "mode here; a \"Jog to ...\" mode also works. Otherwise turn off \"Home at Job Start\"."));
+      + "mode here; a \"Jog to ...\" mode also works. Otherwise set \"Home at Job Start\" to Off."));
   }
 
   // A G54-G59 register holds an offset from MACHINE zero, and homing never touches those registers
@@ -1668,8 +1665,8 @@ function validateJob() {
     // all motion until homed, while Marlin and RRF have no equivalent lock and simply run the move
     // at a height measured from a machine zero that has moved. So when this is the datum, the job
     // homes: the frame the file trusts is one the file established.
-    if (!getProperty(properties.machineHomeAtStart)) {
-      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Home at Job Start\" -- an absolute machine-frame move must be measured against a frame this job established, not one a previous power cycle left behind.");
+    if (!homesAtJobStart()) {
+      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Home at Job Start\" to be Home or Pause, then Home -- an absolute machine-frame move must be measured against a frame this job established, not one a previous power cycle left behind.");
       return;
     }
     if (parseInterPartTravelZ() == undefined) {
@@ -1693,13 +1690,13 @@ function validateJob() {
   // addressing it, and that is also why the "Home at Job Start" half below is GRBL/RepRap-only:
   // their route is an absolute rapid into a frame that must already exist, Marlin's route IS the
   // homing. See writeMachineParkXY() and docs/PReview.md PR-6.
-  if (getProperty(properties.jobGoOriginOnFinish) == "Machine") {
+  if (getProperty(properties.machineParkAtEnd) == "Machine") {
     if (!machineHomesXY()) {
       error("\"At End Park At\" = machine X0 Y0 requires \"Axises Homed and Trusted\" to include X/Y -- a machine's X0 Y0 is its homing corner, which means nothing on a machine that does not home.");
       return;
     }
-    if (fw != eFirmware.MARLIN && !getProperty(properties.machineHomeAtStart)) {
-      error("\"At End Park At\" = machine X0 Y0 emits G53 on " + fw + ", which measures against a machine frame this job must have established, not one a previous power cycle left behind -- turn on \"Home at Job Start\", or park at work X0 Y0.");
+    if (fw != eFirmware.MARLIN && !homesAtJobStart()) {
+      error("\"At End Park At\" = machine X0 Y0 emits G53 on " + fw + ", which measures against a machine frame this job must have established, not one a previous power cycle left behind -- set \"Home at Job Start\" to Home, or park at work X0 Y0.");
       return;
     }
   }
@@ -1844,7 +1841,7 @@ function onClose() {
     // Which X0 Y0 -- the question this control could not previously answer. "Work" is the last
     // section's WCS, which on a multi-part job is whichever fixture Fusion ordered last; "Machine"
     // is the homing corner and is the same physical point for every job. See docs/PReview.md PR-6.
-    var park = getProperty(properties.jobGoOriginOnFinish);
+    var park = getProperty(properties.machineParkAtEnd);
     if (park == "Machine") {
       writeMachineParkXY();
     } else if (park == "Work") {
@@ -2096,6 +2093,18 @@ function machineHomesXY() {
 function machineHomesZ() {
   var declared = getProperty(properties.machineHomedAxes);
   return declared == "Z" || declared == "XYZ";
+}
+
+// The group-4 ACTION, split into the two questions its consumers ask. Unlike the axis declaration
+// above, this enum is NOT information-identical to the two booleans it replaced: those expressed
+// four states of which only three were distinct, because "Prompt Before Home" was inert whenever
+// homing was off and said so in its own tooltip. Collapsing them deletes the meaningless state
+// rather than renaming it -- the dialog can no longer be set to a combination that does nothing.
+function homesAtJobStart() {
+  return getProperty(properties.machineHomeAtStart) != "Off";
+}
+function promptsBeforeHome() {
+  return getProperty(properties.machineHomeAtStart) == "Pause & Home";
 }
 
 // The reserved spoilboard base as a workOffset number (1-6 = G54-G59,
@@ -3050,11 +3059,11 @@ function writeResolvedValues() {
 function writeMachineHoming() {
   var homeXY = machineHomesXY();
   var homeZ = machineHomesZ();
-  var atStart = getProperty(properties.machineHomeAtStart);
+  var atStart = homesAtJobStart();
 
   writeComment(eComment.Debug, " writeMachineHoming: entry fw: " + fw + " Axises Homed and Trusted: "
     + getProperty(properties.machineHomedAxes) + " -- X/Y: " + homeXY + " Z: " + homeZ
-    + " Home at Job Start: " + atStart);
+    + " Home at Job Start: " + getProperty(properties.machineHomeAtStart));
 
   if (!atStart) {
     writeComment(eComment.Debug, " writeMachineHoming: Home at Job Start off -- current position accepted as zero, no motion");
@@ -3070,11 +3079,13 @@ function writeMachineHoming() {
     return;
   }
 
-  // Optional single pause before any homing motion -- lets the operator prepare the machine
-  // (place a movable Z-homing plate, clear the bed, etc.). Independent of firmware and of
-  // which axes home, so it never needs revisiting when the machine changes.
-  if (getProperty(properties.machinePromptBeforeHome)) {
-    writeComment(eComment.Debug, " writeMachineHoming: pausing before homing (Prompt Before Home)");
+  // The "Pause, then Home" answer: a single stop before ANY homing motion, letting the operator
+  // prepare the machine (place a movable Z-homing plate, clear the bed, etc.). Independent of
+  // firmware and of which axes home, so it never needs revisiting when the machine changes. It is
+  // an answer to this control rather than a control of its own because it was never meaningful on
+  // its own: as a separate boolean it was inert whenever homing was off.
+  if (promptsBeforeHome()) {
+    writeComment(eComment.Debug, " writeMachineHoming: pausing before homing (Pause, then Home)");
     askUser("Prepare machine for homing", "Homing", false);
   }
 

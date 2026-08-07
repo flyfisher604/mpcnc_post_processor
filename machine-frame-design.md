@@ -16,6 +16,7 @@
 > |---|---|
 > | `X/Y Home` + `Machine Z Home` — two booleans (§5.1, §6, §9) | one enum, `Axises Homed and Trusted` = `None` / `XY Only` / `Z Only` / `XYZ` — information-identical, read only via `machineHomesXY()` / `machineHomesZ()` |
 > | `Inter Part Safe Z` (whole-mm integer, default 40) **and** `Travel Machine Z` (signed string, empty) as two fields (§3.2, §5.1) | one `Inter Part Travel Z`, signed string, **empty by default**, whose frame follows `Fixed Z Reference` |
+> | `Home at Job Start` **and** `Prompt Before Home` — two booleans (§5.1, §6) | one enum, `Home at Job Start` = `Off` / `Home` / `Pause, then Home` (`PReview.md` **PR-7**). §6's *"`Prompt Before Home` is inert when homing is off"* is why: that state is now unreachable rather than merely documented |
 >
 > The *arguments* below survive both merges intact — §3.2's "collected, never derived", §3.3's
 > rejection of every reference-plus-delta pair, and §5.2's proof that the height cannot be a numeric
