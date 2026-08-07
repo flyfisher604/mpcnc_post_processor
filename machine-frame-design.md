@@ -7,7 +7,20 @@
 > the reason the contracted files exist. Treat every claim here as true as of **2026-08-05** and
 > verify against the post before acting on it.
 >
-> It records a **design and a decision**. No code has been written against it.
+> **The design has since landed, and the dialog it specifies has since been consolidated.** This file
+> is now a *record of the reasoning*, not a description of the shipped dialog. Two of its property
+> decisions were superseded by `PReview.md` **PR-5**, and every section below that names them is
+> stale in exactly that way:
+>
+> | This document says | The post now has |
+> |---|---|
+> | `X/Y Home` + `Machine Z Home` — two booleans (§5.1, §6, §9) | one enum, `Axises Homed and Trusted` = `None` / `XY Only` / `Z Only` / `XYZ` — information-identical, read only via `machineHomesXY()` / `machineHomesZ()` |
+> | `Inter Part Safe Z` (whole-mm integer, default 40) **and** `Travel Machine Z` (signed string, empty) as two fields (§3.2, §5.1) | one `Inter Part Travel Z`, signed string, **empty by default**, whose frame follows `Fixed Z Reference` |
+>
+> The *arguments* below survive both merges intact — §3.2's "collected, never derived", §3.3's
+> rejection of every reference-plus-delta pair, and §5.2's proof that the height cannot be a numeric
+> property are what the merged field still rests on. What changed is how many dialog rows carry them.
+> **`docs/conventions.md` → *Frames* is the current model**; where the two disagree, it wins.
 
 ---
 

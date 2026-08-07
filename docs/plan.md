@@ -13,16 +13,21 @@ thing to change first if you think something new belongs here.
 *Written so a fresh session can resume with no other context. Update it when the situation moves.*
 
 **Baseline.** Branch **`machine-frame-design`**, cut from `PropertyUpdate`. **The machine-frame /
-fixed-Z-reference rework has landed** — `PReview.md` **PR-1 · PR-2 · PR-3** and `HReview.md` **HR-28** —
-and it is **the first change since `c73726c` to alter what the post emits.** Nothing is half-done;
+fixed-Z-reference rework has landed, and its dialog has since been consolidated** — `PReview.md`
+**PR-1 · PR-2 · PR-3 · PR-5** and `HReview.md` **HR-28** — and it is **the first change since `c73726c`
+to alter what the post emits.** Nothing is half-done;
 **nothing is posted.** Untracked and deliberate: both `MPCNC_v4.0_Beta*.zip`, and `Personal.cps` (a test
 harness, excluded via `.git/info/exclude` — see `conventions.md`).
 
-**What that rework did, in one line each.** Group 4 became `X/Y Home` · `Machine Z Home` (machine
-declarations) + `Home at Job Start` (the action), replacing the `None`/`XY`/`XYZ` enum. Group 5 became
+**What that rework did, in one line each.** Group 4 became a machine declaration + `Home at Job Start`
+(the action), replacing the `None`/`XY`/`XYZ` enum that conflated the two. Group 5 became
 `Fixed Z Reference` — `None` / `Spoilboard` / `Machine Z` — so a homed machine Z is a second
 implementation of the frame the reserved base used to be the only route to; the machine-Z answer emits
-`G53 G0 Z<Travel Machine Z>`, consumes no WCS register and needs no probe. Guard B relaxed to *a* datum of
+`G53 G0 Z<Inter Part Travel Z>`, consumes no WCS register and needs no probe. **PR-5 then collapsed the
+two new booleans into one `Axises Homed and Trusted` enum (`None`/`XY Only`/`Z Only`/`XYZ`) and the two
+mutually-exclusive clearance fields into one `Inter Part Travel Z` whose frame follows `Fixed Z
+Reference`** — which forces that field empty by default, since a live default would let an enum flip emit
+a valid-looking height in the wrong frame. Guard B relaxed to *a* datum of
 either kind; four guards and two warnings added; `Probe to Set Base = None` removed. **This resolves the
 standing "Never `G53`" decision** (`PReview.md` §6): the post addresses the machine frame on exactly the
 axes the operator declares.
@@ -46,7 +51,7 @@ records a pass, and the Method column matters as much as the state (`conventions
 
 | | Item | Note |
 |---|---|---|
-| 0 | **Post-verify the machine-frame rework** | It is unposted, and it changed the dialog and the emitted file. **`PReview.md` REG-MF first** — the GRBL/mm factory-default diff, which must touch only the property dump and one Resolved-Values line. Then **PR-2a** (the feature actually working), **PR-2c** (seven refusals, each leaving no file — the Marlin one proves the guard sits *above* Guard C's early return), and `HReview.md` **HR-28 (A)**. Rows in `PReview.md` §3.6. Two node harnesses stand in meanwhile — 29 guard cases and 12 emission cases, run against the working tree and aborting against `HEAD` — and they prove logic and block shape, never output |
+| 0 | **Post-verify the machine-frame rework** | It is unposted, and it changed the dialog and the emitted file. **`PReview.md` REG-MF first** — the GRBL/mm factory-default diff, which must touch only the property dump and the Resolved-Values block. Then **PR-5a** (the enum flip — the one hazard consolidation created, and the row PR-5 lives or dies on), **PR-2a** (the feature actually working), **PR-2c** (nine refusals, each leaving no file — the Marlin one proves the guard sits *above* Guard C's early return), **PR-5b**, and `HReview.md` **HR-28 (A)**. Rows in `PReview.md` §3.6. A node guard harness stands in meanwhile — 23 guard cases + 18 unit checks, green on the working tree and **aborting** against `HEAD` — and it proves logic only, never output |
 | 1 | **Post-verify the 14 `CR-` fixes** | The four `⬜` rows in `HReview.md`'s test register, **`CR-REG` first** — the GRBL/mm factory-default regression matters most, and it now folds into REG-MF above. `CR-1 (A)` needs `Enable Line #s` on + `X/Y Home` and `Home at Job Start` on, a combination no configuration in the record has used. Two further posts serve `PReview.md` §3.5 |
 | 2 | **Tidy-up sweep** | `HR-19`'s `M291` doubled space; **HR-21 / CR-15** (wire the dead `Tool Change Probe` property into `probeTool()` — Tool Change branch work — or delete it); **HR-24** (`writeWCS()` should read `section.getTool()`, not the global `tool`). All one-liners, none changing output |
 | 3 | **Dialog-only checks** | **D1** and **D3**'s dialog half (`PReview.md` §3.3). The properties literal is now declared in display order, so if the dialog *still* shows groups out of numeric order, Fusion is not sorting and the zero-padding convention is wrong |

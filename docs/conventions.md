@@ -200,14 +200,23 @@ no such lock and run the move against a machine zero that has moved.
 
 ### The machine frame — capability, then action
 
-`X/Y Home` and `Machine Z Home` are **facts about the machine**; `Home at Job Start` is **a decision about
-this job**. Separating them expresses a state the enum they replaced could not: *homed at the controller,
-do not home here*.
+`Axises Homed and Trusted` — `None` / `XY Only` / `Z Only` / `XYZ` — is a **fact about the machine**;
+`Home at Job Start` is **a decision about this job**. Separating them expresses a state the old
+`Home Before Start` enum could not: *homed at the controller, do not home here*.
 
-> **Superseded, kept because it is the plausible wrong answer.** The `None`/`XY`/`XYZ` enum was justified as
-> documenting *operator intent, not an axis mask*. Intent is not what any consumer needs — the machine-Z
-> reference and every stored-offset guard need what is **true of the machine**, and the enum's `XYZ` answer
-> emitted `G28 Z` and then threw that fact away.
+**One enum, two predicates.** The declaration is one dialog control because the operator declares a
+machine, and its four answers are exactly the four combinations of two independent axis facts. The code
+never reads it directly: `machineHomesXY()` and `machineHomesZ()` are the only accessors, because the
+machine-Z datum needs Z and the stored-offset warning needs X/Y, and **neither implies the other** — an
+`== "XYZ"` test anywhere would silently exclude `XY Only` and `Z Only`.
+
+> **Superseded, kept because both are plausible wrong answers.** (1) The old `None`/`XY`/`XYZ`
+> `Home Before Start` enum conflated the capability with the action, had no way to say *Z only*, and its
+> `XYZ` answer emitted `G28 Z` and then threw away the fact that the machine *has* a homed Z. (2) The two
+> booleans that replaced it — `X/Y Home` + `Machine Z Home` — carried the right information but asked the
+> operator two questions about one machine and let the dialog express the pair as unrelated. The current
+> enum is information-identical to the booleans and is **not** a return to the first form: it declares
+> capability only, and the action stays separate.
 
 | Firmware | What the post can emit |
 |---|---|
@@ -227,10 +236,28 @@ A frame whose Z0 does not move with stock thickness — the only frame in which 
 meaningful across parts of differing thickness, which is why the cross-part safe-Z feature requires one
 (Guard B). A machine can have one two ways, and they are one dialog question:
 
-| Answer | The frame | The clearance | Costs |
+| Answer | The frame | `Inter Part Travel Z` is then… | Costs |
 |---|---|---|---|
-| **Spoilboard** | a probed surface in a reserved WCS | `Inter Part Safe Z`, above that surface | one WCS register — GRBL has six — plus a probe cycle |
-| **Machine Z** | the machine's own homed Z | `Travel Machine Z`, an absolute machine coordinate | a per-machine number read off a DRO |
+| **Spoilboard** | a probed surface in a reserved WCS | a height **above that surface** — positive | one WCS register — GRBL has six — plus a probe cycle |
+| **Machine Z** | the machine's own homed Z | an **absolute machine coordinate** — signed | a per-machine number read off a DRO |
+
+**One clearance field, not two.** The two answers are never both live, they are read at the same two
+moments (the establish in the preamble, and each cross-WCS traverse), and on a correct setup they name the
+*same physical plane* — so they are one control, `Inter Part Travel Z`, and this enum says which frame it
+is measured in. What that costs is a hazard the two separate fields made impossible: **the enum flip**. A
+height valid in the other frame is still a valid-looking height, and only one direction is detectable —
+a spoilboard clearance is measured *up* from the probed surface, so `<= 0` cannot be one and is guarded,
+while a spoilboard `40` left in a machine-Z job is indistinguishable from a real height on a bed-zeroed
+machine. Three things carry that risk: the field **ships empty and is guarded under both answers**, so an
+untouched dialog cannot post; the header echo **names the frame** beside the number; and both tooltips say
+the frame is decided elsewhere.
+
+**Why it is a parsed string and not a number.** Under the spoilboard answer a number would do — `0` is
+meaningless there, so it could have served as *unset*, which is what the old whole-mm integer relied on.
+The machine-Z answer has no such spare value: every signed number is a real reachable height, `0` very
+much included (on a stock GRBL build the machine zeroes into negative space, so `Z0` is the *top of
+travel*). Fusion's schema gives a numeric property no unset state, so *empty* is only expressible on a
+string — and once the field is shared, the stricter of the two requirements wins.
 
 > **Rejected: exposing only the spoilboard** — the shipped design, which *rejected* multi-WCS jobs on
 > machines whose homed Z would have served, Guard B refusing for want of a base while the operator had
@@ -342,8 +369,9 @@ only and adds no new stops.
   > before the job — which is wrong: the register is the one this Setup designates, and the post *selects*
   > it at job start.
 
-**Two controls were both titled "Safe Z".** The spoilboard one is now **"Inter Part Safe Z"** (whole mm
-above the spoilboard); the post-probe retract keeps **"Safe Z"**.
+**Two controls were both titled "Safe Z".** The cross-part one is now **"Inter Part Travel Z"** (signed
+mm, frame set by `Fixed Z Reference`); the post-probe retract keeps **"Safe Z"**. It absorbed the former
+**"Travel Machine Z"** as well — see *The fixed Z reference* above.
 
 ---
 
@@ -354,9 +382,9 @@ above the spoilboard); the post-probe retract keeps **"Safe Z"**.
 **"Map: Safe Z to Rapid"** answers a narrower question — "within *this* operation, is Z high enough to
 re-emit a cut G1 as a G0?" It is operation-scoped and only populated when the hobby group is on, so it is
 the wrong source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance
-measured above the spoilboard base** ("Inter Part Safe Z").
+measured in the job's fixed Z reference** ("Inter Part Travel Z").
 
-**The Inter Part Safe Z cannot be an F360 expression (asked and answered).** `Clearance:40` would parse
+**The Inter Part Travel Z cannot be an F360 expression (asked and answered).** `Clearance:40` would parse
 today and is still the wrong source: every F360 height parameter is **per-operation and expressed in that
 operation's own WCS**, while this must be expressed in the
 **base's** frame — feeding a part-frame number into a base-frame `G0 Z` under-clears by the stock
@@ -402,28 +430,28 @@ That case gets an Info comment instead (`Ensuring that Z is safe. Unknown Z for 
 that deliberately emits no absolute Z move.
 
 **The machine-Z answer lifts the limit rather than working around it.** A declared, homed machine Z *is* an
-established frame at job start, so on such a machine the arrival emits a real `G53 G0 Z<Travel Machine Z>`
+established frame at job start, so on such a machine the arrival emits a real `G53 G0 Z<Inter Part Travel Z>`
 and the comment is suppressed exactly as an established base suppresses it. The limit stands only where it
 is still true: a job that declares no fixed reference at all.
 
 ## Reference — per-machine settings
 
-Group 4 is `X/Y Home` / `Machine Z Home` (declarations) + `Home at Job Start` (the action); group 5 is
-`Fixed Z Reference` and its clearance.
+Group 4 is `Axises Homed and Trusted` (the declaration) + `Home at Job Start` (the action); group 5 is
+`Fixed Z Reference` and the one clearance it gives a frame to.
 
-| Machine / firmware | X/Y · Z declared | Home at start | Prompt | Fixed Z Reference (multi-fixture) | Operator does |
+| Machine / firmware | Axises Homed and Trusted | Home at start | Prompt | Fixed Z Reference (multi-fixture) | Operator does |
 |---|---|---|---|---|---|
-| LowRider (Marlin or FluidNC) | on · on if Z endstops fitted | on | Off | `Machine Z` where Z is declared, else `Spoilboard` `G59` | homes X/Y; work-Z touched off with the plate either way |
-| MPCNC + FluidNC, X/Y switches | on · off | on | Off | `Spoilboard` `G59` | homes X/Y; machine Z n/a, Z set by the work plate |
-| MPCNC + Marlin, plate as Z-endstop | on · on | on | On | `Spoilboard` `G59` — `G53` is a Marlin build option | homes X/Y; at the pause places the movable plate, then Z homes to it |
-| MPCNC, no switches | off · off | off | Off | `Spoilboard` `G59` | parks X/Y by hand as zero; Z set by the work plate |
+| LowRider (Marlin or FluidNC) | `XYZ` if Z endstops fitted, else `XY Only` | on | Off | `Machine Z` where Z is declared, else `Spoilboard` `G59` | homes X/Y; work-Z touched off with the plate either way |
+| MPCNC + FluidNC, X/Y switches | `XY Only` | on | Off | `Spoilboard` `G59` | homes X/Y; machine Z n/a, Z set by the work plate |
+| MPCNC + Marlin, plate as Z-endstop | `XYZ` | on | On | `Spoilboard` `G59` — `G53` is a Marlin build option | homes X/Y; at the pause places the movable plate, then Z homes to it |
+| MPCNC, no switches | `None` | off | Off | `Spoilboard` `G59` | parks X/Y by hand as zero; Z set by the work plate |
 | Single-part job (any machine) | per row above | per row above | per row above | `None` | one WCS zeroed to the part; no fixed reference needed |
 
 > **Two interactions the rows do not show.** (1) `HReview.md` CR-2 — any row with `Home at Job Start` on
 > must **not** use a `Set … to Current Pos` origin mode: homing moves the tool and the origin would be
 > recorded at the endstop corner. On a homed machine `Use Active WCS X0 Y0, Probe Z0` is the natural
 > answer instead, which is what the warning now says. (2) A stored work offset is repeatable only against
-> a homed machine zero, so the two `Use Active WCS …` modes warn when `X/Y Home` is not declared — and
+> a homed machine zero, so the two `Use Active WCS …` modes warn when the declaration does not include X/Y — and
 > deliberately do **not** warn on the `Jog to …` modes, where every origin is created during that run.
 
 ---
