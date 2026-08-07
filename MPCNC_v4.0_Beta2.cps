@@ -214,13 +214,18 @@ properties = {
     scope      : "post"
   },
   jobGoOriginOnFinish: {
-    title      : "At End Go to 0,0",
-    description: "Return to X0 Y0 at gcode end, Z remains unchanged.",
+    title      : "At End Park At",
+    description: "Where the tool parks when the job ends. Off: leave it where the last operation finished. Work X0 Y0 (default, and what this control has always done): rapid to X0 Y0 in the WCS the LAST operation used -- unambiguous on a single-part job, but on a multi-part job that is the last fixture's corner, and which fixture that is follows Fusion's operation order rather than anything you chose. Machine X0 Y0: the machine's own homing corner -- one park point for every job whatever its structure. It requires Axises Homed and Trusted to include X/Y, and HOW it is reached differs by firmware, as does what else it needs. On GRBL and RepRap it is a rapid, G53 G0 X0 Y0, which ADDRESSES a machine frame this job must already have established -- so it also requires Home at Job Start. On Marlin, where G53 is a build option (CNC_COORDINATE_SYSTEMS) that is off by default, it is G28 X Y instead: this RE-ESTABLISHES the frame rather than addressing it, so it needs no build option and no prior homing, but it is a homing cycle and not a rapid -- slower, onto the endstops, and a larger motion. Note that on Marlin work X0 Y0 and machine X0 Y0 are NOT the same place once a job starts: the part origin is written with G92 at wherever the tool happened to be, and the post cannot read that position back to undo it. Under either machine route, a job that has a Fixed Z Reference retracts to Inter Part Travel Z before traversing; a job with no fixed reference has no frame in which an absolute retract is meaningful and travels at the current Z.",
     group      : "job",
     order      : 90,
-    type       : "boolean",
-    value      : true,
-    scope      : "post"
+    type       : "enum",
+    values: [
+      { title: "Off",           id: "Off" },
+      { title: "Work X0 Y0",    id: "Work" },
+      { title: "Machine X0 Y0", id: "Machine" }
+    ],
+    value: "Work",
+    scope: "post"
   },
 
   feedsTravelSpeedXY: {
@@ -1681,6 +1686,24 @@ function validateJob() {
     }
   }
 
+  // "At End Park At" = the machine answer. Placed ABOVE Guard C's Marlin branch for the same
+  // load-bearing reason the fixed-Z guards are -- that branch returns -- and here it matters more,
+  // because this guard APPLIES on Marlin where the machine-Z datum is excluded outright. The park
+  // has a Marlin route (G28 X Y) precisely because it re-establishes the frame instead of
+  // addressing it, and that is also why the "Home at Job Start" half below is GRBL/RepRap-only:
+  // their route is an absolute rapid into a frame that must already exist, Marlin's route IS the
+  // homing. See writeMachineParkXY() and docs/PReview.md PR-6.
+  if (getProperty(properties.jobGoOriginOnFinish) == "Machine") {
+    if (!machineHomesXY()) {
+      error("\"At End Park At\" = machine X0 Y0 requires \"Axises Homed and Trusted\" to include X/Y -- a machine's X0 Y0 is its homing corner, which means nothing on a machine that does not home.");
+      return;
+    }
+    if (fw != eFirmware.MARLIN && !getProperty(properties.machineHomeAtStart)) {
+      error("\"At End Park At\" = machine X0 Y0 emits G53 on " + fw + ", which measures against a machine frame this job must have established, not one a previous power cycle left behind -- turn on \"Home at Job Start\", or park at work X0 Y0.");
+      return;
+    }
+  }
+
   // Guard C -- Marlin is single-frame: a job using more than one distinct work offset
   // is silently wrong on it. The reserved base is a per-WCS-register concept that does
   // not apply to Marlin (warned at establish time), so its guards are skipped here.
@@ -1810,13 +1833,21 @@ function onClose() {
     // asked for it to be stopped. Prompting first means the operator switches off, resumes, and the
     // machine parks. See docs/HReview.md CR-6.
     //
-    // NOTE what this deliberately does NOT do: it emits no Z retract before the X0 Y0 move. The
-    // property's own text promises "Z remains unchanged", and for milling the last operation's own
-    // end-of-toolpath retract covers it. A jet section that ends at cutting height is not covered --
-    // that is the open half of CR-6 and the same line of code as HR-16.
+    // NOTE what the "Work" answer below deliberately does NOT do: it emits no Z retract before its
+    // X0 Y0 move. For milling the last operation's own end-of-toolpath retract covers it, and the
+    // move is short -- it goes to the last part's own origin, so the tool is already there. A jet
+    // section that ends at cutting height is not covered -- that is the open half of CR-6 and the
+    // same line of code as HR-16. The "Machine" answer DOES retract, because it crosses the bed;
+    // writeMachineParkXY() owns that and says why.
     onCommand(COMMAND_STOP_SPINDLE);
 
-    if (getProperty(properties.jobGoOriginOnFinish)) {
+    // Which X0 Y0 -- the question this control could not previously answer. "Work" is the last
+    // section's WCS, which on a multi-part job is whichever fixture Fusion ordered last; "Machine"
+    // is the homing corner and is the same physical point for every job. See docs/PReview.md PR-6.
+    var park = getProperty(properties.jobGoOriginOnFinish);
+    if (park == "Machine") {
+      writeMachineParkXY();
+    } else if (park == "Work") {
       rapidMovementsXY(0, 0);
     }
 
@@ -2159,6 +2190,64 @@ function writeMachineTravelZ(reason) {
   resetAll();
   gMotionModal.reset();
   flushMotions();
+}
+
+// Park at the machine's own X0 Y0 -- the homing corner -- as the last motion of the job. Two
+// firmware routes, and they are not the same KIND of operation, which is why the guard on this
+// feature is firmware-dependent where the machine-Z datum's is a flat exclusion:
+//
+//   - GRBL / RepRap: "G53 G0 X0 Y0". An absolute rapid that ADDRESSES a frame the job must already
+//     have established, hence validateJob() requiring "Home at Job Start" there. G53 is not modal
+//     so this is its own block, and it is X/Y ONLY -- a three-axis G53 would be the diagonal that
+//     writeMachineTravelZ() and this post's rapid splitting both exist to avoid.
+//   - Marlin: "G28 X / G28 Y". G53 is gated behind CNC_COORDINATE_SYSTEMS (off by default), so the
+//     machine frame cannot be addressed -- but it can be RE-ESTABLISHED, which reaches the same
+//     physical corner with no build option and no arithmetic. Being the homing itself, it is
+//     self-establishing and needs no prior "Home at Job Start"; it is also a homing cycle rather
+//     than a rapid, so it is slower and runs the axes onto the endstops.
+//
+// Arithmetic is NOT a third route on Marlin. The part origin is written with G92 at whatever
+// position the tool happened to occupy (writeWcsOrigin()), so the work frame differs from the
+// machine frame by an offset the post never knew and cannot read back -- see docs/conventions.md
+// "Selection is deterministic, origin is trusted". Work X0 Y0 and machine X0 Y0 coincide on Marlin
+// only BEFORE that G92, which is to say never, by the time this runs.
+function writeMachineParkXY() {
+  // Retract before crossing the bed. This move goes to the home corner from wherever the last
+  // operation ended -- potentially a full diagonal, and on Marlin at homing feedrate with a
+  // bump-and-retry at the switch. Only a job with a fixed Z reference can retract at all: without
+  // one there is no frame in which an absolute Z is meaningful here, and that job travels at the
+  // current Z, which is exactly the state HReview.md HR-16 describes and this does NOT fix.
+  //
+  // Deliberately NOT applied to the "Work" answer, and the reason is the distance rather than
+  // timidity: that park goes to the LAST part's own origin, so the tool is already at that part
+  // and the move does not cross the bed. See docs/PReview.md PR-6.
+  if (usesMachineZDatum()) {
+    writeMachineTravelZ("Retract to the travel height in the machine frame before parking");
+  } else if (getReservedBaseWcs() != 0) {
+    // R1 -- never leave the base active. retractThroughBaseClearance() leaves it selected for a
+    // caller that is about to choose a destination WCS; this caller has no destination, so it
+    // restores the operating WCS itself. Job end is not an excuse: the selection is modal state
+    // the sender keeps, and the operator's next manual move would be made in the base's frame.
+    var operating = currentWorkOffset;
+    retractThroughBaseClearance();
+    if (operating != undefined && currentWorkOffset != operating) {
+      writeBlock(gFormat.format(wcsGcode(operating)));
+      currentWorkOffset = operating;
+    }
+  }
+
+  if (fw == eFirmware.MARLIN) {
+    writeComment(eComment.Info, "   Park at machine X0 Y0 -- re-homing X/Y; G53 is a Marlin build option");
+    writeBlock(gFormat.format(28), "X");
+    writeBlock(gFormat.format(28), "Y");
+    return;
+  }
+
+  writeComment(eComment.Info, "   Park at machine X0 Y0");
+  resetAll();
+  writeBlock(gFormat.format(53), gFormat.format(0), xFormat.format(0), yFormat.format(0));
+  resetAll();
+  gMotionModal.reset();
 }
 
 // Retract to the base's "Safe Z" height measured above the reserved spoilboard base,

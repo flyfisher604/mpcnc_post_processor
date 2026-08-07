@@ -47,10 +47,10 @@ everything the README puts outside the hobbyist's reach:
 
 ## 2. Findings
 
-**✅ 4 fixed · ◑ 1 part-fixed · ⬜ 6 open — 11 findings.** The `HR-` ids were found by the hobbyist pass
+**✅ 5 fixed · ◑ 1 part-fixed · ⬜ 6 open — 12 findings.** The `HR-` ids were found by the hobbyist pass
 and reclassified as professional, and are **kept deliberately** so commit history, `HReview.md` and this
 file all name the same defect the same way; `PR-` ids were found by this file's own machine-frame review.
-Only the four `PR-` fixes are committed code — every `HR-` diff below is a proposal, not a record.
+Only the five `PR-` fixes are committed code — every `HR-` diff below is a proposal, not a record.
 
 | ID | Finding | Sev | Resolution | Status |
 |---|---|---|---|---|
@@ -59,6 +59,7 @@ Only the four `PR-` fixes are committed code — every `HR-` diff below is a pro
 | **PR-3** | `Probe to Set Base = None` stated a precondition it did not have — *"assume a prior job set it"*, where a controller reset or power cycle on a machine with no Z home invalidated that base Z0 **silently** and the tool then descended to a clearance wrong by however far machine zero drifted | Medium | **Option eliminated** (E1). Its one durable use — a machine that homes Z — has a strictly better answer under PR-2: no register consumed, no probe, and it cannot go stale the same way because the job homes. **Removing an enum id resets the property** — a release-notes item | ✅ fixed |
 | **PR-4** | `Tool Change Z` is measured in *whichever WCS happens to be active*, so the physical park point silently drifts per workpiece — flagged in the post's own source as *"likely a bug, not intended behavior"* | Medium | **Deliberately not landed here.** The `G53` branch it needs is now sanctioned by PR-2's decision, but it shares code with §2's Phase 4 reorder and must compose with that design rather than pre-empt it. The code comment now records the settled decision instead of asking for one | ⬜ open |
 | **PR-5** | The machine-frame rework left the dialog asking **two questions per concept**: group 4 posed one machine's homing as two independent booleans, and group 5 carried two clearance fields that `Fixed Z Reference` made **mutually exclusive** — never both read, read at the same two moments, and naming the same physical plane | Medium | Group 4 → `Axises Homed and Trusted` (`None`/`XY Only`/`Z Only`/`XYZ`), information-identical to the booleans, read only through `machineHomesXY()`/`machineHomesZ()`. Group 5 → one `Inter Part Travel Z` whose frame follows `Fixed Z Reference`. **The merge forces the empty default**: with a live default, flipping the enum would emit a valid-looking height in the wrong frame under no guard. Two new spoilboard guards (unset, and `<= 0` — the detectable direction of the flip) and a frame-naming header echo carry the residual risk. 71 → 70 properties. **Three keys replaced, so all three settings reset** — a release-notes item | ✅ fixed |
+| **PR-6** | `At End Go to 0,0` never said **which** X0 Y0, and it is the **last section's WCS** — so on a multi-part job the tool parks at whichever fixture Fusion happened to order last, and re-ordering operations silently moves the park point. Same species as PR-4's `Tool Change Z` | Medium | Enum `Off` / `Work X0 Y0` / `Machine X0 Y0`, default `Work` (today's behaviour, now named). The machine answer is **firmware-split, not firmware-excluded**: `G53 G0 X0 Y0` on GRBL/RepRap, `G28 X Y` on Marlin — which re-establishes the frame instead of addressing it, so it needs neither `CNC_COORDINATE_SYSTEMS` nor `Home at Job Start`. Guard requires X/Y declared on every firmware, and `Home at Job Start` on GRBL/RepRap only. Retracts before parking when a fixed Z reference exists, closing **HR-16**'s Z half for this path. **boolean→enum resets the setting, and asymmetrically — anyone who had it OFF gets the move back ON** | ✅ fixed |
 | **HR-7** | `toolChange()` clobbers `forceSectionToStartWithRapid`, defeating "First G1 → G0" on every tool-change section | Medium | Lands with the Phase 4 reorder below | ⬜ open |
 | **HR-8** | Post-injected motion never updates Fusion's tracked position | Medium | Lands with Phase 4. Confirmed unreachable on any hobbyist path (2026-08-01) | ⬜ open |
 | **HR-9** | `Do First Change` with `Probe After Tool Change` off zeroes Z against the wrong tool | Medium | Lands with Phase 4 | ⬜ open |
@@ -359,7 +360,7 @@ operation in the same post is unaffected and still expands to plain `G0`/`G1`.
 
 ## 3. Test register
 
-**✅ 0 PASS · ❌ 0 FAIL · ⬜ 47 UNRUN · ➖ 7 n/a or moved — 54 rows.** Nothing professional has been
+**✅ 0 PASS · ❌ 0 FAIL · ⬜ 51 UNRUN · ➖ 7 n/a or moved — 58 rows.** Nothing professional has been
 verified yet; this is the whole of what the professional side owes. Absorbed from the Beta-2 test plan.
 
 Every row is a delta from the defaults fixed in `conventions.md` → *How to run a test*; the one
@@ -421,10 +422,14 @@ hold it, and the *Expect* must exist in exactly one place.
 | **PR-1b** | The stored-offset warning fires on the trusting modes and **never** on the `Jog …` modes | 2-WCS job, `Axises Homed and Trusted` = `None` off, each origin mode in turn | posted | §3.6 | ⬜ |
 | **PR-2a** | A multi-WCS job on a homed-Z machine posts with **no** reserved base, one `G53` per traverse | 2 WCS, `Fixed Z Reference = Machine Z`, `Inter Part Travel Z = -12` | posted | §3.6 | ⬜ |
 | **PR-2b** | The first section's arrival emits a real absolute Z instead of the `Unknown Z` comment | as PR-2a, First = `Use Active WCS X0 Y0, Probe Z0` | posted | §3.6 | ⬜ |
-| **PR-2c** | Every new guard refuses, and leaves **no file** | each of the six new `error()` conditions | posted | §3.6 | ⬜ |
+| **PR-2c** | Every new guard refuses, and leaves **no file** | each of the nine new `error()` conditions | posted | §3.6 | ⬜ |
 | **PR-2d** | `Inter Part Travel Z` converts mm → inch in both the block and the header echo | as PR-2a, output units **inch** | posted | §3.6 | ⬜ |
 | **PR-3** | `Probe to Set Base` no longer offers `None`, and the base always probes | base reserved, dialog + a post | dialog | §3.6 | ⬜ |
 | **PR-4** | The `G53` tool-change park lands at one physical spot under two WCS | — verified by **P8**'s matrix once Phase 4 lands | — | §2 | ➖ |
+| **PR-6a** | The machine park emits `G53 G0 X0 Y0` as its own block, X/Y only | GRBL, declaration `XY Only` + `Home at Job Start`, `At End Park At = Machine X0 Y0` | posted | §3.7 | ⬜ |
+| **PR-6b** | The **Marlin** route is `G28 X` / `G28 Y`, and needs no prior homing | Marlin, declaration `XY Only`, `Home at Job Start` **off**, park `Machine X0 Y0` | posted | §3.7 | ⬜ |
+| **PR-6c** | The machine park retracts first where a fixed Z reference exists, and restores the WCS | PR-6a + `Fixed Z Reference = Spoilboard`, and again with `Machine Z` | posted | §3.7 | ⬜ |
+| **PR-6d** | `Work` (default) is byte-identical to the old boolean-on behaviour | GRBL/mm defaults, diffed against the pre-change build | posted | §3.7 | ⬜ |
 | **REG-MF** | A factory-default job is unchanged **apart from the property dump** | GRBL/mm, all defaults, diffed against the pre-change build | posted | §3.6 | ⬜ |
 
 `dialog` is a fifth method alongside the four in `conventions.md` → *How to run a test*: it is settled by
@@ -812,6 +817,36 @@ the functions do not exist) prove *logic and block shape*, never what a machine 
 
 ---
 
+### 3.7 The end-of-job park (PR-6)
+
+Landed unposted. The `Work` answer is the old boolean's behaviour under a new name, so **PR-6d is the
+regression row and should run first**; the rest exercise a path that has never existed.
+
+- [ ] **PR-6a — the GRBL/RepRap route.** *Do:* GRBL, declaration `XY Only` + `Home at Job Start` on,
+      `At End Park At = Machine X0 Y0`, `Fixed Z Reference = None`, single operation. *Get:* after the
+      spindle stop, `(   Park at machine X0 Y0)` then `G53 G0 X0 Y0`, then `M30`. **Pass: `G53` and `G0`
+      are both written on that block even though `G0` was already the active motion mode** — the modal
+      must not swallow it — and the block carries **X and Y only, no Z**: `G53` is not modal, so a
+      Z-and-XY park is two blocks, never a three-axis diagonal. *Discriminator: no `G28` anywhere.*
+- [ ] **PR-6b — the Marlin route, and the guard asymmetry that justifies it.** *Do:* Marlin, declaration
+      `XY Only`, **`Home at Job Start` off**, park `Machine X0 Y0`. **Pass: it posts** — this is the case
+      the firmware split exists for, and the same configuration on GRBL must *refuse* (PR-2c). *Get:*
+      `(   Park at machine X0 Y0 -- re-homing X/Y; G53 is a Marlin build option)` then `G28 X` and
+      `G28 Y` as separate blocks, and **no `G53` anywhere in the file**.
+- [ ] **PR-6c — retract first, and do not leave the base selected.** *Do:* PR-6a plus
+      `Fixed Z Reference = Spoilboard` (`G59` reserved, `Inter Part Travel Z = 40`); then again with
+      `Machine Z`. *Get, spoilboard:* `G59` → `G0 Z40` → **the operating WCS reselected** → `G53 G0 X0 Y0`.
+      *Machine Z:* one `G53 G0 Z<n>` then `G53 G0 X0 Y0`, no frame switch at all. **Pass: the spoilboard
+      leg ends with the operating WCS active, not `G59`** — R1 has no job-end exemption, because the
+      selection is modal state the sender keeps and the operator's next manual move would run in it.
+- [ ] **PR-6d — the default answer changed name only.** *Do:* GRBL/mm factory defaults, single
+      operation, diffed against the pre-change build. **Pass: the only motion difference is none** —
+      `G0 X0 Y0` still, at the same point in `onClose()`, with no retract added. The diff may touch the
+      property dump line for this control and nothing else. *This is the row that says the rename did
+      not quietly become a behaviour change for everyone who never opens group 1.*
+
+---
+
 ## 4. Checked and found correct — do not re-run
 
 Carried over so a later professional pass can tell "looked at, fine" from "never looked at". Every
@@ -895,7 +930,7 @@ and those branches are essentially unexercised.
       **A design review before it is a test** — the answer may be "not applicable, and the dialog
       should say so".
 
-Also on this list: **HR-16** (`onClose` traverses to `X0 Y0` before stopping the spindle, with no
+Also on this list, **for its jet half only now that PR-6 has landed the machine-park retract**: **HR-16** (`onClose` traverses to `X0 Y0` before stopping the spindle, with no
 guaranteed safe Z). **Half of it landed on 2026-08-01** as CR-6 (`HReview.md`): `onClose()` now
 emits `COMMAND_STOP_SPINDLE` **before** the return move, so the tool no longer crosses the work with a
 hand-switched router still turning. **The Z half is deliberately unfixed and is still owed here** —

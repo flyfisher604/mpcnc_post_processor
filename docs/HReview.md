@@ -39,7 +39,7 @@ comment that names one still resolves.
 | **HR-13** | `onCommand` silently discards every command it does not name | Low-Med | → `PReview.md` §2 — has a complete diff | ➖ moved |
 | **HR-14** | Two coolant modes could never match a channel | Low | `coolantLevels` derived from `eCoolant` | ✅ fixed `7e38777` |
 | **HR-15** | `safeZforSection()` mixed global `hasParameter()` with `_section.getParameter()` | Low | All three guards read `_section.` | ✅ fixed `88c7817` |
-| **HR-16** | `onClose` traverses to X0 Y0 before stopping the spindle, no guaranteed safe Z | Low | **Spindle-order half fixed** 2026-08-01 (CR-6). **Z half still open** → `PReview.md` §5 | ◑ part-fixed |
+| **HR-16** | `onClose` traverses to X0 Y0 before stopping the spindle, no guaranteed safe Z | Low | **Spindle-order half fixed** 2026-08-01 (CR-6). **Z half: fixed for the new machine park only** — `PReview.md` **PR-6** retracts before it, because that one crosses the bed. The default `Work` park still does not: it goes to the last part's own origin, so the tool is already there. **The jet case stays open** → `PReview.md` §5 | ◑ part-fixed |
 | **HR-17** | Four tidy-ups; two change emitted text | Cosmetic | Sanitizer double-spaces, group-03 rename, vestigial arg, empty GRBL block | ✅ fixed `924d1f6` |
 | **HR-18** | `loadFile()` left no line break after an include — the next block merges | Medium | Repair in `loadFile()`; `\r` counts as a terminator | ✅ fixed `5b0b94a` |
 | **HR-19** | `M291` doubled space; `()` vs `( )` on empty comments | Cosmetic | `()` **closed as by design** (CR-17b). The `M291` space remains — next sweep | ⬜ open |
@@ -55,7 +55,7 @@ comment that names one still resolves.
 | **CR-3** | A required tool change dropped in complete silence when group 07 is off (the default) | Med-High | `>>> WARNING` per boundary + `validateJob()` warning via `countDistinctTools()`, counted over **sections** | ✅ fixed `c73726c` |
 | **CR-4** | Coolant `Use custom` wrote the property text as g-code; tooltip and README call it a **file** | Medium | `writeCustomCoolantFile()` → `loadFile()`; warns when named but empty | ✅ fixed `c73726c` |
 | **CR-5** | A jet/laser job on the default First-WCS mode never established **Z0** at all | Medium | `Important` warning; the XY-only origin write is unchanged | ✅ fixed `c73726c` |
-| **CR-6** | `onClose()` traversed to X0 Y0 **before** stopping the spindle | Medium | Spindle stops first. **Z retract deliberately not added** — that half stays open as HR-16 → `PReview.md` §5 | ◑ part-fixed |
+| **CR-6** | `onClose()` traversed to X0 Y0 **before** stopping the spindle | Medium | Spindle stops first. **Z retract added for the machine park only** (`PReview.md` **PR-6**); the `Work` park's half stays open as HR-16 → `PReview.md` §5 | ◑ part-fixed |
 | **CR-7** | A Start include substitutes for `G90`/`G21`/`G94`/`G17`, so the job inherits unknown modal state | Medium | **By design** — an include owns the phase it names. Same rule as HR-23 / HR-22 (B) | ✅ closed |
 | **CR-8** | Feed scaling could **raise** a feedrate on a zero-length move, against its documented contract | Low-Med | Clamped; harness-verified against both the working tree and `HEAD` | ✅ fixed `c73726c` |
 | **CR-9** | An unrecognised jet mode left the laser power `undefined` → `S NaN` | Low | Explicit branch | ✅ fixed `c73726c` |
