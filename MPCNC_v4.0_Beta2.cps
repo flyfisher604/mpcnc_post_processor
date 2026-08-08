@@ -1673,9 +1673,39 @@ function validateJob() {
   }
 
   // --- Guards --------------------------------------------------------------------------------
-  // The fixed-Z-reference guards run FIRST, above Guard C's Marlin branch, and the placement is
-  // load-bearing: that branch returns as soon as its own test is done, so a guard written below it
-  // is unreachable on exactly the firmware it was written to exclude.
+  // The include-file check comes first: it is the only guard here that depends on neither the
+  // firmware nor the frame. After it, the fixed-Z-reference guards run above Guard C's Marlin
+  // branch, and THAT placement is load-bearing: that branch returns as soon as its own test is
+  // done, so a guard written below it is unreachable on exactly the firmware it excludes.
+
+  // A named include file that does not exist reaches error() from inside loadFile(), and the Start
+  // include is loaded at step 4 of writeFirstSection() -- by then the header block, the property
+  // dump, the homing and the G54 select are already in the stream. So a mistyped filename left a
+  // TRUNCATED .gcode that looks like the beginning of a job rather than a clean refusal, and the
+  // Stop include failed later still. Checked here, where nothing has been written yet. Same class
+  // as the two geometry guards that fire in onSection() -- HR-27 -- but those need moving rather
+  // than duplicating, so only the include half is fixed here. See docs/HReview.md HB-7.
+  //
+  // The two tool-change files are checked ONLY when group 7 is on, because that is the only time
+  // toolChange() loads them: a stale name left in a field their own descriptions call ignored must
+  // not refuse a job that will never read it. writeCustomCoolantFile()'s four custom-file
+  // properties reach loadFile() too and are deliberately NOT checked here -- see HB-7's row.
+  var includeFileProps = [properties.includeStartFile, properties.includeStopFile];
+  if (getProperty(properties.toolChangeEnabled)) {
+    includeFileProps.push(properties.includeToolFile1);
+    includeFileProps.push(properties.includeToolFile2);
+  }
+  for (var i = 0; i < includeFileProps.length; ++i) {
+    var includeName = getProperty(includeFileProps[i]);
+    if (includeName != "" && !FileSystem.isFile(includeFolder() + includeName)) {
+      error("\"" + includeFileProps[i].title + "\" names \"" + includeName + "\", which is not a file"
+        + " in the NC output folder " + includeFolder() + " -- check the spelling and the extension,"
+        + " or clear the field. Refused before any output, rather than part way through the file it"
+        + " would otherwise have truncated.");
+      return;
+    }
+  }
+
   var fixedZ = getFixedZReference();
   var reservedRaw = getProperty(properties.spoilboardBaseReserve);
 
@@ -3778,9 +3808,16 @@ function linearMovements(_x, _y, _z, _feed) {
   }
 }
 
+// The folder Fusion is writing this .gcode into, which is where every group-8 include file must
+// live. One definition, so validateJob()'s pre-flight check and loadFile()'s own read cannot
+// disagree about where they looked.
+function includeFolder() {
+  return FileSystem.getFolderPath(getOutputPath()) + PATH_SEPARATOR;
+}
+
 // Test if file exist/can read and load it
 function loadFile(_file) {
-  var folder = FileSystem.getFolderPath(getOutputPath()) + PATH_SEPARATOR;
+  var folder = includeFolder();
   if (FileSystem.isFile(folder + _file)) {
     var txt = loadText(folder + _file, "utf-8");
     if (txt.length > 0) {
