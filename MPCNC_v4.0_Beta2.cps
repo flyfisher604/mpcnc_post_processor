@@ -1545,7 +1545,23 @@ function validateJob() {
   // "Subsequent WCS / Part" is consulted only on a genuine WCS change (writeWCS()'s isTraverse),
   // which a single-offset job never has -- so every warning about that control is gated on this.
   var multiWcs = collectDistinctOffsets().length > 1;
-  // The action alone is not the trigger: writeMachineHoming() emits NO MOTION when "Axises Homed
+
+  // The group-4 pair can be set to a combination that cannot be satisfied, and it is the likeliest
+  // group-4 mistake: the operator wants homing, reads the ACTION, sets it, and never treats the
+  // declaration above it as something they must change too. writeMachineHoming() then emits NO
+  // MOTION -- it warns in the file and returns -- so the job starts from an unhomed machine with the
+  // operator believing it homed. That in-file warning was the only trace anywhere; Fusion's post
+  // dialog said nothing. warning(), not error(): the posted file is valid and every other control
+  // still behaves. Exactly complements the (homedXY || homedZ) test below, which is written for the
+  // case where homing DOES move the tool. See docs/HReview.md HB-3.
+  if (homesAtJobStart() && !homedXY && !homedZ) {
+    warning(localize("\"Home at Job Start\" asks this job to home, but \"Axes Homed and Trusted\" is "
+      + "None, so no axis is declared homeable and the post emits no homing motion at all -- the job "
+      + "starts from wherever the machine already sits. Declare which axes this machine homes to "
+      + "endstops, or set \"Home at Job Start\" to Off."));
+  }
+
+  // The action alone is not the trigger: writeMachineHoming() emits NO MOTION when "Axes Homed
   // and Trusted" is None -- it warns that nothing was homed and returns -- so keyed on the action
   // alone this describes a tool move that does not happen and tells the operator to abandon a
   // pre-jog that is in fact intact. Either axis group qualifies: X/Y homing destroys the pre-jogged
@@ -1558,7 +1574,7 @@ function validateJob() {
     // "the axes it homes" rather than "the homing corner": the declaration can be Z only, where
     // there is no corner and what moves is the height the origin is recorded at.
     warning(localize("\"Home at Job Start\" moves the tool onto the endstops of whichever axes "
-      + "\"Axises Homed and Trusted\" declares, and it runs before "
+      + "\"Axes Homed and Trusted\" declares, and it runs before "
       + "\"First WCS / Part\" records the current position as the part origin, so positioning the "
       + "tool before starting the job has no effect on those axes. On a homed machine the stored "
       + "offset in the active WCS is repeatable, so \"Use Active WCS X0 Y0, Probe Z0\" is the "
@@ -1585,7 +1601,7 @@ function validateJob() {
     }
     if (storedOffsetControls.length > 0) {
       warning(localize(storedOffsetControls.join(" and ") + " trust the origin already stored in a "
-        + "work offset register, but \"Axises Homed and Trusted\" does not include X/Y. A stored offset is measured from "
+        + "work offset register, but \"Axes Homed and Trusted\" does not include X/Y. A stored offset is measured from "
         + "machine zero, which moves at every controller reset or power cycle when nothing homes -- "
         + "so an offset written by an earlier job now points somewhere else, and the post cannot "
         + "read the register back to check. Declare X/Y homed on a machine with X/Y endstops, or "
@@ -1709,7 +1725,7 @@ function validateJob() {
       return;
     }
     if (!machineHomesZ()) {
-      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Axises Homed and Trusted\" to include Z -- declare that this machine homes Z, or choose another fixed Z reference.");
+      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Axes Homed and Trusted\" to include Z -- declare that this machine homes Z, or choose another fixed Z reference.");
       return;
     }
     // The declaration alone is not enough HERE, though it is everywhere else. A Z declaration with
@@ -1734,7 +1750,7 @@ function validateJob() {
     // moves between stored work offsets, and those are repeatable only against a homed machine
     // zero. The requirement is stated once, here; usesMachineZDatum() carries no trace of it.
     if (!homedXY) {
-      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Axises Homed and Trusted\" to include X/Y -- the multi-part traverses it serves move between stored work offsets, which are repeatable only on a machine with a homed X/Y zero.");
+      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Axes Homed and Trusted\" to include X/Y -- the multi-part traverses it serves move between stored work offsets, which are repeatable only on a machine with a homed X/Y zero.");
       return;
     }
   }
@@ -1748,7 +1764,7 @@ function validateJob() {
   // homing. See writeMachineParkXY() and docs/PReview.md PR-6.
   if (getProperty(properties.machineParkAtEnd) == "Machine") {
     if (!machineHomesXY()) {
-      error("\"At End Park At\" = machine X0 Y0 requires \"Axises Homed and Trusted\" to include X/Y -- a machine's X0 Y0 is its homing corner, which means nothing on a machine that does not home.");
+      error("\"At End Park At\" = machine X0 Y0 requires \"Axes Homed and Trusted\" to include X/Y -- a machine's X0 Y0 is its homing corner, which means nothing on a machine that does not home.");
       return;
     }
     if (fw != eFirmware.MARLIN && !homesAtJobStart()) {
@@ -3138,7 +3154,7 @@ function writeResolvedValues() {
 // Implements the group-4 machine-frame controls: establishes the machine frame (MCS) at job start,
 // once, before anything work-relative.
 //
-// Capability and action are SEPARATE properties, and only the action is emitted here. "Axises
+// Capability and action are SEPARATE properties, and only the action is emitted here. "Axes
 // Homed and Trusted" is a declaration -- a fact about the machine, set once -- read by
 // validateJob() and by the Machine Z fixed reference; "Home at Job Start" is the job's decision to
 // act on them. The enum they replaced collected an operation where every consumer needed a
@@ -3156,7 +3172,7 @@ function writeMachineHoming() {
   var homeZ = machineHomesZ();
   var atStart = homesAtJobStart();
 
-  writeComment(eComment.Debug, " writeMachineHoming: entry fw: " + fw + " Axises Homed and Trusted: "
+  writeComment(eComment.Debug, " writeMachineHoming: entry fw: " + fw + " Axes Homed and Trusted: "
     + getProperty(properties.machineHomedAxes) + " -- X/Y: " + homeXY + " Z: " + homeZ
     + " Home at Job Start: " + getProperty(properties.machineHomeAtStart));
 
@@ -3169,7 +3185,7 @@ function writeMachineHoming() {
   // satisfied, not a no-op worth passing over in silence: the operator believes the job homes.
   // Not an error() -- it costs no safety on its own, and the guards refuse the case where it does.
   if (!homeXY && !homeZ) {
-    writeComment(eComment.Important, " >>> WARNING: \"Home at Job Start\" is on but \"Axises Homed"
+    writeComment(eComment.Important, " >>> WARNING: \"Home at Job Start\" is on but \"Axes Homed"
       + " and Trusted\" is None -- nothing was homed");
     return;
   }
@@ -4053,7 +4069,7 @@ function toolChange() {
     // machine frame, on exactly the axes the operator declares (group 4) and
     // nowhere else -- see writeMachineTravelZ() and docs/conventions.md
     // "Frames". So the third park branch this comment argues for is
-    // now sanctioned: with "Axises Homed and Trusted" = XYZ, park with
+    // now sanctioned: with "Axes Homed and Trusted" = XYZ, park with
     // G53 G0 Z<n> then G53 G0 X<n> Y<n> -- two blocks, retract first, each
     // carrying its own G53, because G53 is not modal and because a single
     // three-axis G53 block would be the diagonal this post splits its rapids to
