@@ -47,8 +47,11 @@ GRBL and RepRap only.
 
 Several operations — face, pocket, contour — on one part in one Setup, so one WCS throughout.
 
-- **Group 3 does nothing on a full licence**, whatever you set it to. Fusion emits real rapids,
-  so the conversion code is never reached. Leaving it off is tidier.
+- **Leave group 3 off.** With **Map: Safe Z to Rapid** at its default `Retract:15` it converts nothing on
+  a full licence — a genuine cut always sits below the operation's retract level — so it only adds one
+  `( SafeZ … )` comment per operation. But it is **not inert by construction**: the check runs on every
+  cut move whatever your licence, and lowering that threshold (to `Feed:<n>`, or to a small constant)
+  makes real cutting moves eligible. Off is the only setting that cannot surprise you.
 - **First WCS / Part**: if this Setup's WCS is a pre-set fixture offset, use **`Use Active WCS
   X0 Y0, Probe Z0`** — rapid to the stored X0 Y0, re-probe the stock top. Otherwise the default
   **`Set X0 Y0 to Current Pos, Probe Z0`** and pre-jog XY. Prefer either to the `Jog to …` modes.

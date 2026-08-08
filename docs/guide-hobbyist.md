@@ -154,8 +154,9 @@ If you do enable it: the post already emits every rapid as two separate moves, Z
 so the tool lifts before it travels and travels before it descends. A real cutting move is never
 converted.
 
-On a full licence this group does nothing at all, whatever you set — Fusion emits real rapids and
-the conversion never runs.
+On a full licence you do not need it: Fusion already emits real rapids. At the default threshold it also
+converts nothing if you leave it on — but the check still runs, so a lowered threshold could catch a real
+cutting move. Leave the group off on a full licence.
 
 ---
 

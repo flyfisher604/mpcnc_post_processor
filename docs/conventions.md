@@ -282,7 +282,9 @@ checking them per-edit would fight that rule.
   read nothing at all.** Make its diagnostic **unconditional**, not rejection-only (HR-6).
 - **Absence-based rows need a presence-based sibling posted from the same build** (HR-11 (A)/(B)).
 - **When a code path cannot be reached, question the premise before blaming the CAM.** HW-1 cost three
-  posted files: `isSafeToRapid()` has one caller and is unreachable on a paid licence.
+  posted files. But state the conclusion exactly: `isSafeToRapid()` **is called** on a paid licence — what
+  a paid licence does not reach is a *conversion*, and only while the threshold is left at its default.
+  "Unreachable" was the loose paraphrase, and two user-facing claims were built on it (HR-39).
 - **When a defect suppresses output it makes its own behaviour unverifiable — switch to the branch that
   emits.** HW-2 (B) was unanswerable on the manual path and trivial on the automatic one.
 - **`Personal.cps`** (repo root, git-excluded) is the post with `onRapid()` rerouted into `onLinear()` —
