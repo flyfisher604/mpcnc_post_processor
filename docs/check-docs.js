@@ -128,15 +128,38 @@ function checkSizes(budgets) {
     if (!rel) return;
     var text = read(rel);
     if (text === null) return;
+    var b = budgets[doc];
+
+    var allowed = b.base;
+    var how = '' + b.base;
+    if (b.derived) {
+      var lines = text.split('\n');
+      var f = countQuietly(lines, 'Findings');
+      var t = countQuietly(lines, 'Test register');
+      // Unparseable tables are the register loop's FAIL to report, not a reason to invent a ceiling.
+      if (!f || !t) return;
+      var nf = idsIn(f.rows).length, nr = t.rows.length;
+      allowed = b.base + b.perFinding * nf + b.perRow * nr;
+      how = b.base + ' + ' + b.perFinding + '×' + nf + ' findings + ' + b.perRow + '×' + nr +
+        ' rows = ' + allowed;
+    }
+
     var n = lineCount(text);
-    if (n > budgets[doc]) {
-      warn(rel, n + ' lines, budget ' + budgets[doc] +
-        ' — check what has stopped being live rather than trimming prose');
+    if (n > allowed) {
+      warn(rel, n + ' lines, budget ' + how + ' — ' + (b.derived
+        ? 'the per-item allowance already covers every finding and row, so what is over is prose'
+        : 'check what has stopped being live rather than trimming prose'));
     }
   });
 }
 
 // Budgets come out of the contracts table itself, so there is one place to change them.
+//
+// Two forms. A plain "≤ 300 lines" is a fixed ceiling. A register's may be DERIVED —
+// "≤ 110 lines + 2 per finding + 9 per register row" — because a register is *supposed* to grow as
+// findings are filed and rows are posted, and a fixed ceiling there punishes the document for doing its
+// job: HReview's was hit three times in one session, every time by a test passing. The per-item terms
+// are what still catches prose sprawl, so this is a scaling rule, not an exemption.
 function readBudgets() {
   var text = read('docs/conventions.md');
   if (text === null) return {};
@@ -154,7 +177,13 @@ function readBudgets() {
     var name = /`([^`]+)`/.exec(r.cells[0]);
     var guide = r.cells[3] || '';
     var num = /≤\s*(\d+)\s*lines/.exec(guide);
-    if (name && num) budgets[name[1]] = parseInt(num[1], 10);
+    if (!name || !num) return;
+    var b = { base: parseInt(num[1], 10), perFinding: 0, perRow: 0, derived: false };
+    var pf = /\+\s*(\d+)\s*per\s+finding/.exec(guide);
+    var pr = /\+\s*(\d+)\s*per\s+register\s+row/.exec(guide);
+    if (pf) { b.perFinding = parseInt(pf[1], 10); b.derived = true; }
+    if (pr) { b.perRow = parseInt(pr[1], 10); b.derived = true; }
+    budgets[name[1]] = b;
   });
   return budgets;
 }
@@ -331,12 +360,77 @@ function sectionTable(lines, rel, name, label) {
   return requireRows(t, rel, label) ? t : null;
 }
 
+// Same lookup with no reporting. checkSizes() runs before the register loop and must not turn one
+// broken table into two FAILs about it.
+function countQuietly(lines, name) {
+  var re = new RegExp('^##\\s+(\\d+\\.\\s+)?' + name + '\\b', 'i');
+  var i = lines.findIndex(function (l) { return re.test(l); });
+  if (i === -1) return null;
+  var t = tableAfter(lines, i);
+  return (t && t.rows.length) ? t : null;
+}
+
 function findingsTable(lines, rel) {
   return sectionTable(lines, rel, 'Findings', 'the findings table');
 }
 
 function testRegisterTable(lines, rel) {
   return sectionTable(lines, rel, 'Test register', 'the test register');
+}
+
+// ---------------------------------------------------------------- 4b. a passed row's Expect is a result
+
+// conventions.md → The shape of a review document: an *Expect* is written before the run and says what
+// to look for; once every row under that id is ✅ it has done its job and must collapse to the RESULT —
+// the artifact, the discriminator actually checked, and any trap a re-run would walk back into.
+//
+// This is a FAIL rather than a WARN because a stale Expect is wrong in the worst direction: it reads as
+// a criterion still to be met. Four in HReview predicted tokens their own passing file did not contain
+// (`M30` as the last line, `G0 X25 Y0` where motion is modal, `15.000` for `15`, and a parenthesised
+// group that grbl's comment scanner would have broken), and one would have read as a false FAIL on a
+// re-run because the configuration it named trips a different warning.
+//
+// The marker is the register's own convention: `- **HB-9 (A) — PASS, <artifact>...`. Matching "— PASS"
+// on the bullet's FIRST line only is deliberate — "false FAIL" and "reads as a FAIL" appear inside
+// perfectly good criteria, and a looser test would call those results.
+function checkPassedExpectsAreResults(rel) {
+  var text = read(rel);
+  if (text === null) return;
+  var lines = text.split('\n');
+
+  var register = testRegisterTable(lines, rel);
+  if (!register) return;
+
+  // Per base id: every row sharing it must be ✅ before its Expect owes a result. A base id with a
+  // mix of states keeps a criterion for the halves still unrun, so it is skipped either way.
+  var passed = {};
+  register.rows.forEach(function (r) {
+    var id = baseId(r.cells[0]);
+    if (!id) return;
+    var isPass = r.cells[r.cells.length - 1].indexOf('✅') !== -1;
+    passed[id] = (passed[id] === undefined) ? isPass : (passed[id] && isPass);
+  });
+
+  var start = lines.findIndex(function (l) { return /^#{2,4}\s+Expects\b/.test(l); });
+  if (start === -1) return;
+
+  for (var i = start + 1; i < lines.length; i++) {
+    if (/^#{1,4}\s/.test(lines[i]) || /^---\s*$/.test(lines[i])) break;
+    var m = /^-\s+\*\*([A-Z]+-\d+)\b/.exec(lines[i]);
+    if (!m) continue;
+    var id = m[1];
+    if (passed[id] === undefined) continue;
+
+    var isResult = /—\s*\*{0,2}(PASS|FAIL)\b/.test(lines[i]);
+    var where = rel + ':' + (i + 1);
+    if (passed[id] && !isResult) {
+      fail(where, id + ' is ✅ but its Expect still reads as a pre-run criterion — collapse it to the' +
+        ' result: "— PASS", the artifact, and the discriminator actually checked');
+    } else if (!passed[id] && isResult) {
+      fail(where, id + ' records a result in its Expect but not every ' + id +
+        ' row is ✅ — mark the row, or name the half the result belongs to');
+    }
+  }
 }
 
 // ---------------------------------------------------------------- 5. pointer direction
@@ -410,6 +504,7 @@ REGISTERS.forEach(function (rel) {
   checkFindingTotal(rel);
   checkIdCompleteness(rel);
   checkHeadingRanges(rel);
+  checkPassedExpectsAreResults(rel);
 });
 checkPointerDirection();
 checkDocSync();

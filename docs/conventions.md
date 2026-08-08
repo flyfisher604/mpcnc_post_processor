@@ -20,7 +20,7 @@ ships with the repo*.
 | `plan.md` | The checkpoint (baseline, what is true now, **what is left in order**, live risks), phase status, pointers to completed reviews | Design write-ups, findings, test rows, resolved decisions, open questions, backlog detail | **≤ 120 lines** |
 | `conventions.md` | The rules a change must follow — property & dialog conventions, guards, how to run a test, tooling, the harness method — plus these contracts | **Design rationale** (→ `design.md`), status of anything, what is next, unbuilt design | **≤ 300 lines** — an overrun means something live has leaked in, or design has. Do not raise it |
 | `design.md` | Why the shipped behaviour is what it is: the frame model, external firmware facts, the arguments behind orderings that look arbitrary in the source | Rules a session must follow, status of anything, unbuilt design (→ `PReview.md` §6) | **≤ 300 lines** — the one file that **grows with the post**, so this is the one budget expected to move. It moves by argument, in a commit of its own |
-| `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 300 lines** — a register grows one line per row |
+| `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 110 lines + 2 per finding + 9 per register row** — **derived, not fixed:** a register is meant to grow as findings are filed and rows are posted, so the allowance grows with them. What the per-item terms still catch is prose |
 | `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | **≤ 920 lines, and falling.** §2's long form and §3's expansions are unbuilt design and unrun rows; both retire on build. The §3 index table is permanent, everything under it is not |
 | **the user-facing guides** — `README.md`, `docs/guide-hobbyist.md`, `docs/guide-pro.md`, `docs/property-reference.md` | Usage only, split by **reading path**: README is the landing page and the fork between guides; each guide is one path end to end; the reference holds the property tables and carries the `doc-sync` marker recording the ref it last synced to | Anything developer-facing. And **a second copy of the property tables** — one copy, linked from both guides, is the whole point of the split | — |
 | per-user **memory** (outside the repo) | Constraints about the user that hold across projects and cannot be derived from this repo — e.g. no controller hardware is available | **Anything about this post**: its code, conventions, status, findings or history | One short file per fact. Nothing here is reviewed in a diff, which is why so little belongs |
@@ -49,6 +49,10 @@ and **nothing mechanical defends it** — no checker reads the post to see wheth
    this one hold it*. A review document's sections are fixed — see *The shape of a review document*.
 2. **Over the size guide means something has stopped being live.** Check what has quietly become durable
    (→ `conventions.md` or `design.md`) or register-shaped (→ a register) rather than trimming prose.
+   **A register's guide is derived, so this still holds there.** Filing a finding or passing a row raises
+   the allowance by its own cost; going over anyway means the *prose* grew, not the register. A fixed
+   ceiling on `HReview.md` was hit three times in one session and every time the trigger was a test
+   passing — which is the document working, so the number moved instead of the content.
 3. **Never point two ways.** If file A says "written up in B", B must hold the write-up and must not point
    back. A pointer is valid in one direction only: from status toward the register that owns the work.
    (`plan.md` and `PReview.md` §6 once pointed at each other for four items, and neither held the content.)
@@ -74,6 +78,15 @@ register ungated. Sections are matched **by name, not by number** — `PReview.m
 | 5 | **Checked and found correct** | `read`-strength readings. Retires per Rule 4 when a `posted` row supersedes | when non-empty |
 | 6 | **Owed** | What the register itself owes: which artifacts, and why each is worth a post. **Not** the order of work — that is the checkpoint's | yes |
 | 7 | **Design backlog** | Unbuilt design and its open questions. **Only** where the file's contract admits unbuilt design — `PReview.md` does, `HReview.md` does not | optional |
+
+**An *Expect* is pre-run only. A passed row carries a result.** The *Expect* says what to look for; the
+moment every row under that id is `✅` it has done its job and **must collapse to what the artifact showed**
+— `— PASS`, the file, the discriminator actually checked, and any trap a re-run would otherwise walk back
+into. Nothing else: not the prediction, not the reasoning that produced it, not the build it dates once the
+register dates the build once. `check-docs.js` **FAILs** on a `✅` id whose *Expect* has no `— PASS`, and on
+a result recorded against rows that are not all `✅`. It is a FAIL and not a WARN because a stale *Expect*
+is wrong in the worst direction — it reads as a criterion still to be met. Four in `HReview.md` predicted
+tokens their own passing file did not contain, and one would have read as a **false FAIL** on a re-run.
 
 **The fields are canonical; the rendering is not.** A test row carries an id, a state marker, a setup
 delta, a method, and an *Expect* naming its discriminator; where the *Expect* needs a g-code block a
@@ -216,7 +229,7 @@ is guarded on the declaration — the same reason the action lives there, and th
 
 | Artifact | Fired by | Checks | Travels? |
 |---|---|---|---|
-| `docs/check-docs.js` | the pre-commit hook, or by hand | The contracts above: size budgets (warn), tallies vs their tables, findings-vs-register id completeness, heading ranges and row counts, Rule 3's pointer direction, the `doc-sync` ref on `property-reference.md`. Prints which registers it actually parsed — a checker silent about what it skipped reads as a clean bill of health. **Documents only:** it never reads the `.cps`, and two checks that did have been removed for it | ✅ tracked |
+| `docs/check-docs.js` | the pre-commit hook, or by hand | The contracts above: size budgets (warn, **derived where the guide says so**), tallies vs their tables, findings-vs-register id completeness, heading ranges and row counts, **that every `✅` id's *Expect* is a result and no unrun id's is** (fail), Rule 3's pointer direction, the `doc-sync` ref on `property-reference.md`. Prints which registers it actually parsed — a checker silent about what it skipped reads as a clean bill of health. **Documents only:** it never reads the `.cps`, and two checks that did have been removed for it | ✅ tracked |
 | `.githooks/pre-commit` | `git commit` — **anyone's**, not just a session's | runs `check-docs.js --staged`; non-zero aborts the commit | ✅ tracked, ❌ **not armed** — see below |
 | `.claude/hooks/post-edit.js` | Claude Code, after every `Edit`/`Write` | `node --check` when the file is the `.cps`; silent for everything else | ✅ tracked |
 
