@@ -3901,6 +3901,10 @@ function Start() {
 
   // Not GRBL
   else {
+    // No G94/G17 here. Neither is a free no-op off GRBL: Marlin compiles G17 only under
+    // CNC_WORKSPACE_PLANES (off by default) and has no G93/G94 at all, so both answer
+    // `echo:Unknown command`; RRF gained G93/G94 only in 3.5.1. docs/HReview.md HB-6.
+
     // Disable stepper timeout
     writeComment(eComment.Info, "   Disable stepper timeout");
     writeBlock(mFormat.format(84), sFormat.format(0)); // Disable steppers timeout

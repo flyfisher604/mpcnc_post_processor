@@ -66,8 +66,10 @@ warning when `Home at Job Start` can home nothing, plus the ten stale `Axises` H
 checked before any output; `HR-27`'s geometry half stays open), **HB-8** (`fOutput` and the word
 separator assigned on both branches) and **HB-9** (all thirteen `>>> WARNING:` sites bypass
 `Comment Level`). **Three change the emitted file** — the `%` lines, HB-4's lift, warnings at `Off` — so
-all eleven live `HB-` rows are still `⬜`, `HB-9 (A)` being the register's first `Off` post. **Open
-deliberately: HB-5 · HB-6** (outside the request) and **HB-10** (item 4). **`PReview.md` and the
+all ten live `HB-` rows are still `⬜`, `HB-9 (A)` being the register's first `Off` post. **`HB-6` closed
+by design** — `G17`/`G94` are not codes Marlin or pre-3.5.1 RRF have, so emitting them off GRBL buys an
+unknown-command line per job (`design.md` → *Firmware capabilities*). **Open deliberately: HB-5** (outside
+the request) and **HB-10** (item 4). **`PReview.md` and the
 `HR-`/`CR-` register are absent from this branch's working tree**, which is why plan.md is over budget:
 the two paragraphs above are the only surviving summary of what those registers hold.
 
