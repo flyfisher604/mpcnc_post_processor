@@ -1216,6 +1216,17 @@ function parseProbeSafeZProperty() {
   probeSafeZMode = parsed.mode;
   probeSafeZHeightDefault = parsed.dflt;
 
+  // The map-side twin answers a parse failure with an Important ">>> WARNING: ... format error"
+  // (safeZforSection()); this side answered it with the Debug line below, which nobody posts at,
+  // and a "Probe SafeZ = Error = 15.000" in the Info-level Resolved Values block. 15 mm is a
+  // plausible retract height, so the mistake looked like it worked. Same wording as the map side
+  // on purpose -- the two properties document each other as "same syntax" and must fail the same
+  // way. validateJob() carries the post-time half, for both. See docs/HReview.md HB-5.
+  if (probeSafeZMode == eSafeZ.ERROR) {
+    writeWarning(properties.probeSafeZ.title + " (" + groupDefinitions.probe.title + ") format error: "
+      + xyzFormat.format(propertyMmToUnit(probeSafeZHeightDefault)));
+  }
+
   writeComment(eComment.Debug, " parseProbeSafeZProperty: probeSafeZMode = '" + eSafeZ.prop[probeSafeZMode].name + "'");
   writeComment(eComment.Debug, " parseProbeSafeZProperty: probeSafeZHeightDefault = " + probeSafeZHeightDefault);
 }
@@ -1670,6 +1681,24 @@ function validateJob() {
       + "no tool-change code is emitted and every operation runs with the tool already in the "
       + "spindle, at the other tools' feeds and speeds. Enable the \"7 - Tool Changes\" group, or "
       + "post one tool per file."));
+  }
+
+  // Both Safe-Z fields go through parseSafeZExpr(), and anything it cannot read -- a leading minus,
+  // a unit suffix ("15mm"), an emptied field -- resolves to a fixed 15 mm on every section. Neither
+  // property said anything to Fusion's dialog about that, and 15 mm is a plausible retract height,
+  // so the fallback looked like the setting working. Checked here for BOTH, because they document
+  // each other as "same syntax" and so must fail the same way -- warning the probe side alone would
+  // only move the asymmetry. warning(), not error(): 15 mm posts a valid file. parseSafeZExpr() is
+  // pure, so parsing here as well as in onOpen() costs nothing and cannot disagree with it.
+  // See docs/HReview.md HB-5.
+  var safeZProps = [properties.mapRapidsSafeZ, properties.probeSafeZ];
+  for (var s = 0; s < safeZProps.length; ++s) {
+    if (parseSafeZExpr(getProperty(safeZProps[s])).mode == eSafeZ.ERROR) {
+      warning(localize("\"" + safeZProps[s].title + "\" is set to \"" + getProperty(safeZProps[s])
+        + "\", which is not a Safe Z expression the post can read, so it falls back to a fixed 15 mm "
+        + "on every operation. Give a plain number of millimetres, or Feed:, Retract: or Clearance: "
+        + "followed by one -- no sign, no unit suffix."));
+    }
   }
 
   // --- Guards --------------------------------------------------------------------------------
