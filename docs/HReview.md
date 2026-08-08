@@ -1,6 +1,6 @@
 # HReview — hobbyist review of `MPCNC_v4.0_Beta2.cps`
 
-The hobbyist-side findings register and test register. **47 findings** — 30 `HR-` from the hobbyist
+The hobbyist-side findings register and test register. **48 findings** — 31 `HR-` from the hobbyist
 review, 17 `CR-` from the 2026-08-01 whole-file review. All are fixed, closed by design, or moved to
 `docs/PReview.md`, except three one-liners awaiting a tidy-up sweep and one unstarted robustness fix
 (HR-27). Nothing is failing.
@@ -16,7 +16,7 @@ the long form on close — is `CLAUDE.md` → *Registers ship with the code*, an
 
 ---
 
-## Findings — HR-1 … HR-30 · CR-1 … CR-17
+## Findings — HR-1 … HR-31 · CR-1 … CR-17
 
 `HR-` came from the hobbyist review; `CR-` from the 2026-08-01 whole-file review driven by the dialog and
 the F360 API. Both registers merged here on the same terms — ids kept, so every commit message and code
@@ -74,6 +74,7 @@ comment that names one still resolves.
 | **HR-27** | The two **geometry** guards fire in `onSection()`, not `onOpen()`, so a rejected job can leave a **truncated `.gcode` on disk** | Medium | Guards A/B/C run before any output, so they write no file; multi-axis and HR-6's orientation check do not. A hobbyist who builds a Setup on a model face gets a partial file rather than a clean refusal. Fix: promote both into `validateJob()`. Not started | ⬜ open |
 | **HR-28** | Four `Jog to …` origin modes advertise a capability **GRBL does not have** — the post's default firmware and the hobbyist's usual controller | Med-High | `askUser()` consumes `allowJog` in the **RepRap branch only** (`M291 … X1 Y1 Z1`); the GRBL branch emits a bare `M0` and discards it, and GRBL 1.1 accepts a jog only in Idle or Jog state, which an `M0` hold is not. The job stopped and waited and the operator could not move the machine, with nothing saying why. **Gated, not deleted** — the modes are correct on RepRap. `warnJogAtPauseOnGrbl()` in the file + a `validateJob()` warning; both tooltips now name the limitation | ✅ fixed |
 | **HR-29** | `Axises Homed and Trusted` — not a word, on the one group-4 control the dialog asks a hobbyist to read | Cosmetic | Title → `Axes Homed and Trusted`. A title is not a stored identifier, so no preset resets | ✅ fixed |
+| **HR-31** | **Description altitude, wrong in both directions.** Seven group-4/5/6 descriptions ran 150–475 words and re-derived firmware facts `design.md` already holds, burying the decisive sentence — `probeOnStart`'s *the jog modes do not work on GRBL* sat two-thirds in. Meanwhile four controls a hobbyist meets first said almost nothing: `Manual Spindle On/Off` (8 words for the control that decides whether the post asks or commands), `Plate Thickness` (6, no unit), `G38 Target` (6, no frame), `Map: Safe Z to Rapid` (23, no syntax) | Medium | All eleven rewritten. Each of the seven now **leads with what to set and whether it can be skipped**; the firmware derivations are **deleted, not moved** — `design.md` holds every one (`:80` GRBL `$H`, `:178-180` `G53`/`G28 X Y`/Marlin `G92`, `:182` jog-at-`M0`, `:92-150` the fixed-Z frames), so it grew by nothing. **Only three shrank materially** (2092 → 1821 words, −13%): the other four carried no derivation to cut and needed reordering, which the added skip signals slightly outweigh. The four stubs went 43 → 323 words. `probeOnStart` also now leads with **the default assumes a wired touch plate** (HR-35) | ✅ fixed |
 | **HR-30** | Seven property descriptions carry typos or broken grammar — `fo`, `seperation`, `is include`, `are include`, `power to on`, and a doubled space in both Duet fields | Cosmetic | All seven corrected. Descriptions are never emitted (the header dump prints names and values), so this is dialog-only | ✅ fixed |
 
 **Open, no fix:** HR-19 (`M291` space), HR-21 / CR-15 (one decision, two ids), HR-24 — a tidy-up sweep of
@@ -90,9 +91,9 @@ README tells a hobbyist to consider.
 
 ---
 
-## Test register — 91 rows
+## Test register — 92 rows
 
-**✅ 67 PASS · ❌ 0 FAIL · ⬜ 6 UNRUN · ➖ 18 n/a or moved — 91 rows.** Complete by construction: every `H`/`HR`/`HW`
+**✅ 67 PASS · ❌ 0 FAIL · ⬜ 6 UNRUN · ➖ 19 n/a or moved — 92 rows.** Complete by construction: every `H`/`HR`/`HW`
 id has a row, including the ones that belong to another file. **If you move a finding out, leave the
 pointer row behind.** `CR-` ids are exempt — most are cosmetic or by-design closures that were never
 separate tests. `docs/check-docs.js` enforces the tally, the completeness and the exemption.
@@ -189,6 +190,7 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **CR-10 (A)** | GRBL laser mode formats its M-code as a number | group 09 on, GRBL, a laser operation | a real M-code number, **never `M NaN`**. Group 09 has never appeared in any posted file — see `PReview.md` **J4**, which this post also serves | posted | — **owed** | ⬜ |
 | **HR-29** | The corrected group-4 title | — | → `PReview.md` **D1** — a title exists only in the dialog; the header dump prints keys and values, so no posted file can show it | — | — | ➖ |
 | **HR-30** | The seven corrected descriptions | — | → `PReview.md` **D1**, same reason. Descriptions are never emitted at all | — | — | ➖ |
+| **HR-31** | The eleven rewritten descriptions read at the right altitude | — | → `PReview.md` **D1**, extended to read each leading sentence on its own. The claim is *the first sentence answers it*, which no posted file can show | — | — | ➖ |
 | **HR-27** | A geometry-rejected job writes **no file at all** | **(a)** a Setup built on a tilted model face, GRBL/mm defaults; **(b)** the same job on an upright Setup | **(a)** the post `error()`s and **no `.gcode` exists on disk** — the discriminator is the *absence of the output file*, not its contents. Today the guard fires in `onSection()` and leaves a **truncated** file ending mid-toolpath, which is the pre-fix discriminator and must stop appearing. **(b)** posts normally and completely, proving the promotion into `validateJob()` did not reject a job it should accept. Shares HR-6 (B)'s dependency — it needs the same rotated Setup, and if Fusion re-expresses `forward` as `Z1` then branch (a) is unreachable and that is itself the HR-6 (B) answer | posted | — **owed** | ⬜ |
 
 ---
