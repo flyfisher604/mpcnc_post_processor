@@ -26,8 +26,8 @@ everything the README puts outside the hobbyist's reach:
 | Area | Controls |
 |---|---|
 | Multiple WCS / multiple parts | `Subsequent WCS / Part`, Replicate jobs, the `Jog to …` per-part modes |
-| The machine frame | group `4 - Machine Frame` (all four properties) — declarations plus the homing action |
-| The fixed Z reference | group `5 - Fixed Z Reference` (all six properties) — the spoilboard base and the machine-Z datum |
+| The machine frame | group `4 - Machine Frame - homing and end park` (all three properties) — the declaration, the homing action, the end park |
+| The fixed Z reference | group `5 - Fixed Z Reference - multi-part jobs only` (all five properties) — the spoilboard base and the machine-Z datum |
 | Cross-part clearance | `Retract Across Parts`, `Inter Part Travel Z` |
 | Pre-set fixture offsets | both `Use Active WCS …` origin modes |
 | Tool changes | group `7 - Tool Changes` (all eight properties) |
@@ -61,7 +61,7 @@ and a `✅ fixed` row must not quietly cover a second fix.
 | **PR-2** | A reserved spoilboard base and a homed machine Z are **two implementations of one frame**, but only the first was exposed — so Guard B *rejected* multi-WCS jobs on machines whose homed Z would have served, and charged the rest one of GRBL's six WCS registers | Med-High | `Fixed Z Reference` = `None` / `Spoilboard` / `Machine Z`, with `Travel Machine Z` (one absolute machine height, no touch-off, no arithmetic) emitted as `G53 G0 Z<n>`. Guard B relaxed to *a* datum of either kind. Resolves the standing **"Never `G53`"** decision — §6. Also lifts a hard limit: the first section's arrival now emits a real absolute Z instead of `Unknown Z for XY move.` where a machine Z is declared. **`Travel Machine Z` was merged into `Inter Part Travel Z` by PR-5**; the two-implementations model is unchanged | ✅ fixed |
 | **PR-3** | `Probe to Set Base = None` stated a precondition it did not have — *"assume a prior job set it"*, where a controller reset or power cycle on a machine with no Z home invalidated that base Z0 **silently** and the tool then descended to a clearance wrong by however far machine zero drifted | Medium | **Option eliminated** (E1). Its one durable use — a machine that homes Z — has a strictly better answer under PR-2: no register consumed, no probe, and it cannot go stale the same way because the job homes. **Removing an enum id resets the property** — a release-notes item | ✅ fixed |
 | **PR-4** | `Tool Change Z` is measured in *whichever WCS happens to be active*, so the physical park point silently drifts per workpiece — flagged in the post's own source as *"likely a bug, not intended behavior"* | Medium | **Deliberately not landed here.** The `G53` branch it needs is now sanctioned by PR-2's decision, but it shares code with §2's Phase 4 reorder and must compose with that design rather than pre-empt it. The code comment now records the settled decision instead of asking for one | ⬜ open |
-| **PR-5** | The machine-frame rework left the dialog asking **two questions per concept**: group 4 posed one machine's homing as two independent booleans, and group 5 carried two clearance fields that `Fixed Z Reference` made **mutually exclusive** — never both read, read at the same two moments, and naming the same physical plane | Medium | Group 4 → `Axises Homed and Trusted` (`None`/`XY Only`/`Z Only`/`XYZ`), information-identical to the booleans, read only through `machineHomesXY()`/`machineHomesZ()`. Group 5 → one `Inter Part Travel Z` whose frame follows `Fixed Z Reference`. **The merge forces the empty default**: with a live default, flipping the enum would emit a valid-looking height in the wrong frame under no guard. Two new spoilboard guards (unset, and `<= 0` — the detectable direction of the flip) and a frame-naming header echo carry the residual risk. 71 → 70 properties. **Three keys replaced, so all three settings reset** — a release-notes item | ✅ fixed |
+| **PR-5** | The machine-frame rework left the dialog asking **two questions per concept**: group 4 posed one machine's homing as two independent booleans, and group 5 carried two clearance fields that `Fixed Z Reference` made **mutually exclusive** — never both read, read at the same two moments, and naming the same physical plane | Medium | Group 4 → `Axes Homed and Trusted` (`None`/`XY Only`/`Z Only`/`XYZ`), information-identical to the booleans, read only through `machineHomesXY()`/`machineHomesZ()`. Group 5 → one `Inter Part Travel Z` whose frame follows `Fixed Z Reference`. **The merge forces the empty default**: with a live default, flipping the enum would emit a valid-looking height in the wrong frame under no guard. Two new spoilboard guards (unset, and `<= 0` — the detectable direction of the flip) and a frame-naming header echo carry the residual risk. 71 → 70 properties. **Three keys replaced, so all three settings reset** — a release-notes item | ✅ fixed |
 | **PR-6** | `At End Go to 0,0` never said **which** X0 Y0, and it is the **last section's WCS** — so on a multi-part job the tool parks at whichever fixture Fusion happened to order last, and re-ordering operations silently moves the park point. Same species as PR-4's `Tool Change Z` | Medium | Enum `Off` / `Work X0 Y0` / `Machine X0 Y0`, default `Work` (today's behaviour, now named). The machine answer is **firmware-split, not firmware-excluded**: `G53 G0 X0 Y0` on GRBL/RepRap, `G28 X Y` on Marlin — which re-establishes the frame instead of addressing it, so it needs neither `CNC_COORDINATE_SYSTEMS` nor `Home at Job Start`. Guard requires X/Y declared on every firmware, and `Home at Job Start` on GRBL/RepRap only. Retracts before parking when a fixed Z reference exists, closing **HR-16**'s Z half for this path. **boolean→enum resets the setting, and asymmetrically — anyone who had it OFF gets the move back ON**. Relocated to group 4 and rekeyed by **PR-7** | ✅ fixed |
 | **PR-7** | Group 4 still asked **two questions about one homing decision** — `Home at Job Start` plus `Prompt Before Home`, the second **inert whenever the first was off** and saying so in its own tooltip: four dialog settings, three distinct behaviours. And PR-6's new park sat in group 1 while being guarded by group 4 | Medium | One enum, `Home at Job Start` = `Off` / `Home` / `Pause, then Home`, read only through `homesAtJobStart()` / `promptsBeforeHome()`. **Unlike PR-5's axis merge this is not information-preserving — it deletes the meaningless state**, which is the stronger reason to merge and the one PR-5 could not claim. `At End Park At` moved to group 4 and its key renamed `machineParkAtEnd` so the prefix matches the group, per this file's own key convention. Group 4 is now declaration / action / park; group 1 loses a control. **Both key changes reset those settings**, and the homing one resets to `Off` — the inert direction, deliberately: the reverse would add unexpected motion to a job that never asked for it | ✅ fixed |
 | **PR-8** | PR-6's park asked *is a base reserved?* where it needed *was a fixed Z reference **established**?*, and the two differ on Marlin. A Marlin job with `Fixed Z Reference = Spoilboard` + `At End Park At = Machine` passes every guard — the park's own guard sits **above** Guard C's Marlin return, the base's RepRap-slot check **below** it — and then transits a base `writeBaseEstablish()` refused to write, emitting `G55` / `G0 Z40` / `G54` on a firmware where `G54`–`G59` is itself a build option, and `Gundefined` for a `G59.1`–`G59.3` base. The same test also let the **no-fixed-reference** job park in silence: a full-diagonal bed crossing at the last operation's finishing Z, while `onClose()`'s comment asserted the opposite | Med-High | One predicate, `parkCanRetract()` = *not Marlin* **and** `fixedZEstablishedAtStart()`, read by the emission and by a new post-time `warning()` so the two cannot drift. When it is false the park now says so in the file rather than retracting into a frame that does not exist — the honest statement of `HReview.md` **HR-16** reached down a second path, not a fix for it. `onClose()`'s comment corrected | ✅ fixed |
@@ -101,7 +101,7 @@ boundary does each thing once:
 3. **Park position — two branches decided, and a third now sanctioned:** base reserved → park relative to
    the base (a fixed physical spot for the whole job), reusing the transit-select machinery; no base →
    plain `G0` in the current WCS, as today. Current code implements only the no-base branch. **The blanket
-   "Never `G53`" that used to close this list is superseded** — see PR-4: with `Axises Homed and
+   "Never `G53`" that used to close this list is superseded** — see PR-4: with `Axes Homed and
    Trusted` = `XYZ` there is a third branch, `G53 G0 Z<n>` then `G53 G0 X<n> Y<n>`, two blocks and
    retract-first because `G53` is not modal and a three-axis `G53` would be the diagonal this post splits
    its rapids to avoid. The two existing branches stand unchanged for machines that declare nothing, and
@@ -427,7 +427,7 @@ hold it, and the *Expect* must exist in exactly one place.
 | **HR-13** | `onCommand` no longer discards silently | — has a complete diff; folds into **P8** | — | §2 | ➖ |
 | **HR-20** | Tapping beyond a warning on the manual path | a drill + tap job, automatic spindle | posted | §2 | ⬜ |
 | **PR-1a** | The capability/action split emits what the old enum did, and nothing when the action is off | group 04 declarations × `Home at Job Start`, GRBL then Marlin | posted | §3.6 | ⬜ |
-| **PR-1b** | The stored-offset warning fires on the trusting modes and **never** on the `Jog …` modes | 2-WCS job, `Axises Homed and Trusted` = `None` off, each origin mode in turn | posted | §3.6 | ⬜ |
+| **PR-1b** | The stored-offset warning fires on the trusting modes and **never** on the `Jog …` modes | 2-WCS job, `Axes Homed and Trusted` = `None` off, each origin mode in turn | posted | §3.6 | ⬜ |
 | **PR-2a** | A multi-WCS job on a homed-Z machine posts with **no** reserved base, one `G53` per traverse | 2 WCS, `Fixed Z Reference = Machine Z`, `Inter Part Travel Z = -12` | posted | §3.6 | ⬜ |
 | **PR-2b** | The first section's arrival emits a real absolute Z instead of the `Unknown Z` comment | as PR-2a, First = `Use Active WCS X0 Y0, Probe Z0` | posted | §3.6 | ⬜ |
 | **PR-2c** | Every new guard refuses, and leaves **no file** | each of the nine new `error()` conditions | posted | §3.6 | ⬜ |
@@ -581,8 +581,8 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
 
 ### 3.3 Dialog & defaults audit — needs the dialog, not a posted file
 
-- [ ] **D1 — labels, groups and field types.** Confirm group **`6 - On WCS / Part / Fixture
-      Changes`** exists (no lingering `Probe / Work Origin`); titles read **First WCS / Part**,
+- [ ] **D1 — labels, groups, field types, and the descriptions.** Confirm group **`6 - On WCS / Part /
+      Fixture Changes`** exists (no lingering `Probe / Work Origin`); titles read **First WCS / Part**,
       **Subsequent WCS / Part**, **Probe Pause**, **Probe with G38.2**; the base-establish option
       reads **Pause, Probe Z, Pause**; **First WCS / Part** lists all six modes in order and defaults
       to the first (`Set X0 Y0 to Current Pos, Probe Z0`); **Subsequent WCS / Part** lists its four
@@ -590,16 +590,25 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       `Set … to Current Pos` modes; **Probe X/Y Offset**, group-05 **Inter Part Travel Z** and group-06
       **Safe Z** accept only whole numbers (reject `2.5`) and read as whole mm. Confirm no group shows
       two fields both titled "Safe Z".
+      **Added by the hobbyist dialog review** (`HReview.md` HR-29 · HR-30 · HR-31 · HR-32): group 4 reads
+      `4 - Machine Frame - homing and end park`, group 5 `5 - Fixed Z Reference - multi-part jobs only`,
+      and the group-4 declaration is `Axes Homed and Trusted`, not `Axises`. Then read the **leading
+      sentence alone** of each of the eleven rewritten descriptions (the seven group-4/5/6 controls plus
+      `jobManualSpindlePowerControl`, `probeThickness`, `probeG38Target`, `mapRapidsSafeZ`). **Pass — each
+      answers *what do I set, and can I skip this*, unaided.** Merely shorter and still burying the answer
+      is a fail. *(The only check those four findings can have: a title and a description exist nowhere
+      but the dialog, so no posted file can evidence them.)*
 - [ ] **D3 — the key rename resets every saved preset, once, and the new keys then hold.** Open the dialog
       with a **previously customised preset** loaded. *Get:* groups read `1 - Job`, `2 - Feeds and Speeds`,
       `3 - Map G1s to Rapids - disable when using full license` (**renamed** by `HReview.md` HR-17),
-      `4 - Establish Machine Coordinates`, `5 - Establish Spoilboard Reference`,
-      `6 - On WCS / Part / Fixture Changes`, `7 - Tool Changes`, `8 - External Include Files`,
+      `4 - Machine Frame - homing and end park`, `5 - Fixed Z Reference - multi-part jobs only`
+      (both **renamed** by `HReview.md` HR-32), `6 - On WCS / Part / Fixture Changes`,
+      `7 - Tool Changes`, `8 - External Include Files`,
       `9 - Laser`, `10 - Coolant`, `11 - Duet` — **in that order, none collapsed** — with
-      **9 / 7 / 4 / 2 / 4 / 10 / 8 / 5 / 7 / 10 / 2** properties (68 total), placed by `order:` (100…200 in
+      **8 / 7 / 4 / 3 / 5 / 10 / 8 / 5 / 7 / 10 / 2** properties (**69** total), placed by `order:` (100…200 in
       tens) rather than by a text sort of the title.
       **Pass — every property is back at its default, exactly once.** The key is the stored identifier and
-      all 68 were renamed, so a customised Beta-1/Beta-2 preset **must** come up empty: a value that
+      every key was renamed, so a customised Beta-1/Beta-2 preset **must** come up empty: a value that
       *survived* means the rename missed a key. Then save a fresh preset, close, reopen — **it must reload
       intact**, which is what proves the new keys are stable identifiers rather than merely different ones.
       Spot-check Home Before Start, both origin dropdowns and any nonzero Probe X/Y Offset in both halves.
@@ -631,7 +640,7 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
       identical and no line moves.** A moved line means an `order:` is wrong; a changed value means a key
       is read somewhere the rename missed; a motion-line diff means the pass was not mechanical. *(Order
       and the counts are already proven by harness against the file's own `group:`/`order:` fields; only a
-      post shows that Fusion's `getProperty()` resolves all 68 renamed keys.)*
+      post shows that Fusion's `getProperty()` resolves every renamed key.)*
 
 ### 3.4 Other outstanding professional checks
 
@@ -758,12 +767,12 @@ Landed unposted — **every row here is owed against real output**, and the two 
 them (29 guard cases, 12 emission cases; `node`, against the working tree, aborting against `HEAD` where
 the functions do not exist) prove *logic and block shape*, never what a machine receives.
 
-- [ ] **PR-1a — the declaration emits what the old enum did.** *Do:* `Axises Homed and Trusted` through
+- [ ] **PR-1a — the declaration emits what the old enum did.** *Do:* `Axes Homed and Trusted` through
       all four answers with `Home at Job Start` = `Home`, then one at `Off`; GRBL and Marlin/RRF; then one at `Pause, then Home`.
       *Get:* GRBL one `$H` whenever either axis is declared, **identical for every declaration set**
       (compile-time there); Marlin/RRF exactly the declared axes, `G28 X`/`G28 Y`/`G28 Z`. **Pass:** the
       action off emits no homing block on any firmware; the action on with the declaration `None` emits
-      `( >>> WARNING: "Home at Job Start" is on but "Axises Homed and Trusted" is None …)` and no motion; the prompt appears once,
+      `( >>> WARNING: "Home at Job Start" is on but "Axes Homed and Trusted" is None …)` and no motion; the prompt appears once,
       not per axis. *Discriminator: that warning — the one state the old enum could not reach.*
       *(Supersedes P4.)*
 - [ ] **PR-1b — the stored-offset warning, and what must not trip it.** *Do:* 2 WCS, declaration **`None`**,
@@ -907,7 +916,7 @@ regression row and should run first**; the rest exercise a path that has never e
       *Presence-based sibling, same build:* set First to a `Jog` mode and the warning must return —
       an absence-based row alone cannot tell a fixed gate from a deleted warning (`conventions.md`).
 - [ ] **PR-7b — the dialog reads in the right order.** *Method `dialog`.* **Pass:** group 4 shows
-      `Axises Homed and Trusted`, `Home at Job Start`, `At End Park At` in that order and nothing else;
+      `Axes Homed and Trusted`, `Home at Job Start`, `At End Park At` in that order and nothing else;
       **group 1 no longer carries the end park**; and a preset saved before this change comes back with
       the homing action at `Off` and the park at `Work X0 Y0` — both keys were replaced, and `Off` is the
       inert direction for the one that moves the machine.
@@ -1086,7 +1095,7 @@ this section when it empties** — Rule 4.
 | Rows | What moved | Effect |
 |---|---|---|
 | **every saved GRBL `.gcode` predating 2026-07-31** | HR-3 — the manual-spindle stop now prompts on GRBL | A default job ends `M0 (MSG Turn OFF spindle)` where it once ended `M5`, and each tool change gains the same prompt. **No row's assertions are affected** — do not read a tail diff as a regression |
-| **§4's two header-dump rows** (`H7c.gcode`, `H7c-a/-b/-c.gcode`) | the `groupDefinitions` move retitled the dump headings; the key rename renamed every dumped property; the machine-frame work then changed the counts | `( Properties -- 03 - Map G1s …)` now reads `3 - Map G1s …`, and `A_Job_SelectedFirmware = Grbl` reads `jobSelectedFirmware = Grbl`. **The assertions stand** — one block per group, in dialog order — but the numbers are now **72 summing 9/7/4/4/6/10/8/5/7/10/2**, groups 4 and 5 read `4 - Machine Frame` / `5 - Fixed Z Reference`, and `machineHomeBeforeStart` is gone. Delete this row when **D5** re-posts |
+| **§4's two header-dump rows** (`H7c.gcode`, `H7c-a/-b/-c.gcode`) | the `groupDefinitions` move retitled the dump headings; the key rename renamed every dumped property; the machine-frame work then changed the counts | `( Properties -- 03 - Map G1s …)` now reads `3 - Map G1s …`, and `A_Job_SelectedFirmware = Grbl` reads `jobSelectedFirmware = Grbl`. **The assertions stand** — one block per group, in dialog order — but the numbers are now **69 summing 8/7/4/3/5/10/8/5/7/10/2**, groups 4 and 5 read `4 - Machine Frame - homing and end park` / `5 - Fixed Z Reference - multi-part jobs only`, and `machineHomeBeforeStart` is gone. Delete this row when **D5** re-posts |
 | **§4's "base establish `None`" row** and **§4's third "unknown Z" file** (`H7c-c.gcode`) | PR-3 removed the `None` option, so *"no probe, Info comment `assuming base G59 is already established …`"* is now an unreachable configuration; and *"back again when the base is only assumed pre-set"* was that same configuration | Both halves retire rather than re-baseline — **there is no longer a way to reserve a base and not probe it.** The other two `H7c` files' assertions (warning present with no base, suppressed with an established base) stand unchanged. Delete when **PR-3** runs |
 | **§4's "Guard B (1a–1e)" row** | PR-2 relaxed Guard B from *requires a reserved base* to *requires a fixed Z reference of either kind* | 1a–1d stand as written. **1e is now incomplete**: "base reserved → posts" needs a sibling proving `Fixed Z Reference = Machine Z` also posts with **no** base. Delete when **PR-2a** runs |
 

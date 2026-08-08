@@ -56,7 +56,7 @@ no such lock and run the move against a machine zero that has moved.
 
 ### The machine frame — capability, then action
 
-`Axises Homed and Trusted` — `None` / `XY Only` / `Z Only` / `XYZ` — is a **fact about the machine**;
+`Axes Homed and Trusted` — `None` / `XY Only` / `Z Only` / `XYZ` — is a **fact about the machine**;
 `Home at Job Start` is **a decision about this job**. Separating them expresses a state the old
 `Home Before Start` enum could not: *homed at the controller, do not home here*.
 

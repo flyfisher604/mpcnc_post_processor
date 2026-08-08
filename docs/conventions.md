@@ -174,13 +174,13 @@ mm, frame set by `Fixed Z Reference`); the post-probe retract keeps **"Safe Z"**
 
 ## Reference — per-machine settings
 
-Group 4 is `Axises Homed and Trusted` (the declaration) + `Home at Job Start` (the action, including its
+Group 4 is `Axes Homed and Trusted` (the declaration) + `Home at Job Start` (the action, including its
 optional pause) + `At End Park At`; group 5 is `Fixed Z Reference` and the one clearance it gives a frame
 to. The park sits in group 4 rather than group 1 because what it *addresses* is the machine frame and it
 is guarded on the declaration — the same reason the action lives there, and the reason its key is
 `machineParkAtEnd`.
 
-| Machine / firmware | Axises Homed and Trusted | Home at Job Start | Fixed Z Reference (multi-fixture) | Operator does |
+| Machine / firmware | Axes Homed and Trusted | Home at Job Start | Fixed Z Reference (multi-fixture) | Operator does |
 |---|---|---|---|---|
 | LowRider (Marlin or FluidNC) | `XYZ` if Z endstops fitted, else `XY Only` | `Home` | `Machine Z` where Z is declared, else `Spoilboard` `G59` | homes X/Y; work-Z touched off with the plate either way |
 | MPCNC + FluidNC, X/Y switches | `XY Only` | `Home` | `Spoilboard` `G59` | homes X/Y; machine Z n/a, Z set by the work plate |
