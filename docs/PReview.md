@@ -47,7 +47,7 @@ everything the README puts outside the hobbyist's reach:
 
 ## 2. Findings
 
-**✅ 10 fixed · ◑ 1 part-fixed · ⬜ 6 open — 17 findings.** The `HR-` ids were found by the hobbyist pass
+**✅ 10 fixed · ◑ 1 part-fixed · ⬜ 7 open — 18 findings.** The `HR-` ids were found by the hobbyist pass
 and reclassified as professional, and are **kept deliberately** so commit history, `HReview.md` and this
 file all name the same defect the same way; `PR-` ids were found by this file's own machine-frame review.
 Only the ten `PR-` fixes are committed code — every `HR-` diff below is a proposal, not a record.
@@ -74,6 +74,7 @@ and a `✅ fixed` row must not quietly cover a second fix.
 | **HR-10** | `Disable Z Stepper` emits Marlin-only `M84 Z` on GRBL | Medium | **Complete diff, independent of the reorder** — can go first as a warm-up commit | ⬜ open |
 | **HR-13** | `onCommand` silently discards every command it does not name | Low-Med | **Complete diff, independent of the reorder** — can go first as a warm-up commit | ⬜ open |
 | **HR-20** | Tapping is not really implemented | Medium | Manual path prompts (via HR-12); the automatic path always emitted `M4`. **Not tool-change work and does not wait for Phase 4** — it is here only because tapping was *decided* to be professional | ◑ part-fixed |
+| **HR-26** | The base-clearance retract has no tool-0 / jet guard though the base *establish* does, so a jet job transits a base whose Z0 was never set — an absolute `G0 Z` in an unestablished frame | Medium | **Not started.** Write-up, the reproduction and the three candidate fixes are §3.4's row. Belongs to §5's jet workstream, but it is a Guard-B-shaped hole rather than a jet feature gap. **Row added 2026-08-07** when `HReview.md` stopped carrying a stub copy — the finding is unchanged | ⬜ open |
 
 The five tool-change findings — HR-7, HR-8, HR-9, HR-10, HR-13 — land **as one unit** with the ordering
 rework below, rather than patching the same section-boundary code twice. HR-10 and HR-13 are the

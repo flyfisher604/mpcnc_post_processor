@@ -1,9 +1,14 @@
 # HReview — hobbyist review of `MPCNC_v4.0_Beta2.cps`
 
-The hobbyist-side findings register and test register. **56 findings** — 39 `HR-` from the hobbyist
-review, 17 `CR-` from the 2026-08-01 whole-file review. All are fixed, closed by design, or moved to
-`docs/PReview.md`, except three one-liners awaiting a tidy-up sweep and one unstarted robustness fix
-(HR-27). Nothing is failing.
+The hobbyist-side findings register and test register. **49 findings** — 32 `HR-` from the hobbyist
+review, 17 `CR-` from the 2026-08-01 whole-file review. All are fixed or closed by design, except three
+one-liners awaiting a tidy-up sweep and one unstarted robustness fix (HR-27). Nothing is failing.
+
+**Findings that turned out to be professional are not here at all** — no summary row, no pointer row.
+`HR-7`, `HR-8`, `HR-9`, `HR-10`, `HR-13`, `HR-20` and `HR-26` live in `docs/PReview.md` and only there,
+with their ids kept, so a commit message or code comment naming one still resolves — in that file. This
+register held stub copies of all seven until 2026-08-07; a stub that restates a finding is a second place
+for it to go stale.
 
 Reasoning, diffs and session narratives were trimmed 2026-08-01 — read the code and the commit messages
 for *why*. What is kept is what a later reader needs: every issue with its status, and every test with
@@ -20,7 +25,8 @@ the long form on close — is `CLAUDE.md` → *Registers ship with the code*, an
 
 `HR-` came from the hobbyist review; `CR-` from the 2026-08-01 whole-file review driven by the dialog and
 the F360 API. Both registers merged here on the same terms — ids kept, so every commit message and code
-comment that names one still resolves.
+comment that names one still resolves. **The seven professional ids are the exception and resolve in
+`PReview.md`** — the gaps at HR-7 … HR-10, HR-13, HR-20 and HR-26 are deliberate.
 
 | ID | Finding | Sev | Resolution | Status |
 |---|---|---|---|---|
@@ -30,26 +36,19 @@ comment that names one still resolves.
 | **HR-4** | Safe-Z fallback constants never converted mm → output unit | Med-High | Four call sites converted; inch only, identity in mm | ✅ fixed `439ce2d` |
 | **HR-5** | `Scale Feedrate` did not apply to G2/G3 arcs | Med-High | `limitArcFeed()` caps at the arc's **plane's** axis limits | ✅ fixed `b95c954` |
 | **HR-6** | No tool-orientation guard — a rotated 3-axis Setup posted silently wrong g-code | Medium | `isSectionOrientationSupported()`, component-wise, **fails open**, ~0.006° | ✅ fixed `684f28a` `e2b2424` |
-| **HR-7** | `toolChange()` clobbers `forceSectionToStartWithRapid` | Medium | → `PReview.md` §2 — Tool Change branch | ➖ moved |
-| **HR-8** | Post-injected motion never updates Fusion's tracked position | Medium | → `PReview.md` §2. Confirmed unreachable on any hobbyist path (2026-08-01) | ➖ moved |
-| **HR-9** | `Do First Change` + probe-after off zeroes Z against the wrong tool | Medium | → `PReview.md` §2 | ➖ moved |
-| **HR-10** | `Disable Z Stepper` emits Marlin-only `M84 Z` on GRBL | Medium | → `PReview.md` §2 — has a complete diff | ➖ moved |
 | **HR-11** | Marlin/RRF jobs never ended and left every stepper energised | Medium | `M84 S60` both; `M2` on RepRap only (Marlin has never implemented it). **`S60`, not a bare `M84`, deliberately** — a 60-second idle timeout rather than releasing the steppers at once, which would drop Z on an unbalanced LowRider gantry | ✅ fixed `7a35f7f` `8054b6e` |
 | **HR-12** | A manual spindle is never told about an RPM change between operations | Medium | Prompt on formatted-speed **or** direction change | ✅ fixed `dd8e11d` |
-| **HR-13** | `onCommand` silently discards every command it does not name | Low-Med | → `PReview.md` §2 — has a complete diff | ➖ moved |
 | **HR-14** | Two coolant modes could never match a channel | Low | `coolantLevels` derived from `eCoolant` | ✅ fixed `7e38777` |
 | **HR-15** | `safeZforSection()` mixed global `hasParameter()` with `_section.getParameter()` | Low | All three guards read `_section.` | ✅ fixed `88c7817` |
 | **HR-16** | `onClose` traverses to X0 Y0 before stopping the spindle, no guaranteed safe Z | Low | **Spindle-order half fixed** 2026-08-01 (CR-6). **Z half: fixed for the new machine park only** — `PReview.md` **PR-6** retracts before it, because that one crosses the bed. The default `Work` park still does not: it goes to the last part's own origin, so the tool is already there. **The jet case stays open** → `PReview.md` §5 | ◑ part-fixed |
 | **HR-17** | Four tidy-ups; two change emitted text | Cosmetic | Sanitizer double-spaces, group-03 rename, vestigial arg, empty GRBL block | ✅ fixed `924d1f6` |
 | **HR-18** | `loadFile()` left no line break after an include — the next block merges | Medium | Repair in `loadFile()`; `\r` counts as a terminator | ✅ fixed `5b0b94a` |
 | **HR-19** | `M291` doubled space; `()` vs `( )` on empty comments | Cosmetic | `()` **closed as by design** (CR-17b). The `M291` space remains — next sweep | ⬜ open |
-| **HR-20** | Tapping is not really implemented | Medium | → `PReview.md` — manual path now prompts (HR-12); automatic path always emitted `M4` | ➖ moved |
 | **HR-21** | `includeProbeFile` declared but never read — dead property | Low | Tooltip now says `NOT IMPLEMENTED YET`. Wire into `probeTool()` or delete — undecided | ⬜ open |
 | **HR-22** | An include file that exists but is **empty** contributes nothing, silently | Medium | **(A)** empty include now announces itself ✅. **(B)** empty Start include leaves no preamble — **closed as by design** 2026-08-01 (CR-7): the include owns the phase | ✅ closed |
 | **HR-23** | A Start/Stop include *replaces* the whole preamble/footer | — | **Designed behaviour.** Filed as a defect and resolved as correct the same day. Lesson: before calling a bypass a defect, ask whether the bypass is the feature | ✅ closed |
 | **HR-24** | `writeWCS(section)` takes a section then consults the global `tool` | Low | Latent (both callers pass `currentSection`). One line: `section.getTool()` — next sweep | ⬜ open |
 | **HR-25** | `wcsGcode(0)` / `wcsName(0)` yield `G53` | Low | **Closed as by design** 2026-08-01 (CR-17d): a pure conversion should not carry frame policy; no caller can pass 0 | ✅ closed |
-| **HR-26** | Base-clearance retract has no jet guard though the base *establish* does | Medium | → `PReview.md` §3.4 — jet + multi-WCS + base | ➖ moved |
 | **CR-1** | `$H` went through `writeBlock()`, so `Enable Line #s` emitted `N10 $H` and GRBL rejects it | High | `writeln()` — `$` must be the line's first character | ✅ fixed `c73726c` |
 | **CR-2** | Homing moves the tool, then a `Current Pos` origin mode records the **homing corner** as the part origin | High | Post-time `warning()` in `validateJob()`. **Re-gated `1eb8141`:** keyed on the *action* alone it fired when `Axes Homed and Trusted` is `None`, where `writeMachineHoming()` emits **no motion at all** — so it described a move that never happens and told the operator to abandon a pre-jog that was intact. Now `homesAtJobStart() && (machineHomesXY() \|\| machineHomesZ())`, and its wording says *the axes the declaration names* rather than *the homing corner*, which the `Z Only` answer does not have | ✅ fixed `c73726c` |
 | **CR-3** | A required tool change dropped in complete silence when group 07 is off (the default) | Med-High | `>>> WARNING` per boundary + `validateJob()` warning via `countDistinctTools()`, counted over **sections** | ✅ fixed `c73726c` |
@@ -87,7 +86,7 @@ comment that names one still resolves.
 
 **Open, no fix:** HR-19 (`M291` space), HR-21 / CR-15 (one decision, two ids), HR-24 — a tidy-up sweep of
 one-liners, none changing output today. Plus **HR-27**, which is not a one-liner and is not in that sweep.
-Everything else is fixed, closed by design, or moved.
+Everything else here is fixed or closed by design.
 
 **Open questions carried in the rows above:** HR-1 (added-part provisional `Z0` — settle on `PReview.md`
 M4), HR-2 (guard breadth), HR-16 / CR-6 (jet Z retract — `PReview.md` §5), HR-21 / CR-15 (wire or delete).
@@ -99,12 +98,13 @@ README tells a hobbyist to consider.
 
 ---
 
-## Test register — 100 rows
+## Test register — 89 rows
 
-**✅ 67 PASS · ❌ 0 FAIL · ⬜ 9 UNRUN · ➖ 24 n/a or moved — 100 rows.** Complete by construction: every `H`/`HR`/`HW`
-id has a row, including the ones that belong to another file. **If you move a finding out, leave the
-pointer row behind.** `CR-` ids are exempt — most are cosmetic or by-design closures that were never
-separate tests. `docs/check-docs.js` enforces the tally, the completeness and the exemption.
+**✅ 67 PASS · ❌ 0 FAIL · ⬜ 9 UNRUN · ➖ 13 n/a — 89 rows.** Complete by construction: every `H`/`HR`/`HW`
+id **in this file's findings table** has a row. **A finding that moves to `PReview.md` takes its rows with
+it and leaves nothing behind** — no stub, no pointer — so `PReview.md` §3 is the one place a professional
+row is stated. `CR-` ids are exempt — most are cosmetic or by-design closures that were never separate
+tests. `docs/check-docs.js` enforces the tally, the completeness and the exemption.
 
 | Test | Proves | Setup (delta from defaults) | Expect — *discriminator in bold* | Method | Evidence | State |
 |---|---|---|---|---|---|---|
@@ -118,7 +118,6 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-1 (A)** | Provisional `Z0` on the default mode | all defaults | `( Provisional Z0 at the current height …)` → `G10 L20 P1 X0 Y0 **Z0**` before `G38.2` | posted | `H2.gcode` | ✅ |
 | **HR-1 (B)** | Same on the jog mode | H1 config | identical, after the jog `M0` | posted | `HR1b.gcode` | ✅ |
 | **HR-1 (C)** | **Absent** on `Use Active WCS` — the scope claim | H7 config | no provisional `Z0`, no comment; **motion byte-identical** to the pre-HR-1 reference | posted | `HR1c.gcode` vs `H7c-a.gcode` | ✅ |
-| **HR-1 (D)** | Jet / tool-0 absence | — | → `PReview.md` **J1** | — | — | ➖ |
 | **HR-1 (E)** | Both firmwares, both origin modes | Marlin + RRF, default and jog | the `Z0` word present on the pre-probe origin write in **all four** files | posted | `H11a`, `H11b - RRF`, both `H6` | ✅ |
 | **HR-2 (A)** | A drill posts at all | CAM = peck drill | **a file exists and reaches `( *** STOP end ***)`**; no `G81`/`G82`/`G83`/`G73` anywhere | posted | `Drill_Tap.gcode` | ✅ |
 | **HR-2 (A2)** | Tapping warning per occurrence | CAM = drill + tap, 4 holes | **8** warnings, single-spaced | posted | `Drill_Tap.gcode` | ✅ |
@@ -126,7 +125,6 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-2 (U)** | `isProbeOperation()` over 8 inputs | node | `probe`, `probing-*` → true; `drilling`/`tapping`/`boring`/absent → false | harness | node | ✅ |
 | **HR-3 (A)** | GRBL prompts spindle OFF | all defaults | `M0 (MSG Turn OFF spindle)` present; **no `M5`, no `M300` anywhere** | posted | `H2.gcode` — ⚠ order restated by CR-6 | ✅ |
 | **HR-3 (B)** | Automatic branch untouched | `Manual Spindle On/Off` = **false** | `M3 S<n>` at start, `M5` in the stop block, **no prompts anywhere** | posted | `HR3b.gcode`, `Face1 (auto).gcode` | ✅ |
-| **HR-3 (C)** | Tool-change half | — | → `PReview.md` §3.4 | — | — | ➖ |
 | **HR-3 (D)** | Marlin/RRF unchanged; only GRBL moved | Marlin + RRF | `M300 S300 P3000` then the prompt; **no bare `M5` in any of the six files** | posted | six session-1 files | ✅ |
 | **HR-4 (A)** | Inch: bare-number probe Safe Z converts | **inch**, `06` Safe Z = `20` | `G0 **Z0.7874**`, not `Z20` | posted | `H4a - GRBL Inch.gcode` — ⚠ comment reformatted by CR-17a | ✅ |
 | **HR-4 (B)** | mm: identity, no reference invalidated | mm, `06` Safe Z = `20` | differs from `H11c` in **5 lines only**; `G0 Z20` | posted | `H4b - GRBL.gcode` | ✅ |
@@ -141,10 +139,6 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-5 (E)** | Marlin: linearized segments limited like any `G1` | Marlin, `Scale Feedrate` on | **no** cut move exceeds an axis limit; 122 do in the scaling-off file | posted | `H5d - Marlin.gcode` vs `H11a.gcode` | ✅ |
 | **HR-6 (A)** | The guard is live, not failing open | Comment Level **Debug** | `( onSection orientation: forward X0 Y0 Z1, tilt … 0 deg -> upright, section allowed)`. **`UNREADABLE` would mean the guard is dead code** | posted | `H2 - Debug.gcode` | ✅ |
 | **HR-6 (B)** | An off-axis section is actually rejected | node, 13 forward vectors | ≤0.001° allowed; 0.01°/1°/45°/90°/180° **REJECTED**; missing/`NaN`/string components allowed; **nothing throws** | harness + read | node. ⚠ **residual: needs a rotated Setup** — Fusion may re-express `forward` as `Z1` anyway, making the guard a no-op on the case it exists to catch | ✅ |
-| **HR-7** | `toolChange()` clobbers the first-rapid flag | — | → `PReview.md` §2 | — | — | ➖ |
-| **HR-8** | Post-injected motion never updates tracked position | — | → `PReview.md` §2 | — | — | ➖ |
-| **HR-9** | `Do First Change` zeroes Z on the wrong tool | — | → `PReview.md` §2 | — | — | ➖ |
-| **HR-10** | `Disable Z Stepper` emits `M84 Z` on GRBL | — | → `PReview.md` §2 | — | — | ➖ |
 | **HR-11 (A)** | Marlin: `M84 S60`, no `M2` | Marlin, defaults | tail `M400` → `M117 Job end` → `M84 **S60**`; **no `M2` anywhere**. `M84 S0` still once, at the top | posted | `H11a.gcode` | ✅ |
 | **HR-11 (B)** | RepRap: `M2` after `M84 S60` | RepRap, defaults | identical tail **plus `M2`**. Present here / absent in (A) is the discriminator | posted | `H11b - RRF.gcode` | ✅ |
 | **HR-11 (C)** | GRBL tail untouched | defaults | `M0 (MSG Turn OFF spindle)` … `M30` → `%`; **no `M84` at all**, no `M2` | posted | `H11c - GRBL.gcode` — ⚠ order restated by CR-6 | ✅ |
@@ -155,7 +149,6 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-12 (A3)** | Every tapping reversal announced | drill + tap CAM, defaults | **9 prompts total**, 8 in the tap section, strictly alternating from `clockwise`. **12 direction commands but only 8 prompts** — the post prompts on *changes*, not commands | posted | `Drill_Tap.gcode` | ✅ |
 | **HR-12 (A4)** | A counterclockwise start names the direction | needs a left-hand tap / CCW tool | `M0 (MSG Turn ON <n> RPM counterclockwise)` | read | 4-hop chain, no branch drops it. ⚠ **artifact does not exist** | ✅ |
 | **HR-12 (A5)** | A clockwise start is unchanged | any single-op manual job | `Turn ON <n> RPM` with **no direction word**, byte-identical across the fix | posted | `Speed Change.gcode` | ✅ |
-| **HR-13** | `onCommand` discards unnamed commands | — | → `PReview.md` §2 | — | — | ➖ |
 | **HR-14 (A)** | `Flood and Mist` matches a channel | drill CAM; tool coolant *Flood and mist*, Ch A Mode = **Flood and Mist** | `( >>> Coolant Channel A: Flood and Mist)` → `M7`, `M9` at the end, **no warning** | posted | `Drill Flood Mist.gcode` | ✅ |
 | **HR-14 (B)** | The warning names the mode the operator saw | same, Ch A Mode = **Off** | `( >>> WARNING: No matching Coolant channel : **Flood and Mist** requested)` — not `FloodMist`, not `unknown` | posted | `Drill Flood Mist (No).gcode` | ✅ |
 | **HR-14 (C)** | Ordinary `Flood` unchanged | tool Flood, Ch A Flood | `Channel A: Flood` → `M7` → `M9`, no warning | posted | `Drill Flood.gcode` | ✅ |
@@ -171,12 +164,9 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-17 (U)** | Sanitizer before/after over 4 input shapes | node | interior doubles gone; leading/trailing whitespace byte-identical | harness | node | ✅ |
 | **HR-18 (A)** | Stop include: the next block is not merged | Marlin + a stop include whose **last byte is not a newline**, Comment Level **`Important`** | last block and `M400` on **separate lines**. On GRBL the merge is `M5%`, not `M5M400` — `flushMotions()` returns early there | read | ⚠ needs a post; `Stop File.gcode` already qualifies | ✅ |
 | **HR-18 (B)** | Start include: the origin write is not merged | Start include, Comment Level **`Important`** | the include's last block and `G10 L20 P1 X0 Y0 Z0` on **separate lines**. Worse than (A) — it destroys the origin write | read | ⚠ needs a post | ✅ |
-| **HR-18 (T)** | Tool-change includes | — | → `PReview.md` §3.4 | — | — | ➖ |
 | **HR-18 (U)** | The guard over 6 file endings × 3 comment levels | node | **4 merged blocks → 0**. Terminated files byte-identical. The two `Info` "ok"s pre-fix are the finding in miniature | harness | node | ✅ |
 | **HR-19** | `M291` doubled space; `()` vs `( )` | — | `()` closed by design; `M291` space open, next sweep | — | — | ➖ |
-| **HR-20** | A fuller tapping implementation | — | → `PReview.md` | — | — | ➖ |
 | **HR-21** | `includeProbeFile` is dead | — | tooltip declares it; wiring undecided | — | — | ➖ |
-| **HR-26** | Base-clearance retract has no jet guard | — | → `PReview.md` §3.4 | — | — | ➖ |
 | **HR-22 (A)** | An empty include announces itself | a zero-byte include file, Comment Level `Info` | `( --- Custom gcode file is empty, nothing included <path>)`; **absent above `Info`** | harness | node | ✅ |
 | **HR-22 (B)** | An empty Start include leaves no preamble | — | **closed as by design** — the include owns the phase (CR-7) | read | — | ✅ |
 | **HW-1** | `isSafeToRapid()`'s three conversion branches | `Personal.cps`, group 03 all on, Map Safe Z = `Retract:15` then `15` | **74 conversions → 2** on identical geometry; all three cases fire at 5.08; **all 17,779 genuine cut moves stay `G1`**. Traps: `grep -c '^G0'` under-counts (modal suppression) | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
@@ -190,7 +180,6 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-23** | An include replaces the phase it names | Marlin + stop include, vs the same job without | coolant off, `G0 X0 Y0`, the spindle prompt, `M84 S60` and the program end **all absent** — **as designed** | posted | `H11d - Marlin.gcode` vs `H11a.gcode` | ✅ |
 | **HR-24** | `writeWCS()` consults the global `tool` | — | latent — both callers pass `currentSection`; next sweep | read | — | ➖ |
 | **HR-25** | `wcsGcode(0)` yields `G53` | — | **closed as by design** (CR-17d) | read | — | ✅ |
-| **HW-7** | Dialog audit — labels, defaults, preset survival | — | → `PReview.md` §3.3 (**D1**, **D3**) | — | — | ➖ |
 | **CR-REG** | The 14 fixes leave a factory-default job **otherwise unchanged** | GRBL/mm, Comment Level `Info`, all defaults, single operation | `M0 (MSG Turn OFF spindle)` **precedes** `G0 X0 Y0`; the probe comment reads **`Retract the tool to 5.08`**, not `5.080000000000001`. **The header dump is no longer the invariant it was** — the machine-frame work adds four properties, removes one and retitles two groups, so the assertion is now *the dump changes only in those places*, and **no motion, command or non-dump comment moves at all** except the one Resolved-Values line `Reserved base WCS = None` → `Fixed Z reference = None` | posted | — **owed** | ⬜ |
 | **CR-1 (A)** | `$H` survives line numbering | GRBL, `Axes Homed and Trusted` = **`XY Only`** + `Home at Job Start` = **`Home`**, `Enable Line #s` **on** | **`$H` on its own line with no `N` prefix**, while every surrounding block carries one. No configuration in the record has ever combined homing with line numbers — which is why it shipped broken | posted | — **owed** | ⬜ |
 | **CR-2 (A)** | The homing / `Current Pos` warning fires, and the job still posts | `Home at Job Start` = `Home` (and again `Pause, then Home`) + a `Set … to Current Pos` origin mode | the warning names the control by its exact dialog title and now **recommends `Use Active WCS X0 Y0, Probe Z0`**; **the file still posts**. Negative half: a default job with the action **off** produces no warning | posted | — **owed** | ⬜ |
@@ -240,7 +229,7 @@ a `posted` row and stronger than nothing.
 | **Guard reachability from hobbyist settings** | Guard B exempts the single-WCS job, so default `Retract Across Parts = on` with no base does **not** fire; Guard C's Marlin check runs before the base logic; Guard A is unreachable with no base. All three run in `onOpen()`, so a rejected job writes no file |
 | **Units** | Every dialog dimension is converted by `propertyMmToUnit()` before being emitted or compared; F360 level values arrive in the output unit already and are correctly **not** converted |
 | **Safe-Z expression parsing** | `parseSafeZExpr()` handles a bare number and all three `Feed:`/`Retract:`/`Clearance:` forms and falls to `ERROR` (15 mm fallback + warning) for anything else; every level path asks the **passed** section, not the global |
-| **The G1→G0 mapper's move ordering** | Safe despite the untracked position: the only post-injected motion before the first section body is the probe retract, which leaves the tool *higher* than the kernel believes, so `rapidMovements()` errs toward Z-first. The general defect is real and professional-scoped (HR-8) |
+| **The G1→G0 mapper's move ordering** | Safe despite the untracked position: the only post-injected motion before the first section body is the probe retract, which leaves the tool *higher* than the kernel believes, so `rapidMovements()` errs toward Z-first. The general defect is real and professional-scoped — `PReview.md` **HR-8**, which cites this row |
 | **Feed handling** | `G0` blocks carry their travel `F` through the same `fOutput` the cut moves use (the one exception is CR-12); `limitArcFeed()` caps against the axes the arc actually sweeps; both limiters return the feed untouched when `Scale Feedrate` is off |
 | **Canned cycles** | Expansion is the only correct choice on all three firmwares — derivation in `design.md` → *Firmware capabilities*. `isProbeOperation()` is defined locally rather than depending on the kernel supplying one |
 | **Early rejections** | Multi-axis (`onSection`, with `onRapid5D`/`onLinear5D` as a backstop) and `onRadiusCompensation` both `error()` with actionable text; the off-axis Setup guard fails **open**, the right bias for a check whose false positive would abort every job |

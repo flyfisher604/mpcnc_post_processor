@@ -62,9 +62,11 @@ the last carrying the `doc-sync` marker, now re-bumped to `17a20f2`. **The prope
 three places and is 69 = 8/7/4/3/5/10/8/5/7/10/2**, which two unrun rows (D3, D5) had been asserting
 wrongly. `conventions.md` traded its README contract row for one covering all four guides, still 298/300.
 
-**Where the record lives.** The hobbyist review (`HR-1`…`HR-38`) and the 2026-08-01 whole-file review
-(`CR-1`…`CR-17`) are one register in `HReview.md`: 55 findings, all fixed, closed by design or moved to
-`PReview.md`, except three one-liners and **HR-27**, unstarted. **Neither pass found the factory-default
+**Where the record lives.** The hobbyist review (`HR-1`…`HR-39`) and the 2026-08-01 whole-file review
+(`CR-1`…`CR-17`) are one register in `HReview.md`: **49 findings**, all fixed or closed by design, except
+three one-liners and **HR-27**, unstarted. **The seven professional ids — `HR-7`…`HR-10`, `HR-13`,
+`HR-20`, `HR-26` — are in `PReview.md` and nowhere else** (2026-08-07: `HReview.md` had been carrying stub
+rows for all seven, a second place for the same finding to go stale). **Neither pass found the factory-default
 single-operation job broken** — every High/Medium finding needed one dialog field moved off its default.
 Test rows are in `HReview.md`'s test register (hobbyist) and `PReview.md` §3 (professional); nothing else
 records a pass, and the Method column matters as much as the state (`conventions.md` → *How to run a test*).
