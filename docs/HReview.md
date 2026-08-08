@@ -1,6 +1,6 @@
 # HReview — hobbyist review of `MPCNC_v4.0_Beta2.cps`
 
-The hobbyist-side findings register and test register. **45 findings** — 28 `HR-` from the hobbyist
+The hobbyist-side findings register and test register. **47 findings** — 30 `HR-` from the hobbyist
 review, 17 `CR-` from the 2026-08-01 whole-file review. All are fixed, closed by design, or moved to
 `docs/PReview.md`, except three one-liners awaiting a tidy-up sweep and one unstarted robustness fix
 (HR-27). Nothing is failing.
@@ -16,7 +16,7 @@ the long form on close — is `CLAUDE.md` → *Registers ship with the code*, an
 
 ---
 
-## Findings — HR-1 … HR-28 · CR-1 … CR-17
+## Findings — HR-1 … HR-30 · CR-1 … CR-17
 
 `HR-` came from the hobbyist review; `CR-` from the 2026-08-01 whole-file review driven by the dialog and
 the F360 API. Both registers merged here on the same terms — ids kept, so every commit message and code
@@ -73,6 +73,8 @@ comment that names one still resolves.
 | **CR-17 (e)** | `sectionComment` printed `undefined`, or inherited the previous operation's name | Cosmetic | Fixed in `onSection()`/`onSectionEnd()` | ✅ fixed `c73726c` |
 | **HR-27** | The two **geometry** guards fire in `onSection()`, not `onOpen()`, so a rejected job can leave a **truncated `.gcode` on disk** | Medium | Guards A/B/C run before any output, so they write no file; multi-axis and HR-6's orientation check do not. A hobbyist who builds a Setup on a model face gets a partial file rather than a clean refusal. Fix: promote both into `validateJob()`. Not started | ⬜ open |
 | **HR-28** | Four `Jog to …` origin modes advertise a capability **GRBL does not have** — the post's default firmware and the hobbyist's usual controller | Med-High | `askUser()` consumes `allowJog` in the **RepRap branch only** (`M291 … X1 Y1 Z1`); the GRBL branch emits a bare `M0` and discards it, and GRBL 1.1 accepts a jog only in Idle or Jog state, which an `M0` hold is not. The job stopped and waited and the operator could not move the machine, with nothing saying why. **Gated, not deleted** — the modes are correct on RepRap. `warnJogAtPauseOnGrbl()` in the file + a `validateJob()` warning; both tooltips now name the limitation | ✅ fixed |
+| **HR-29** | `Axises Homed and Trusted` — not a word, on the one group-4 control the dialog asks a hobbyist to read | Cosmetic | Title → `Axes Homed and Trusted`. A title is not a stored identifier, so no preset resets | ✅ fixed |
+| **HR-30** | Seven property descriptions carry typos or broken grammar — `fo`, `seperation`, `is include`, `are include`, `power to on`, and a doubled space in both Duet fields | Cosmetic | All seven corrected. Descriptions are never emitted (the header dump prints names and values), so this is dialog-only | ✅ fixed |
 
 **Open, no fix:** HR-19 (`M291` space), HR-21 / CR-15 (one decision, two ids), HR-24 — a tidy-up sweep of
 one-liners, none changing output today. Plus **HR-27**, which is not a one-liner and is not in that sweep.
@@ -88,9 +90,9 @@ README tells a hobbyist to consider.
 
 ---
 
-## Test register — 89 rows
+## Test register — 91 rows
 
-**✅ 67 PASS · ❌ 0 FAIL · ⬜ 6 UNRUN · ➖ 16 n/a or moved — 89 rows.** Complete by construction: every `H`/`HR`/`HW`
+**✅ 67 PASS · ❌ 0 FAIL · ⬜ 6 UNRUN · ➖ 18 n/a or moved — 91 rows.** Complete by construction: every `H`/`HR`/`HW`
 id has a row, including the ones that belong to another file. **If you move a finding out, leave the
 pointer row behind.** `CR-` ids are exempt — most are cosmetic or by-design closures that were never
 separate tests. `docs/check-docs.js` enforces the tally, the completeness and the exemption.
@@ -185,6 +187,8 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **CR-2 (A)** | The homing / `Current Pos` warning fires, and the job still posts | `Home at Job Start` = `Home` (and again `Pause, then Home`) + a `Set … to Current Pos` origin mode | the warning names the control by its exact dialog title and now **recommends `Use Active WCS X0 Y0, Probe Z0`**; **the file still posts**. Negative half: a default job with the action **off** produces no warning | posted | — **owed** | ⬜ |
 | **HR-28 (A)** | A `Jog to …` mode on GRBL says so, twice | GRBL, First WCS / Part = `Jog to X0 Y0 Z0` | Fusion shows the post-time `warning()`, **and** the file carries `( >>> WARNING: jogging at this pause is not supported on GRBL …)` immediately **above** the `M0 (MSG Jog to X0 Y0 Z0, then continue)`. *Discriminator: the comment survives at Comment Level `Important`, and the `M0` is unchanged — this gates, it does not delete.* Negative half, and it is the half that proves the gate: the same job on **RepRap** emits `M291 … S3 X1 Y1 Z1` with **no warning of either kind** | posted | — **owed** | ⬜ |
 | **CR-10 (A)** | GRBL laser mode formats its M-code as a number | group 09 on, GRBL, a laser operation | a real M-code number, **never `M NaN`**. Group 09 has never appeared in any posted file — see `PReview.md` **J4**, which this post also serves | posted | — **owed** | ⬜ |
+| **HR-29** | The corrected group-4 title | — | → `PReview.md` **D1** — a title exists only in the dialog; the header dump prints keys and values, so no posted file can show it | — | — | ➖ |
+| **HR-30** | The seven corrected descriptions | — | → `PReview.md` **D1**, same reason. Descriptions are never emitted at all | — | — | ➖ |
 | **HR-27** | A geometry-rejected job writes **no file at all** | **(a)** a Setup built on a tilted model face, GRBL/mm defaults; **(b)** the same job on an upright Setup | **(a)** the post `error()`s and **no `.gcode` exists on disk** — the discriminator is the *absence of the output file*, not its contents. Today the guard fires in `onSection()` and leaves a **truncated** file ending mid-toolpath, which is the pre-fix discriminator and must stop appearing. **(b)** posts normally and completely, proving the promotion into `validateJob()` did not reject a job it should accept. Shares HR-6 (B)'s dependency — it needs the same rotated Setup, and if Fusion re-expresses `forward` as `Z1` then branch (a) is unreachable and that is itself the HR-6 (B) answer | posted | — **owed** | ⬜ |
 
 ---

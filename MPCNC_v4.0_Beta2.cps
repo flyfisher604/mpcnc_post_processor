@@ -170,7 +170,7 @@ properties = {
   },
   jobUseArcs: {
     title      : "Use Arcs",
-    description: "Use G2/G3 g-codes fo circular movements.",
+    description: "Use G2/G3 g-codes for circular movements.",
     group      : "job",
     order      : 40,
     type       : "boolean",
@@ -206,7 +206,7 @@ properties = {
   },
   jobSeparateWordsWithSpace: {
     title      : "Include Whitespace",
-    description: "Includes whitespace seperation between text.",
+    description: "Includes whitespace separation between text.",
     group      : "job",
     order      : 80,
     type       : "boolean",
@@ -234,7 +234,7 @@ properties = {
   },
   feedsEnforceFeedrate: {
     title      : "Enforce Feedrate",
-    description: "Feedrate is include on every g-code movement.",
+    description: "Feedrate is included on every g-code movement.",
     group      : "feeds",
     order      : 30,
     type       : "boolean",
@@ -316,7 +316,7 @@ properties = {
   },
 
   machineHomedAxes: {
-    title      : "Axises Homed and Trusted",
+    title      : "Axes Homed and Trusted",
     description: "DECLARE which axes this machine homes to endstops -- a fact about the machine, set once and never revisited, not an instruction to home anything (that is Home at Job Start). None (default): no endstops, or they are not trusted; machine zero is wherever the controller was last reset. XY Only: X and Y home to endstops, so a work offset stored in a G54-G59 register points at the same physical place across power cycles; Z has no machine frame. Z Only: Z homes to a real endstop (LowRider switches) or to the Marlin movable-plate trick, so the machine has a Z frame that does not move with stock thickness -- a TRAVEL datum, never the cutting reference. XYZ: both. Two features read this and nothing else does: Fixed Z Reference = Machine Z requires Z (and X/Y, for the multi-part traverses that clearance serves), and the post warns when a job trusts a STORED work offset without X/Y. Homing buys repeatability only -- the everyday Z cutting reference is always the work-Z touch-off (see First WCS / Part), never this.",
     group      : "machine",
     order      : 10,
@@ -538,7 +538,7 @@ properties = {
 
   toolChangeEnabled: {
     title      : "Tool Changes are Included",
-    description: "Tool changes are include in the NC file.",
+    description: "Tool changes are included in the NC file.",
     group      : "toolChange",
     order      : 10,
     type       : "boolean",
@@ -681,7 +681,7 @@ properties = {
   },
   laserOnEtch: {
     title      : "Laser: On - Etch",
-    description: "Percentage of power to on the laser/plasma cutter in etch mode.",
+    description: "Percentage of power to turn on the laser/plasma cutter in etch mode.",
     group      : "laser",
     order      : 30,
     type       : "integer",
@@ -886,7 +886,7 @@ properties = {
 
   duetMillingMode: {
     title      : "Milling Mode",
-    description: "GCode  to setup Duet3d into milling mode.",
+    description: "GCode to set up Duet3d into milling mode.",
     group      : "duet",
     order      : 10,
     type       : "string",
@@ -895,7 +895,7 @@ properties = {
   },
   duetLaserMode: {
     title      : "Laser Mode",
-    description: "GCode  to setup Duet3d into laser mode.",
+    description: "GCode to set up Duet3d into laser mode.",
     group      : "duet",
     order      : 20,
     type       : "string",
