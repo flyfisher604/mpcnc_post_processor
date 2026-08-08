@@ -1081,6 +1081,12 @@ Professional or nice-to-have; none is scheduled, and none is a defect.
   likely inert: the enforcing `validateCommonParameters()` lives in a shared post library this post does
   not import, so `writeWCS()` still silently aliases `0`→`1`. **Should the post enforce it itself?**
   Natural companion to the item above; test row in §3.4.
+- **A post-time coolant dialect warning.** `CoolantA()` / `CoolantB()` pass the chosen enum id straight to
+  `writeBlock()` with no firmware check, so any `Mrln:` code posts happily into a GRBL file and any `Grbl:`
+  code into a Marlin one. `HReview.md` **HR-34** made the *defaults* match the default firmware, which is
+  all a panel change can do; the durable fix is a `validateJob()` warning when the selected code's dialect
+  and `CNC Firmware` disagree. Cheap — the dialect is already in each option's title. The same argument
+  covers `Use custom`, where the post cannot know the dialect at all and should say nothing.
 - **`permittedCommentChars` global.** A comparable community GRBL post declares it; research whether it
   adds real kernel-side filtering on top of `sanitizeMessageText()` before adding — may be informational.
 - **Global-metadata gaps.** Optionally `model`. Cosmetic.

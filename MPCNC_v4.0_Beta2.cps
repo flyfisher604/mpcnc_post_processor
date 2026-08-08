@@ -787,7 +787,7 @@ properties = {
   },
   coolantChannelAOn: {
     title      : "Turn Channel A On",
-    description: "GCode to turn On coolant channel A.",
+    description: "The g-code emitted to switch channel A on. MATCH IT TO YOUR CNC FIRMWARE -- the Grbl: options (M7 mist, M8 flood) and the Mrln: options (M42 pin writes) are not interchangeable, and the post emits whichever you pick verbatim without checking, so a Marlin code sent to GRBL is rejected mid-job. The default is the Grbl code, matching the default CNC Firmware. Use custom names a file of your own g-code instead, set further down this group.",
     group      : "coolant",
     order      : 30,
     type       : "enum",
@@ -798,12 +798,12 @@ properties = {
       { title: "Grbl: M8 (flood)", id: "M8" },
       { title: "Use custom", id: "Use custom" }
     ],
-    value      : "M42 P6 S255",
+    value      : "M8",
     scope      : "post"
   },
   coolantChannelAOff: {
     title      : "Turn Channel A Off",
-    description: "Gcode to turn Off coolant channel A.",
+    description: "The g-code emitted to switch channel A off. Must be the same dialect as Turn Channel A On above -- see its note. On GRBL there is only one off code, M9, and it stops every coolant output at once. The default is the Grbl code, matching the default CNC Firmware.",
     group      : "coolant",
     order      : 40,
     type       : "enum",
@@ -813,12 +813,12 @@ properties = {
       { title: "Grbl: M9 (off)", id: "M9" },
       { title: "Use custom", id: "Use custom" }
     ],
-    value      : "M42 P6 S0",
+    value      : "M9",
     scope      : "post"
   },
   coolantChannelBOn: {
     title      : "Turn Channel B On",
-    description: "GCode to turn On coolant channel B.",
+    description: "The g-code emitted to switch channel B on -- the second, independent coolant output. Must be the same dialect as your CNC Firmware; see Turn Channel A On above. The default is the Grbl code.",
     group      : "coolant",
     order      : 50,
     type       : "enum",
@@ -829,12 +829,12 @@ properties = {
       { title: "Grbl: M8 (flood)", id: "M8" },
       { title: "Use custom", id: "Use custom" }
     ],
-    value      : "M42 P11 S255",
+    value      : "M7",
     scope      : "post"
   },
   coolantChannelBOff: {
     title      : "Turn Channel B Off",
-    description: "Gcode to turn Off coolant channel B.",
+    description: "The g-code emitted to switch channel B off. Must be the same dialect as Turn Channel B On above. On GRBL this is M9, the same single off code channel A uses. The default is the Grbl code.",
     group      : "coolant",
     order      : 60,
     type       : "enum",
@@ -844,7 +844,7 @@ properties = {
       { title: "Grbl: M9 (off)", id: "M9" },
       { title: "Use custom", id: "Use custom" }
     ],
-    value      : "M42 P11 S0",
+    value      : "M9",
     scope      : "post"
   },
   coolantChannelAOnCustom: {
