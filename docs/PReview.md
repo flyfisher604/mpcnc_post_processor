@@ -47,10 +47,13 @@ everything the README puts outside the hobbyist's reach:
 
 ## 2. Findings
 
-**✅ 6 fixed · ◑ 1 part-fixed · ⬜ 6 open — 13 findings.** The `HR-` ids were found by the hobbyist pass
+**✅ 10 fixed · ◑ 1 part-fixed · ⬜ 6 open — 17 findings.** The `HR-` ids were found by the hobbyist pass
 and reclassified as professional, and are **kept deliberately** so commit history, `HReview.md` and this
 file all name the same defect the same way; `PR-` ids were found by this file's own machine-frame review.
-Only the six `PR-` fixes are committed code — every `HR-` diff below is a proposal, not a record.
+Only the ten `PR-` fixes are committed code — every `HR-` diff below is a proposal, not a record.
+**PR-8 … PR-11 are defects in PR-2 / PR-6's own landed code**, found by a review of the branch before it
+was ever posted, and they are separate ids rather than clauses on PR-6 because commit messages cite ids
+and a `✅ fixed` row must not quietly cover a second fix.
 
 | ID | Finding | Sev | Resolution | Status |
 |---|---|---|---|---|
@@ -61,6 +64,10 @@ Only the six `PR-` fixes are committed code — every `HR-` diff below is a prop
 | **PR-5** | The machine-frame rework left the dialog asking **two questions per concept**: group 4 posed one machine's homing as two independent booleans, and group 5 carried two clearance fields that `Fixed Z Reference` made **mutually exclusive** — never both read, read at the same two moments, and naming the same physical plane | Medium | Group 4 → `Axises Homed and Trusted` (`None`/`XY Only`/`Z Only`/`XYZ`), information-identical to the booleans, read only through `machineHomesXY()`/`machineHomesZ()`. Group 5 → one `Inter Part Travel Z` whose frame follows `Fixed Z Reference`. **The merge forces the empty default**: with a live default, flipping the enum would emit a valid-looking height in the wrong frame under no guard. Two new spoilboard guards (unset, and `<= 0` — the detectable direction of the flip) and a frame-naming header echo carry the residual risk. 71 → 70 properties. **Three keys replaced, so all three settings reset** — a release-notes item | ✅ fixed |
 | **PR-6** | `At End Go to 0,0` never said **which** X0 Y0, and it is the **last section's WCS** — so on a multi-part job the tool parks at whichever fixture Fusion happened to order last, and re-ordering operations silently moves the park point. Same species as PR-4's `Tool Change Z` | Medium | Enum `Off` / `Work X0 Y0` / `Machine X0 Y0`, default `Work` (today's behaviour, now named). The machine answer is **firmware-split, not firmware-excluded**: `G53 G0 X0 Y0` on GRBL/RepRap, `G28 X Y` on Marlin — which re-establishes the frame instead of addressing it, so it needs neither `CNC_COORDINATE_SYSTEMS` nor `Home at Job Start`. Guard requires X/Y declared on every firmware, and `Home at Job Start` on GRBL/RepRap only. Retracts before parking when a fixed Z reference exists, closing **HR-16**'s Z half for this path. **boolean→enum resets the setting, and asymmetrically — anyone who had it OFF gets the move back ON**. Relocated to group 4 and rekeyed by **PR-7** | ✅ fixed |
 | **PR-7** | Group 4 still asked **two questions about one homing decision** — `Home at Job Start` plus `Prompt Before Home`, the second **inert whenever the first was off** and saying so in its own tooltip: four dialog settings, three distinct behaviours. And PR-6's new park sat in group 1 while being guarded by group 4 | Medium | One enum, `Home at Job Start` = `Off` / `Home` / `Pause, then Home`, read only through `homesAtJobStart()` / `promptsBeforeHome()`. **Unlike PR-5's axis merge this is not information-preserving — it deletes the meaningless state**, which is the stronger reason to merge and the one PR-5 could not claim. `At End Park At` moved to group 4 and its key renamed `machineParkAtEnd` so the prefix matches the group, per this file's own key convention. Group 4 is now declaration / action / park; group 1 loses a control. **Both key changes reset those settings**, and the homing one resets to `Off` — the inert direction, deliberately: the reverse would add unexpected motion to a job that never asked for it | ✅ fixed |
+| **PR-8** | PR-6's park asked *is a base reserved?* where it needed *was a fixed Z reference **established**?*, and the two differ on Marlin. A Marlin job with `Fixed Z Reference = Spoilboard` + `At End Park At = Machine` passes every guard — the park's own guard sits **above** Guard C's Marlin return, the base's RepRap-slot check **below** it — and then transits a base `writeBaseEstablish()` refused to write, emitting `G55` / `G0 Z40` / `G54` on a firmware where `G54`–`G59` is itself a build option, and `Gundefined` for a `G59.1`–`G59.3` base. The same test also let the **no-fixed-reference** job park in silence: a full-diagonal bed crossing at the last operation's finishing Z, while `onClose()`'s comment asserted the opposite | Med-High | One predicate, `parkCanRetract()` = *not Marlin* **and** `fixedZEstablishedAtStart()`, read by the emission and by a new post-time `warning()` so the two cannot drift. When it is false the park now says so in the file rather than retracting into a frame that does not exist — the honest statement of `HReview.md` **HR-16** reached down a second path, not a fix for it. `onClose()`'s comment corrected | ✅ fixed |
+| **PR-9** | PR-6's `G53 G0 X0 Y0` park block carries **no `F` word**, alone among the post's rapids — `rapidMovementsXY`/`Z` and its own sibling `writeMachineTravelZ()` all emit one. On firmware that honours the modal feedrate for `G0`, the longest move in the job crosses the bed at whatever feed the last **cut** commanded | Medium | `fFormat` (not `fOutput` — `resetAll()` has just cleared the tracked `F`) at `Travel Speed XY`, matching `writeMachineTravelZ()` exactly | ✅ fixed |
+| **PR-10** | PR-2 made the preamble **move the tool** — step 5 establishes the fixed Z reference, step 6 records the first part's origin — so under **both** implementations the "current position" step 6 reads is bed clearance. `Set X0 Y0 to Current Pos, Probe Z0` (the **default**) then writes HR-1's provisional `Z0` there, turning `G38 Target -10` into a 10 mm descent from bed clearance: the probe never reaches the stock and the controller alarms. `Set X0 Y0 Z0 to Current Pos` fails quieter and worse — clearance *becomes* the part's `Z0`. The spoilboard half predates PR-2; the machine-Z answer is a second route to it, and none of PR-2's six guards covers either | Med-High | Post-time `warning()` naming the establish as the cause and the two sound modes as the answer. **Not a code fix, and cannot be one:** the distance from clearance to the stock top is exactly what the probe exists to discover. The `Jog to …` modes are deliberately exempt — there the operator positions the tool *after* the establish, which is the condition HR-1's provisional `Z0` was sound under all along | ✅ fixed |
+| **PR-11** | HR-28's post-time GRBL jog warning tests `Subsequent WCS / Part` unconditionally, but that control is consulted only on a genuine WCS change (`writeWCS()`'s `isTraverse`) — so a **single-WCS** job warns about a pause its file will not contain. Its neighbour, the stored-offset warning, already carried the gate | Low-Med | `multiWcs` hoisted to one local and applied to the subsequent-part half only. The first-part half stays ungated: that mode runs on every job | ✅ fixed |
 | **HR-7** | `toolChange()` clobbers `forceSectionToStartWithRapid`, defeating "First G1 → G0" on every tool-change section | Medium | Lands with the Phase 4 reorder below | ⬜ open |
 | **HR-8** | Post-injected motion never updates Fusion's tracked position | Medium | Lands with Phase 4. Confirmed unreachable on any hobbyist path (2026-08-01) | ⬜ open |
 | **HR-9** | `Do First Change` with `Probe After Tool Change` off zeroes Z against the wrong tool | Medium | Lands with Phase 4 | ⬜ open |
@@ -361,7 +368,7 @@ operation in the same post is unaffected and still expands to plain `G0`/`G1`.
 
 ## 3. Test register
 
-**✅ 0 PASS · ❌ 0 FAIL · ⬜ 53 UNRUN · ➖ 7 n/a or moved — 60 rows.** Nothing professional has been
+**✅ 0 PASS · ❌ 0 FAIL · ⬜ 58 UNRUN · ➖ 7 n/a or moved — 65 rows.** Nothing professional has been
 verified yet; this is the whole of what the professional side owes. Absorbed from the Beta-2 test plan.
 
 Every row is a delta from the defaults fixed in `conventions.md` → *How to run a test*; the one
@@ -433,6 +440,11 @@ hold it, and the *Expect* must exist in exactly one place.
 | **PR-6d** | `Work` (default) is byte-identical to the old boolean-on behaviour | GRBL/mm defaults, diffed against the pre-change build | posted | §3.7 | ⬜ |
 | **PR-7a** | `Pause, then Home` emits one pause then the homing, and `Home` emits homing with none | GRBL and Marlin, declaration `XYZ`, both non-`Off` answers | posted | §3.7 | ⬜ |
 | **PR-7b** | Group 4 reads declaration / action / park, and group 1 no longer carries the park | dialog | dialog | §3.7 | ⬜ |
+| **PR-8a** | A Marlin park with a reserved base emits **no** base transit — the register was never written | Marlin, `Fixed Z Reference = Spoilboard` (`G55`, then `G59.1`), park `Machine X0 Y0` | posted | §3.7 | ⬜ |
+| **PR-8b** | A park with **no** fixed Z reference says in the file that it cannot retract | PR-6a exactly — `Fixed Z Reference = None`, park `Machine X0 Y0` | posted | §3.7 | ⬜ |
+| **PR-9** | The `G53` park block carries the XY travel feedrate | PR-6a, `Travel Speed XY` moved off its default | posted | §3.7 | ⬜ |
+| **PR-10** | The fixed-Z establish warns off the two `… to Current Pos` first-part modes | `Fixed Z Reference` = `Machine Z`, then `Spoilboard`, First = each `Current` mode then each `Jog` mode | posted | §3.6 | ⬜ |
+| **PR-11** | The GRBL jog warning is silent on a single-WCS job whose *subsequent* mode is a `Jog` mode | GRBL, one WCS, Subsequent = `Jog to X0 Y0, Probe Z0` | posted | §3.7 | ⬜ |
 | **REG-MF** | A factory-default job is unchanged **apart from the property dump** | GRBL/mm, all defaults, diffed against the pre-change build | posted | §3.6 | ⬜ |
 
 `dialog` is a fifth method alongside the four in `conventions.md` → *How to run a test*: it is settled by
@@ -606,9 +618,9 @@ first, then act** — confirm that retract precedes any XY move. Marlin is out o
 - [ ] **D4 — the groups are still identifiable in the legacy Post Process dialog.** The Guide states the
       group `title:` **is not displayed** there, and before the `groupDefinitions` move the label *was* the
       `group:` string — so that dialog showed `01 - Job` regardless; now the string is an opaque key.
-      *Do:* post through the legacy Post Process dialog rather than an NC Program. **Pass:** all 68
+      *Do:* post through the legacy Post Process dialog rather than an NC Program. **Pass:** all 69
       properties still reachable and grouped intelligibly — headings reading `job`, `feeds` … is
-      acceptable; **no headings, or 68 properties in one flat list, is a fail.** *(Fix if it fails: carry
+      acceptable; **no headings, or 69 properties in one flat list, is a fail.** *(Fix if it fails: carry
       the number in the key, `g01_job`, which sorts and reads in both dialogs.)*
 - [ ] **D5 — the header property dump after the `groupDefinitions` move and the key rename.** Re-baselines
       what §4 verified against `H7c.gcode`, which predates both (§7). *Do:* one GRBL/mm factory-default job
@@ -808,6 +820,21 @@ the functions do not exist) prove *logic and block shape*, never what a machine 
       inheriting `40` — and it follows the existing precedent that the Spoilboard answer must be
       configured on every firmware (the no-`Reserved WCS` guard already errored there, above Guard C's
       early return).
+- [ ] **PR-10 — the establish moves the tool, so `… to Current Pos` no longer means what it says.**
+      *Do:* four legs, each posted. (1) `Fixed Z Reference = Machine Z` (declaration `XYZ`, `Home at Job
+      Start = Home`, `Inter Part Travel Z = -12`) + First = `Set X0 Y0 to Current Pos, Probe Z0`;
+      (2) the same with First = `Set X0 Y0 Z0 to Current Pos`; (3) `Fixed Z Reference = Spoilboard`
+      (`G59`, `40`) + First = `Set X0 Y0 to Current Pos, Probe Z0`; (4) leg 1 with First =
+      `Jog to X0 Y0, Probe Z0`. **Pass: legs 1–3 raise the post-time warning naming `Inter Part Travel Z`
+      as the reason the origin lands at bed clearance, and leg 4 raises none** — the jog prompt comes
+      *after* the establish, which is the condition HR-1's provisional `Z0` was always sound under.
+      *Discriminator, in the file:* legs 1 and 3 still contain
+      `(   Provisional Z0 at the current height …)` immediately after a `G53 G0 Z-12` (leg 1) or a
+      `G0 Z40` in the base frame (leg 3) — **the two blocks being adjacent is the defect made visible**,
+      and the warning is the whole of the fix, because no arithmetic in the post can know how far the
+      stock top is below that clearance. *Fifth leg, the regression:* `Fixed Z Reference = None` on
+      factory defaults must raise **no** warning — this fires on the post's default first-part mode, so
+      a false positive there would reach every hobbyist.
 - [ ] **REG-MF — the default job's blast radius, and the row to run first.** *Do:* GRBL/mm factory
       defaults, single operation, `Info`, diffed against the pre-change build. **Pass: the diff touches
       only the header property dump and the Resolved-Values block** — net **two** properties added and
@@ -855,6 +882,30 @@ regression row and should run first**; the rest exercise a path that has never e
       three `G28` blocks on Marlin still get one stop, which is why the pause never needed to be its own
       question. *Discriminator: `Off` emits neither, and the combination that used to be expressible —
       prompt on, homing off — is no longer reachable from the dialog at all.*
+- [ ] **PR-8a — Marlin never transits a base it never wrote.** *Do:* Marlin, declaration `XY Only`,
+      `Fixed Z Reference = Spoilboard`, `Reserved WCS = G55`, `Inter Part Travel Z = 40`, park
+      `Machine X0 Y0`; then again with the base at `G59.1`. *Get:* the establish's existing
+      `>>> WARNING: reserved base G55 ignored on Marlin`, and at job end
+      `>>> WARNING: no retract before parking at machine X0 Y0 -- the reserved spoilboard base was not
+      established on Marlin …` followed straight by `G28 X` / `G28 Y`. **Pass: no `G55`, no `G0 Z40` and
+      no `G54` anywhere after the last operation** — and in the `G59.1` leg, **no `Gundefined`**, the
+      token `wcsGcode()` returns off-firmware. *Discriminator: the file contains exactly one WCS-select
+      block, the one the preamble wrote.*
+- [ ] **PR-8b — a park that cannot retract says so.** *Do:* PR-6a unchanged (`Fixed Z Reference = None`).
+      *Get:* `>>> WARNING: no retract before parking at machine X0 Y0 -- this job establishes no fixed Z
+      reference …` immediately before `(   Park at machine X0 Y0)`. **Pass: the warning is present and no
+      `G0 Z` precedes the park** — it is HR-16's state named, not fixed, and the file must not imply a
+      retract it did not make. *Also check Fusion's dialog raised the matching post-time warning.*
+- [ ] **PR-9 — the park block carries a feedrate.** *Do:* PR-6a with `Travel Speed XY` set to a value
+      distinguishable from the defaults and from `Travel Speed Z`. *Get:* `G53 G0 X0 Y0 F<that value>` on
+      one block. **Pass: the `F` is the XY travel speed, not the Z one and not the last cut's feed** — and
+      under `Fixed Z Reference = Machine Z` the two `G53` blocks carry *different* `F` words, Z's then
+      XY's, which is the discriminator that the park is not reusing the retract's.
+- [ ] **PR-11 — the jog warning is scoped to the control that runs.** *Do:* GRBL, one WCS, First =
+      `Set X0 Y0 to Current Pos, Probe Z0` (default), Subsequent = `Jog to X0 Y0, Probe Z0`. **Pass:
+      Fusion raises no jog warning at all**, and the posted file contains no `M0` from a jog prompt.
+      *Presence-based sibling, same build:* set First to a `Jog` mode and the warning must return —
+      an absence-based row alone cannot tell a fixed gate from a deleted warning (`conventions.md`).
 - [ ] **PR-7b — the dialog reads in the right order.** *Method `dialog`.* **Pass:** group 4 shows
       `Axises Homed and Trusted`, `Home at Job Start`, `At End Park At` in that order and nothing else;
       **group 1 no longer carries the end park**; and a preset saved before this change comes back with

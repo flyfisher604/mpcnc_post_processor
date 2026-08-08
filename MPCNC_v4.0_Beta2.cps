@@ -1541,16 +1541,29 @@ function validateJob() {
   var startMode = getProperty(properties.probeOnStart);
   var changeMode = getProperty(properties.probeOnChange);
   var homedXY = machineHomesXY();
-  if (homesAtJobStart() &&
+  var homedZ = machineHomesZ();
+  // "Subsequent WCS / Part" is consulted only on a genuine WCS change (writeWCS()'s isTraverse),
+  // which a single-offset job never has -- so every warning about that control is gated on this.
+  var multiWcs = collectDistinctOffsets().length > 1;
+  // The action alone is not the trigger: writeMachineHoming() emits NO MOTION when "Axises Homed
+  // and Trusted" is None -- it warns that nothing was homed and returns -- so keyed on the action
+  // alone this describes a tool move that does not happen and tells the operator to abandon a
+  // pre-jog that is in fact intact. Either axis group qualifies: X/Y homing destroys the pre-jogged
+  // XY, and Z homing moves the tool to the Z endstop, which both modes then record as Z0.
+  if (homesAtJobStart() && (homedXY || homedZ) &&
       (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
     // Reworded as advice rather than prohibition: with X/Y declared homed, a stored fixture offset
     // in the active WCS is repeatable across power cycles, so it is a better first-part answer than
     // the pre-jog this configuration destroys -- naming it costs a clause and saves a round trip.
-    warning(localize("\"Home at Job Start\" moves the tool to the homing corner before "
-      + "\"First WCS / Part\" records the current position as the part origin, so jogging to the "
-      + "part before starting the job has no effect. On a homed machine the stored offset in the "
-      + "active WCS is repeatable, so \"Use Active WCS X0 Y0, Probe Z0\" is the natural first-part "
-      + "mode here; a \"Jog to ...\" mode also works. Otherwise set \"Home at Job Start\" to Off."));
+    // "the axes it homes" rather than "the homing corner": the declaration can be Z only, where
+    // there is no corner and what moves is the height the origin is recorded at.
+    warning(localize("\"Home at Job Start\" moves the tool onto the endstops of whichever axes "
+      + "\"Axises Homed and Trusted\" declares, and it runs before "
+      + "\"First WCS / Part\" records the current position as the part origin, so positioning the "
+      + "tool before starting the job has no effect on those axes. On a homed machine the stored "
+      + "offset in the active WCS is repeatable, so \"Use Active WCS X0 Y0, Probe Z0\" is the "
+      + "natural first-part mode here; a \"Jog to ...\" mode also works. Otherwise set \"Home at "
+      + "Job Start\" to Off."));
   }
 
   // A G54-G59 register holds an offset from MACHINE zero, and homing never touches those registers
@@ -1567,7 +1580,7 @@ function validateJob() {
     if (startMode == "Probe Z" || startMode == "Skip") {
       storedOffsetControls.push("\"First WCS / Part\"");
     }
-    if ((changeMode == "Probe Z" || changeMode == "Skip") && collectDistinctOffsets().length > 1) {
+    if ((changeMode == "Probe Z" || changeMode == "Skip") && multiWcs) {
       storedOffsetControls.push("\"Subsequent WCS / Part\"");
     }
     if (storedOffsetControls.length > 0) {
@@ -1581,14 +1594,57 @@ function validateJob() {
   }
 
   // E2 -- the post-time half of warnJogAtPauseOnGrbl(). See that function for the source read.
+  // The "Subsequent WCS / Part" half carries multiWcs and the "First WCS / Part" half does not,
+  // and the asymmetry is the controls' own: the first-part mode runs on every job, while the
+  // subsequent-part mode is never consulted on a single-offset job, so warning on it there
+  // describes a pause the file will not contain.
   if (fw == eFirmware.GRBL &&
       (startMode == "Jog XY & Probe Z" || startMode == "Jog XYZ" ||
-       changeMode == "Jog XY & Probe Z" || changeMode == "Jog XYZ")) {
+       (multiWcs && (changeMode == "Jog XY & Probe Z" || changeMode == "Jog XYZ")))) {
     warning(localize("A \"Jog to ...\" origin mode is selected, but GRBL cannot jog at the pause "
       + "it produces: the post emits M0, and GRBL 1.1 accepts a jog command only in its Idle or Jog "
       + "states. The job will stop and wait, and the operator will be unable to move the machine "
       + "without resetting the program. These modes are supported on RepRap. On GRBL, position the "
       + "tool before starting and use a \"Set ... to Current Pos\" or \"Use Active WCS ...\" mode."));
+  }
+
+  // Establishing the fixed Z reference MOVES THE TOOL, and it is step 5 of writeFirstSection() --
+  // before step 6 records the first part's origin. The machine-Z answer rapids to
+  // G53 Z<Inter Part Travel Z>; the spoilboard answer probes the base and retracts to that same
+  // height above it. So under either answer the "current position" step 6 reads is bed clearance,
+  // not where the operator left the tool, and both "... to Current Pos" modes record it anyway:
+  //   - "Set X0 Y0 to Current Pos, Probe Z0" writes HR-1's provisional Z0 at that clearance, which
+  //     turns "G38 Target -10" into a 10 mm descent from bed clearance: the probe never reaches the
+  //     stock and the controller alarms on "did not contact".
+  //   - "Set X0 Y0 Z0 to Current Pos" fails quieter and worse -- bed clearance becomes the part's
+  //     Z0, and every cut in the job runs that far above the stock with nothing saying so.
+  // No arithmetic fixes either: the distance from clearance to the stock top is exactly what the
+  // probe exists to discover. Hence a warning. The "Jog to ..." modes are deliberately NOT included
+  // -- there the operator positions the tool AFTER the establish, which is the condition HR-1's
+  // provisional Z0 is sound under. Marlin reaches neither establish (the machine-Z answer is
+  // refused outright below, and writeBaseEstablish() skips the base for want of per-WCS registers),
+  // so nothing moves there and the warning would be false.
+  if (fw != eFirmware.MARLIN && fixedZEstablishedAtStart() &&
+      (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
+    warning(localize("\"Fixed Z Reference\" is established at job start by moving the tool to "
+      + "\"Inter Part Travel Z\", and that runs before \"First WCS / Part\" records the current "
+      + "position -- so the origin is recorded at bed clearance rather than at the part, and the "
+      + "probe target measured from it will not reach the stock. Use \"Use Active WCS X0 Y0, Probe "
+      + "Z0\" or a \"Jog to ...\" mode, or set \"Fixed Z Reference\" to None."));
+  }
+
+  // "At End Park At" = machine X0 Y0 crosses the bed from wherever the last operation ended, and
+  // writeMachineParkXY() can retract first only in a frame THIS JOB ESTABLISHED -- parkCanRetract().
+  // With no fixed Z reference there is no such frame, so the crossing happens at the last
+  // operation's finishing Z. A warning rather than a guard because Fusion's own end-of-operation
+  // retract covers an ordinary milling job; a jet section that ends at cutting height is not
+  // covered, which is HReview.md HR-16's open half. writeMachineParkXY() says the same thing in the
+  // posted file, for the operator who never sees this dialog.
+  if (getProperty(properties.machineParkAtEnd) == "Machine" && !parkCanRetract()) {
+    warning(localize("\"At End Park At\" = machine X0 Y0 crosses the bed to the homing corner, but "
+      + "this job establishes no fixed Z reference to retract in, so the tool makes that crossing "
+      + "at whatever Z the last operation left it at. Set \"Fixed Z Reference\", or park at work "
+      + "X0 Y0."));
   }
 
   // Post-time half of toolChange()'s suppression warning, so it reaches Fusion's dialog and not
@@ -1834,8 +1890,10 @@ function onClose() {
     // X0 Y0 move. For milling the last operation's own end-of-toolpath retract covers it, and the
     // move is short -- it goes to the last part's own origin, so the tool is already there. A jet
     // section that ends at cutting height is not covered -- that is the open half of CR-6 and the
-    // same line of code as HR-16. The "Machine" answer DOES retract, because it crosses the bed;
-    // writeMachineParkXY() owns that and says why.
+    // same line of code as HR-16. The "Machine" answer retracts because it crosses the bed -- but
+    // only where the job established a fixed Z reference to retract in (parkCanRetract()); with
+    // none it warns in the file instead, which is the same HR-16 state reached down a second path.
+    // writeMachineParkXY() owns both and says why.
     onCommand(COMMAND_STOP_SPINDLE);
 
     // Which X0 Y0 -- the question this control could not previously answer. "Work" is the last
@@ -2158,6 +2216,21 @@ function fixedZEstablishedAtStart() {
   return usesMachineZDatum() || getReservedBaseWcs() != 0;
 }
 
+// Can the end-of-job machine park retract before it crosses the bed? Only into a frame this job
+// established, which is the fixed Z reference and nothing else -- and on MARLIN neither
+// implementation is established, so the answer there is always no however the dialog is set:
+//   - the machine-Z answer is refused outright by validateJob() (G53 is CNC_COORDINATE_SYSTEMS,
+//     off by default);
+//   - a reserved base passes every guard on Marlin -- the park's own guard sits above Guard C's
+//     Marlin return, and the base's RepRap-slot check sits below it -- but writeBaseEstablish()
+//     then skips the base for want of per-WCS registers. Transiting one anyway would select a
+//     register the job never wrote, through a G54-G59 that is itself a Marlin build option, and for
+//     a G59.1-G59.3 base wcsGcode() returns undefined and the block would carry a malformed G word.
+// Read by validateJob()'s warning and by writeMachineParkXY(), so the two cannot drift apart.
+function parkCanRetract() {
+  return fw != eFirmware.MARLIN && fixedZEstablishedAtStart();
+}
+
 // Human-readable G-code name for a workOffset number, for comments/errors.
 function wcsName(n) {
   return n <= 6 ? ("G" + (53 + n)) : ("G59." + (n - 6));
@@ -2223,16 +2296,29 @@ function writeMachineTravelZ(reason) {
 function writeMachineParkXY() {
   // Retract before crossing the bed. This move goes to the home corner from wherever the last
   // operation ended -- potentially a full diagonal, and on Marlin at homing feedrate with a
-  // bump-and-retry at the switch. Only a job with a fixed Z reference can retract at all: without
-  // one there is no frame in which an absolute Z is meaningful here, and that job travels at the
-  // current Z, which is exactly the state HReview.md HR-16 describes and this does NOT fix.
+  // bump-and-retry at the switch. Only a job that ESTABLISHED a fixed Z reference can retract at
+  // all -- parkCanRetract(), which is where the Marlin exclusion lives and why it is not repeated
+  // here. Without one there is no frame in which an absolute Z is meaningful, and the job travels
+  // at the current Z: the state HReview.md HR-16 describes, which this does NOT fix and therefore
+  // must not pass over in silence. validateJob() carries the same warning to Fusion's dialog.
   //
   // Deliberately NOT applied to the "Work" answer, and the reason is the distance rather than
   // timidity: that park goes to the LAST part's own origin, so the tool is already at that part
   // and the move does not cross the bed. See docs/PReview.md PR-6.
-  if (usesMachineZDatum()) {
+  if (!parkCanRetract()) {
+    writeComment(eComment.Important, " >>> WARNING: no retract before parking at machine X0 Y0 --"
+      + (fw == eFirmware.MARLIN && getReservedBaseWcs() != 0
+          ? " the reserved spoilboard base was not established on Marlin, so there is no frame to"
+            + " retract in;"
+          : " this job establishes no fixed Z reference;")
+      + " the tool crosses the bed at whatever Z the last operation left it at");
+  } else if (usesMachineZDatum()) {
     writeMachineTravelZ("Retract to the travel height in the machine frame before parking");
-  } else if (getReservedBaseWcs() != 0) {
+  } else {
+    // A base is reserved AND was established -- parkCanRetract() has already excluded Marlin, the
+    // one firmware where writeBaseEstablish() emits nothing and this transit would select a
+    // register the job never wrote.
+    //
     // R1 -- never leave the base active. retractThroughBaseClearance() leaves it selected for a
     // caller that is about to choose a destination WCS; this caller has no destination, so it
     // restores the operating WCS itself. Job end is not an excuse: the selection is modal state
@@ -2254,7 +2340,13 @@ function writeMachineParkXY() {
 
   writeComment(eComment.Info, "   Park at machine X0 Y0");
   resetAll();
-  writeBlock(gFormat.format(53), gFormat.format(0), xFormat.format(0), yFormat.format(0));
+  // The F word is not optional here even though this is a G0. Every other rapid in the post carries
+  // one (rapidMovementsXY/Z, and writeMachineTravelZ on the sibling G53 block), because on firmware
+  // that honours the modal feedrate for G0 an F-less rapid crosses the bed at whatever feed the last
+  // CUT commanded. resetAll() above has just cleared the tracked F, so this is written through
+  // fFormat rather than fOutput -- the same reason writeMachineTravelZ() does.
+  writeBlock(gFormat.format(53), gFormat.format(0), xFormat.format(0), yFormat.format(0),
+    fFormat.format(propertyMmToUnit(getProperty(properties.feedsTravelSpeedXY))));
   resetAll();
   gMotionModal.reset();
 }
