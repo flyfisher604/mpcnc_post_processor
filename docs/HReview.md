@@ -271,10 +271,11 @@ follows is what the register itself owes: the specific artifacts, and why each o
    upgrade HR-18 (A)(B) from `read` to `posted`. *(All six now also carry CR-6's reordered tail.)*
 4. **Nine reference files predate HR-17** and would differ in two text respects if re-posted. No
    assertion is invalidated — tidiness, not risk.
-5. **Owed to the next README doc-sync: nothing.** The six items this list used to carry — the group-03
-   label, group 08's *"post processor might be unsafe"* prompt, HR-23's substitution contract, the
-   `Tool Change Probe` field, CR-4's coolant file loading and CR-16's descending Safe Z move — all
-   landed in `cd57a48`, whose `doc-sync` marker reads `7b80b44`. The two `.cps` commits since
-   (`6cad4ca`, `e056def`) are both comment-only. Refresh from `git diff 7b80b44..HEAD -- MPCNC_v4.0_Beta2.cps` and re-bump the marker
-   when the post next changes what it emits. **The README is not touched during code changes.**
+5. **Owed to the user guides: nothing.** The single README was split into a landing page plus
+   `guide-hobbyist.md`, `guide-pro.md` and `property-reference.md` on 2026-08-07, and everything
+   HR-29 … HR-38 changed went in at the same time — the two group titles, the corrected 69-property
+   tables, both moved defaults, and group 8's REPLACE-versus-ADD contracts. The `doc-sync` marker
+   moved to `property-reference.md` and reads `17a20f2`, the last commit to touch the post.
+   Refresh from `git diff 17a20f2..HEAD -- MPCNC_v4.0_Beta2.cps` and re-bump when the post next
+   changes what it emits. **The guides are not touched during code changes.**
 

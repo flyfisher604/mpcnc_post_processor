@@ -35,11 +35,19 @@ var DOCS = {
   'design.md': 'docs/design.md',
   'HReview.md': 'docs/HReview.md',
   'PReview.md': 'docs/PReview.md',
-  'README.md': 'README.md'
+  'README.md': 'README.md',
+  'docs/guide-hobbyist.md': 'docs/guide-hobbyist.md',
+  'docs/guide-pro.md': 'docs/guide-pro.md',
+  'docs/property-reference.md': 'docs/property-reference.md'
 };
 
 var REGISTERS = ['docs/HReview.md', 'docs/PReview.md'];
 var CPS = 'MPCNC_v4.0_Beta2.cps';
+
+// The doc-sync marker lives on the file that actually tracks the post's dialog. That used to be
+// README.md, when the README held the property tables; the tables now live in their own file and
+// the marker went with them, because the thing the ref answers is "are these tables stale".
+var DOC_SYNC = 'docs/property-reference.md';
 
 var problems = [];
 function fail(where, msg) { problems.push({ level: 'FAIL', where: where, msg: msg }); }
@@ -350,24 +358,27 @@ function checkPointerDirection() {
 // ---------------------------------------------------------------- 6. README doc-sync (WARN)
 
 function checkDocSync() {
-  var text = read('README.md');
-  if (text === null) return;
+  var text = read(DOC_SYNC);
+  if (text === null) {
+    fail(DOC_SYNC, 'missing — it carries the doc-sync marker for ' + CPS);
+    return;
+  }
   var m = /<!--\s*doc-sync:\s*\S+\s*@\s*([0-9a-f]{7,40})/.exec(text);
   if (!m) {
-    warn('README.md', 'no doc-sync marker found');
+    warn(DOC_SYNC, 'no doc-sync marker found');
     return;
   }
   var ref = m[1];
   try {
     git(['merge-base', '--is-ancestor', ref, 'HEAD']);
   } catch (e) {
-    fail('README.md', 'doc-sync ref ' + ref + ' is not an ancestor of HEAD');
+    fail(DOC_SYNC, 'doc-sync ref ' + ref + ' is not an ancestor of HEAD');
     return;
   }
   var since = git(['log', '--oneline', ref + '..HEAD', '--', CPS]).trim();
   if (since) {
     var n = since.split('\n').length;
-    warn('README.md', CPS + ' has ' + n + ' commit(s) since doc-sync ref ' + ref +
+    warn(DOC_SYNC, CPS + ' has ' + n + ' commit(s) since doc-sync ref ' + ref +
       ' — review `git diff ' + ref + '..HEAD -- ' + CPS + '` and re-bump if any changed what it emits');
   }
 }

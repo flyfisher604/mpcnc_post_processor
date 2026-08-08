@@ -22,7 +22,7 @@ ships with the repo*.
 | `design.md` | Why the shipped behaviour is what it is: the frame model, external firmware facts, the arguments behind orderings that look arbitrary in the source | Rules a session must follow, status of anything, unbuilt design (→ `PReview.md` §6) | **≤ 300 lines** — the one file that **grows with the post**, so this is the one budget expected to move. It moves by argument, in a commit of its own |
 | `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 300 lines** — a register grows one line per row |
 | `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | **≤ 920 lines, and falling.** §2's long form and §3's expansions are unbuilt design and unrun rows; both retire on build. The §3 index table is permanent, everything under it is not |
-| `README.md` | User-facing usage only. Its `doc-sync` marker records the ref it last synced to | Anything developer-facing | — |
+| **the user-facing guides** — `README.md`, `docs/guide-hobbyist.md`, `docs/guide-pro.md`, `docs/property-reference.md` | Usage only, split by **reading path**: README is the landing page and the fork between guides; each guide is one path end to end; the reference holds the property tables and carries the `doc-sync` marker recording the ref it last synced to | Anything developer-facing. And **a second copy of the property tables** — one copy, linked from both guides, is the whole point of the split | — |
 | per-user **memory** (outside the repo) | Constraints about the user that hold across projects and cannot be derived from this repo — e.g. no controller hardware is available | **Anything about this post**: its code, conventions, status, findings or history | One short file per fact. Nothing here is reviewed in a diff, which is why so little belongs |
 
 ### What earns a place
@@ -233,7 +233,7 @@ verification post must carry — it cannot execute on a paid licence (HW-1).
 
 | Artifact | Fired by | Checks | Travels? |
 |---|---|---|---|
-| `docs/check-docs.js` | the pre-commit hook, or by hand | The contracts above: size budgets (warn), tallies vs their tables, findings-vs-register id completeness, heading ranges and row counts, Rule 3's pointer direction, the README `doc-sync` ref. Prints which registers it actually parsed — a checker silent about what it skipped reads as a clean bill of health. **Documents only:** it never reads the `.cps`, and two checks that did have been removed for it | ✅ tracked |
+| `docs/check-docs.js` | the pre-commit hook, or by hand | The contracts above: size budgets (warn), tallies vs their tables, findings-vs-register id completeness, heading ranges and row counts, Rule 3's pointer direction, the `doc-sync` ref on `property-reference.md`. Prints which registers it actually parsed — a checker silent about what it skipped reads as a clean bill of health. **Documents only:** it never reads the `.cps`, and two checks that did have been removed for it | ✅ tracked |
 | `.githooks/pre-commit` | `git commit` — **anyone's**, not just a session's | runs `check-docs.js --staged`; non-zero aborts the commit | ✅ tracked, ❌ **not armed** — see below |
 | `.claude/hooks/post-edit.js` | Claude Code, after every `Edit`/`Write` | `node --check` when the file is the `.cps`; silent for everything else | ✅ tracked |
 
@@ -295,4 +295,4 @@ checking them per-edit would fight that rule.
 - **Write every Pass criterion as something visible in the file** — exact tokens, their order, and what
   must be **absent**. When a row passes, mark it `PASS` outright: no "static PASS" hedging and no note
   explaining what was skipped. Operator-safety facts a file cannot show (*park the tool over bare
-  spoilboard before starting*) belong in code comments, here, and the README — never as a test step.
+  spoilboard before starting*) belong in code comments, here, and the user guides — never as a test step.
