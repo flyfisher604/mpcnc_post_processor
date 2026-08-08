@@ -1837,10 +1837,16 @@ function onOpen() {
   // Validate the job configuration before emitting anything (may error() out).
   validateJob();
 
-  // Output anything special to start the GCode
-  if (fw == eFirmware.GRBL) {
-    writeln("%");
-  }
+  // NO "%" wrapper, on any firmware. Recorded because an absence cannot explain itself, and the
+  // character is familiar enough from Fanuc/LinuxCNC posts to be re-added by a later reader. Stock
+  // Grbl 1.1 has no "%" feature: in gnea/grbl the '%' branch of grbl/protocol.c's line reader is
+  // commented out -- "// TODO: Install '%' feature" -- beside the live '(' and ';' cases, so the
+  // character is buffered like any other. The line is not $-prefixed, so it reaches
+  // gc_execute_line(), which rejects a first word that is not a letter A-Z: error:1. With homing
+  // enabled the opening one was also sent while Grbl was still in Alarm, before $H, answering
+  // error:9 instead. UGS / bCNC / Candle strip '%' before streaming and so masked it; a sender that
+  // streams verbatim and halts on error never started the job at all. Marlin/RepRap never had one.
+  // See docs/HReview.md HB-2.
 
   // Configure the GCode G commands
   if (fw == eFirmware.GRBL) {
@@ -1957,10 +1963,7 @@ function onClose() {
     loadFile(getProperty(properties.includeStopFile));
     flushMotions();
   }
-
-  if (fw == eFirmware.GRBL) {
-    writeln("%");
-  }
+  // No closing "%" on GRBL either -- see onOpen() and docs/HReview.md HB-2.
 }
 
 var forceSectionToStartWithRapid = false;
@@ -3197,8 +3200,8 @@ function writeMachineHoming() {
     // GRBL only recognises a $ system command when $ is the first character of the line -- "N10 $H"
     // is handed to the g-code parser instead, which has no word letter $, so the controller errors
     // and the sender halts on the first motion line of the preamble. $H is not a g-code block and
-    // takes no line number. The only other raw controller strings in this file, the GRBL "%"
-    // wrappers in onOpen()/onClose(), already use writeln() for the same reason.
+    // takes no line number. It is now the only raw controller string this post writes -- the GRBL
+    // "%" wrappers in onOpen()/onClose() used writeln() for the same reason and are gone (HB-2).
     writeln("$H");
     return;
   }

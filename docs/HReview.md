@@ -1,273 +1,109 @@
-# HReview — hobbyist review of `MPCNC_v4.0_Beta2.cps`
+Hobbyist review — findings and tests
+====
 
-The hobbyist-side findings register and test register. **49 findings** — 32 `HR-` from the hobbyist
-review, 17 `CR-` from the 2026-08-01 whole-file review. All are fixed or closed by design, except three
-one-liners awaiting a tidy-up sweep and one unstarted robustness fix (HR-27). Nothing is failing.
+## Scope
 
-**Findings that turned out to be professional are not here at all** — no summary row, no pointer row.
-`HR-7`, `HR-8`, `HR-9`, `HR-10`, `HR-13`, `HR-20` and `HR-26` live in `docs/PReview.md` and only there,
-with their ids kept, so a commit message or code comment naming one still resolves — in that file. This
-register held stub copies of all seven until 2026-08-07; a stub that restates a finding is a second place
-for it to go stale.
+A blind, from-scratch walk of `MPCNC_v4.0_Beta2.cps` from the **hobby operator's** point of view:
+one part, one Fusion Setup, one tool, several operations, zeroed by hand or off a touch plate, on
+an MPCNC / LowRider running GRBL, Marlin or RepRap.
 
-Reasoning, diffs and session narratives were trimmed 2026-08-01 — read the code and the commit messages
-for *why*. What is kept is what a later reader needs: every issue with its status, and every test with
-enough to set it up and run it again.
+**Controls covered — groups 1, 2, 3, 4, 5, 6, 8, 10** (55 of the 69 dialog properties). Each was
+read for its default, then walked through every code path it reaches from every Fusion entry point
+that can call it, and the emitted g-code checked against the dialect the **CNC Firmware** answer
+names and against what `README.md`, `guide-hobbyist.md` and `property-reference.md` promise.
 
-**How to run a test, the personas, and the method notes live in `conventions.md`** — they govern this
-register and `PReview.md` alike, so they sit in one place rather than in whichever file happened to hold
-them. **The standing rule for updating this register** — add the Do→Get row in the same commit, retire
-the long form on close — is `CLAUDE.md` → *Registers ship with the code*, and `/close-finding` runs it.
+**Deliberately excluded:** group 7 (tool changes), group 9 (laser) and group 11 (Duet), and every
+multi-WCS / multi-fixture / Manual NC path — those belong to the professional register. Findings
+that a hobbyist can only reach through one of those are not recorded here.
+
+**Method note.** This pass did not read the previous `HR-`/`CR-` register, so a finding below may
+restate one already closed there; ids are `HB-` precisely so they cannot collide with ids cited in
+commit messages. Two items were pre-seeded from the checkpoint before the pass began and are
+labelled as such rather than claimed as independent finds. Firmware behaviour is settled from
+firmware source, cited in the row — **no controller was available**, so no row is proved by running
+one.
 
 ---
 
-## Findings — HR-1 … HR-39 · CR-1 … CR-17
-
-`HR-` came from the hobbyist review; `CR-` from the 2026-08-01 whole-file review driven by the dialog and
-the F360 API. Both registers merged here on the same terms — ids kept, so every commit message and code
-comment that names one still resolves. **The seven professional ids are the exception and resolve in
-`PReview.md`** — the gaps at HR-7 … HR-10, HR-13, HR-20 and HR-26 are deliberate.
+## Findings — HB-1 … HB-10 — 10 findings
 
 | ID | Finding | Sev | Resolution | Status |
 |---|---|---|---|---|
-| **HR-1** | `G38 Target` was an absolute Z in a frame whose Z0 is stale, on the default probe path | High | Provisional `Z0` on the two just-positioned modes only; gated on `canProbe`. **Scope is deliberate:** the frame-dependence remains open for the `Use Active WCS`, added-part and base probes, which descend from a retracted clearance and would be made **worse** by the same fix. Added-part symmetry is an open question — `PReview.md` **M4** | ✅ fixed `8d61790` |
-| **HR-2** | `isProbeOperation()` undefined — any drilling operation could abort the post | High | Defined locally, two signals (strategy + `cycleType` prefix). ⬜ **Open question:** keep the extra breadth, or trim to the strict reference form? Two signals catch more than the reference post does, at the cost of possibly refusing an operation it would accept | ✅ fixed `9c87fb0` |
-| **HR-3** | GRBL + Manual Spindle never prompted to switch the router **off** | High | `spindleOff()` branches on the property first, firmware inside | ✅ fixed `43d09aa` |
-| **HR-4** | Safe-Z fallback constants never converted mm → output unit | Med-High | Four call sites converted; inch only, identity in mm | ✅ fixed `439ce2d` |
-| **HR-5** | `Scale Feedrate` did not apply to G2/G3 arcs | Med-High | `limitArcFeed()` caps at the arc's **plane's** axis limits | ✅ fixed `b95c954` |
-| **HR-6** | No tool-orientation guard — a rotated 3-axis Setup posted silently wrong g-code | Medium | `isSectionOrientationSupported()`, component-wise, **fails open**, ~0.006° | ✅ fixed `684f28a` `e2b2424` |
-| **HR-11** | Marlin/RRF jobs never ended and left every stepper energised | Medium | `M84 S60` both; `M2` on RepRap only (Marlin has never implemented it). **`S60`, not a bare `M84`, deliberately** — a 60-second idle timeout rather than releasing the steppers at once, which would drop Z on an unbalanced LowRider gantry | ✅ fixed `7a35f7f` `8054b6e` |
-| **HR-12** | A manual spindle is never told about an RPM change between operations | Medium | Prompt on formatted-speed **or** direction change | ✅ fixed `dd8e11d` |
-| **HR-14** | Two coolant modes could never match a channel | Low | `coolantLevels` derived from `eCoolant` | ✅ fixed `7e38777` |
-| **HR-15** | `safeZforSection()` mixed global `hasParameter()` with `_section.getParameter()` | Low | All three guards read `_section.` | ✅ fixed `88c7817` |
-| **HR-16** | `onClose` traverses to X0 Y0 before stopping the spindle, no guaranteed safe Z | Low | **Spindle-order half fixed** 2026-08-01 (CR-6). **Z half: fixed for the new machine park only** — `PReview.md` **PR-6** retracts before it, because that one crosses the bed. The default `Work` park still does not: it goes to the last part's own origin, so the tool is already there. **The jet case stays open** → `PReview.md` §5 | ◑ part-fixed |
-| **HR-17** | Four tidy-ups; two change emitted text | Cosmetic | Sanitizer double-spaces, group-03 rename, vestigial arg, empty GRBL block | ✅ fixed `924d1f6` |
-| **HR-18** | `loadFile()` left no line break after an include — the next block merges | Medium | Repair in `loadFile()`; `\r` counts as a terminator | ✅ fixed `5b0b94a` |
-| **HR-19** | `M291` doubled space; `()` vs `( )` on empty comments | Cosmetic | `()` **closed as by design** (CR-17b). The `M291` space remains — next sweep | ⬜ open |
-| **HR-21** | `includeProbeFile` declared but never read — dead property | Low | Tooltip now says `NOT IMPLEMENTED YET`. Wire into `probeTool()` or delete — undecided | ⬜ open |
-| **HR-22** | An include file that exists but is **empty** contributes nothing, silently | Medium | **(A)** empty include now announces itself ✅. **(B)** empty Start include leaves no preamble — **closed as by design** 2026-08-01 (CR-7): the include owns the phase | ✅ closed |
-| **HR-23** | A Start/Stop include *replaces* the whole preamble/footer | — | **Designed behaviour.** Filed as a defect and resolved as correct the same day. Lesson: before calling a bypass a defect, ask whether the bypass is the feature | ✅ closed |
-| **HR-24** | `writeWCS(section)` takes a section then consults the global `tool` | Low | Latent (both callers pass `currentSection`). One line: `section.getTool()` — next sweep | ⬜ open |
-| **HR-25** | `wcsGcode(0)` / `wcsName(0)` yield `G53` | Low | **Closed as by design** 2026-08-01 (CR-17d): a pure conversion should not carry frame policy; no caller can pass 0 | ✅ closed |
-| **CR-1** | `$H` went through `writeBlock()`, so `Enable Line #s` emitted `N10 $H` and GRBL rejects it | High | `writeln()` — `$` must be the line's first character | ✅ fixed `c73726c` |
-| **CR-2** | Homing moves the tool, then a `Current Pos` origin mode records the **homing corner** as the part origin | High | Post-time `warning()` in `validateJob()`. **Re-gated `1eb8141`:** keyed on the *action* alone it fired when `Axes Homed and Trusted` is `None`, where `writeMachineHoming()` emits **no motion at all** — so it described a move that never happens and told the operator to abandon a pre-jog that was intact. Now `homesAtJobStart() && (machineHomesXY() \|\| machineHomesZ())`, and its wording says *the axes the declaration names* rather than *the homing corner*, which the `Z Only` answer does not have | ✅ fixed `c73726c` |
-| **CR-3** | A required tool change dropped in complete silence when group 07 is off (the default) | Med-High | `>>> WARNING` per boundary + `validateJob()` warning via `countDistinctTools()`, counted over **sections** | ✅ fixed `c73726c` |
-| **CR-4** | Coolant `Use custom` wrote the property text as g-code; tooltip and README call it a **file** | Medium | `writeCustomCoolantFile()` → `loadFile()`; warns when named but empty | ✅ fixed `c73726c` |
-| **CR-5** | A jet/laser job on the default First-WCS mode never established **Z0** at all | Medium | `Important` warning; the XY-only origin write is unchanged | ✅ fixed `c73726c` |
-| **CR-6** | `onClose()` traversed to X0 Y0 **before** stopping the spindle | Medium | Spindle stops first. **Z retract added for the machine park only** (`PReview.md` **PR-6**); the `Work` park's half stays open as HR-16 → `PReview.md` §5 | ◑ part-fixed |
-| **CR-7** | A Start include substitutes for `G90`/`G21`/`G94`/`G17`, so the job inherits unknown modal state | Medium | **By design** — an include owns the phase it names. Same rule as HR-23 / HR-22 (B) | ✅ closed |
-| **CR-8** | Feed scaling could **raise** a feedrate on a zero-length move, against its documented contract | Low-Med | Clamped; harness-verified against both the working tree and `HEAD` | ✅ fixed `c73726c` |
-| **CR-9** | An unrecognised jet mode left the laser power `undefined` → `S NaN` | Low | Explicit branch | ✅ fixed `c73726c` |
-| **CR-10** | GRBL laser mode passed the enum's **string** id into `mFormat.format()` | Low | Explicit `Number()`. Group 09 still has no posted evidence — `PReview.md` J4 | ✅ fixed `c73726c` |
-| **CR-11** | `roundTo()` returned `NaN` for any value JS renders in exponential notation | Low | Plain arithmetic replaces the string-exponent trick; harness-verified | ✅ fixed `c73726c` |
-| **CR-12** | `probeTool()` wrote `F`/`Z` through the raw formats, desynchronising `fOutput`/`zOutput` | Low | No behaviour change — `resetAll()` documented as **load-bearing** | ✅ fixed `c73726c` |
-| **CR-13** | `onOpen()` reset 2 of ~14 mutable module globals | Low | `resetPostState()` — all 18, one function | ✅ fixed `c73726c` |
-| **CR-14** | The `properties` literal was declared out of the dialog order it promises | Low | Pure move, proved by sorted-line checksum. Keep new properties in dialog order | ✅ fixed `c73726c` |
-| **CR-15** | `Tool Change Probe` is a dialog field wired to nothing | Low | The same defect as **HR-21** — wire into `probeTool()` or delete, undecided | ⬜ open |
-| **CR-16** | `Use Active WCS X0 Y0 Z0` called a move a "retract" when it can descend | Low | Comment + tooltip corrected | ✅ fixed `c73726c` |
-| **CR-17 (a)** | `Retract the tool to 5.080000000000001` — a raw JS number in a comment | Cosmetic | Formatted | ✅ fixed `c73726c` |
-| **CR-17 (b)** | Section separator is an empty comment `()`, not a blank line | Cosmetic | **By design** — the separator is comment-level-gated on purpose. Closes HR-19's `()` half | ✅ closed |
-| **CR-17 (c)** | `feedFormat` declared and never used | Cosmetic | Deleted | ✅ fixed `c73726c` |
-| **CR-17 (d)** | `wcsGcode(0)` returns `G53` against the standing "never `G53`" rule | Cosmetic | **By design** — a pure conversion carries no frame policy, and no caller can pass 0. Same as HR-25 | ✅ closed |
-| **CR-17 (e)** | `sectionComment` printed `undefined`, or inherited the previous operation's name | Cosmetic | Fixed in `onSection()`/`onSectionEnd()` | ✅ fixed `c73726c` |
-| **HR-27** | The two **geometry** guards fire in `onSection()`, not `onOpen()`, so a rejected job can leave a **truncated `.gcode` on disk** | Medium | Guards A/B/C run before any output, so they write no file; multi-axis and HR-6's orientation check do not. A hobbyist who builds a Setup on a model face gets a partial file rather than a clean refusal. Fix: promote both into `validateJob()`. Not started | ⬜ open |
-| **HR-28** | Four `Jog to …` origin modes advertise a capability **GRBL does not have** — the post's default firmware and the hobbyist's usual controller | Med-High | `askUser()` consumes `allowJog` in the **RepRap branch only** (`M291 … X1 Y1 Z1`); the GRBL branch emits a bare `M0` and discards it, and GRBL 1.1 accepts a jog only in Idle or Jog state, which an `M0` hold is not. The job stopped and waited and the operator could not move the machine, with nothing saying why. **Gated, not deleted** — the modes are correct on RepRap. `warnJogAtPauseOnGrbl()` in the file + a `validateJob()` warning; both tooltips now name the limitation | ✅ fixed |
-| **HR-29** | `Axises Homed and Trusted` — not a word, on the one group-4 control the dialog asks a hobbyist to read | Cosmetic | Title → `Axes Homed and Trusted`. A title is not a stored identifier, so no preset resets | ✅ fixed |
-| **HR-39** | **“Group 3 is inert on a full licence” is two claims, and both are narrower than the record stated.** `conventions.md` carried HW-1's paraphrase *“`isSafeToRapid()` … is unreachable on a paid licence”*, and the dialog review then built two user-facing sentences on it. Neither survives reading the code. **(a) The file is not identical:** `onSection()` calls `safeZforSection()` unconditionally, and that function's whole body is gated on `mapRapidsRestoreRapids`, writing a `( SafeZ … )` comment at `Important`/`Info` — once per section, visible at the default comment level. `isSafeToRapid()` adds three more per linear move at `Debug`. **HR-15 (A)/(B) already measured exactly this on a posted full-licence file** and the register did not connect it. **(b) The conversion is not structurally prevented:** `isSafeToRapid()` **is called on every `onLinear` whatever the licence**. It returns false only because the default `Retract:15` resolves to the operation's retract level, which every genuine cut sits below — a property of the *threshold*, not of the licence | Low-Med (documentation) | Both guide sentences rewritten to say *converts nothing at the default threshold*, not *does nothing*; `conventions.md`'s lesson restated to distinguish the call from the conversion. **No code change** — the behaviour is correct, only the claims about it were wrong. **The reachable case is unverified**: no posted paid-licence file exists at a lowered threshold, so whether Fusion's linking actually emits a qualifying move is open — HR-39 (A) | ✅ fixed, one row owed |
-| **HR-38** | **Group 8's descriptions omitted the two things a user must know before naming a file.** They read *"File with custom Gcode for header/start (in nc folder)"* and nothing more — so nothing said that a Start or Stop file **REPLACES** that phase (HR-23 / CR-7, designed behaviour: a Start file takes the modal preamble `G90`/`G21`/`G94`/`G17` with it), and nothing said that naming any file here makes Fusion ask *"This post processor might be unsafe…"*, where answering No **aborts the post**. A hobbyist adding a start file to set their own dust boot loses the preamble silently | Medium | All four rewritten. Start and Stop now say REPLACE and list what goes; both tool files say **ADDED**, which is the opposite contract and was equally undocumented — `loadFile()` runs and the built-in sequence continues — and both now say they are ignored unless group 7 is on. The unsafe prompt is named once in full on `Start GCode File` and cross-referenced from `Stop GCode File` | ✅ fixed |
-| **HR-35** | **`First WCS / Part`'s default assumes a wired, working Z touch plate** and the dialog never said so. Without one, a GRBL job at factory defaults drives `G38.2 F30 Z-10` into the stock at 30 mm/min and then alarms. The asymmetry is what an experienced operator would flag: the opposite error — defaulting to a mode that does not probe when a probe exists — only wastes the probe | Med-High as a surprise, but see Resolution | **Considered and deliberately NOT changed.** Flipping the default to `Set X0 Y0 Z0 to Current Pos` would invalidate the whole default-job evidence base at once — `H2`, `HR-1 (A)`, `HR-1 (E)`, `HW-3`, `HW-4`, `HW-5`, `H11c` and `CR-REG` are all posted at this default, and probing *is* the correct hobbyist workflow for anyone who has the plate the README assumes. **Mitigated in the dialog instead** (HR-31): `probeOnStart` now opens by saying the default assumes a wired plate and naming the mode to pick without one, ahead of the six mode descriptions. `probeG38Target` separately explains that a probe reaching its target without touching is a failed probe that alarms | ✅ closed by design |
-| **HR-36** | **Group 3's four defaults are `false`, while `README.md:162` instructs *"Hobbyists should turn all options in this group on"*.** The one group that exists purely for the Personal-licence user is the one group they must configure by hand, and the documented hobbyist configuration is not the shipped one | — | **The defaults stay off, deliberately.** Group 3 works around another vendor's licence restriction, and **shipping it pre-enabled would make that the post's decision rather than the operator's.** Recorded rather than left silent, because a default nobody wrote down reads as an oversight and the next review would re-open it. *(The technical question is separate, and narrower than it first looked — see **HR-39**. It is in any case not the reason: the default would stay off even if the group were provably inert everywhere.)* The README half is fixed the other way: the instruction becomes a neutral description of what the group does and that enabling it is the reader's call | ✅ closed by design |
-| **HR-37** | **`Tool Changes are Included` defaults `false`, and the hobbyist persona says "one tool".** A roughing bit followed by a finishing bit is an ordinary hobbyist job, so `conventions.md` → *Which register?* describes a narrower hobbyist than the one the README's Quick Start addresses | Low | **No change to the default.** CR-3 already warns at post time and marks every suppressed change in the file, so the failure is loud rather than silent; and defaulting the group on would emit relocation and re-probe code down paths the Tool Change branch (`PReview.md` §2) has not yet reworked — enabling by default before that lands would ship unverified motion. **The scope note is the finding**: the persona is a register-routing rule, not a claim about what hobbyists build, and a two-tool hobbyist job routes here rather than to `PReview.md` | ✅ closed by design |
-| **HR-34** | **The coolant channel defaults were Marlin codes under a GRBL default firmware.** `Turn Channel A On` shipped `M42 P6 S255`, a Marlin pin write, while `CNC Firmware` ships `Grbl` — and `CoolantA()` passes the property text straight to `writeBlock()` with **no firmware check of any kind**. A hobbyist with an air-assist blower who sets `Channel A Mode` to match their tool, changing one field and accepting the rest, gets `M42 P6 S255` in a GRBL file, which GRBL rejects. All four On/Off defaults were the same way round | Medium | Defaults changed to the codes that match the default firmware — `M8` / `M9` for channel A, `M7` / `M9` for channel B. Changing which `id` is the default is not a key or `id` change, so **no saved preset resets**; and since both `Channel A/B Mode` still default `Off`, **a job that accepts every default emits no coolant code at all and is byte-identical**. All four descriptions now say the dialects are not interchangeable and that the post emits the text verbatim without checking. **The durable fix is a post-time dialect warning** — recorded as an unscheduled idea in `PReview.md` §6, not built here: this branch reviews the panel | ✅ fixed |
-| **HR-33** | **`Max XY Cut Speed` / `Max Z Cut Speed` / `Max Toolpath Speed` promised a limit the post did not apply.** All three read as unconditional guarantees -- *"Limit X or Y feedrate to be less then this value"* -- but `limitFeedByXYZComponents()` returns the feed untouched at its first line when `Scale Feedrate` is off, before reading any of them, and `Scale Feedrate` defaulted **off**. So a hobbyist who set all three to their machine's real capability, which the README tells them to do, got no limiting at all and nothing said so. HR-5 (E)'s evidence is the shape of it: 122 cut moves in a scaling-off Marlin file exceed an axis limit | Medium | Two halves. **`Scale Feedrate` now defaults on** -- `README.md:159` already told hobbyists to enable it, and this is the post honouring limits the operator stated three fields above. **And all four descriptions now say what is conditional on what**: each limit leads with `ONLY APPLIED WHEN SCALE FEEDRATE ABOVE IS ON`, and `Scale Feedrate` itself warns that the shipped 900/180/1000 are generic MPCNC figures which, left below a faster machine's real capability, quietly slow every cut. **The only default this branch moves**, so it re-baselines `PReview.md` REG-MF | ✅ fixed |
-| **HR-32** | Groups **4** and **5** gave a hobbyist no signal that a single-part job can skip them — `4 - Machine Frame` and `5 - Fixed Z Reference` name a concept and say nothing about who needs it. Between them they are 8 of the 69 fields, and both are irrelevant to the one-part, one-WCS job the README calls the hobbyist case | Low | Retitled `4 - Machine Frame - homing and end park` and `5 - Fixed Z Reference - multi-part jobs only`, following group 3's existing precedent of carrying the instruction in the title. A group title is not a stored identifier, so nothing resets. **`PReview.md` D1 / D3 / D5 quoted the old titles and were restated in the same commit** — they are unrun rows, so a stale expectation there would have reported a failure that was the register's own error | ✅ fixed |
-| **HR-31** | **Description altitude, wrong in both directions.** Seven group-4/5/6 descriptions ran 150–475 words and re-derived firmware facts `design.md` already holds, burying the decisive sentence — `probeOnStart`'s *the jog modes do not work on GRBL* sat two-thirds in. Meanwhile four controls a hobbyist meets first said almost nothing: `Manual Spindle On/Off` (8 words for the control that decides whether the post asks or commands), `Plate Thickness` (6, no unit), `G38 Target` (6, no frame), `Map: Safe Z to Rapid` (23, no syntax) | Medium | All eleven rewritten. Each of the seven now **leads with what to set and whether it can be skipped**; the firmware derivations are **deleted, not moved** — `design.md` holds every one (`:80` GRBL `$H`, `:178-180` `G53`/`G28 X Y`/Marlin `G92`, `:182` jog-at-`M0`, `:92-150` the fixed-Z frames), so it grew by nothing. **Only three shrank materially** (2092 → 1821 words, −13%): the other four carried no derivation to cut and needed reordering, which the added skip signals slightly outweigh. The four stubs went 43 → 323 words. `probeOnStart` also now leads with **the default assumes a wired touch plate** (HR-35) | ✅ fixed |
-| **HR-30** | Seven property descriptions carry typos or broken grammar — `fo`, `seperation`, `is include`, `are include`, `power to on`, and a doubled space in both Duet fields | Cosmetic | All seven corrected. Descriptions are never emitted (the header dump prints names and values), so this is dialog-only | ✅ fixed |
-
-**Open, no fix:** HR-19 (`M291` space), HR-21 / CR-15 (one decision, two ids), HR-24 — a tidy-up sweep of
-one-liners, none changing output today. Plus **HR-27**, which is not a one-liner and is not in that sweep.
-Everything else here is fixed or closed by design.
-
-**Open questions carried in the rows above:** HR-1 (added-part provisional `Z0` — settle on `PReview.md`
-M4), HR-2 (guard breadth), HR-16 / CR-6 (jet Z retract — `PReview.md` §5), HR-21 / CR-15 (wire or delete).
-Professional ones live in `PReview.md` §6.
-
-**Nothing found by either pass breaks the factory-default single-operation job.** Every High/Medium
-finding needed the operator to move one dialog field off its default — but each of those is a field the
-README tells a hobbyist to consider.
+| **HB-1** | **Marlin `M0` is conditionally compiled, so a build without a panel would skip every operator stop.** `askUser()` (4010-4013) emits `M0 <text>` on Marlin. Marlin gates `M0` on `HAS_RESUME_CONTINUE` — `Marlin/src/gcode/gcode.cpp` 2.1.x: `#if HAS_RESUME_CONTINUE` / `case 0: case 1: M0_M1(); break;` / `#endif` — which `Marlin/src/inc/Conditionals_adv.h` defines as `#if ANY(EXTENSIBLE_UI, IS_NEWPANEL, EMERGENCY_PARSER, HAS_ADC_BUTTONS, HAS_DWIN_E3V2)`. On a build satisfying none of those, `M0` reaches `default: parser.unknown_command_warning(); break;` and the job runs on, losing the probe-attach stop, the *Turn ON RPM* stop and the spindle-off stop at once | — | **Closed by design — not a defect on the machines this post targets.** Every Marlin build in the target audience has a panel, so `IS_NEWPANEL` is satisfied and `M0` is always compiled in. The post is therefore right to emit `M0` unconditionally on Marlin, and no warning is wanted: it would fire on every Marlin job to describe a build that does not exist here. Recorded so the `gcode.cpp` gate is not re-derived and re-raised by a later pass | ➖ |
+| **HB-2** | Every GRBL file opened and closed with a `%` line stock Grbl 1.1 rejects — `error:1`, or `error:9` from the opening one while still in Alarm before `$H`. Masked only because UGS / bCNC / Candle strip `%` before streaming | Med | **Dropped from both branches**, not gated behind a property: the wrapper is correct for no supported firmware, and a dialog field to disable something nothing wants is worse than its absence. `onOpen()` carries the `grbl/protocol.c` citation, because an absence cannot explain itself and the character is familiar from Fanuc/LinuxCNC posts | ✅ fixed |
+| **HB-3** | **`Home at Job Start` = `Home` with `Axes Homed and Trusted` = `None` homes nothing and says so only inside the file.** `writeMachineHoming()` 3168-3172 warns at `Important` level and returns. `validateJob()` carries six `warning()` calls for advisory cases but **none for this one**, so Fusion's post dialog is silent — and at `Comment Level` = `Off` the file is silent too, leaving no trace anywhere. This is the likeliest group-4 mistake a hobbyist makes: the operator wants homing, reads *the action*, sets it, and never reads the declaration above it as something they must also change. The job then starts from an unhomed machine believing it homed | Med | Open — add a `warning()` in `validateJob()` mirroring the in-file text. `machineHomesXY()`/`machineHomesZ()`/`homesAtJobStart()` already give it the exact predicate | ⬜ |
+| **HB-4** | **A non-zero `Probe X/Y Offset` traverses to the probe point at the operator's own jogged Z, with no lift and no warning.** On the default `First WCS / Part` = `Set X0 Y0 to Current Pos, Probe Z0`, `writeWcsOnStart()` 3523-3527 writes the provisional `G10 L20 P1 X0 Y0 Z0` and calls `partProbe(true)`; with an offset set, `partProbe()` 3408-3427 emits `G0 X<ox> Y<oy> F2500` **at whatever Z the operator left the tool at**. The sibling path (`Use Active WCS X0 Y0, Probe Z0`, which passes `zUnknown = true`) prints `Ensuring that Z is safe. Unknown Z for XY move.` for exactly this hazard; this path passes no `zUnknown`, so it prints nothing and lifts nothing. The offsets are a documented hobbyist feature — `guide-hobbyist.md` → *Probing away from the corner* recommends them for an origin in fresh air — and the mode's own premise is that the operator has just jogged the bit down to the corner. Failure: offset 25 mm, tool parked a millimetre over the stock, and the bit is dragged 25 mm across the work or into a clamp before the probe | Med | Open — the provisional `Z0` is written *before* the offset move, so an absolute retract is meaningful here: emit `rapidMovementsZ(probeSafeZ())` between 3524 and 3527. Cheaper alternative is to pass `zUnknown` so at least the comment appears | ⬜ |
+| **HB-5** | **A malformed group-6 `Safe Z` falls back to 15 mm with only a `Debug` trace, where its group-3 twin warns.** Both properties share `parseSafeZExpr()`, which returns `eSafeZ.ERROR` for anything that is not a bare number or `Feed:`/`Retract:`/`Clearance:<n>` — including a leading minus, a unit suffix (`15mm`) or an emptied field. `safeZforSection()` 1119-1122 answers that with an `Important` `>>> WARNING: … format error`; `parseProbeSafeZProperty()` 1214-1221 answers it with a `Debug` comment nobody posts at. The only other trace is `Probe SafeZ = Error = 15.000` in the `Info`-level Resolved Values block. 15 mm is a plausible retract height, so the mistake looks like it worked | Low | Open — raise the probe-side parse failure to `Important` and to a `warning()`, matching the map-side. The two Safe-Z properties should fail the same way, since they document each other as "same syntax" | ⬜ |
+| **HB-6** | **`G17` and `G94` are emitted only on the GRBL branch, so RepRap inherits whatever plane and feed mode the last job left.** `Start()` 3794-3803 puts both inside `if (fw == eFirmware.GRBL)`; the Marlin/RepRap branch emits `G90`, `G21`/`G20` and `M84 S0` only. `circular()`'s non-GRBL branch 3966-3968 then writes `G2`/`G3` with `I`/`J` and **no `G17`**. Both codes are live modal state in RRF — `Duet3D/RepRapFirmware` `src/GCodes/GCodes2.cpp` `HandleGcode()` has `case 17:`/`case 18:`/`case 19:` setting `selectedPlane`, and `case 93:`/`case 94:` setting `inverseTimeMode` — so a controller left in `G18` reads every arc's `I`/`J` in the wrong plane, and one left in `G93` reads every `F` as inverse time. Marlin is unaffected: without `CNC_WORKSPACE_PLANES` it has no `G17` to be wrong about and is always XY, and it has no `G93` | Low | Open — emit `G17` (and `G94`) on the non-GRBL branch too. Both are no-ops on a controller already in that mode, so the cost is two lines per Marlin/RepRap file | ⬜ |
+| **HB-7** | **A group-8 include file that does not exist aborts the post after part of the file is already written.** `loadFile()` 3774-3777 calls `error()` when `FileSystem.isFile()` fails. The Start include is loaded at step 4 of `writeFirstSection()`, by which point the header block, the property dump, the homing and the `G54` select are all in the stream — so a mistyped filename leaves a **truncated `.gcode`** rather than a clean refusal, the same class as the geometry guards that fire in `onSection()`. The Stop include fails later still. The operator sees a file that looks like it starts a job | Low | Open — check the four include filenames in `validateJob()` with `FileSystem.isFile(FileSystem.getFolderPath(getOutputPath()) + PATH_SEPARATOR + name)` so a typo refuses before any output. `getOutputPath()` is available in `onOpen()` | ⬜ |
+| **HB-8** | **`fOutput` and the word separator are set one way in `onOpen()` and are not covered by `resetPostState()`.** 1854-1856 rebuilds `fOutput` as `{force:true}` when `Enforce Feedrate` is on but has **no else branch** restoring `{force:false}`; 1862-1864 calls `setWordSeparator("")` when `Include Whitespace` is off and never restores `" "`. `resetPostState()` 1810-1830 exists precisely because the post does not want to rely on a fresh JavaScript context per output file, and it resets fourteen globals — these two were missed. Consequence within one Fusion session: post a file with `Enforce Feedrate` on, then a second with it off, and the second still carries a forced `F` on every move; same for whitespace. Output is a superset rather than wrong g-code, which is why it is quiet. Contrast `gMotionModal`, whose `onOpen()` conditional assigns on **both** branches and so does not leak | Low | Open — make both unconditional: `fOutput = createVariable({force: getProperty(properties.feedsEnforceFeedrate)}, fFormat)` and `setWordSeparator(getProperty(properties.jobSeparateWordsWithSpace) ? " " : "")` | ⬜ |
+| **HB-9** | **`Comment Level` = `Off` suppresses every `>>> WARNING:` the post writes, including those with no Fusion-dialog twin.** `writeComment()` 3548-3559 gates on level, and every in-file warning is `Important`. Several have a `validateJob()` sibling and survive; these do not: the jet-tool / tool-0 `Z0 was NOT established` warning (3540), `No matching Coolant channel : <mode> requested` (1400), and HB-3's `nothing was homed`. A tool carrying a Fusion coolant mode no channel is configured for is the ordinary group-10 case — the post correctly emits no coolant code, but at `Off` it also says nothing about having ignored the request | Low | Open — either give the warnings without a dialog twin a `warning()` call, or emit `>>> WARNING:` lines unconditionally regardless of level. The second is the smaller change and matches what an operator expects `Off` to mean (less commentary, not fewer warnings) | ⬜ |
+| **HB-10** | **`Tool Change Probe` (`includeProbeFile`) is a dialog field that does nothing.** Declared at 654-662 with a title and tooltip; nothing in the post calls `loadFile()` with it, so a filename entered here is silently ignored. The tooltip does say `NOT IMPLEMENTED YET`. *Pre-seeded — named in the checkpoint before this pass began, not an independent find; recorded so the fresh register is not missing a known group-8 defect* | Low | Open — wire it into `probeTool()` or delete the property. It belongs to the tool-change branch's ordering work either way | ⬜ |
 
 ---
 
-## Test register — 90 rows
+## Test register — 12 rows
 
-**✅ 70 PASS · ❌ 0 FAIL · ⬜ 8 UNRUN · ➖ 12 n/a — 90 rows.** Complete by construction: every `H`/`HR`/`HW`
-id **in this file's findings table** has a row. **A finding that moves to `PReview.md` takes its rows with
-it and leaves nothing behind** — no stub, no pointer — so `PReview.md` §3 is the one place a professional
-row is stated. `CR-` ids are exempt — most are cosmetic or by-design closures that were never separate
-tests. `docs/check-docs.js` enforces the tally, the completeness and the exemption.
+Every finding resolves to a row. All rows are **unrun**: they are written to be posted from Fusion
+after the fix lands, and each states what must be **present** and what must be **absent** in the
+file. Personas are `conventions.md` → *How to run a test*; defaults are GRBL/mm, `Comment Level`
+`Info`, unless the Setup delta says otherwise.
 
-| Test | Proves | Setup (delta from defaults) | Expect — *discriminator in bold* | Method | Evidence | State |
-|---|---|---|---|---|---|---|
-| **H1** | `Jog to X0 Y0, Probe Z0` | First = `Jog to X0 Y0, Probe Z0` | `M0 (MSG Jog to X0 Y0 above Z0, probe)` → `G10 L20 P1 X0 Y0 Z0` → `G38.2 F30 Z-10` → `G10 L20 P1 Z0.8` → `G0 Z5.08` | posted | `H1.gcode` | ✅ |
-| **H2** | Default mode, the whole hobbyist path | all defaults | no jog prompt; origin write → probe → `G10 L20 P1 Z0.8` | posted | `H2.gcode` — **retired as a baseline** (pre-HR-17); use `H11c` | ✅ |
-| **H3** | `Jog to X0 Y0 Z0` | First = `Jog to X0 Y0 Z0` | jog `M0` → `G10 L20 P1 X0 Y0 Z0`; **no `G38.2`** | posted | `H3.gcode` | ✅ |
-| **H4** | `Set X0 Y0 Z0 to Current Pos` | First = that | `G10 L20 P1 X0 Y0 Z0`; **no prompt, no probe** | posted | `H4.gcode` | ✅ |
-| **H5** | `Use Active WCS X0 Y0 Z0` | First = that | `G0 Z5.08` → `G0 X0 Y0`; **no origin write** | posted | `H5.gcode` | ✅ |
-| **H6** | Marlin + RRF variants of H1 | H1 + firmware Marlin, then RepRap | `; …` comments; Marlin `G92`; RRF `G54` + `G10 L20 P1` + `M291 … S3 X1 Y1 Z1`. **No multi-WCS warning** on a single-op Marlin job | posted | `H6 - Marlin.gcode`, `H6 - RRF.gcode` | ✅ |
-| **H7** | `Use Active WCS X0 Y0, Probe Z0` | First = that | **absence of `G10 L20 P1 X0 Y0`** — the only `P1` write is the probe's `Z0.8` | posted | `H7.gcode`, `H7a.gcode` | ✅ |
-| **HR-1 (A)** | Provisional `Z0` on the default mode | all defaults | `( Provisional Z0 at the current height …)` → `G10 L20 P1 X0 Y0 **Z0**` before `G38.2` | posted | `H2.gcode` | ✅ |
-| **HR-1 (B)** | Same on the jog mode | H1 config | identical, after the jog `M0` | posted | `HR1b.gcode` | ✅ |
-| **HR-1 (C)** | **Absent** on `Use Active WCS` — the scope claim | H7 config | no provisional `Z0`, no comment; **motion byte-identical** to the pre-HR-1 reference | posted | `HR1c.gcode` vs `H7c-a.gcode` | ✅ |
-| **HR-1 (E)** | Both firmwares, both origin modes | Marlin + RRF, default and jog | the `Z0` word present on the pre-probe origin write in **all four** files | posted | `H11a`, `H11b - RRF`, both `H6` | ✅ |
-| **HR-2 (A)** | A drill posts at all | CAM = peck drill | **a file exists and reaches `( *** STOP end ***)`**; no `G81`/`G82`/`G83`/`G73` anywhere | posted | `Drill_Tap.gcode` | ✅ |
-| **HR-2 (A2)** | Tapping warning per occurrence | CAM = drill + tap, 4 holes | **8** warnings, single-spaced | posted | `Drill_Tap.gcode` | ✅ |
-| **HR-2 (B)** | Probing cycles still refused | — | not creatable — needs the Machining Extension | — | licence | ➖ |
-| **HR-2 (U)** | `isProbeOperation()` over 8 inputs | node | `probe`, `probing-*` → true; `drilling`/`tapping`/`boring`/absent → false | harness | node | ✅ |
-| **HR-3 (A)** | GRBL prompts spindle OFF | all defaults | `M0 (MSG Turn OFF spindle)` present; **no `M5`, no `M300` anywhere** | posted | `H2.gcode` — ⚠ order restated by CR-6 | ✅ |
-| **HR-3 (B)** | Automatic branch untouched | `Manual Spindle On/Off` = **false** | `M3 S<n>` at start, `M5` in the stop block, **no prompts anywhere** | posted | `HR3b.gcode`, `Face1 (auto).gcode` | ✅ |
-| **HR-3 (D)** | Marlin/RRF unchanged; only GRBL moved | Marlin + RRF | `M300 S300 P3000` then the prompt; **no bare `M5` in any of the six files** | posted | six session-1 files | ✅ |
-| **HR-4 (A)** | Inch: bare-number probe Safe Z converts | **inch**, `06` Safe Z = `20` | `G0 **Z0.7874**`, not `Z20` | posted | `H4a - GRBL Inch.gcode` — ⚠ comment reformatted by CR-17a | ✅ |
-| **HR-4 (B)** | mm: identity, no reference invalidated | mm, `06` Safe Z = `20` | differs from `H11c` in **5 lines only**; `G0 Z20` | posted | `H4b - GRBL.gcode` | ✅ |
-| **HR-4 (C1)** | Inch: the mapper's threshold converts | inch, group 03 all on, Map Safe Z = `20` | `( SafeZ using const: 0.7874…)` — pre-fix it read `20` | posted | `H4c - GRBL Inch.gcode` | ✅ |
-| **HR-4 (C2)** | The mapper then actually converts | `Personal.cps`, group 03 on | conversions fire at the 5.08 threshold | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
-| **HR-4 (D)** | Header never mixes mm and inch | inch, all defaults | both Safe-Z lines read `fallback 0.5906, resolves to 0.2`, beside `Inter Part Safe Z … = 1.5748` | posted | `H4base - GRBL Inch.gcode` | ✅ |
-| **HR-4 (U)** | 5 expression forms × 2 units | node | `Retract:15` abs → `5`/`0.2`; relative or absent → `15`/`0.5906`; `20` → `20`/`0.7874`; malformed → `15`/`0.5906` | harness | node | ✅ |
-| **HR-5 (A)** | Arcs capped at the plane's axis limits | face-mill CAM, `Scale Feedrate` on, 900/180/1000 | every `G17` arc **`F900`**, matching the `G1`s either side | posted | `HR5a.gcode` | ✅ |
-| **HR-5 (B)** | Unscaled baseline | same, scaling **off** | arcs at Fusion's raw `F2667`/`F1016` | posted | `HR5b.gcode` | ✅ |
-| **HR-5 (C)** | `Max Toolpath Speed` caps arcs too | + Max Toolpath Speed = `500` | the same arcs and lines read **`F500`** | posted | `HR5c.gcode` | ✅ |
-| **HR-5 (D)** | Non-XY (`G18`) arc limited by the slower axis | same job — a face mill's helical lead-in *is* a ZX arc | `G18 G3 X… Z… I… **F180**` | posted | `HR5a.gcode`, `H11c - GRBL.gcode` | ✅ |
-| **HR-5 (E)** | Marlin: linearized segments limited like any `G1` | Marlin, `Scale Feedrate` on | **no** cut move exceeds an axis limit; 122 do in the scaling-off file | posted | `H5d - Marlin.gcode` vs `H11a.gcode` | ✅ |
-| **HR-6 (A)** | The guard is live, not failing open | Comment Level **Debug** | `( onSection orientation: forward X0 Y0 Z1, tilt … 0 deg -> upright, section allowed)`. **`UNREADABLE` would mean the guard is dead code** | posted | `H2 - Debug.gcode` | ✅ |
-| **HR-6 (B)** | An off-axis section is actually rejected | node, 13 forward vectors | ≤0.001° allowed; 0.01°/1°/45°/90°/180° **REJECTED**; missing/`NaN`/string components allowed; **nothing throws** | harness + read | node. ⚠ **residual: needs a rotated Setup** — Fusion may re-express `forward` as `Z1` anyway, making the guard a no-op on the case it exists to catch | ✅ |
-| **HR-11 (A)** | Marlin: `M84 S60`, no `M2` | Marlin, defaults | tail `M400` → `M117 Job end` → `M84 **S60**`; **no `M2` anywhere**. `M84 S0` still once, at the top | posted | `H11a.gcode` | ✅ |
-| **HR-11 (B)** | RepRap: `M2` after `M84 S60` | RepRap, defaults | identical tail **plus `M2`**. Present here / absent in (A) is the discriminator | posted | `H11b - RRF.gcode` | ✅ |
-| **HR-11 (C)** | GRBL tail untouched | defaults | `M0 (MSG Turn OFF spindle)` … `M30` → `%`; **no `M84` at all**, no `M2` | posted | `H11c - GRBL.gcode` — ⚠ order restated by CR-6 | ✅ |
-| **HR-11 (D)** | Stop file bypasses the whole stop block | Marlin + `includeStopFile` = `Stop File.gcode` | `M117 Job end`, `M84 S60`, `M2`, `M30` and `*** STOP end ***` **all absent** | posted | `H11d - Marlin.gcode` | ✅ |
-| **HR-11 (S)** | Whether Marlin / RRF honour `M2` | firmware source | Marlin: never implemented (`gcode.cpp` has no `case 2`). RRF: since 3.5.1, runs `stop.g` | source | `gcode.cpp`, `GCodes2.cpp`, RRF changelog | ✅ |
-| **HR-12 (A)** | Prompt on an RPM change between operations | 2-op 1-tool CAM, 12000 → 10000 | `Turn ON 12000 RPM` then `( >>> Spindle Speed: Manual change)` → **`M0 (MSG Set spindle to 10000 RPM clockwise)`** | posted | `Speed Change.gcode` vs `Link.gcode` | ✅ |
-| **HR-12 (A2)** | Two operations at the *same* RPM → one prompt | same CAM, op 2 also 12000 | **one** prompt, no `Manual change` line. Only meaningful posted beside (A) | posted | `Speed Change (No Change).gcode` | ✅ |
-| **HR-12 (A3)** | Every tapping reversal announced | drill + tap CAM, defaults | **9 prompts total**, 8 in the tap section, strictly alternating from `clockwise`. **12 direction commands but only 8 prompts** — the post prompts on *changes*, not commands | posted | `Drill_Tap.gcode` | ✅ |
-| **HR-12 (A4)** | A counterclockwise start names the direction | needs a left-hand tap / CCW tool | `M0 (MSG Turn ON <n> RPM counterclockwise)` | read | 4-hop chain, no branch drops it. ⚠ **artifact does not exist** | ✅ |
-| **HR-12 (A5)** | A clockwise start is unchanged | any single-op manual job | `Turn ON <n> RPM` with **no direction word**, byte-identical across the fix | posted | `Speed Change.gcode` | ✅ |
-| **HR-14 (A)** | `Flood and Mist` matches a channel | drill CAM; tool coolant *Flood and mist*, Ch A Mode = **Flood and Mist** | `( >>> Coolant Channel A: Flood and Mist)` → `M7`, `M9` at the end, **no warning** | posted | `Drill Flood Mist.gcode` | ✅ |
-| **HR-14 (B)** | The warning names the mode the operator saw | same, Ch A Mode = **Off** | `( >>> WARNING: No matching Coolant channel : **Flood and Mist** requested)` — not `FloodMist`, not `unknown` | posted | `Drill Flood Mist (No).gcode` | ✅ |
-| **HR-14 (C)** | Ordinary `Flood` unchanged | tool Flood, Ch A Flood | `Channel A: Flood` → `M7` → `M9`, no warning | posted | `Drill Flood.gcode` | ✅ |
-| **HR-14 (D)** | Channel B, and selection is per-channel | tool Mist; Ch A Flood + Ch B Mist, then Ch B Off | B lights (`M8`) or warns; **A stays silent both times — no `M7`** | posted | `Drill Mist.gcode`, `Drill Mist (no Mist).gcode` | ✅ |
-| **HR-14 (U)** | All 9 coolant indices, before and after | node | **7/9 → 9/9** matching | harness | node | ✅ |
-| **HR-15 (A)** | Mapping-on changes nothing but one comment | group 03 all **on** | vs `H11c`: **5 lines** differ — timestamp, 3 property values, 1 added comment. No motion | posted | `H15a - GRBL.gcode` | ✅ |
-| **HR-15 (B)** | The level branch is taken, not the fallback | same | that added line is **`( SafeZ retract level: 5.08)`**, not `not defined` | posted | `H15a - GRBL.gcode` | ✅ |
-| **HR-16** | `onClose` traverse ordering | — | spindle-order half fixed (CR-6); Z half → `PReview.md` §5 | — | — | ➖ |
-| **HR-17 (A)** | Property heading no longer double-spaced | any post | `Properties -- 3 - Map G1s to Rapids - disable when using full license:` — the **single space** is the assertion. The evidence files read `03 -`: the `0` left with the `groupDefinitions` move, which re-baselines under `PReview.md` **D5** | posted | six session-1 files vs `H2.gcode` | ✅ |
-| **HR-17 (B)** | Spindle prompt reads `… RPM` | any manual-spindle post | `Turn ON 7000 RPM` — the **space** is the assertion | posted | same | ✅ |
-| **HR-17 (C)** | Tapping warning single-spaced | tap CAM | no match for `synchronization  rigid`, `tapping  is` or `WARNING:  ` | posted | `Drill_Tap.gcode` | ✅ |
-| **HR-17 (D)** | The two inert tidy-ups changed nothing | defaults | `H11c` vs `H2` differs in **4 lines**; no motion, feed or ordering | posted | `H11c - GRBL.gcode` vs `H2.gcode` | ✅ |
-| **HR-17 (U)** | Sanitizer before/after over 4 input shapes | node | interior doubles gone; leading/trailing whitespace byte-identical | harness | node | ✅ |
-| **HR-18 (A)** | Stop include: the next block is not merged | Marlin + a stop include whose **last byte is not a newline**, Comment Level **`Important`** | last block and `M400` on **separate lines**. On GRBL the merge is `M5%`, not `M5M400` — `flushMotions()` returns early there | read | ⚠ needs a post; `Stop File.gcode` already qualifies | ✅ |
-| **HR-18 (B)** | Start include: the origin write is not merged | Start include, Comment Level **`Important`** | the include's last block and `G10 L20 P1 X0 Y0 Z0` on **separate lines**. Worse than (A) — it destroys the origin write | read | ⚠ needs a post | ✅ |
-| **HR-18 (U)** | The guard over 6 file endings × 3 comment levels | node | **4 merged blocks → 0**. Terminated files byte-identical. The two `Info` "ok"s pre-fix are the finding in miniature | harness | node | ✅ |
-| **HR-19** | `M291` doubled space; `()` vs `( )` | — | `()` closed by design; `M291` space open, next sweep | — | — | ➖ |
-| **HR-21** | `includeProbeFile` is dead | — | tooltip declares it; wiring undecided | — | — | ➖ |
-| **HR-22 (A)** | An empty include announces itself | a zero-byte include file, Comment Level `Info` | `( --- Custom gcode file is empty, nothing included <path>)`; **absent above `Info`** | harness | node | ✅ |
-| **HR-22 (B)** | An empty Start include leaves no preamble | — | **closed as by design** — the include owns the phase (CR-7) | read | — | ✅ |
-| **HW-1** | `isSafeToRapid()`'s three conversion branches | `Personal.cps`, group 03 all on, Map Safe Z = `Retract:15` then `15` | **74 conversions → 2** on identical geometry; all three cases fire at 5.08; **all 17,779 genuine cut moves stay `G1`**. Traps: `grep -c '^G0'` under-counts (modal suppression) | harness | `Link-5-GRBL`, `Link-15-GRBL` | ✅ |
-| **HW-2 (A)** | HP-5 section boundary: WCS suppression, rapid lifecycle, tracking | 2 ops, 1 tool, 1 WCS, no base | **one `G54` in the whole file**; `( WCS unchanged: 1, not re-selecting)` at section 2; `resetAll()` makes section 2 re-emit full coordinates | posted | `Link.gcode` | ✅ |
-| **HW-2 (B)** | HP-5 boundary: a spindle-speed change | same CAM, `Manual Spindle On/Off` = **false** | `M3 S12000` then `M3 S10000` — two `M3`s, different speeds | posted | ⚠ **file overwritten** — re-post as `HR12-auto - GRBL.gcode` | ✅ |
-| **HW-3** | `Probe Pause = No` | `probePause` = `No` | **neither** prompt. vs `HW4` the diff is exactly **2 lines** | posted | `HW3 - GRBL.gcode` vs `H11c` | ✅ |
-| **HW-4** | `Probe Pause = Before` | `probePause` = `Before` | attach only. The three-rung ladder `H11c`→`HW4`→`HW3` is the result, not any one file | posted | `HW4 - GRBL.gcode` | ✅ |
-| **HW-5** | The HP-1 baseline in one file | `Scale Feedrate` = **true**, on top of HW-4's `Probe Pause` = `Before` — the ladder carries it, so **`HW5` is not a factory-default post** and must not be cited as one | vs `HW4`: timestamp, that property, and **feedrates only** — XY cuts/arcs → `F900`, plunges and `G18` arcs → `F180`. No motion, no block added | posted | `HW5 - GRBL.gcode` | ✅ |
-| **HW-6 (A)** | Static regression sweep | `git diff dd8e11d..HEAD` + 3 harnesses + property structure | surface = `loadFile()` + one dialog-only title; 68 properties, no duplicate keys, all 67 `getProperty()` refs resolve | harness + read | node, git | ✅ |
-| **HW-6 (B)** | Posted regression sweep | the six posts below | byte-identical modulo timestamp except posts 5–6 | read | ⚠ **the release sweep rests on no posted file** | ✅ |
-| **HR-23** | An include replaces the phase it names | Marlin + stop include, vs the same job without | coolant off, `G0 X0 Y0`, the spindle prompt, `M84 S60` and the program end **all absent** — **as designed** | posted | `H11d - Marlin.gcode` vs `H11a.gcode` | ✅ |
-| **HR-24** | `writeWCS()` consults the global `tool` | — | latent — both callers pass `currentSection`; next sweep | read | — | ➖ |
-| **HR-25** | `wcsGcode(0)` yields `G53` | — | **closed as by design** (CR-17d) | read | — | ✅ |
-| **CR-REG** | The 14 fixes leave a factory-default job **otherwise unchanged** | GRBL/mm, Comment Level `Info`, all defaults, single operation | `M0 (MSG Turn OFF spindle)` **precedes** `G0 X0 Y0`; the probe comment reads **`Retract the tool to 5.08`**, not `5.080000000000001`. **The header dump is no longer the invariant it was** — the machine-frame work adds four properties, removes one and retitles two groups, so the assertion is now *the dump changes only in those places*, and **no motion, command or non-dump comment moves at all** except **two** Resolved-Values changes: `Reserved base WCS = None` → `Fixed Z reference = None`, **and the `Inter Part Safe Z in output units = 40` line gone** — `spoilboardTravelZ` now defaults empty, and PR-5 emits that line only under a non-`None` answer. Both are visible in `HR-33 (A).gcode`; `PReview.md` REG-MF's long form already named the second and **this row did not**, which would have read as a failure that was the register's own error | posted | — **owed** | ⬜ |
-| **CR-1 (A)** | `$H` survives line numbering | GRBL, `Axes Homed and Trusted` = **`XY Only`** + `Home at Job Start` = **`Home`**, `Enable Line #s` **on** | **`$H` on its own line with no `N` prefix**, while every surrounding block carries one. No configuration in the record has ever combined homing with line numbers — which is why it shipped broken | posted | — **owed** | ⬜ |
-| **CR-2 (A)** | The homing / `Current Pos` warning fires, and the job still posts | `Home at Job Start` = `Home` (and again `Pause, then Home`) + a `Set … to Current Pos` origin mode | the warning names the control by its exact dialog title and now **recommends `Use Active WCS X0 Y0, Probe Z0`**; **the file still posts**. Negative half: a default job with the action **off** produces no warning | posted | — **owed** | ⬜ |
-| **HR-28 (A)** | A `Jog to …` mode on GRBL says so, twice | GRBL, First WCS / Part = `Jog to X0 Y0 Z0` | Fusion shows the post-time `warning()`, **and** the file carries `( >>> WARNING: jogging at this pause is not supported on GRBL …)` immediately **above** the `M0 (MSG Jog to X0 Y0 Z0, then continue)`. *Discriminator: the comment survives at Comment Level `Important`, and the `M0` is unchanged — this gates, it does not delete.* Negative half, and it is the half that proves the gate: the same job on **RepRap** emits `M291 … S3 X1 Y1 Z1` with **no warning of either kind** | posted | — **owed** | ⬜ |
-| **CR-10 (A)** | GRBL laser mode formats its M-code as a number | group 09 on, GRBL, a laser operation | a real M-code number, **never `M NaN`**. Group 09 has never appeared in any posted file — see `PReview.md` **J4**, which this post also serves | posted | — **owed** | ⬜ |
-| **HR-29** | The corrected group-4 title | — | → `PReview.md` **D1** — a title exists only in the dialog; the header dump prints keys and values, so no posted file can show it | — | — | ➖ |
-| **HR-30** | The seven corrected descriptions | — | → `PReview.md` **D1**, same reason. Descriptions are never emitted at all | — | — | ➖ |
-| **HR-31** | The eleven rewritten descriptions read at the right altitude | — | → `PReview.md` **D1**, extended to read each leading sentence on its own. The claim is *the first sentence answers it*, which no posted file can show | — | — | ➖ |
-| **HR-39 (A)** | Whether a **full licence** ever converts a real move at a lowered threshold | Full licence, GRBL/mm, group 3 all on, **`Map: Safe Z to Rapid` = `Feed:0`**, a multi-pass pocket with *keep tool down* linking | Either **`( Safe G1 --> G0)` appears** — the conversion is reachable on a paid licence and the guides must say so outright — or it does not, and the claim narrows to *Fusion emits no qualifying `onLinear`*, which is then evidence rather than inference. **Both outcomes settle it**; today neither is evidenced. Negative half already held: at the default `Retract:15`, **HR-15 (A)** shows 1 comment and no motion | posted | — **owed** | ⬜ |
-| **HR-38** | Group 8's four descriptions state their contract | — | → `PReview.md` **D1**. The REPLACE contract itself is already proven by **HR-23** and **HR-11 (D)**; what is new here is only that the dialog says so | — | — | ➖ |
-| **HR-35** | The touch-plate precondition leads `probeOnStart` | — | → `PReview.md` **D1**'s leading-sentence pass. The default itself is unchanged, so every existing default-job row still stands as posted | — | — | ➖ |
-| **HR-36** | Group 3's four defaults are still off | — | read off **HR-33 (A)**'s dump: `mapRapidsRestoreFirstRapids = false`, `mapRapidsRestoreRapids = false`, `mapRapidsSafeZ = Retract:15`, `mapRapidsAllowRapidZ = false`. No separate artifact — the assertion is what a factory-default post prints | posted | `HR-33 (A).gcode` | ✅ |
-| **HR-37** | The tool-change default and the persona note | — | Nothing to run — no code changed. CR-3's warning is the behaviour, and it is already covered | — | — | ➖ |
-| **HR-34 (A)** | A job that lights a channel gets codes its firmware speaks | GRBL, `Channel A Mode` = `Flood`, tool coolant Flood | `M8` on, `M9` off — **no `M42` anywhere in the file** | posted | — **owed** | ⬜ |
-| **HR-34 (B)** | The coolant default change costs the default job nothing | all defaults | the four dump lines read `M8` / `M9` / `M7` / `M9` and both Mode fields read `Off`, and **no `M7`, `M8`, `M9` or `M42` appears anywhere below the header** — the tail's `( COMMAND_COOLANT_OFF)` is a bare comment. *Discriminator is the absence: no coolant code is reached, so which dialect the defaults name cannot matter to this job.* Byte-identity against the pre-HR-34 build was not readable — same substituted baseline as **HR-33 (A)** — but the substantive claim is direct | posted | `HR-33 (A).gcode` | ✅ |
-| **HR-33 (A)** | `Scale Feedrate` on by default changes feedrates and nothing else | GRBL/mm, all defaults, HW-5's CAM — `Setup1` / `Face1`, one operation, T171 face mill at 7000 RPM, CAM feeds cut 2667 / ramp 1016 / plunge 339 | **12 × `F900`** on the XY cuts and `G17` arcs, **6 × `F180`** on the plunges and `G18` arcs, with `F2500` / `F300` / `F30` travel and probe feeds untouched — line for line what **HW-5** got by setting the property *by hand*. *Discriminator: not one feedrate line differs from `HW5`.* **This is HW-5 inverted**: what was a setup delta is now the default. **Baseline substituted** — the row asked for a re-post of the pre-`20392c5` build, and `HW5` stood in, so the *"no change beyond the one property-dump line"* clause is **not readable from this diff** (the whole machine-frame rework sits between the two files) and the unscaled half of the ladder rests on **HW-4** ✅. The CAM's feeds must exceed 900 / 180 or the scaler clamps nothing and the row proves nothing | posted | `HR-33 (A).gcode` vs `HW5 - GRBL.gcode` | ✅ |
-| **HR-32** | The two retitled groups carry their skip signal | — | → `PReview.md` **D1** / **D3** / **D5**, all three restated against the new titles. **D5 is the one that would catch a mistake**: the header dump prints group titles, so a retitle that broke `order:` shows there | — | — | ➖ |
-| **HR-27** | A geometry-rejected job writes **no file at all** | **(a)** a Setup built on a tilted model face, GRBL/mm defaults; **(b)** the same job on an upright Setup | **(a)** the post `error()`s and **no `.gcode` exists on disk** — the discriminator is the *absence of the output file*, not its contents. Today the guard fires in `onSection()` and leaves a **truncated** file ending mid-toolpath, which is the pre-fix discriminator and must stop appearing. **(b)** posts normally and completely, proving the promotion into `validateJob()` did not reject a job it should accept. Shares HR-6 (B)'s dependency — it needs the same rotated Setup, and if Fusion re-expresses `forward` as `Z1` then branch (a) is unreachable and that is itself the HR-6 (B) answer | posted | — **owed** | ⬜ |
+**✅ 0 PASS · ❌ 0 FAIL · ⬜ 10 UNRUN · ➖ 2 n/a — 12 rows.**
 
----
+| Test | Proves | Setup | Method | State |
+|---|---|---|---|---|
+| **HB-1 (A)** | Retired with HB-1 — no warning is being added, so there is nothing to post | — | — | ➖ |
+| **HB-1 (B)** | Retired with HB-1 | — | — | ➖ |
+| **HB-2 (A)** | No GRBL file carries a `%` line | HP-1, unchanged defaults | posted | ⬜ |
+| **HB-2 (B)** | Presence sibling for (A): the file's own first and last lines are intact, so (A) is not passing on an empty or truncated file | HP-1, unchanged defaults — same post as (A) | posted | ⬜ |
+| **HB-3 (A)** | The unsatisfiable group-4 combination is refused at the dialog, not only in the file | HP-1 + `Home at Job Start` = `Home`, `Axes Homed and Trusted` left at `None` | posted | ⬜ |
+| **HB-3 (B)** | The warning does not fire on the legitimate configuration | HP-1 + `Home at Job Start` = `Home`, `Axes Homed and Trusted` = `XY Only` | posted | ⬜ |
+| **HB-4 (A)** | The offset probe traverse happens at a known height | HP-1 + `Probe X Offset` = `25` | posted | ⬜ |
+| **HB-4 (B)** | Absence sibling: a zero-offset job emits no extra lift, so (A)'s new block is attributable to the offset | HP-1, unchanged defaults | posted | ⬜ |
+| **HB-5 (A)** | A malformed probe `Safe Z` is loud | HP-1 + group-6 `Safe Z` = `15mm` | posted | ⬜ |
+| **HB-6 (A)** | RepRap files set the plane and the feed mode | HP-1 on RepRap, `Use Arcs` on, a Setup containing at least one XY fillet | posted | ⬜ |
+| **HB-7 (A)** | A mistyped include filename refuses before any output | HP-1 + `Start GCode File` = `no_such_file.g` | posted | ⬜ |
+| **HB-8 (A)** | The two one-way settings survive a second post in the same Fusion session | HP-1 posted twice without restarting Fusion: first with `Enforce Feedrate` on and `Include Whitespace` off, then with `Enforce Feedrate` off and `Include Whitespace` on | posted | ⬜ |
 
-## Invalidated by the 2026-08-01 code-review fixes
+### Expects
 
-The `CR-` pass landed 14 fixes at `c73726c`. Assertions below still hold; **the quoted token
-*sequences* do not.** Re-baseline when the affected rows are next posted.
+Where the discriminator needs more than a table cell.
 
-| Row | What moved | Was | Now |
-|---|---|---|---|
-| **every posted file in this register predating `20392c5`** | **HR-33** turned `Scale Feedrate` on by default (2026-08-07) | every reference file but `HR5a/c`, `H5d` and `HW-5` was posted with scaling **off**, so it carries Fusion's raw feedrates | a re-post at defaults carries **scaled** feedrates. **Only the `F` words move** — no assertion in any row is about a feedrate except HR-5's and HW-5's, and those set the property explicitly. **HW-5's half is discharged**: `HR-33 (A)` posted that CAM at the new default and matched `HW5` feedrate for feedrate, so `Scale Feedrate = true` is no longer a delta and **HR-5 (B)**'s *"same, scaling off"* is now the delta rather than the baseline. **The rest stands.** `HR-33 (A)` re-posted **one CAM, not the register** — `H11c`, `H2`, `Drill_Tap`, `Link` and the others still carry raw feedrates. Retire this row **per file as each is re-posted**, not on any single post |
-| **HR-3 (A)**, **HR-11 (C)** | CR-6 reordered `onClose()` | coolant off → `X0 Y0` → spindle off | coolant off → **spindle off** → `X0 Y0`. The `M5`/`M300` absences and `M30` are unaffected |
-| **HR-11 (A)(B)**, **HR-23** | same | `X0 Y0 F2500` before the prompt | after it. `M400`/`M117`/`M84 S60`/`M2` order unchanged |
-| **HR-4 (A)** | CR-17a formatted the retract comment | `Retract the tool to 0.7874015748031497` | `Retract the tool to 0.7874` |
-| **HR-15 (A)**, **HR-17 (D)**, **HR-4 (B)**, **HW-3/4/5** | the "differs in N lines" diffs are between two files from the *same* build | — | still valid as historical evidence; a **re-post** shifts the `X0 Y0` line |
-| **all rows** | CR-13 (`resetPostState()`), CR-14 (properties reorder) | — | **no output change expected** — the property dump is sorted by the post, so the reorder is dialog-only. Any diff here is a defect in the fix |
-
----
-
-## Checked and found correct
-
-Recorded so a later pass can tell *"looked at, fine"* from *"never looked at"*. All of it by reading
-control flow against the API — **no posted file was consulted**, which makes every line here weaker than
-a `posted` row and stronger than nothing.
-
-| Area | Verdict |
-|---|---|
-| **The default single-op job, all three firmwares** | Phase order is right where it matters: `writeWCS()` emits `G54` **before** any origin write, so the origin cannot land on a WCS a previous job left active; `Start()` sets `G90`/`G21` before the base establish and the probe; the provisional `Z0` precedes the `G38.2`; probe and prompts run with the spindle **off** |
-| **Multi-op, single WCS** (the common Personal-licence job) | Section 2+ short-circuits on `workOffset == currentWorkOffset` — no spurious retract, re-probe or re-select. Two Setups both left at Fusion's default offset `0` alias to `1` consistently in both `collectDistinctOffsets()` and `writeWCS()` |
-| **Guard reachability from hobbyist settings** | Guard B exempts the single-WCS job, so default `Retract Across Parts = on` with no base does **not** fire; Guard C's Marlin check runs before the base logic; Guard A is unreachable with no base. All three run in `onOpen()`, so a rejected job writes no file |
-| **Units** | Every dialog dimension is converted by `propertyMmToUnit()` before being emitted or compared; F360 level values arrive in the output unit already and are correctly **not** converted |
-| **Safe-Z expression parsing** | `parseSafeZExpr()` handles a bare number and all three `Feed:`/`Retract:`/`Clearance:` forms and falls to `ERROR` (15 mm fallback + warning) for anything else; every level path asks the **passed** section, not the global |
-| **The G1→G0 mapper's move ordering** | Safe despite the untracked position: the only post-injected motion before the first section body is the probe retract, which leaves the tool *higher* than the kernel believes, so `rapidMovements()` errs toward Z-first. The general defect is real and professional-scoped — `PReview.md` **HR-8**, which cites this row |
-| **Feed handling** | `G0` blocks carry their travel `F` through the same `fOutput` the cut moves use (the one exception is CR-12); `limitArcFeed()` caps against the axes the arc actually sweeps; both limiters return the feed untouched when `Scale Feedrate` is off |
-| **Canned cycles** | Expansion is the only correct choice on all three firmwares — derivation in `design.md` → *Firmware capabilities*. `isProbeOperation()` is defined locally rather than depending on the kernel supplying one |
-| **Early rejections** | Multi-axis (`onSection`, with `onRapid5D`/`onLinear5D` as a backstop) and `onRadiusCompensation` both `error()` with actionable text; the off-axis Setup guard fails **open**, the right bias for a check whose false positive would abort every job |
-| **Comment levels** | Behaviourally inert — no control flow depends on a comment being emitted. `loadFile()`'s trailing-newline repair is independent of the surrounding `Info` markers, which is why it works at `Important` and `Off` |
-| **`Include Whitespace = off`** | Valid blocks everywhere — `askUser()` and `display_text()` prepend their own separator, and the concatenated forms (`G10L20P1X0Y0Z0`, `G38.2F30Z-10`) are accepted by all three parsers |
-| **Coolant channel bookkeeping** | `setCoolant()` turns both channels off before switching, warns when a tool requests a coolant no channel is configured for, and derives `coolantLevels` from `eCoolant` so the numeric index and the enum ids cannot drift apart |
-| **Property structure** | 69 properties across 11 groups — 8/7/4/3/5/10/8/5/7/10/2 (**recounted 2026-08-07**; three earlier tallies disagreed and all three were wrong) — every one carrying `scope: "post"`, a key that starts with its own group key, and an `order:` unique within that group. `writeAllProperties()` iterates the object rather than a hand-kept list and sorts on the same `order:` fields the dialog does, so dialog order and dump order are one number rather than two conventions that can disagree |
+- **HB-2 (A)** — the file's first character is `(`, not `%`, and `%` appears **nowhere** in it
+  (`grep -c '%'` = 0). `M30` is still the last g-code block. **(B)** — the first line is the
+  `generated-by` header comment and the last is `M30`, proving (A)'s absence is not an empty file.
+- **HB-3 (A)** — Fusion's post dialog carries the warning. The file still holds
+  `>>> WARNING: "Home at Job Start" is on but "Axises Homed and Trusted" is None`, and **no** `$H`.
+  **(B)** — no dialog warning, and `$H` present.
+- **HB-4 (A)** — between `G10 L20 P1 X0 Y0 Z0` and `G0 X25 Y0 F2500` there is an absolute
+  `G0 Z<probeSafeZ> F300`, in that order. **(B)** — no `G0 Z…` between the origin write and
+  `G38.2`, and no `X`/`Y` rapid at all (a zero-offset job emits neither).
+- **HB-5 (A)** — an `Important` `>>> WARNING:` naming the `Safe Z` title and the 15 mm fallback,
+  and the Resolved Values line reads `Probe SafeZ = Error = 15.000 …`. A dialog `warning()` too if
+  that route is taken.
+- **HB-6 (A)** — `G17` appears in the `*** START begin ***` block, before the first `G2`/`G3`;
+  `G94` likewise. Neither appears more than once (both are modal).
+- **HB-7 (A)** — Fusion reports the error and **no `.gcode` file is written at all**. This is the
+  discriminator: today's behaviour is a file containing the header, the property dump and `G54`.
+- **HB-8 (A)** — the second file has **no** `F` word on moves whose feed did not change, and
+  spaces between words. Read the property dump in each file first to confirm the dialog state
+  actually differed — the row is worthless if the second post reused the first's settings.
 
 ---
 
 ## Owed
 
-**Which of these to do next, and in what order, is the checkpoint's job — not this list's.** What
-follows is what the register itself owes: the specific artifacts, and why each one is worth a post.
+What this register still owes, and why each artifact is worth a post.
 
-1. **Six `read` rows want a post.** **One post settles three**: `Stop File.gcode` (last byte `e`, no
-   terminator) as the **Stop include** on the Marlin job at Comment Level **`Important`** → HR-18 (A),
-   HW-6 (B), and re-baselines `H11d`. Also owed: `HR12-auto - GRBL.gcode` (Link's CAM, `Manual Spindle
-   On/Off` = false) to restore HW-2 (B)'s overwritten file.
-2. **HR-6 (B) is the one residual that could still hide a real defect** — the orientation guard rejects a
-   tilted `workPlane.forward`, proven over 13 vectors by harness, but **nothing evidences what Fusion
-   actually puts in `forward` for a re-oriented Setup**. If Fusion re-expresses the frame so `forward`
-   stays `X0 Y0 Z1`, the guard is a no-op on exactly the case it exists to catch. No code reading can
-   settle it; it needs a rotated Setup. The failure mode is a **missed** rejection — a part cut in the
-   wrong plane, silently. **HR-27's row shares this dependency**, and the same post answers both.
-3. **The posted regression sweep**, if run: 1 `HW6a - GRBL` (defaults) ≡ `H11c` · 2 `HW6b - Marlin` ≡
-   `H11a` · 3 `HW6c - RRF` ≡ `H11b` · 4 `HW6d - GRBL Inch` ≡ `H4base` · 5 `HW6e - Marlin` + stop include
-   → one difference, `--- End custom gcode` on its own line · 6 `HW6f - Marlin` as 5 but as the **Start**
-   include at Comment Level `Important`. **Post 1 is the one to run if only one is run.** Posts 5–6
-   upgrade HR-18 (A)(B) from `read` to `posted`. *(All six now also carry CR-6's reordered tail.)*
-4. **Nine reference files predate HR-17** and would differ in two text respects if re-posted. No
-   assertion is invalidated — tidiness, not risk.
-5. **Owed to the user guides: nothing.** The single README was split into a landing page plus
-   `guide-hobbyist.md`, `guide-pro.md` and `property-reference.md` on 2026-08-07, and everything
-   HR-29 … HR-38 changed went in at the same time — the two group titles, the corrected 69-property
-   tables, both moved defaults, and group 8's REPLACE-versus-ADD contracts. The `doc-sync` marker
-   moved to `property-reference.md` and reads `17a20f2`, the last commit to touch the post.
-   Refresh from `git diff 17a20f2..HEAD -- MPCNC_v4.0_Beta2.cps` and re-bump when the post next
-   changes what it emits. **The guides are not touched during code changes.**
-
+- **Every live row above is unrun.** Nothing here is proved by a posted file yet; the findings are
+  proved by reading the post, and the firmware claims by firmware source, cited in each row.
+- **Two guard-placement rows are missing on purpose.** HB-7 is one instance of "an `error()` after
+  output has begun leaves a truncated file"; the geometry guards are another, and the general fix
+  is one piece of work rather than two. When it is scheduled, HB-7 (A) should be re-posted
+  alongside whatever row covers the geometry guards, from the same build.
+- **Groups 7, 9 and 11 were not walked.** A hobbyist doing a manual tool change on an MPCNC or
+  running a diode laser is an ordinary case, and neither is covered by any row here.
+- **The `Comment Level` = `Off` file has never been posted.** HB-9 was found by reading
+  `writeComment()`'s gate; a posted `Off` file would also settle whether anything else the review
+  assumed was visible actually disappears at that level.
