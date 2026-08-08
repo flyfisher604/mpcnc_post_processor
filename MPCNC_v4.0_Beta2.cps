@@ -1853,6 +1853,11 @@ function validateJob() {
 // file would open with spindleEnabled already true and never emit its "Turn ON ... RPM" prompt, or
 // with coolantChannelA still holding the previous job's coolant. Collected into one function so a
 // newly added global is reset by editing one place. See docs/HReview.md CR-13.
+//
+// Two mutable globals are deliberately NOT here: fOutput and gMotionModal are rebuilt from
+// properties in onOpen() rather than restored to a declared default, so their reset IS that
+// assignment. Both assign on every branch, which is what makes them leak-free (HB-8) -- they are not
+// a third pair that was missed.
 function resetPostState() {
   currentWorkOffset = undefined;          // no work offset emitted yet
   sequenceNumber = getProperty(properties.jobSequenceNumberStart);
@@ -1902,18 +1907,18 @@ function onOpen() {
     gMotionModal = createModal({ force: true }, gFormat); // modal group 1 // G0-G3, ...
   }
 
-  // Configure how the feedrate is formatted
-  if (getProperty(properties.feedsEnforceFeedrate)) {
-    fOutput = createVariable({ force: true }, fFormat);
-  }
+  // Configure how the feedrate is formatted. Assigned on BOTH answers, like gMotionModal above and
+  // for the same reason: onOpen() may run again in the same JavaScript context -- resetPostState()
+  // exists because this post does not assume otherwise -- and a one-way assignment leaks into the
+  // next file. Posting with "Enforce Feedrate" on and then off left every move in the second file
+  // carrying a forced F. { force: false } is the declaration's own value, not a guess.
+  fOutput = createVariable({ force: getProperty(properties.feedsEnforceFeedrate) }, fFormat);
 
   // (sequenceNumber and currentWorkOffset are initialised by resetPostState() above, with the
   // other module globals.)
 
-  // Set the seperator used between text
-  if (!getProperty(properties.jobSeparateWordsWithSpace)) {
-    setWordSeparator("");
-  }
+  // Set the separator used between words -- set on both answers, the same leak as fOutput above.
+  setWordSeparator(getProperty(properties.jobSeparateWordsWithSpace) ? " " : "");
 
   // Determine the safeZHeight to do rapids
   parseSafeZProperty();
