@@ -12,12 +12,13 @@ thing to change first if you think something new belongs here.
 
 *Written so a fresh session can resume with no other context. Update it when the situation moves.*
 
-**Baseline.** **`master`.** The three working branches the machine-frame rework was built on —
-`PropertyUpdate` → `machine-frame-design` → `Goto-0,0` — were a linear chain, so `master`
-fast-forwarded onto the tip and all three labels were deleted; every commit is retained and no merge
-commit was made. **`master` is 14 commits ahead of `origin/master` and nothing has been pushed.**
+**Baseline.** **`master`**, now carrying the `design.md` split. Four working branches have closed the same
+way — `PropertyUpdate` → `machine-frame-design` → `Goto-0,0` for the machine-frame rework, then
+`control-review` for the doc split: each a linear chain, so `master` fast-forwarded onto the tip and the
+label was deleted; every commit is retained and no merge commit was made. **`master` is 16 commits ahead
+of `origin/master` and nothing has been pushed.** Work continues on **`hobby-dialog-review`**.
 
-**What landed in those 14.** The property rework (`groupDefinitions`, explicit `order:`, the
+**What the machine-frame range landed.** The property rework (`groupDefinitions`, explicit `order:`, the
 `<groupKey><Name>` key rename), then the machine frame and the fixed Z reference — `PReview.md`
 **PR-1 · PR-2 · PR-3 · PR-5** and `HReview.md` **HR-28** — then **PR-6 · PR-7**: `At End Go to 0,0`
 never said *which* X0 Y0 and it was the last section's WCS, so it is now `At End Park At` = `Off` /
