@@ -7,9 +7,11 @@ A Fusion 360 post for GRBL / Marlin / RepRap hobby CNC. The deliverable is
 
 1. **`docs/plan.md` → *Checkpoint*** — always, first. The only place that says what is next.
    `/checkpoint` reads it and reports in ten lines.
-2. **`docs/conventions.md`** — when writing code. The models the code assumes, the guards, the property
-   and dialog rules, how to run a test, and the harness method and its hard-won lessons.
-3. **`docs/HReview.md` / `docs/PReview.md`** — only when a specific finding or test row is in play.
+2. **`docs/conventions.md`** — when writing code. The guards, the property and dialog rules, how to run
+   a test, and the harness method and its hard-won lessons.
+3. **`docs/design.md`** — only when changing frame, Z-reference or ordering behaviour. Why the post emits
+   what it does, and the firmware facts behind it.
+4. **`docs/HReview.md` / `docs/PReview.md`** — only when a specific finding or test row is in play.
 
 Do not read or search files under `./Test/` unless explicitly asked.
 

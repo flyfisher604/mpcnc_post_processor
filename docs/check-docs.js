@@ -32,6 +32,7 @@ var DOCS = {
   'CLAUDE.md': 'CLAUDE.md',
   'plan.md': 'docs/plan.md',
   'conventions.md': 'docs/conventions.md',
+  'design.md': 'docs/design.md',
   'HReview.md': 'docs/HReview.md',
   'PReview.md': 'docs/PReview.md',
   'README.md': 'README.md'

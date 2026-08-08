@@ -46,12 +46,12 @@ standing "Never `G53`" decision** (`PReview.md` §6): the post addresses the mac
 axes the operator declares.
 
 **Two things it deliberately did not do.** The **`G53` tool-change park** is `PReview.md` **PR-4** — it
-shares code with §2's Phase 4 reorder and must compose with that design, not pre-empt it. And **both
-review files now exceed their size budgets** (`conventions.md` 565/480, `PReview.md` 1051/920, both `WARN`
-not `FAIL`): a Rule-2 pass found nothing *live* had leaked in — the growth is new model, external firmware
-fact and seven landed findings — so the open question is whether to raise those two budgets in the
-contracts table or move content out (the `Reference — per-machine settings` table is the one section that
-fails `conventions.md`'s own admission test, and reads as README material).
+shares code with §2's Phase 4 reorder and must compose with that design, not pre-empt it. And
+**`PReview.md` is still over its size budget** (1102/920, `WARN` not `FAIL`): a Rule-2 pass found nothing
+*live* had leaked in — the growth is unbuilt design and unrun rows, which retire on build.
+`conventions.md`'s own overrun is closed the other way: the design record moved out to `design.md`,
+leaving it 298/300, with the `Reference — per-machine settings` table still the one section that fails its
+own admission test and still reading as README material.
 
 **Where the record lives.** The hobbyist review (`HR-1`…`HR-27`) and the 2026-08-01 whole-file review
 (`CR-1`…`CR-17`) are one register in `HReview.md`: 44 findings, all fixed, closed by design or moved to
@@ -77,7 +77,7 @@ no-op on exactly the case it exists to catch, and the failure mode is a part cut
 silently. It needs a rotated Setup. Written up in `HReview.md` → *Owed*.
 
 **No controller access**, so firmware questions are settled from source — `conventions.md` →
-*How to run a test* and *Firmware capabilities*.
+*How to run a test*, and `design.md` → *Firmware capabilities*.
 
 ---
 
