@@ -1651,13 +1651,37 @@ function validateJob() {
   // provisional Z0 is sound under. Marlin reaches neither establish (the machine-Z answer is
   // refused outright below, and writeBaseEstablish() skips the base for want of per-WCS registers),
   // so nothing moves there and the warning would be false.
-  if (fw != eFirmware.MARLIN && fixedZEstablishedAtStart() &&
+  if (fixedZEstablishedInFile() &&
       (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
     warning(localize("\"Fixed Z Reference\" is established at job start by moving the tool to "
       + "\"Inter Part Travel Z\", and that runs before \"First WCS / Part\" records the current "
       + "position -- so the origin is recorded at bed clearance rather than at the part, and the "
       + "probe target measured from it will not reach the stock. Use \"Use Active WCS X0 Y0, Probe "
       + "Z0\" or a \"Jog to ...\" mode, or set \"Fixed Z Reference\" to None."));
+  }
+
+  // The same boundary as the warning above, read from the other side: that one fires when a fixed Z
+  // reference IS established and a "... Current Pos" mode records the clearance it left; this one
+  // fires when none is and the mode cannot lift. "Use Active WCS X0 Y0, Probe Z0" is the one
+  // first-part mode that traverses with no Z move in front of it, and that is its premise rather than
+  // an oversight -- the active WCS's Z0 is stale, about to be probed, so no absolute Z in that frame
+  // means anything and partProbe() rapids at whatever height the tool holds.
+  //
+  // warning(), not error(). The start height is a promise only the operator can make, and refusing
+  // the mode would remove the one first-part answer that establishes a trusted Z on a machine whose
+  // stored XY is worth trusting -- the cure destroying what it was for. So the post names the promise
+  // it is relying on, here and in the file. One message carries both halves of the finding, because
+  // they are satisfied by the same act of parking the tool: the traverse needs a clear start height,
+  // and "G38 Target" is measured from the untrusted stored Z0, so it bounds the descent only as well
+  // as that number covers the distance from wherever the operator parked. See docs/HReview.md HB-13.
+  if (startMode == "Probe Z" && !fixedZEstablishedInFile()) {
+    warning(localize("\"First WCS / Part\" = \"Use Active WCS X0 Y0, Probe Z0\" rapids to the stored "
+      + "X0 Y0 before this job has established any Z the post can move in, so that traverse happens "
+      + "at whatever height the tool is left at -- position it clear of the stock, clamps and "
+      + "fixtures before starting the program. The probe that follows measures \"G38 Target\" from the "
+      + "Z0 already stored in the active WCS, which this mode re-probes precisely because it is not "
+      + "trusted, so set the target deep enough to reach the stock from that start height. \"Fixed Z "
+      + "Reference\" removes both, by establishing a Z the post can move in itself."));
   }
 
   // "At End Park At" = machine X0 Y0 crosses the bed from wherever the last operation ended, and
@@ -2323,13 +2347,24 @@ function interPartTravelZ() {
   return propertyMmToUnit(parseInterPartTravelZ());
 }
 
-// True when the job ESTABLISHES its fixed Z reference during the preamble, so an absolute Z move is
-// meaningful before any part's own origin exists. Both implementations qualify and neither is
-// available on Marlin. This is the condition partProbe()'s "Unknown Z for XY move." warning is the
-// negation of -- with a fixed reference established, the first section's arrival happens at a known
-// clear height and the warning would be false.
+// True when the DIALOG names a fixed Z reference. That is all it answers, and the name has been read
+// as more: it does not test the firmware, so it reads true on Marlin, where neither implementation
+// runs. A caller reasoning about WHERE THE TOOL IS must ask the predicate below.
 function fixedZEstablishedAtStart() {
   return usesMachineZDatum() || getReservedBaseWcs() != 0;
+}
+
+// True when the job also EMITS the establish, so the tool holds a height this file put it at. The gap
+// between the two is Marlin, and it is not hypothetical: the machine-Z answer is refused there
+// outright, and a reserved base passes every guard (see parkCanRetract() below) only for
+// writeBaseEstablish() to warn and return for want of per-WCS registers. So the dialog could say
+// "spoilboard" while the preamble moved nothing, and the unknown-Z warning partProbe() exists to
+// write was suppressed on exactly that job -- the one configuration where it was most needed was the
+// one that silenced it. Every consumer that reasons about the height the tool holds asks THIS one:
+// that warning is its negation, validateJob()'s first-part warning fires on it, and the end-of-job
+// park reads it through parkCanRetract(). See docs/HReview.md HB-13.
+function fixedZEstablishedInFile() {
+  return fw != eFirmware.MARLIN && fixedZEstablishedAtStart();
 }
 
 // Can the end-of-job machine park retract before it crosses the bed? Only into a frame this job
@@ -2342,9 +2377,11 @@ function fixedZEstablishedAtStart() {
 //     then skips the base for want of per-WCS registers. Transiting one anyway would select a
 //     register the job never wrote, through a G54-G59 that is itself a Marlin build option, and for
 //     a G59.1-G59.3 base wcsGcode() returns undefined and the block would carry a malformed G word.
-// Read by validateJob()'s warning and by writeMachineParkXY(), so the two cannot drift apart.
+// Read by validateJob()'s warning and by writeMachineParkXY(), so the two cannot drift apart. The
+// test is fixedZEstablishedInFile() above, which the first-part warning shares; this name stays
+// because the park's callers ask about the park.
 function parkCanRetract() {
-  return fw != eFirmware.MARLIN && fixedZEstablishedAtStart();
+  return fixedZEstablishedInFile();
 }
 
 // Human-readable G-code name for a workOffset number, for comments/errors.
@@ -3533,15 +3570,23 @@ function partProbe(atOrigin, zUnknown) {
   if (!atOrigin || offsetSet) {
     resetAll();
     // The rapid below is at an unknown height and, on the first-part path, is the program's first
-    // motion -- so no absolute Z move can precede it and the file must say so instead, for both the
-    // operator and an automated review. Suppressed when the job's fixed Z reference was established
-    // in the preamble and has already left the tool at a known-clear height: a probed spoilboard
-    // base (base frame + Inter Part Travel Z), or a homed machine Z (G53 G0 Z<Inter Part Travel Z>).
-    // Either way the warning would be false, and on the machine-Z route the arrival is a real
-    // absolute move rather than a comment -- the one path in the post that deliberately emitted no
-    // absolute Z now has a case where it does not have to.
-    if (zUnknown && !fixedZEstablishedAtStart()) {
-      writeComment(eComment.Info, "   Ensuring that Z is safe. Unknown Z for XY move.");
+    // motion -- so no absolute Z move can precede it and the file must say so instead. A WARNING and
+    // not an Info comment: what it reports is a precondition the operator has to satisfy before the
+    // program runs, and at "Comment Level" = Off an Info comment is gone -- HB-9's class on the one
+    // line in the file that asks for something. The old text also read as reassurance, "Ensuring that
+    // Z is safe" while ensuring nothing. Suppressed when the fixed Z reference was established in the
+    // preamble and has already left the tool at a known-clear height: a probed spoilboard base (base
+    // frame + Inter Part Travel Z), or a homed machine Z (G53 G0 Z<Inter Part Travel Z>). Either way
+    // it would be false, and on the machine-Z route the arrival is a real absolute move rather than a
+    // sentence -- the one path in the post that deliberately emitted no absolute Z now has a case
+    // where it does not have to. ...InFile(), because the dialog answer reads true on a Marlin job
+    // whose base establish returned without probing, which silenced this on the configuration that
+    // needed it most. See docs/HReview.md HB-13.
+    if (zUnknown && !fixedZEstablishedInFile()) {
+      writeWarning("no Z reference is established, so the XY move below runs at whatever height the"
+        + " tool is holding -- it must be clear of the stock, clamps and fixtures before the program"
+        + " starts. The G38.2 target that follows is measured from the Z0 already stored in this WCS,"
+        + " which is the value this mode re-probes because it is not trusted.");
     }
     if (offsetSet) {
       writeComment(eComment.Info, "   Move to probe point = origin + offset X" + xyzFormat.format(ox) + " Y" + xyzFormat.format(oy) + ", then probe Z");

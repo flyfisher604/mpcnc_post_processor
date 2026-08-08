@@ -243,10 +243,16 @@ gets. Un-suppressing it where it sits does **not** work:
 The resolution keeps the intent and fixes the placement: the first section's safe arrival happens **after**
 the fixed Z reference is established, in that reference's frame. That exposed a hard limit — **with no
 fixed reference there is no established frame at job start at all**, so no retract can be made safe there.
-That case gets an Info comment instead (`Ensuring that Z is safe. Unknown Z for XY move.`), on the one path
-that deliberately emits no absolute Z move.
+That case gets a `>>> WARNING:` instead, on the one path that deliberately emits no absolute Z move — a
+precondition the operator must satisfy, not commentary, so it bypasses `Comment Level` and the same
+sentence is raised in the post dialog where there is still something to change. The post does **not**
+substitute a relative `G91` lift: it would be the only motion emitted in no frame at all, its extent is
+unknowable on a machine whose Z travel the post cannot see, and it would leave the `G38.2` target — an
+absolute Z in the same stale frame — exactly as unbounded as it found it.
 
 **The machine-Z answer lifts the limit rather than working around it.** A declared, homed machine Z *is* an
 established frame at job start, so on such a machine the arrival emits a real `G53 G0 Z<Inter Part Travel Z>`
-and the comment is suppressed exactly as an established base suppresses it. The limit stands only where it
-is still true: a job that declares no fixed reference at all.
+and the warning is suppressed exactly as an established base suppresses it. The limit stands only where it
+is still true: a job that establishes no fixed reference at all — and *declaring* one is not establishing it
+on Marlin, where neither implementation runs, so the suppression asks `fixedZEstablishedInFile()` and not the
+dialog's own answer.
