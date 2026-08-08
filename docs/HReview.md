@@ -59,7 +59,7 @@ session **from a build proved identical to `e5db625` — see *Owed***, so no row
 Personas are `conventions.md` → *How to run a test*; defaults are GRBL/mm, `Comment Level` `Info`,
 unless the Setup delta says otherwise.
 
-**✅ 12 PASS · ❌ 0 FAIL · ⬜ 8 UNRUN · ➖ 3 n/a — 23 rows.**
+**✅ 15 PASS · ❌ 0 FAIL · ⬜ 5 UNRUN · ➖ 3 n/a — 23 rows.**
 
 | Test | Proves | Setup | Method | State |
 |---|---|---|---|---|
@@ -78,12 +78,12 @@ unless the Setup delta says otherwise.
 | **HB-7 (A)** | A mistyped include filename refuses before any output | HP-1 + `Start GCode File` = `nofilename` | posted | ✅ |
 | **HB-8 (A)** | The two one-way settings survive a second post in the same Fusion session | HP-1 posted twice without restarting Fusion: first with `Enforce Feedrate` on and `Include Whitespace` off, then with `Enforce Feedrate` off and `Include Whitespace` on | posted | ✅ |
 | **HB-9 (A)** | A `>>> WARNING:` reaches the file at `Comment Level` = `Off`, and nothing else does | HP-1 + `Comment Level` = `Off` + `Home at Job Start` = `Home` + `Axes Homed and Trusted` = `None` (HB-3 (A)'s combination) | posted | ✅ |
-| **HB-11 (A)** | Both blank separators read the same | HP-1, unchanged defaults — re-post of `HB-2 (A)`'s job after the fix | posted | ⬜ |
-| **HB-14 (A)** | The warning reads as one property name plus one group, and still parses as a single GRBL comment | HP-1 + group-6 `Safe Z` = `15mm` — `HB-5 (A)`'s configuration, so today's file is the pre-fix reading | posted | ⬜ |
+| **HB-11 (A)** | Both blank separators read the same | HP-1, unchanged defaults — re-post of `HB-2 (A)`'s job after the fix | posted | ✅ |
+| **HB-14 (A)** | The warning reads as one property name plus one group, and still parses as a single GRBL comment | HP-1 + group-6 `Safe Z` = `15mm` — `HB-5 (A)`'s configuration, so today's file is the pre-fix reading | posted | ✅ |
 | **HB-14 (B)** | The map-side twin emits the same shape — the call site that has never appeared in any artifact | HP-1 + `Map: G1s -> G0 Rapids` **on** + `Map: Safe Z to Rapid` = `15mm`. `HB-5 (B)` left the mapper off, which is why its file held no `format error` at all, so this is the first post that reaches `safeZforSection()`'s error case | posted | ⬜ |
 | **HB-13 (A)** | The operator is told, in the file and at the dialog, that the traverse and the probe target both depend on where they left the tool | `HB-3 (B)`'s configuration exactly — HP-1 + `Home at Job Start` = `Home`, `Axes Homed and Trusted` = `XY`, `First WCS / Part` = `Use Active WCS X0 Y0, Probe Z0`. Today's file is the pre-fix reading. **Post it twice, `Comment Level` `Info` then `Off`** — the level is the discriminator for half of what the row claims | posted | ⬜ |
 | **HB-12 (A)** | A Stop file's XY arcs are not read in the plane the last lead-out left | HP-1 + `Stop GCode File` = a footer whose only motion is one `G2 X… Y… I… J…`, on a job whose final operation has a **Z lead-out** (`HB-2 (A)`'s job qualifies — its last arc is `G18 G2`) | posted | ⬜ |
-| **HB-15 (A)** | The refusal tells the operator what to fix and claims nothing about a file | `HB-7 (A)`'s configuration exactly — HP-1 + `Start GCode File` = `nofilename`. Today's log is the pre-fix reading | posted | ⬜ |
+| **HB-15 (A)** | The refusal tells the operator what to fix and claims nothing about a file | `HB-7 (A)`'s configuration exactly — HP-1 + `Start GCode File` = `nofilename`. Today's log is the pre-fix reading | posted | ✅ |
 | **HB-16 (A)** | A `Start GCode File` cannot suppress the post's `G17`, because it replaced the block that writes it — the reading that redirected HB-16's second half | HP-1 + `Start GCode File` = a header whose only g-code is `G18`, on `HB-2 (A)`'s job. Not a pre/post-fix pair: the fix is a no-op on this path, and the row exists to show *why* | posted | ⬜ |
 | **HB-17 (A)** | A job that *names* a fixed Z reference it cannot establish still gets HB-13's warning | HP-1 + **`CNC Firmware` = `Marlin`** + `Fixed Z Reference` = the spoilboard answer + `Reserved WCS` = `G59` + `Inter Part Travel Z` = `40` (the spoilboard answer refuses an unset or non-positive height, so the row cannot post without it) + `First WCS / Part` = `Use Active WCS X0 Y0, Probe Z0`, single Setup. Marlin, so **`HB-13 (A)`'s artifact cannot cover this** — the suppression is the firmware's | posted | ⬜ |
 
@@ -94,9 +94,10 @@ GRBL `gMotionModal` omits a G-word that is already in effect, so name the axis w
 established above them*, never `G0 X…`. Two Expects here were written the other way and mis-stated a
 passing file (HB-2 (B), HB-4 (A)).
 
-- **HB-2 (A)/(B) — PASS, `HB-2 (A).gcode`, one post.** `grep -c '%'` = 0; line 1 is
+- **HB-2 (A)/(B) — PASS, `HB-2 (A).gcode`, re-read on the `HB-11` re-post.** `grep -c '%'` = 0; line 1 is
   `(Fusion CAM 2704.1.36)`; `M30` is the last g-code **block**, with `writeStop()`'s
-  `( *** STOP end ***)` trailer as the last *line* — the block is the criterion, never the line.
+  `( *** STOP end ***)` trailer as the last *line* — the block is the criterion, never the line. *The
+  artifact every other row diffs against is now post-fix, so nothing here cites a superseded baseline.*
 - **HB-3 (A) — PASS both halves, `HB-3 (A).gcode`, dialog confirmed by the operator at the post.** Line
   114 carries the nothing-was-homed warning and no `$H`, `G28` or `G53` appears anywhere. **(B) — PASS,
   `HB-3 (B).gcode`, dialog clean.** `$H` at 114 in place of the warning, the file differing from (A) in
@@ -109,7 +110,7 @@ passing file (HB-2 (B), HB-4 (A)).
   dump spells the declaration `XY`, the enum id for the `XY Only` title.*
   **"Dialog clean" is no longer the criterion:** HB-13's warning fires here by design, so what (B)
   proves is the absence of **HB-3's own text**. Still ✅ — its discriminators are `$H` and the six-line
-  diff — but the artifact is now pre-fix for line 127, which `HB-13 (A)` re-posts anyway.
+  diff — and `HB-13 (A).gcode` has since re-posted the configuration, so its line 127 is the current one.
 - **HB-4 (A) — PASS, `HB-4 (A).gcode`; (B) — PASS, `HB-2 (A).gcode` as the absence half, paired with
   (A).** 127-131 read `G10 L20 P1 X0 Y0 Z0` / the retract comment / `G0 Z5.08 F300` / the offset
   comment / `X25 Y0 F2500`, in that order, with `Probe XY offset in output units = X25 Y0` in the
@@ -173,37 +174,38 @@ passing file (HB-2 (B), HB-4 (A)).
   and never g-code. *The four `M0 (MSG …)` prompts survive, correctly — an `M0` at `Off` with no message
   would be an unexplained pause — and they are why the `^(` form mattered: six lines contain a `(`, so
   the earlier "the file's only `(` line" wording would have read as a false FAIL.*
-- **HB-11 (A)** — every blank separator in the file is the same string. `grep -c '^()$'` = 0 and the
-  count of `^( )$` equals what `HB-2 (A).gcode` shows for the two forms combined (17), so the fix
-  changed the form and not the number of separators. Today's file is the pre-fix reading: `( )` at
-  141, `()` at 196.
-- **HB-14 (A)** — the line reads `( >>> WARNING: "Safe Z" in "6 - On WCS / Part / Fixture Changes" --
-  format error, falling back to 15)` with exactly one `(` and one `)`; `grep -c '('` on it must be 1,
-  which is what rules out the parenthesised form. Today's file is the pre-fix reading —
-  `Safe Z 6 - … format error: 15`, the written brackets already eaten by the sanitizer. **(B)** the same
-  shape with `"Map: Safe Z to Rapid"` and group 3's title, proving the second call site rather than
-  assuming it follows, and **counted**: `safeZforSection()` runs per section, so one warning per
-  operation rather than (A)'s one per file — a single occurrence would mean it is not reached on each.
-- **HB-13 (A)** — the line before `G0 X0 Y0 F2500` is a `>>> WARNING:` naming both halves: that the XY
-  move runs at whatever height the tool holds, and that the `G38.2` target is measured from the stored
-  `Z0` this mode re-probes. **The discriminator is the `Off` post, not the `Info` one** — at `Info` a
-  warning and a comment look alike on the page, so only the `Off` file shows the *bypass*, which is the
-  whole difference between this fix and the notice already there. `HB-9 (A).gcode` proves the mechanism
-  in general; this row needs it on **this** line, the one thing that stood between the operator and an
-  un-narrated traverse and that `Off` removed. So `grep '>>> WARNING'` on the `Off` file returns it, and
-  the g-code around it — `$H` / `G54` / `G0 X0 Y0 F2500` — is byte-identical to the `Info` file's.
-  **Expect no Z move and no `G10 L20` before the probe**, deliberately: (b) is bounded by the operator's
-  number and not by the post, so a provisional zero here would be a *different* fix. Today's file is the
-  pre-fix reading — 127 is the `Info` comment, gone at `Off`, and the only `G10 L20` is `P1 Z0.8` at 139,
-  after the probe. **Also read the dialog**, which is the half no artifact holds:
-  **one** warning, quoting `"First WCS / Part"`, and CR-2's still **absent** — `HB-3 (B)` established
-  that this mode clears the third clause of 1580-1581, so a second warning here would mean the two
-  tests have started to overlap rather than complement each other.
-- **HB-15 (A)** — the error text ends at `or clear the field.` and claims nothing about truncation.
-  Read it from the **log**, not from the output: a refused post writes no `.gcode`, so the string exists
-  nowhere else. `HB-7 (A).log` 23 is the pre-fix reading, both sentences present. *`HB-7 (A)` itself
-  stays ✅ across this change — its discriminators are the missing `.gcode` and the abort location the
-  log names, neither of which is the wording.*
+- **HB-11 (A) — PASS, `HB-2 (A).gcode` re-posted.** `grep -c '^()$'` = 0 and `^( )$` = **17**, the count
+  the pre-fix file showed for the two forms combined, so the fix changed the form and not the number.
+  *Every cited line number in this register still holds: `()` sat at 196, and a same-line substitution
+  moved nothing.*
+- **HB-14** — **(B)** still owes the map-side twin: the same shape with `"Map: Safe Z to Rapid"` and group
+  3's title, proving the second call site rather than assuming it follows, and **counted** —
+  `safeZforSection()` runs per section, so one warning per operation rather than (A)'s one per file; a
+  single occurrence would mean it is not reached on each. **(A) — PASS, `HB-14 (A).gcode`:** line **1** is
+  `( >>> WARNING: "Safe Z" in "6 - On WCS / Part / Fixture Changes" -- format error, falling back to 15)`,
+  one `(` and one `)`, so a single GRBL comment with the group no longer a property name's tail. **The
+  diff attributes it:** against `HB-2 (A).gcode` only the warning, the timestamp, the property echo, the
+  Resolved-Values `Error` line and the retract pair (`to 5.08` → `to 15`, `Z5.08` → `Z15`) move.
+- **HB-13 (A) — one post of two in, `HB-13 (A).gcode` at `Comment Level` = `Info`.** 127 is the
+  `>>> WARNING:` naming both halves — the XY move runs at whatever height the tool holds, and the
+  `G38.2` target is measured from the stored `Z0` this mode re-probes — and 129 is the traverse it
+  precedes. **Both deliberate absences hold:** no Z move before 129, and the only `G10 L20` is `P1 Z0.8`
+  at 139, *after* the probe, so (b) stays bounded by the operator's number rather than by the post. The
+  diff against `HB-2 (A).gcode` is three properties, adding `$H` and swapping the baseline's
+  provisional-`Z0` block for the warning and the traverse.
+  **What is owed is the discriminator, not the text — the `Off` post.** At `Info` a warning and a comment
+  look alike on the page, so only the `Off` file shows the *bypass*, which is the whole difference
+  between this fix and the notice it replaced; `HB-9 (A).gcode` proves the mechanism in general, this row
+  needs it on **this** line. So `grep '>>> WARNING'` there returns 127 and the g-code around it — `$H` /
+  `G54` / `G0 X0 Y0 F2500` — is byte-identical to this file's. **And the dialog**, which no artifact
+  holds: **one** warning, quoting `"First WCS / Part"`, CR-2's still **absent** — `HB-3 (B)` established
+  that this mode clears the third clause of 1580-1581, so a second warning would mean the two tests have
+  started to overlap rather than complement each other.
+- **HB-15 (A) — PASS, read at the dialog.** The text ends at `or clear the field.`, matching 1792-1794
+  word for word, and claims nothing about truncation — where the pre-fix wording said output stopped
+  "rather than part way through the file it would otherwise have truncated", which the 51-byte
+  `HB-15 (A).gcode.failed` on disk contradicts. **`HB-7 (A)` stays ✅**: no `.gcode` exists, and its
+  discriminators were never the wording.
 - **HB-12 (A)** — the Stop file's arc is preceded by `G17`. The discriminator is **order**: `G17`
   after the last `G18` line and before the first line of the loaded footer. Today's file is the
   pre-fix reading — `G18 G2 X182.797 Z-0.083 K4.997` (192) is the last plane code, and `G0 Z15.24`,
@@ -289,29 +291,30 @@ when a row is written that asserts it, or when the artifact it names is supersed
 
 What this register still owes, and why each artifact is worth a post.
 
-- **Every finding is closed but HB-10, and eight rows owe a post.** HB-2, HB-3, HB-4, HB-5, HB-7, HB-8
-  and HB-9 are ✅ from eight files posted in one session off one build. **HB-11 to HB-17 are fixed and
-  unposted** — the state HB-7 to HB-9 were in before this session, and what the dating bullet below
-  bounds. HB-11, HB-14 (A) and HB-15 are re-posts of existing jobs; HB-12 (A) and HB-16 (A) each need a
-  small include file first, one of which could serve both; HB-13 (A) is one configuration at two comment
-  levels; HB-14 (B) is the first post to reach the map-side resolver's error case; HB-17 (A) is this
-  register's only **Marlin** post. HB-10 alone is open, deferred by its own row.
+- **Every finding is closed but HB-10, and five rows owe a post.** HB-11, HB-14 (A) and HB-15 came in as
+  re-posts of existing jobs on the fix build and all three passed on first read, which leaves only rows
+  needing something that does not exist yet: `HB-12 (A)` and `HB-16 (A)` each need a small include file,
+  one of which could serve both; `HB-13 (A)` owes its second comment level, the discriminating half;
+  `HB-14 (B)` is the first post to reach the map-side resolver's error case; `HB-17 (A)` is this
+  register's only **Marlin** post. HB-10 alone is open, deferred by its own row. *Nothing owed is a
+  re-post any more — the cheap half of the backlog is spent.*
 - **HB-16's include half is fixed where no row here can watch it.** Its payoff is on the tool-change
   include files — group 7, excluded from this register and already carrying HB-10 / `HR-21` / `CR-15`.
   So `HB-16 (A)` is re-aimed at what a hobbyist post *can* show: that a Start include cannot cause the
   hazard, because it replaces the block that would have set the plane.
-- **HB-13 (b) has an answer this register is not taking.** A provisional `G10 L20 P<wcs> Z0` at the start
-  height would make `G38 Target` a relative limit here as it is on `Current XY & Probe Z`, on the same
-  promise the warning states, trading an unbounded descent for one that fails by *alarming*. Withheld
-  because 3719-3723 records that decision, and the trade belongs to whichever pass owns group 6.
+- **HB-13 (b) has an answer, and the baseline artifact shows it working.** `HB-2 (A).gcode` 125-127 is the
+  sibling mode doing exactly this — `G10 L20 P1 X0 Y0 Z0` under the comment "Provisional Z0 at the
+  current height so the probe target is a relative limit" — and the `Z`-only form is separable here
+  precisely because this mode exists to keep the stored `X0 Y0`. **So (b) is an asymmetry between two
+  adjacent modes rather than an open question**, trading an unbounded descent for one that fails by
+  *alarming*; withheld because 3719-3723 records the decision and group 6 belongs to another pass.
 - **Three of the seventeen findings were discovered by posting rather than by reading — HB-13, HB-14 and
-  HB-15.** That is the argument for the rows still unrun. HB-13 (a) sits on a configuration the post's
-  own dialog recommends by name, and four passes of reading went past it: the `HR-`/`CR-` review, this
-  `HB-` pass, HB-4's row citing the path approvingly, and the machine-frame rework that gave `G53` a
-  meaning there. HB-14 was invisible for the opposite reason — the Expect that should have caught it
-  asked for the broken form. HB-15 is the string HB-7's own fix wrote, read for the first time where the
-  operator reads it. None was bookkeeping. **Two of the three are operator-facing text**, which nothing
-  in the source review looks at as text.
+  HB-15 — and all three of their fixes are now read back from an artifact.** That is the argument for the
+  rows still unrun. HB-13 (a) sits on a configuration the post's own dialog recommends by name and four
+  reading passes went past it; HB-14 was invisible for the opposite reason, the Expect that should have
+  caught it asking for the broken form; HB-15 is the string HB-7's own fix wrote, read for the first time
+  where the operator reads it. **Two of the three are operator-facing text**, which nothing in the source
+  review looks at as text.
 - **What empties the Expects section: a row passing.** Once a row is ✅ its pre-run criteria have done
   their work, so the entry collapses to the artifact, the discriminator actually checked, the build it
   dates, and any trap a re-run would otherwise walk back into — which is why HB-3 (B) keeps the CR-2
@@ -334,13 +337,10 @@ What this register still owes, and why each artifact is worth a post.
   per-row dating clauses went with it. *Both the logs and the `Gcode generated:` headers run +7 h from
   the filesystem: the 10:21–11:42 file span and the 17:21–18:42 span quoted in these documents are the
   same six posts.*
-- **The `Off` file answered a question wider than HB-9.** It was the only artifact that could settle
-  whether anything else this review assumed visible disappears at that level, and it does: every plain
-  comment goes, `>>> WARNING:` lines stay, and the g-code is untouched. **It is the evidence behind
-  HB-13's remedy, and it did not survive being right about the general case:** the reading first retired
-  HB-13's `Off` sibling and argued (a) needed a Z *move*, since a notice that vanishes is worse than
-  useless; the fix took the other branch and made the notice one `Off` cannot remove. So that sibling is
-  owed after all, as `HB-13 (A)`'s second post and its discriminator.
+- **The `Off` file answered a question wider than HB-9:** every plain comment goes, `>>> WARNING:` lines
+  stay, the g-code is untouched. **It is the evidence behind HB-13's remedy and it did not survive being
+  right about the general case** — the reading retired HB-13's `Off` sibling and argued (a) needed a Z
+  *move*; the fix instead made the notice one `Off` cannot remove, so that sibling is owed after all.
 - **The geometry guards' half of "a rejected job leaves no file" is still owed.** HB-7's include check
   is now proved to refuse before any output, but the multi-axis and orientation guards still fire in
   `onSection()` and still leave a truncated `.gcode` — `HR-27`, unstarted, and the general fix is moving
