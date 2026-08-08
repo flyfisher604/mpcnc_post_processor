@@ -1,6 +1,6 @@
 # HReview — hobbyist review of `MPCNC_v4.0_Beta2.cps`
 
-The hobbyist-side findings register and test register. **54 findings** — 37 `HR-` from the hobbyist
+The hobbyist-side findings register and test register. **55 findings** — 38 `HR-` from the hobbyist
 review, 17 `CR-` from the 2026-08-01 whole-file review. All are fixed, closed by design, or moved to
 `docs/PReview.md`, except three one-liners awaiting a tidy-up sweep and one unstarted robustness fix
 (HR-27). Nothing is failing.
@@ -16,7 +16,7 @@ the long form on close — is `CLAUDE.md` → *Registers ship with the code*, an
 
 ---
 
-## Findings — HR-1 … HR-37 · CR-1 … CR-17
+## Findings — HR-1 … HR-38 · CR-1 … CR-17
 
 `HR-` came from the hobbyist review; `CR-` from the 2026-08-01 whole-file review driven by the dialog and
 the F360 API. Both registers merged here on the same terms — ids kept, so every commit message and code
@@ -74,6 +74,7 @@ comment that names one still resolves.
 | **HR-27** | The two **geometry** guards fire in `onSection()`, not `onOpen()`, so a rejected job can leave a **truncated `.gcode` on disk** | Medium | Guards A/B/C run before any output, so they write no file; multi-axis and HR-6's orientation check do not. A hobbyist who builds a Setup on a model face gets a partial file rather than a clean refusal. Fix: promote both into `validateJob()`. Not started | ⬜ open |
 | **HR-28** | Four `Jog to …` origin modes advertise a capability **GRBL does not have** — the post's default firmware and the hobbyist's usual controller | Med-High | `askUser()` consumes `allowJog` in the **RepRap branch only** (`M291 … X1 Y1 Z1`); the GRBL branch emits a bare `M0` and discards it, and GRBL 1.1 accepts a jog only in Idle or Jog state, which an `M0` hold is not. The job stopped and waited and the operator could not move the machine, with nothing saying why. **Gated, not deleted** — the modes are correct on RepRap. `warnJogAtPauseOnGrbl()` in the file + a `validateJob()` warning; both tooltips now name the limitation | ✅ fixed |
 | **HR-29** | `Axises Homed and Trusted` — not a word, on the one group-4 control the dialog asks a hobbyist to read | Cosmetic | Title → `Axes Homed and Trusted`. A title is not a stored identifier, so no preset resets | ✅ fixed |
+| **HR-38** | **Group 8's descriptions omitted the two things a user must know before naming a file.** They read *"File with custom Gcode for header/start (in nc folder)"* and nothing more — so nothing said that a Start or Stop file **REPLACES** that phase (HR-23 / CR-7, designed behaviour: a Start file takes the modal preamble `G90`/`G21`/`G94`/`G17` with it), and nothing said that naming any file here makes Fusion ask *"This post processor might be unsafe…"*, where answering No **aborts the post**. A hobbyist adding a start file to set their own dust boot loses the preamble silently | Medium | All four rewritten. Start and Stop now say REPLACE and list what goes; both tool files say **ADDED**, which is the opposite contract and was equally undocumented — `loadFile()` runs and the built-in sequence continues — and both now say they are ignored unless group 7 is on. The unsafe prompt is named once in full on `Start GCode File` and cross-referenced from `Stop GCode File` | ✅ fixed |
 | **HR-35** | **`First WCS / Part`'s default assumes a wired, working Z touch plate** and the dialog never said so. Without one, a GRBL job at factory defaults drives `G38.2 F30 Z-10` into the stock at 30 mm/min and then alarms. The asymmetry is what an experienced operator would flag: the opposite error — defaulting to a mode that does not probe when a probe exists — only wastes the probe | Med-High as a surprise, but see Resolution | **Considered and deliberately NOT changed.** Flipping the default to `Set X0 Y0 Z0 to Current Pos` would invalidate the whole default-job evidence base at once — `H2`, `HR-1 (A)`, `HR-1 (E)`, `HW-3`, `HW-4`, `HW-5`, `H11c` and `CR-REG` are all posted at this default, and probing *is* the correct hobbyist workflow for anyone who has the plate the README assumes. **Mitigated in the dialog instead** (HR-31): `probeOnStart` now opens by saying the default assumes a wired plate and naming the mode to pick without one, ahead of the six mode descriptions. `probeG38Target` separately explains that a probe reaching its target without touching is a failed probe that alarms | ✅ closed by design |
 | **HR-36** | **Group 3's four defaults are `false`, while `README.md:162` instructs *"Hobbyists should turn all options in this group on"*.** The one group that exists purely for the Personal-licence user is the one group they must configure by hand, and the documented hobbyist configuration is not the shipped one | — | **The defaults stay off, deliberately.** Group 3 works around another vendor's licence restriction, and **shipping it pre-enabled would make that the post's decision rather than the operator's.** Recorded rather than left silent, because a default nobody wrote down reads as an oversight and the next review would re-open it. *(The technical question is separate and settled: `onRapid()` clears `forceSectionToStartWithRapid` before any `onLinear`, so a paid licence never reaches the mapper — that is why the group is inert there, not why the default is off.)* The README half is fixed the other way: the instruction becomes a neutral description of what the group does and that enabling it is the reader's call | ✅ closed by design |
 | **HR-37** | **`Tool Changes are Included` defaults `false`, and the hobbyist persona says "one tool".** A roughing bit followed by a finishing bit is an ordinary hobbyist job, so `conventions.md` → *Which register?* describes a narrower hobbyist than the one the README's Quick Start addresses | Low | **No change to the default.** CR-3 already warns at post time and marks every suppressed change in the file, so the failure is loud rather than silent; and defaulting the group on would emit relocation and re-probe code down paths the Tool Change branch (`PReview.md` §2) has not yet reworked — enabling by default before that lands would ship unverified motion. **The scope note is the finding**: the persona is a register-routing rule, not a claim about what hobbyists build, and a two-tool hobbyist job routes here rather than to `PReview.md` | ✅ closed by design |
@@ -97,9 +98,9 @@ README tells a hobbyist to consider.
 
 ---
 
-## Test register — 98 rows
+## Test register — 99 rows
 
-**✅ 67 PASS · ❌ 0 FAIL · ⬜ 8 UNRUN · ➖ 23 n/a or moved — 98 rows.** Complete by construction: every `H`/`HR`/`HW`
+**✅ 67 PASS · ❌ 0 FAIL · ⬜ 8 UNRUN · ➖ 24 n/a or moved — 99 rows.** Complete by construction: every `H`/`HR`/`HW`
 id has a row, including the ones that belong to another file. **If you move a finding out, leave the
 pointer row behind.** `CR-` ids are exempt — most are cosmetic or by-design closures that were never
 separate tests. `docs/check-docs.js` enforces the tally, the completeness and the exemption.
@@ -197,6 +198,7 @@ separate tests. `docs/check-docs.js` enforces the tally, the completeness and th
 | **HR-29** | The corrected group-4 title | — | → `PReview.md` **D1** — a title exists only in the dialog; the header dump prints keys and values, so no posted file can show it | — | — | ➖ |
 | **HR-30** | The seven corrected descriptions | — | → `PReview.md` **D1**, same reason. Descriptions are never emitted at all | — | — | ➖ |
 | **HR-31** | The eleven rewritten descriptions read at the right altitude | — | → `PReview.md` **D1**, extended to read each leading sentence on its own. The claim is *the first sentence answers it*, which no posted file can show | — | — | ➖ |
+| **HR-38** | Group 8's four descriptions state their contract | — | → `PReview.md` **D1**. The REPLACE contract itself is already proven by **HR-23** and **HR-11 (D)**; what is new here is only that the dialog says so | — | — | ➖ |
 | **HR-35** | The touch-plate precondition leads `probeOnStart` | — | → `PReview.md` **D1**'s leading-sentence pass. The default itself is unchanged, so every existing default-job row still stands as posted | — | — | ➖ |
 | **HR-36** | Group 3's four defaults are still `false` | — | → **HR-33 (A)**'s property dump, which lists all four as part of a factory-default post. No separate artifact | — | — | ➖ |
 | **HR-37** | The tool-change default and the persona note | — | Nothing to run — no code changed. CR-3's warning is the behaviour, and it is already covered | — | — | ➖ |

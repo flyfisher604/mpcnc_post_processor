@@ -611,7 +611,7 @@ properties = {
 
   includeStartFile: {
     title      : "Start GCode File",
-    description: "File with custom Gcode for header/start (in nc folder).",
+    description: "Names a file in the NC output folder whose contents REPLACE the post's own header rather than adding to it. That includes the modal preamble -- G90, G21/G20, G94, G17 -- so your file must set whatever the job needs, or it inherits whatever mode the controller was left in. Leave empty (the default) for the built-in header. NAMING ANY FILE IN THIS GROUP makes Fusion ask \"This post processor might be unsafe...\" when you post; answer Yes, because answering No aborts the post.",
     group      : "include",
     order      : 10,
     type       : "string",
@@ -620,7 +620,7 @@ properties = {
   },
   includeStopFile: {
     title      : "Stop GCode File",
-    description: "File with custom Gcode for footer/end (in nc folder).",
+    description: "Names a file in the NC output folder whose contents REPLACE the post's own footer rather than adding to it -- the spindle stop or its prompt, the end park, the stepper release and the program end all go, so your file must do whatever the job needs. Leave empty (the default) for the built-in footer. See the note on Start GCode File about Fusion's \"might be unsafe\" prompt.",
     group      : "include",
     order      : 20,
     type       : "string",
@@ -629,7 +629,7 @@ properties = {
   },
   includeToolFile1: {
     title      : "Tool Change Start",
-    description: "File with custom Gcode to start tool change (in nc folder).",
+    description: "File of custom g-code inserted at the START of each tool change (in the NC output folder). Unlike the Start and Stop files above this one is ADDED to the tool-change sequence, not a replacement for it. Ignored unless group 7's Tool Changes are Included is on.",
     group      : "include",
     order      : 30,
     type       : "string",
@@ -638,7 +638,7 @@ properties = {
   },
   includeToolFile2: {
     title      : "Tool Change End",
-    description: "File with custom Gcode to end tool change (in nc folder).",
+    description: "File of custom g-code inserted at the END of each tool change (in the NC output folder), after the change and any re-probe. ADDED to the sequence, not a replacement for it. Ignored unless group 7's Tool Changes are Included is on.",
     group      : "include",
     order      : 40,
     type       : "string",
