@@ -236,6 +236,13 @@ is guarded on the declaration — the same reason the action lives there, and th
 Run the doc check by hand with `node docs/check-docs.js` (working tree) or `--staged` (what a commit
 would record). It is deliberately quiet: `WARN` never fails a commit, only `FAIL` does.
 
+**Once per commit, not once per edit.** Every check here grades a *finished* document. Mid-edit the
+answers are noise or actively wrong: a size WARN reports prose still being written, and the tally and
+*Expect* checks fire on a table whose row lands in one edit and its count in the next. Nor does a
+working-tree run predict the gate — that reads the **index**, so only `--staged`, after staging, answers
+the question that matters. `/checkpoint` runs it once at session start; otherwise a run that is not
+about to become a commit is spending the session's context to grade an unfinished file.
+
 **A fresh clone must run this once — nothing else installs it:**
 
 ```
