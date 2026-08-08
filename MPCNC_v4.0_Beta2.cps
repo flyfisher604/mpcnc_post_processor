@@ -1035,6 +1035,31 @@ function parseSafeZProperty() {
   writeComment(eComment.Debug, " parseSafeZProperty: safeZHeightDefault = " + safeZHeightDefault);
 }
 
+// One writer for both Safe-Z parse failures, so the two properties that document each other as "same
+// syntax" cannot drift in wording, in punctuation, or in how they print the fallback. Three things
+// were wrong with the pair rather than one:
+//
+//   - The separator was written and then eaten. The probe side wrapped the group name in brackets and
+//     writeCommentLine() collapses "(" and ")" to a space, so the operator read
+//     "Safe Z 6 - On WCS / Part / Fixture Changes format error: 15" -- which parses as a property
+//     called "Safe Z 6". The brackets cannot simply come back: grbl 1.1 does not nest comments and
+//     ends one at the first ")" (grbl/gcode.c, gc_execute_line()), so an inner bracket would close
+//     the comment and leave " format error: 15)" to be parsed as g-code -- "error:" on the one line
+//     written to explain a mistake. Quotes and " -- " survive the sanitizer, and quoting a property
+//     title is how validateJob()'s warnings already name one. See docs/HReview.md HB-14.
+//   - The map side named no group at all, though "Safe Z" alone does not identify either property.
+//   - The map side printed the fallback as a bare JavaScript number while the probe side went through
+//     xyzFormat, so on an inch job the two warnings disagreed about the same 15 mm.
+//
+// Length is not a hazard: both firmwares discard comment characters as they read rather than buffering
+// them -- grbl 1.1 grbl/protocol.c, protocol_main_loop(), "Throw away all (except EOL) comment
+// characters and overflow characters" under LINE_FLAG_COMMENT_PARENTHESES -- and the post already
+// emits far longer comment lines in its property dump.
+function writeSafeZFormatWarning(title, groupTitle, heightInUnit) {
+  writeWarning("\"" + title + "\" in \"" + groupTitle + "\" -- format error, falling back to "
+    + xyzFormat.format(heightInUnit));
+}
+
 function safeZforSection(_section)
 {
   if (getProperty(properties.mapRapidsRestoreRapids)) {
@@ -1118,7 +1143,7 @@ function safeZforSection(_section)
         
       case eSafeZ.ERROR:
         safeZHeight = dfltInUnit;
-        writeWarning(properties.mapRapidsSafeZ.title + " format error: " + safeZHeight);
+        writeSafeZFormatWarning(properties.mapRapidsSafeZ.title, groupDefinitions.mapRapids.title, safeZHeight);
         break;
     }
   }
@@ -1221,10 +1246,17 @@ function parseProbeSafeZProperty() {
   // and a "Probe SafeZ = Error = 15.000" in the Info-level Resolved Values block. 15 mm is a
   // plausible retract height, so the mistake looked like it worked. Same wording as the map side
   // on purpose -- the two properties document each other as "same syntax" and must fail the same
-  // way. validateJob() carries the post-time half, for both. See docs/HReview.md HB-5.
+  // way, which is now enforced by both going through one writer rather than by two call sites
+  // agreeing. validateJob() carries the post-time half, for both. See docs/HReview.md HB-5, HB-14.
+  //
+  // Emitted HERE, above the generated-by header, while HB-3's warning lands after the property dump,
+  // and the two are right to differ: each is written at the point the post learns of the problem --
+  // this one in onOpen(), that one in writeMachineHoming() -- and agreeing on a region would mean
+  // buffering warnings to emit them somewhere else. A parse failure above the header is if anything
+  // the better place for one. HB-14's open question, settled without a change.
   if (probeSafeZMode == eSafeZ.ERROR) {
-    writeWarning(properties.probeSafeZ.title + " (" + groupDefinitions.probe.title + ") format error: "
-      + xyzFormat.format(propertyMmToUnit(probeSafeZHeightDefault)));
+    writeSafeZFormatWarning(properties.probeSafeZ.title, groupDefinitions.probe.title,
+      propertyMmToUnit(probeSafeZHeightDefault));
   }
 
   writeComment(eComment.Debug, " parseProbeSafeZProperty: probeSafeZMode = '" + eSafeZ.prop[probeSafeZMode].name + "'");
@@ -3970,6 +4002,29 @@ function loadFile(_file) {
         writeln("");
       }
       writeComment(eComment.Info, " --- End custom gcode " + folder + _file);
+
+      // The post's beliefs about the controller do not survive a file it did not write. An include
+      // file can set the plane, the motion mode or a feed, and it can move the tool -- and every one
+      // of those is something the post re-asserts LAZILY, so a stale belief is not a wrong word but a
+      // MISSING one. A G18 left behind makes the next XY arc omit its G17 and cut in ZX (HB-16); a
+      // file that moves the tool makes the next block omit the axis word that would have brought it
+      // back, which is a move that does not happen at all.
+      //
+      // Only lazily re-asserted state can be repaired by a reset, and this is that whole set.
+      // gAbsIncModal / gUnitModal / gFeedModeModal are formatted ONCE, in Start(), so resetting them
+      // would emit nothing later and a file leaving G91 or G20 in force stays undetected -- and on the
+      // Start include Start() is skipped outright, so those words are never written at all. That is
+      // HR-22's question, not this one.
+      //
+      // Here rather than at the four call sites, so Start, Stop and both tool-change files are covered
+      // by one statement. The payoff is entirely on the TOOL-CHANGE files, which are read mid-job with
+      // every modal and coordinate populated: the Start include REPLACES Start() (writeFirstSection()),
+      // so nothing has set a plane, a motion mode or a coordinate when it is read and all three resets
+      // are no-ops there, and after the Stop include nothing further is written. So this changes no
+      // output on any group-8 path a job without tool changes can take. See docs/HReview.md HB-16.
+      gPlaneModal.reset();
+      gMotionModal.reset();
+      resetAll();
     } else {
       // An include file that EXISTS but is empty used to emit nothing at all -- not even the
       // Start/End markers above -- so the operator got no indication their file contributed
