@@ -39,13 +39,10 @@ standing "Never `G53`" decision** — the post now addresses the machine frame o
 operator declares.
 
 **Two things it deliberately did not do.** The **`G53` tool-change park** is `PReview.md` **PR-4** — it
-shares code with §2's Phase 4 reorder and must compose with that design, not pre-empt it. And
-**`PReview.md` is still over its size budget** (1102/920, `WARN` not `FAIL`): a Rule-2 pass found nothing
-*live* had leaked in — the growth is unbuilt design and unrun rows, which retire on build.
-`conventions.md`'s own overrun is closed the other way: the design record moved out to `design.md`,
-leaving it 298/300, with the `Reference — per-machine settings` table still the one section that fails its
-own admission test — and it now has a home to move to, `docs/guide-pro.md`, which did not exist before the
-doc split.
+shares code with §2's Phase 4 reorder and must compose with that design, not pre-empt it. And it left
+`PReview.md` over its size budget, where a Rule-2 pass found nothing *live* had leaked in: the growth is
+unbuilt design and unrun rows, which retire on build. `check-docs.js` prints every current doc-size
+number, so none is repeated here.
 
 **What `hobby-dialog-review` landed (2026-08-07).** A hobbyist-perspective walk of all **69** dialog
 properties — `HReview.md` **HR-29 … HR-38**. Seven output-neutral: the `Axises` title, seven description
@@ -61,6 +58,18 @@ README split into a landing page plus `docs/guide-hobbyist.md` / `guide-pro.md` 
 the last carrying the `doc-sync` marker, now re-bumped to `17a20f2`. **The property count was wrong in
 three places and is 69 = 8/7/4/3/5/10/8/5/7/10/2**, which two unrun rows (D3, D5) had been asserting
 wrongly. `conventions.md` traded its README contract row for one covering all four guides, still 298/300.
+
+**What the HB- pass landed (2026-08-08).** Six of `HReview.md`'s ten `HB-` findings, one commit each and
+each row closed with its code — **HB-2** (the GRBL `%` wrapper dropped), **HB-3** (a `validateJob()`
+warning when `Home at Job Start` can home nothing, plus the ten stale `Axises` HR-29's rename left),
+**HB-4** (retract before the offset probe traverse, gated on the offset), **HB-7** (include filenames
+checked before any output; `HR-27`'s geometry half stays open), **HB-8** (`fOutput` and the word
+separator assigned on both branches) and **HB-9** (all thirteen `>>> WARNING:` sites bypass
+`Comment Level`). **Three change the emitted file** — the `%` lines, HB-4's lift, warnings at `Off` — so
+all eleven live `HB-` rows are still `⬜`, `HB-9 (A)` being the register's first `Off` post. **Open
+deliberately: HB-5 · HB-6** (outside the request) and **HB-10** (item 4). **`PReview.md` and the
+`HR-`/`CR-` register are absent from this branch's working tree**, which is why plan.md is over budget:
+the two paragraphs above are the only surviving summary of what those registers hold.
 
 **Where the record lives.** The hobbyist review (`HR-1`…`HR-39`) and the 2026-08-01 whole-file review
 (`CR-1`…`CR-17`) are one register in `HReview.md`: **49 findings**, all fixed or closed by design, except

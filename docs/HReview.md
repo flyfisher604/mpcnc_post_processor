@@ -37,19 +37,19 @@ one.
 | **HB-6** | **`G17` and `G94` are emitted only on the GRBL branch, so RepRap inherits whatever plane and feed mode the last job left.** `Start()` 3794-3803 puts both inside `if (fw == eFirmware.GRBL)`; the Marlin/RepRap branch emits `G90`, `G21`/`G20` and `M84 S0` only. `circular()`'s non-GRBL branch 3966-3968 then writes `G2`/`G3` with `I`/`J` and **no `G17`**. Both codes are live modal state in RRF — `Duet3D/RepRapFirmware` `src/GCodes/GCodes2.cpp` `HandleGcode()` has `case 17:`/`case 18:`/`case 19:` setting `selectedPlane`, and `case 93:`/`case 94:` setting `inverseTimeMode` — so a controller left in `G18` reads every arc's `I`/`J` in the wrong plane, and one left in `G93` reads every `F` as inverse time. Marlin is unaffected: without `CNC_WORKSPACE_PLANES` it has no `G17` to be wrong about and is always XY, and it has no `G93` | Low | Open — emit `G17` (and `G94`) on the non-GRBL branch too. Both are no-ops on a controller already in that mode, so the cost is two lines per Marlin/RepRap file | ⬜ |
 | **HB-7** | A group-8 include file that does not exist aborted the post *after* part of the file was written: `loadFile()`'s `error()` fires at step 4 of `writeFirstSection()`, by which point the header block, the property dump, the homing and the `G54` select are already in the stream. The operator got a truncated `.gcode` that looks like it starts a job, and the Stop include failed later still | Low | Pre-flight loop at the head of `validateJob()`'s Guards block, above everything firmware- or frame-dependent, using a new `includeFolder()` that `loadFile()` also adopts so the two cannot disagree about where they looked. The **tool-change pair is checked only when group 7 is on**, since a name in a field their descriptions call ignored must not refuse the job. **The four `coolant…Custom` files are not covered** — same class through the same `loadFile()`, but reaching them needs a coolant-mode match and they belong with the coolant-dialect work in `PReview.md` §6. HR-27's geometry half is still open and wants moving, not duplicating | ✅ fixed |
 | **HB-8** | `fOutput` and the word separator were set one way in `onOpen()` and covered by neither branch nor `resetPostState()` — which exists precisely because the post does not rely on a fresh JavaScript context per file. Post with `Enforce Feedrate` on, then a second file with it off, and the second still carried a forced `F` on every move; same for whitespace. Quiet because the output is a superset rather than wrong g-code. `gMotionModal`'s conditional assigns on both branches and so never leaked | Low | Both assignments unconditional, `{ force: false }` being the declaration's own value rather than a guess. `resetPostState()`'s header now records that these two and `gMotionModal` are rebuilt from properties in `onOpen()` rather than reset there, so the next reader does not count them as missed a second time | ✅ fixed |
-| **HB-9** | **`Comment Level` = `Off` suppresses every `>>> WARNING:` the post writes, including those with no Fusion-dialog twin.** `writeComment()` 3548-3559 gates on level, and every in-file warning is `Important`. Several have a `validateJob()` sibling and survive; these do not: the jet-tool / tool-0 `Z0 was NOT established` warning (3540), `No matching Coolant channel : <mode> requested` (1400), and HB-3's `nothing was homed`. A tool carrying a Fusion coolant mode no channel is configured for is the ordinary group-10 case — the post correctly emits no coolant code, but at `Off` it also says nothing about having ignored the request | Low | Open — either give the warnings without a dialog twin a `warning()` call, or emit `>>> WARNING:` lines unconditionally regardless of level. The second is the smaller change and matches what an operator expects `Off` to mean (less commentary, not fewer warnings) | ⬜ |
+| **HB-9** | `Comment Level` = `Off` suppressed every `>>> WARNING:` the post writes, because `writeComment()` gates on level and every in-file warning is `Important`. Most have a `validateJob()` sibling and survive there; three do not — the jet-tool / tool-0 `Z0 was NOT established`, `No matching Coolant channel : <mode> requested`, and HB-3's `nothing was homed`. A tool carrying a coolant mode no channel is configured for is the ordinary group-10 case: the post correctly emits no coolant code, and at `Off` it also said nothing about having ignored the request | Low | All **thirteen** `>>> WARNING:` sites now go through `writeWarning()`, which bypasses the level gate — `Off` means less commentary, not fewer warnings. Made structural rather than a string match: `writeComment()`'s emit half became `writeCommentLine()`, shared by both, and the prefix lives in one place so it cannot drift. The row named three warnings and the code had thirteen. The `>>>` lines that are *not* warnings (coolant channel, laser power, dwell, spindle speed) stay level-gated | ✅ fixed |
 | **HB-10** | **`Tool Change Probe` (`includeProbeFile`) is a dialog field that does nothing.** Declared at 654-662 with a title and tooltip; nothing in the post calls `loadFile()` with it, so a filename entered here is silently ignored. The tooltip does say `NOT IMPLEMENTED YET`. *Pre-seeded — named in the checkpoint before this pass began, not an independent find; recorded so the fresh register is not missing a known group-8 defect* | Low | Open — wire it into `probeTool()` or delete the property. It belongs to the tool-change branch's ordering work either way | ⬜ |
 
 ---
 
-## Test register — 12 rows
+## Test register — 13 rows
 
 Every finding resolves to a row. All rows are **unrun**: they are written to be posted from Fusion
 after the fix lands, and each states what must be **present** and what must be **absent** in the
 file. Personas are `conventions.md` → *How to run a test*; defaults are GRBL/mm, `Comment Level`
 `Info`, unless the Setup delta says otherwise.
 
-**✅ 0 PASS · ❌ 0 FAIL · ⬜ 10 UNRUN · ➖ 2 n/a — 12 rows.**
+**✅ 0 PASS · ❌ 0 FAIL · ⬜ 11 UNRUN · ➖ 2 n/a — 13 rows.**
 
 | Test | Proves | Setup | Method | State |
 |---|---|---|---|---|
@@ -65,6 +65,7 @@ file. Personas are `conventions.md` → *How to run a test*; defaults are GRBL/m
 | **HB-6 (A)** | RepRap files set the plane and the feed mode | HP-1 on RepRap, `Use Arcs` on, a Setup containing at least one XY fillet | posted | ⬜ |
 | **HB-7 (A)** | A mistyped include filename refuses before any output | HP-1 + `Start GCode File` = `no_such_file.g` | posted | ⬜ |
 | **HB-8 (A)** | The two one-way settings survive a second post in the same Fusion session | HP-1 posted twice without restarting Fusion: first with `Enforce Feedrate` on and `Include Whitespace` off, then with `Enforce Feedrate` off and `Include Whitespace` on | posted | ⬜ |
+| **HB-9 (A)** | A `>>> WARNING:` reaches the file at `Comment Level` = `Off`, and nothing else does | HP-1 + `Comment Level` = `Off` + `Home at Job Start` = `Home` + `Axes Homed and Trusted` = `None` (HB-3 (A)'s combination) | posted | ⬜ |
 
 ### Expects
 
@@ -91,6 +92,11 @@ Where the discriminator needs more than a table cell.
 - **HB-8 (A)** — the second file has **no** `F` word on moves whose feed did not change, and
   spaces between words. Read the property dump in each file first to confirm the dialog state
   actually differed — the row is worthless if the second post reused the first's settings.
+- **HB-9 (A)** — the file's **only** `(` line is
+  `( >>> WARNING: "Home at Job Start" is on but "Axes Homed and Trusted" is None -- nothing was homed )`.
+  Presence and absence in one row, so it needs no sibling: the warning is the presence half, and no
+  `*** START begin ***`, no property dump, no `Resolved Values` block and no `Probe SafeZ` line is the
+  absence half proving `Comment Level` really was `Off`. Also **no `$H`**, as in HB-3 (A).
 
 ---
 
@@ -108,5 +114,6 @@ What this register still owes, and why each artifact is worth a post.
 - **Groups 7, 9 and 11 were not walked.** A hobbyist doing a manual tool change on an MPCNC or
   running a diode laser is an ordinary case, and neither is covered by any row here.
 - **The `Comment Level` = `Off` file has never been posted.** HB-9 was found by reading
-  `writeComment()`'s gate; a posted `Off` file would also settle whether anything else the review
-  assumed was visible actually disappears at that level.
+  `writeComment()`'s gate and is now `HB-9 (A)`, which is that post. Worth running for more than the
+  fix: it is the only artifact that would settle whether anything else this review assumed was visible
+  actually disappears at that level.

@@ -1118,7 +1118,7 @@ function safeZforSection(_section)
         
       case eSafeZ.ERROR:
         safeZHeight = dfltInUnit;
-        writeComment(eComment.Important, " >>> WARNING: " + properties.mapRapidsSafeZ.title + " format error: " + safeZHeight);
+        writeWarning(properties.mapRapidsSafeZ.title + " format error: " + safeZHeight);
         break;
     }
   }
@@ -1311,7 +1311,7 @@ function isSafeToRapid(x, y, z) {
 // also inherit its missing-file error and its missing-trailing-newline repair. See HReview.md CR-4.
 function writeCustomCoolantFile(channel, on, file) {
   if (file == "") {
-    writeComment(eComment.Important, " >>> WARNING: coolant channel " + channel + " is set to \"Use custom\""
+    writeWarning("coolant channel " + channel + " is set to \"Use custom\""
       + " but no custom file is named -- nothing emitted");
     return;
   }
@@ -1397,7 +1397,7 @@ function setCoolant(coolant) {
     }
 
     if (warn) {
-      writeComment(eComment.Important, " >>> WARNING: No matching Coolant channel : " + ((coolantLevels.indexOf(coolant) != -1 ) ? coolant : "unknown") + " requested");
+      writeWarning("No matching Coolant channel : " + ((coolantLevels.indexOf(coolant) != -1 ) ? coolant : "unknown") + " requested");
     }
   }
 }
@@ -2040,7 +2040,7 @@ function writeWCS(section) {
 
   if (fw == eFirmware.MARLIN) {
     if (workOffset > 1 && workOffset != currentWorkOffset) {
-      writeComment(eComment.Important, " >>> WARNING: Marlin uses a G92 origin; work offset " + workOffset + "/G" + (53 + workOffset) + " is not supported and is ignored");
+      writeWarning("Marlin uses a G92 origin; work offset " + workOffset + "/G" + (53 + workOffset) + " is not supported and is ignored");
     }
     currentWorkOffset = workOffset;
     return;
@@ -2360,7 +2360,7 @@ function writeMachineParkXY() {
   // timidity: that park goes to the LAST part's own origin, so the tool is already at that part
   // and the move does not cross the bed. See docs/PReview.md PR-6.
   if (!parkCanRetract()) {
-    writeComment(eComment.Important, " >>> WARNING: no retract before parking at machine X0 Y0 --"
+    writeWarning("no retract before parking at machine X0 Y0 --"
       + (fw == eFirmware.MARLIN && getReservedBaseWcs() != 0
           ? " the reserved spoilboard base was not established on Marlin, so there is no frame to"
             + " retract in;"
@@ -2974,10 +2974,10 @@ function onCommand(command) {
       // is a deliberate no-op: the tap feed F360 calculated already assumes a constant
       // spindle RPM, and a floating/tension tap holder is needed to absorb any timing drift.
       // Warned every occurrence (not just once) so every affected move in the file is flagged.
-      writeComment(eComment.Important, " >>> WARNING: Speed-feed synchronization (rigid tapping) is not supported; a floating/tension tap holder is required");
+      writeWarning("Speed-feed synchronization (rigid tapping) is not supported; a floating/tension tap holder is required");
       return;
     case COMMAND_DEACTIVATE_SPEED_FEED_SYNCHRONIZATION:
-      writeComment(eComment.Important, " >>> WARNING: Speed-feed synchronization (rigid tapping) is not supported; a floating/tension tap holder is required");
+      writeWarning("Speed-feed synchronization (rigid tapping) is not supported; a floating/tension tap holder is required");
       return;
     case COMMAND_TOOL_MEASURE:
       if (!tool.isJetTool()) {
@@ -3220,8 +3220,8 @@ function writeMachineHoming() {
   // satisfied, not a no-op worth passing over in silence: the operator believes the job homes.
   // Not an error() -- it costs no safety on its own, and the guards refuse the case where it does.
   if (!homeXY && !homeZ) {
-    writeComment(eComment.Important, " >>> WARNING: \"Home at Job Start\" is on but \"Axes Homed"
-      + " and Trusted\" is None -- nothing was homed");
+    writeWarning("\"Home at Job Start\" is on but \"Axes Homed and Trusted\" is None -- nothing was"
+      + " homed");
     return;
   }
 
@@ -3338,7 +3338,7 @@ function writeFixedZReference() {
     if (fw == eFirmware.MARLIN) {
       // Unreachable via the dialog -- validateJob() refuses this combination before any output.
       // Kept so the function is safe to call from anywhere, not because a job can arrive here.
-      writeComment(eComment.Important, " >>> WARNING: Fixed Z Reference = Machine Z ignored on Marlin");
+      writeWarning("Fixed Z Reference = Machine Z ignored on Marlin");
       return;
     }
     writeComment(eComment.Important, " Establish fixed Z reference -- homed machine Z");
@@ -3361,7 +3361,7 @@ function writeBaseEstablish() {
   var gname = wcsName(base);
 
   if (fw == eFirmware.MARLIN) {
-    writeComment(eComment.Important, " >>> WARNING: reserved base " + gname + " ignored on Marlin (no per-WCS registers; single global frame)");
+    writeWarning("reserved base " + gname + " ignored on Marlin (no per-WCS registers; single global frame)");
     return;
   }
 
@@ -3609,25 +3609,43 @@ function writeWcsOnStart() {
     // laser user lands on rather than the "Set X0 Y0 Z0 to Current Pos" the README tells them to
     // pick. Suppressing the origin write is still right (see above); being quiet about it is not.
     // See HReview.md CR-5, and PReview.md J1 / HR-1 (D) for the jet workstream this belongs to.
-    writeComment(eComment.Important, " >>> WARNING: a jet tool / tool 0 cannot probe, so Z0 was NOT"
+    writeWarning("a jet tool / tool 0 cannot probe, so Z0 was NOT"
       + " established -- this job runs against whatever Z origin is already stored. Use"
       + " \"Set X0 Y0 Z0 to Current Pos\" for a jet/laser job.");
     writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool)");
   }
 }
 
+// The emit half of writeComment(), shared with writeWarning() below so the two cannot come to differ
+// on how a comment is delimited or sanitized.
+function writeCommentLine(text) {
+  // Collapse parentheses (comment markers) and newlines to a space so a multi-line
+  // value can't split the comment into a second, uncommented (active G-code) line.
+  var safeText = sanitizeMessageText(text, "()");
+  if (fw == eFirmware.GRBL) {
+    writeln("(" + safeText + ")");
+  }
+  else {
+    writeln(";" + safeText);
+  }
+}
+
+// Every ">>> WARNING:" the post writes goes through here, and it IGNORES Comment Level. The gate in
+// writeComment() suppressed all thirteen of them at Off, and three have no validateJob() twin to
+// survive in: the jet-tool / tool-0 "Z0 was NOT established", "No matching Coolant channel", and
+// writeMachineHoming()'s "nothing was homed". A tool carrying a coolant mode no channel is configured
+// for is the ordinary group-10 case -- the post rightly emits no coolant code, and at Off it also
+// said nothing about having ignored the request. Off means less commentary, not fewer warnings. The
+// prefix lives here rather than at the call sites so it cannot drift.
+// See docs/HReview.md HB-9.
+function writeWarning(text) {
+  writeCommentLine(" >>> WARNING: " + text);
+}
+
 // Output a comment
-function writeComment(level, text) { 
+function writeComment(level, text) {
   if (commentLevels.indexOf(level) <= commentLevels.indexOf(getProperty(properties.jobCommentLevel))) {
-    // Collapse parentheses (comment markers) and newlines to a space so a multi-line
-    // value can't split the comment into a second, uncommented (active G-code) line.
-    var safeText = sanitizeMessageText(text, "()");
-    if (fw == eFirmware.GRBL) {
-      writeln("(" + safeText + ")");
-    }
-    else {
-      writeln(";" + safeText);
-    }
+    writeCommentLine(text);
   }
 }
 
@@ -4067,7 +4085,7 @@ function warnJogAtPauseOnGrbl() {
   if (fw != eFirmware.GRBL) {
     return;
   }
-  writeComment(eComment.Important, " >>> WARNING: jogging at this pause is not supported on GRBL --"
+  writeWarning("jogging at this pause is not supported on GRBL --"
     + " M0 holds the controller in a state that refuses jog commands. Position the tool before"
     + " starting the job, or choose a \"Use Active WCS ...\" mode.");
 }
@@ -4102,7 +4120,7 @@ function toolChange() {
   // on purpose, which is exactly why it has to be loud. validateJob() carries the post-time half of
   // the same warning. See docs/HReview.md CR-3.
   if (!getProperty(properties.toolChangeEnabled)) {
-    writeComment(eComment.Important, " >>> WARNING: change to T" + tool.number + " " + tool.comment
+    writeWarning("change to T" + tool.number + " " + tool.comment
       + " suppressed -- \"Tool Changes are Included\" is off; the previous tool stays in the spindle");
     return;
   }
