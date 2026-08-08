@@ -201,31 +201,14 @@ is guarded on the declaration — the same reason the action lives there, and th
 
 - **Post the job from Fusion and read the g-code.** Machine dry-runs and physical measurement are out of
   scope — every row must stand on the posted file alone.
-- **Fusion posts with its own copy of the `.cps`** at `%APPDATA%\Autodesk\Fusion 360 CAM\Posts\`. Re-import
-  before every session and **date the output** against a token the newest commit changed, or you will
-  verify a stale build. Absence-based rows pass trivially on a build lacking the feature.
-- **Read the posted file's own property dump before believing a row ran.** It records the whole dialog
-  state; a row can silently not have been exercised.
+- **Read the posted file's own property dump.** It records the whole dialog
+  state.
 - Output goes to `C:\Users\don_m\Documents\Fusion 360\NC Programs\`, **is not in the repo**, and a reused
-  filename destroys evidence. **Name a post for the row it serves** (`HR12a`), not for what the job does,
-  and grep this file for the name first.
-- Setting any group-08 include makes Fusion ask *"This post processor might be unsafe…"* — answer **Yes**.
-  Answering No aborts the post and **invalidates** the row rather than failing it.
-- Defaults unless stated: GRBL/mm, Comment Level `Info`, probe target/speed/thickness `Z-10`/`F30`/`Z0.8`,
-  probe Safe Z resolves to `5.08`. Comments are `( … )` on GRBL, `; …` on Marlin/RRF. `G10 L20 P<n>` on
-  GRBL/RepRap, `G92` on Marlin.
+  filename destroys evidence. **Name a post for the row it serves** (`HR12a`), not for what the job does.
+- Defaults unless stated: GRBL/mm, Comment Level `Info`, probe target/speed/thickness `Z-10`/`F30`/`Z0.8`.
 
-**Method**, strongest first: **`posted`** a real file from the real post — the only method that proves what
-a hobbyist receives · **`harness`** node against functions brace-matched out of the `.cps`, or a post from
-`Personal.cps` — proves *logic*, not output · **`source`** firmware source · **`read`** a reading of the
-post's own control flow — **weaker than the rest**, used only where the artifact a posted row needs does
-not exist.
+**Method**, strongest first: **`posted`** a real file from the real post — the only method that proves what is generated.
 
-**Personas** (setup shorthand): **HP-1** one Setup / one Operation / one tool, pre-jogged XY, touch plate —
-defaults + firmware + travel/max speeds + `Scale Feedrate` on · **HP-2** HP-1 + First WCS/Part =
-`Set X0 Y0 Z0 to Current Pos` · **HP-3** HP-1 + a `Jog to …` mode · **HP-4** HP-1 on Marlin or RepRap ·
-**HP-5** HP-1 + more than one operation. Group 03 is part of the HP-1 *persona*, not of the config a
-verification post must carry — it cannot execute on a paid licence (HW-1).
 
 ---
 
