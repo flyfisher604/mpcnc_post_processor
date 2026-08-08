@@ -3399,6 +3399,11 @@ function writeBaseEstablish() {
 function probeOffsetX() { return propertyMmToUnit(getProperty(properties.probeOffsetX)); }
 function probeOffsetY() { return propertyMmToUnit(getProperty(properties.probeOffsetY)); }
 
+// True when a part probe touches off somewhere other than the part origin, i.e. when the XY offset
+// creates a traverse. Read by partProbe() and by the first-part "... Current Pos" path, which must
+// retract before that traverse -- one definition so the two cannot disagree about when it happens.
+function probeOffsetIsSet() { return probeOffsetX() != 0 || probeOffsetY() != 0; }
+
 // Operator-pause spec the next probeTool() honors: whether to prompt the operator to attach
 // the Z probe (before) and detach it (after). Both default true -- the historical behavior,
 // and what the tool-change re-probe uses. A caller (part probe / base establish) sets these
@@ -3423,7 +3428,7 @@ var probePauseAfter = true;
 function partProbe(atOrigin, zUnknown) {
   var ox = probeOffsetX();
   var oy = probeOffsetY();
-  var offsetSet = (ox != 0 || oy != 0);
+  var offsetSet = probeOffsetIsSet();
   if (!atOrigin || offsetSet) {
     resetAll();
     // The rapid below is at an unknown height and, on the first-part path, is the program's first
@@ -3541,8 +3546,21 @@ function writeWcsOnStart() {
     // into a "did not contact" alarm. See docs/HReview.md HR-1.
     writeComment(eComment.Info, "   Provisional Z0 at the current height so the probe target is a relative limit");
     writeWcsOrigin(currentWorkOffset, 0, 0, 0);
-    // The origin is the current position; partProbe() steps to the probe point (origin + XY
-    // offset) only when an offset is set.
+    // The origin is the current position; partProbe() steps to the probe point (origin + XY offset)
+    // only when an offset is set -- and that step ran at whatever Z the operator jogged to, which on
+    // this mode's own premise is a millimetre over the stock. A 25 mm offset then dragged the bit
+    // that far across the work, or into a clamp, before the probe. The sibling "Use Active WCS X0
+    // Y0, Probe Z0" path cannot lift (its Z0 is stale, so it prints the unknown-Z warning instead);
+    // here the provisional Z0 was just written one line up, so an ABSOLUTE retract is meaningful and
+    // is measured from the height the operator chose. Gated on the offset so a zero-offset job --
+    // the default -- stays byte-identical. The G38 target keeps its meaning: still a bounded
+    // descent, now from probeSafeZ() above the jogged height. See docs/HReview.md HB-4.
+    if (probeOffsetIsSet()) {
+      writeComment(eComment.Info, "   Retract to Safe Z before the offset traverse");
+      resetAll();
+      rapidMovementsZ(probeSafeZ());
+      flushMotions();
+    }
     partProbe(true);
   } else {
     // Tool 0 / jet tool: no probe, so there is no G38 target to bound and nothing for a
