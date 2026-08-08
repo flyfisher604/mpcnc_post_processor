@@ -1912,6 +1912,15 @@ function resetPostState() {
   probePauseBefore = true;
   probePauseAfter = true;
   pendingRadiusCompensation = RADIUS_COMPENSATION_OFF;
+
+  // Not a value, but the same leak these lines exist for. gPlaneModal is created once at file scope
+  // and nothing rebuilds it, so a second file sharing one JavaScript context would open believing the
+  // plane it last emitted is still in force -- suppressing Start()'s G17 and shipping a file with no
+  // G17 at all, HB-6's hazard arriving through the post. Latent rather than observed: every posted
+  // file carries exactly one G90, G21 and G94 from Start() and those modals are never reset either,
+  // so this context does appear to be fresh per file. Reset regardless, because the G17 added before
+  // a Stop file now leaves a GRBL file ON G17 and would make the suppression systematic. HB-12.
+  gPlaneModal.reset();
 }
 
 function onOpen() {
@@ -2045,6 +2054,25 @@ function onClose() {
 
     writeComment(eComment.Important, " *** STOP end ***");
   } else {
+    // Assert the XY plane before handing the tail of the file to the operator's footer. A Z lead-out
+    // ends the last section with G18 in force -- HB-2 (A) 192, "G18 G2 X182.797 Z-0.083 K4.997" -- and
+    // nothing between there and M30 puts it back, so a footer holding "G2 X.. Y.. I.. J.." runs in ZX:
+    // HB-6's silent wrong-plane arc, this time caused by this post and not by a stale controller. Past
+    // M30 grbl repairs its own state -- grbl/gcode.c gc_execute_line(), the PROGRAM_FLOW_COMPLETED
+    // branch resets plane_select to PLANE_SELECT_XY -- so this window, before it, is the exposure.
+    //
+    // GRBL-only, for the inverse of HB-6's reason. There G17 was rejected as not free off GRBL (Marlin
+    // compiles it only under CNC_WORKSPACE_PLANES); here it would also buy nothing, because
+    // circular()'s non-GRBL branch linearizes every non-XY arc and cannot leave the plane off XY.
+    //
+    // In this branch and not at the head of onClose(), because the built-in stop block emits no arc:
+    // a G17 there protects nothing and changes every GRBL job's output, gPlaneModal.onchange resetting
+    // gMotionModal so the park move gains a G0 it currently rides in from the section retract. Through
+    // gPlaneModal, so a job whose arcs were all XY still emits nothing. See docs/HReview.md HB-12.
+    if (fw == eFirmware.GRBL) {
+      writeBlock(gPlaneModal.format(17));
+    }
+
     loadFile(getProperty(properties.includeStopFile));
     flushMotions();
   }
