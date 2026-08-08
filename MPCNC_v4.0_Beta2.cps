@@ -243,16 +243,16 @@ properties = {
   },
   feedsScaleFeedrate: {
     title      : "Scale Feedrate",
-    description: "Scale feedrates to remain less than X, Y, Z axis maximums.",
+    description: "On (default): every cut feedrate is scaled down so that no axis is asked to move faster than its limit below, and the resulting toolpath feed is capped at Max Toolpath Speed. Off: Fusion's feedrates are emitted exactly as the CAM produced them, and THE THREE LIMITS BELOW DO NOTHING AT ALL. Set those three to your machine's real capability before relying on this -- the shipped 900/180/1000 are generic MPCNC figures, and limits set below what your machine can actually do will quietly slow every cut in the job.",
     group      : "feeds",
     order      : 40,
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
   feedsMaxCutSpeedXY: {
     title      : "Max XY Cut Speed",
-    description: "Limit X or Y feedrate to be less then this value (mm/min).",
+    description: "The fastest your machine may cut in X or Y, in mm/min. ONLY APPLIED WHEN SCALE FEEDRATE ABOVE IS ON -- with it off this field does nothing. 900 is a generic MPCNC figure; use your own machine's.",
     group      : "feeds",
     order      : 50,
     type       : "integer",
@@ -261,7 +261,7 @@ properties = {
   },
   feedsMaxCutSpeedZ: {
     title      : "Max Z Cut Speed",
-    description: "Limit Z feedrate to be less then this value (mm/min).",
+    description: "The fastest your machine may cut in Z, in mm/min -- normally far slower than X/Y on a leadscrew Z. ONLY APPLIED WHEN SCALE FEEDRATE ABOVE IS ON -- with it off this field does nothing. 180 is a generic MPCNC figure; use your own machine's.",
     group      : "feeds",
     order      : 60,
     type       : "integer",
@@ -270,7 +270,7 @@ properties = {
   },
   feedsMaxCutSpeedXYZ: {
     title      : "Max Toolpath Speed",
-    description: "Maximum scaled toolpath feedrate (mm/min).",
+    description: "A cap on the speed the tool travels ALONG ITS PATH, in mm/min, applied after the per-axis scaling above -- a diagonal move can stay inside both axis limits and still be faster than you want overall. ONLY APPLIED WHEN SCALE FEEDRATE ABOVE IS ON.",
     group      : "feeds",
     order      : 70,
     type       : "integer",
