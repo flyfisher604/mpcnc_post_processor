@@ -1719,6 +1719,12 @@ function validateJob() {
   // toolChange() loads them: a stale name left in a field their own descriptions call ignored must
   // not refuse a job that will never read it. writeCustomCoolantFile()'s four custom-file
   // properties reach loadFile() too and are deliberately NOT checked here -- see HB-7's row.
+  //
+  // The message below says only what the operator can act on. It once ended "Refused before any
+  // output, rather than part way through the file it would otherwise have truncated", which describes
+  // behaviour this operator never saw and reads as a claim that THIS attempt truncated something --
+  // misleading, because a refused post does leave a .gcode.failed on disk. Where the check sits and
+  // why is this comment's job, not the dialog's. HB-15.
   var includeFileProps = [properties.includeStartFile, properties.includeStopFile];
   if (getProperty(properties.toolChangeEnabled)) {
     includeFileProps.push(properties.includeToolFile1);
@@ -1729,8 +1735,7 @@ function validateJob() {
     if (includeName != "" && !FileSystem.isFile(includeFolder() + includeName)) {
       error("\"" + includeFileProps[i].title + "\" names \"" + includeName + "\", which is not a file"
         + " in the NC output folder " + includeFolder() + " -- check the spelling and the extension,"
-        + " or clear the field. Refused before any output, rather than part way through the file it"
-        + " would otherwise have truncated.");
+        + " or clear the field.");
       return;
     }
   }
@@ -2668,7 +2673,11 @@ function onSectionEnd() {
   // header and on the LCD. onSection() substitutes a placeholder when nothing arrives.
   sectionComment = undefined;
   writeComment(eComment.Important, " *** SECTION end ***");
-  writeComment(eComment.Important, "");
+  // " " and not "" -- the same blank separator Start() ends with, so every separator in a file is one
+  // form. The two disagreed by this character, giving GRBL files "( )" after START and "()" after each
+  // section. Nothing operational turned on it; a one-character difference between two adjacent call
+  // sites just reads as significant to whoever diffs two files next. HB-11.
+  writeComment(eComment.Important, " ");
 }
 
 function onComment(message) {
