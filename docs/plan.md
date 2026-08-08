@@ -12,20 +12,25 @@ thing to change first if you think something new belongs here.
 
 *Written so a fresh session can resume with no other context. Update it when the situation moves.*
 
-**Baseline.** Branch **`Goto-0,0`**, cut from `machine-frame-design` (itself cut from `PropertyUpdate`).
-`PReview.md` **PR-6 · PR-7** have landed there. PR-6: `At End Go to 0,0` never said *which* X0 Y0, and it
-was the last section's WCS; it is now `At End Park At` = `Off` / `Work X0 Y0` / `Machine X0 Y0`, the
-machine answer being `G53 G0 X0 Y0` on GRBL/RepRap and `G28 X Y` on Marlin. PR-7 folded `Prompt Before
-Home` into `Home at Job Start` = `Off` / `Home` / `Pause, then Home` — **the first merge that deletes a
-state rather than renaming one**, the prompt having been inert whenever homing was off — and moved the
-park into group 4 as `machineParkAtEnd`. Group 4 now reads declaration / action / park. **Also unposted.** The branch
-name is `Goto-0,0`, not `Goto 0,0`: git refs cannot contain a space.
+**Baseline.** **`master`.** The three working branches the machine-frame rework was built on —
+`PropertyUpdate` → `machine-frame-design` → `Goto-0,0` — were a linear chain, so `master`
+fast-forwarded onto the tip and all three labels were deleted; every commit is retained and no merge
+commit was made. **`master` is 14 commits ahead of `origin/master` and nothing has been pushed.**
 
-On the parent branch, **the machine-frame / fixed-Z-reference rework has landed, and its dialog has since
-been consolidated** — `PReview.md` **PR-1 · PR-2 · PR-3 · PR-5** and `HReview.md` **HR-28**. Together with
-PR-6 these are **the first changes since `c73726c` to alter what the post emits.** Nothing is half-done;
-**nothing is posted.** Untracked and deliberate: both `MPCNC_v4.0_Beta*.zip`, and `Personal.cps` (a test
-harness, excluded via `.git/info/exclude` — see `conventions.md`).
+**What landed in those 14.** The property rework (`groupDefinitions`, explicit `order:`, the
+`<groupKey><Name>` key rename), then the machine frame and the fixed Z reference — `PReview.md`
+**PR-1 · PR-2 · PR-3 · PR-5** and `HReview.md` **HR-28** — then **PR-6 · PR-7**: `At End Go to 0,0`
+never said *which* X0 Y0 and it was the last section's WCS, so it is now `At End Park At` = `Off` /
+`Work X0 Y0` / `Machine X0 Y0`, the machine answer being `G53 G0 X0 Y0` on GRBL/RepRap and `G28 X Y`
+on Marlin; and `Prompt Before Home` folded into `Home at Job Start` = `Off` / `Home` / `Pause, then
+Home` — **the first merge that deletes a state rather than renaming one**, the prompt having been
+inert whenever homing was off — with the park moved to group 4 as `machineParkAtEnd`. Group 4 now
+reads declaration / action / park. A pre-post review of the whole range then found four defects in
+PR-2 / PR-6's own code and fixed them: **PR-8 … PR-11**.
+
+Together these are **the first changes since `c73726c` to alter what the post emits.** Nothing is
+half-done; **nothing is posted.** Untracked and deliberate: both `MPCNC_v4.0_Beta*.zip`, and
+`Personal.cps` (a test harness, excluded via `.git/info/exclude` — see `conventions.md`).
 
 **What that rework did, in one line each.** Group 4 became a machine declaration + `Home at Job Start`
 (the action), replacing the `None`/`XY`/`XYZ` enum that conflated the two. Group 5 became
@@ -79,8 +84,8 @@ silently. It needs a rotated Setup. Written up in `HReview.md` → *Owed*.
 ## Phase status
 
 - **Phases 1–3 — done & verified.** WCS origin/probe rework to `G10 L20`; `writeWcsOrigin()`; MCS homing;
-  reserved base + establish + Guards A/B/C. **Two of these were reworked on `machine-frame-design` and are
-  verified only up to that point** — MCS homing (the enum is gone) and Guard B (relaxed).
+  reserved base + establish + Guards A/B/C. **Two of these were reworked by the machine-frame range and
+  are verified only up to `c73726c`** — MCS homing (the enum is gone) and Guard B (relaxed).
 - **Phase 4 — in progress.** All of it has landed except tool-change ordering + base-relative park — design
   settled, written up in `PReview.md` §2. Verification is still owed on the probe XY offset's added-part
   halves and on the multi-part rows generally.
