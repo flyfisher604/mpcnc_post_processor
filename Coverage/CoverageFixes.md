@@ -52,8 +52,15 @@ while its test has never been run, and a test can fail on a fix that was applied
 
 | Section | Status line | Values |
 |---|---|---|
-| FIX | `**Status:** ` | `[ ] applied` while it is still a proposal; `[x] applied` plus the commit **subject** once a commit carries it — a subject survives an amend or a rebase, and the CR id in it makes `git log --grep` find the commit; a sha written here does not survive, because this line ships inside the very commit it names |
+| FIX | `**Status:** ` | `[ ] applied` while it is still a proposal; `[x] applied` plus the commit **subject** once a commit carries it — a subject survives an amend or a rebase, and the CR id in it makes `git log --grep` find the commit; a sha written here does not survive, because this line ships inside the very commit it names; `deferred — <why, and what would settle it>` when the design is finished but deliberately not being applied |
 | TEST | `**Status:** ` | `open` — not run, or not yet written; `pass`; `fail — <what was seen>` |
+
+A **deferred** FIX is not a stalled one. It says the design is done and the decision to apply it is being
+withheld on a stated question — most often whether the finding's premise holds — and it keeps the design
+whole so that answering the question is all a return to it needs. Its TEST stays `open`: walking a fix
+nobody has decided to apply proves only that the walk works. The finding's own box in
+`CoverageFindings.md` carries the same word and the same reason, since a reader of the ledger has to see
+that the entry exists and is not being acted on.
 
 Each row names its **method**: `walk` — hand-executed against the source, per the procedure above; or
 `posted` — a real file from the real post. A `walk` row is complete when the block stream has been written
@@ -663,7 +670,26 @@ Record it in the status line above and revise the FIX; do not edit the expectati
 
 ### FIX
 
-**Status:** `[ ] applied`
+**Status:** `deferred` — the design below is complete and unapplied. What is in doubt is the **finding**,
+not the fix: it is not settled that a section's first motion callback ever carries a cutting move.
+
+**Why it is deferred, and what would settle it.** CR-04 is filed on the code's silence rather than on an
+observed job — the finding itself grants that a section opening with a positioning move is *"true of
+ordinary Fusion output"* and objects that this is an assumption about the CAM rather than a property of the
+code. That objection stands on its own, but it does not by itself show the dangerous case is reachable, and
+the fix's cost is not zero: it puts a test in front of the one conversion the hobbyist configuration relies
+on for every section, where reading `false` too widely costs the recovery the group exists for.
+
+The question is answerable, and on the licence the operator has: **under a full licence, is the first
+motion of every section a `G0`?** If it always is, then under Personal that same first move is the
+positioning move the conversion assumes, and there is nothing to guard. The case to hunt is a section
+Fusion links into without retracting first, whose opening motion is a link or lead-in at feed rather than a
+rapid; drilling is not a candidate, since `onCyclePoint()` never reaches `onLinear()`. One posted file from
+a multi-operation job with stay-down linking answers it. Until it is answered, nothing here is applied and
+no walk is run.
+
+Everything below is the design as it stood when it was written, kept whole so that answering the question
+is the only work a return to this finding needs.
 
 The finding names its own fix — *a destination Z test costs nothing here* — and names the function to use
 for it: `isSafeToRapid()`, which already exists. The test is right. The function is the wrong one to ask,
@@ -785,7 +811,8 @@ constant-axis tests below still need it:*
 
 ### TEST
 
-**Status:** `open`
+**Status:** `open` — written, and not run: the FIX is deferred, and walking a fix nobody has decided to
+apply would prove only that the walk works.
 
 Walks, not posted files. The claim is an absence — *no `G0` is emitted for a first move below Safe Z* — and
 absence from the source is absence from every configuration, where absence from one posted file is not. All
@@ -1010,7 +1037,9 @@ function rapidRecoveryEnabled() {
 ```
 
 **Where this meets CR-04.** Both edit `onLinear()`'s first arm and the same property description. Neither
-depends on the other, and whichever lands second rebases onto the first. Composed, the arm reads:
+depends on the other, and whichever lands second rebases onto the first — **CR-04 is deferred**, so this
+one lands alone unless that changes, and its arm is then the plain substitution shown above. Composed, the
+arm reads:
 
 ```js
   if (rapidRecoveryEnabled() && (forceSectionToStartWithRapid == true)) {

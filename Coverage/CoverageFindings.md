@@ -35,7 +35,9 @@ judgement belongs in a later pass of `CoverageReview.md`, not in an edit here.
 
 ## Ledger
 
-**24 findings — 3 fixed, 21 open.** Ordered by severity; the bodies below are in CR order.
+**24 findings — 3 fixed, 20 open, 1 deferred.** Ordered by severity; the bodies below are in CR order.
+*def.* in the status cell means the finding's own premise is in doubt and no fix is being applied until it
+is settled — the box says which question, and the fix, where one is designed, waits in `CoverageFixes.md`.
 
 | Status | Finding | Audience | Severity | Summary |
 |---|---|---|---|---|
@@ -45,7 +47,7 @@ judgement belongs in a later pass of `CoverageReview.md`, not in an edit here.
 | `[ ]` | CR-19 | Both | Machine damage | the `M6` tool-change route stops nothing before the change |
 | `[ ]` | CR-21 | Both | Machine damage | `resetPostState()` does not reset the modal formatters, so a second file in one context loses its preamble |
 | `[ ]` | CR-03 | Hobbyist | Machine damage | group 3 is not gated to the licence it exists for, and nothing warns |
-| `[ ]` | CR-04 | Hobbyist | Machine damage | the first-move conversion applies no test of any kind to the destination |
+| `[ ]` *def.* | CR-04 | Hobbyist | Machine damage | the first-move conversion applies no test of any kind to the destination |
 | `[ ]` | CR-12 | Professional | Machine damage | both `Use Active WCS …, Probe Z0` modes measure the probe target from the Z0 they distrust |
 | `[ ]` | CR-16 | Professional | Machine damage | one part machined from several WCS is accepted and traverses to an unset register |
 | `[ ]` | CR-05 | Both | Machine damage | a start include file leaves `G90`, `G21`/`G20`, `G94` and `G17` unwritten, with no warning |
@@ -124,7 +126,11 @@ warn.
 
 ### CR-04 — the first-move conversion applies no test of any kind to the destination
 
-**Status:** `[ ] fixed`
+**Status:** `[ ] fixed` — **deferred**: the premise is unconfirmed. The finding grants that a section
+opening with a positioning move is ordinary Fusion output and objects to the assumption, but no job has
+been shown whose first motion callback carries a cut. The fix is designed and unapplied in
+[`CoverageFixes.md` → CR-04](CoverageFixes.md), which names the question that would settle it — under a
+full licence, is the first motion of every section a `G0`?
 **Audience:** Hobbyist
 **Severity:** Machine damage
 **Confidence:** Certain
