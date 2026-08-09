@@ -35,13 +35,13 @@ judgement belongs in a later pass of `CoverageReview.md`, not in an edit here.
 
 ## Ledger
 
-**24 findings — 2 fixed, 22 open.** Ordered by severity; the bodies below are in CR order.
+**24 findings — 3 fixed, 21 open.** Ordered by severity; the bodies below are in CR order.
 
 | Status | Finding | Audience | Severity | Summary |
 |---|---|---|---|---|
 | `[x]` | CR-11 | Professional | Machine damage | the spoilboard base is probed to a target measured in the frame the probe is establishing |
 | `[x]` | CR-13 | Professional | Machine damage | with `Retract Across Parts` off, the inter-part traverse height is resolved in one frame and emitted in another |
-| `[ ]` | CR-14 | Professional | Machine damage | the base-establish tool-0 skip leaves the job believing a base was established |
+| `[x]` | CR-14 | Professional | Machine damage | the base-establish tool-0 skip leaves the job believing a base was established |
 | `[ ]` | CR-19 | Both | Machine damage | the `M6` tool-change route stops nothing before the change |
 | `[ ]` | CR-21 | Both | Machine damage | `resetPostState()` does not reset the modal formatters, so a second file in one context loses its preamble |
 | `[ ]` | CR-03 | Hobbyist | Machine damage | group 3 is not gated to the licence it exists for, and nothing warns |
@@ -314,7 +314,8 @@ rather than suppressing the traverse. Nothing warns.
 
 ### CR-14 — the base-establish tool-0 skip leaves the job believing a base was established
 
-**Status:** `[ ] fixed`
+**Status:** `[x] fixed` — 348e35a, the predicate now asks whether the probe can run and a second guard
+refuses the multi-WCS form; walked in [`CoverageFixes.md` → CR-14](CoverageFixes.md)
 **Audience:** Professional
 **Severity:** Machine damage
 **Confidence:** Certain
