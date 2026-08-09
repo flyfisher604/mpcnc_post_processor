@@ -339,7 +339,7 @@ properties = {
 
   spoilboardFixedZRef: {
     title      : "Fixed Z Reference",
-    description: "MULTI-PART JOBS NEED THIS; A SINGLE-PART JOB DOES NOT -- leave it None and skip the rest of the group. The job's fixed Z reference is a frame whose Z0 does NOT move with stock thickness, and therefore the only frame in which one clearance height is meaningful across parts of differing thickness. This answer also decides WHICH FRAME Inter Part Travel Z below is measured in, so re-read that height whenever you change it. None (default): no fixed reference -- Retract Across Parts is unavailable on a multi-WCS job, and Inter Part Travel Z is ignored. Spoilboard: reserve a WCS and probe the spoilboard into it; Inter Part Travel Z is then a height above that surface. Reserved WCS and Probe to Set Base below are its sub-questions. Costs one of GRBL's six WCS registers. GRBL/RepRap only -- Marlin has no per-WCS registers. Machine Z: use the machine's own homed Z frame; Inter Part Travel Z is then an absolute machine coordinate. Consumes NO WCS register and needs no probe, but requires Axes Homed and Trusted to include Z AND Home at Job Start not Off, both in group 4 -- the frame an absolute move trusts must be one this job established. Not available on Marlin.",
+    description: "MULTI-PART JOBS NEED THIS; A SINGLE-PART JOB DOES NOT -- leave it None and skip the rest of the group. The job's fixed Z reference is a frame whose Z0 does NOT move with stock thickness, and therefore the only frame in which one clearance height is meaningful across parts of differing thickness. This answer also decides WHICH FRAME Inter Part Travel Z below is measured in, so re-read that height whenever you change it. None (default): no fixed reference -- SINGLE-PART JOBS ONLY, because a multi-WCS job then has no frame in which one clearance height is meaningful and the post refuses to post it (Guard B); Inter Part Travel Z is ignored. Spoilboard: reserve a WCS and probe the spoilboard into it; Inter Part Travel Z is then a height above that surface. Reserved WCS and Probe to Set Base below are its sub-questions. Costs one of GRBL's six WCS registers. GRBL/RepRap only -- Marlin has no per-WCS registers. Machine Z: use the machine's own homed Z frame; Inter Part Travel Z is then an absolute machine coordinate. Consumes NO WCS register and needs no probe, but requires Axes Homed and Trusted to include Z AND Home at Job Start not Off, both in group 4 -- the frame an absolute move trusts must be one this job established. Not available on Marlin.",
     group      : "spoilboard",
     order      : 10,
     type       : "enum",
@@ -385,15 +385,6 @@ properties = {
     value: "Pause & Probe Z",
     scope: "post"
   },
-  spoilboardSafeZAcrossWcs: {
-    title      : "Retract Across Parts",
-    description: "Multi-fixture safety. On (default): before traversing between operations that use different WCS, the tool retracts to a clearance measured in the job's fixed Z reference so it clears fixtures/clamps/other parts, and the job is validated (Guard B) to reject a multi-WCS job that has no fixed Z reference at all -- a clearance height is meaningless across WCS whose offsets are only known after probing at runtime. The height is Inter Part Travel Z below, read in whichever frame Fixed Z Reference names. Single-WCS jobs (including a single operation) are unaffected: no extra retract is emitted and the guard does not apply. Off: no cross-WCS retract and no guard. GRBL/RepRap only (Marlin is single-frame; see Guard C).",
-    group      : "spoilboard",
-    order      : 40,
-    type       : "boolean",
-    value      : true,
-    scope      : "post"
-  },
   spoilboardTravelZ: {
     title      : "Inter Part Travel Z",
     description: "The height the tool holds while it travels between parts, in mm -- the one clearance that stays valid across parts of differing thickness. Set it to clear the tallest fixture, clamp and part in the job. WHICH FRAME THIS NUMBER IS MEASURED IN IS DECIDED BY FIXED Z REFERENCE ABOVE, and the two readings are unrelated numbers for the same physical plane -- re-read it whenever that answer changes. Ignored entirely when Fixed Z Reference = None. Spoilboard: a height ABOVE THE PROBED SPOILBOARD SURFACE, so positive, typically 30-60. It is used both immediately after the base is probed at job start, as the height the tool holds while travelling to the first part, and before each traverse to a different WCS. Machine Z: an ABSOLUTE MACHINE COORDINATE, signed. Get it once per machine: home, jog to a height that visibly clears everything on the bed, and read Z off your sender's DRO -- no touch-off and no arithmetic. It is often negative, which is normal and needs no adjusting. EMPTY BY DEFAULT UNDER BOTH ANSWERS, because a height carried over from the other frame is a valid-looking number in the wrong frame: the post refuses to post rather than guess. The value is echoed WITH ITS FRAME in the file's Resolved Values block, so check it there before the machine moves. UNDER THE MACHINE Z ANSWER THIS NUMBER BELONGS TO THE MACHINE, NOT TO THE JOB -- unlike every other height in this dialog it does NOT stay correct when a Setup is copied or a design is shared, so re-read it on any machine that is not the one it was measured on. A wrong value sends the tool to a wrong height at travel speed.",
@@ -422,7 +413,7 @@ properties = {
   },
   probeOnChange: {
     title      : "Subsequent WCS / Part",
-    description: "MULTI-PART JOBS ONLY -- milling several parts or copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). A single-part job never reaches this control. Not supported on Marlin at all, which has one global origin -- use separate jobs. THE TWO JOG MODES DO NOT WORK ON GRBL, the default firmware (see First WCS / Part); the post warns and says so in the file. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS; XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X, Y and Z already in its own WCS, from a prior job or set manually). JOG (you jog to each part during the run) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0, no probe. \"Active WCS\" means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. The attach/detach prompts around any probe follow Probe Pause; the safe-Z retract on the traverse is separate (see Retract Across Parts). Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
+    description: "MULTI-PART JOBS ONLY -- milling several parts or copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). A single-part job never reaches this control. Not supported on Marlin at all, which has one global origin -- use separate jobs. THE TWO JOG MODES DO NOT WORK ON GRBL, the default firmware (see First WCS / Part); the post warns and says so in the file. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS; XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X, Y and Z already in its own WCS, from a prior job or set manually). JOG (you jog to each part during the run) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0, no probe. \"Active WCS\" means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. The attach/detach prompts around any probe follow Probe Pause; the safe-Z retract on the traverse is separate, automatic, and measured in whatever frame Fixed Z Reference names. Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
     group      : "probe",
     order      : 20,
     type       : "enum",
@@ -1685,9 +1676,10 @@ function validateJob() {
   if (base == 0) {
     // Guard B -- safe-Z across WCS needs A FIXED Z REFERENCE of either kind: across offsets only
     // established by probing at runtime, no single clearance height is meaningful. Single-WCS is exempt.
-    if (!usesMachineZDatum() && getProperty(properties.spoilboardSafeZAcrossWcs)
-        && collectDistinctOffsets().length > 1) {
-      error("Safe-Z across parts requires a fixed Z reference: set \"Fixed Z Reference\" to the spoilboard answer (and reserve a WCS) or to the machine-Z answer, or turn off \"Retract Across Parts\".");
+    // UNCONDITIONAL since CR-13: it was gated on "Retract Across Parts", so turning that off was the one
+    // way to post the job this refuses -- and what it then posted was a traverse in the wrong frame.
+    if (!usesMachineZDatum() && collectDistinctOffsets().length > 1) {
+      error("A multi-WCS job requires a fixed Z reference: the tool must clear the fixtures on its way between parts, and no single clearance height is meaningful across WCS whose offsets are only known after probing at runtime. Set \"Fixed Z Reference\" to the spoilboard answer (and reserve a WCS) or to the machine-Z answer -- or post one job per part.");
     }
     return; // no base reserved -> Guard A and the slot check are moot
   }
@@ -1873,25 +1865,29 @@ function writeWCS(section) {
     + " canProbe: " + canProbe);
 
   // Retract Z FIRST, before selecting the new WCS -- its Z origin may be unknown, so an absolute Z
-  // move there would be unsafe. The three routes below are the machine frame, the base, and neither.
+  // move there would be unsafe. Every traverse takes one of the two fixed-reference routes: Guard B has
+  // already refused any multi-WCS job that has neither, so there is no third route to fall into.
   var base = getReservedBaseWcs();
   var isTraverse = (previousWorkOffset != undefined);   // a genuine inter-part WCS change
-  var crossPart = isTraverse && getProperty(properties.spoilboardSafeZAcrossWcs);
-  var machineFrame = crossPart && usesMachineZDatum();
-  var baseRelative = crossPart && base != 0 && base != workOffset;
+  var machineFrame = isTraverse && usesMachineZDatum();
+  // Includes the case where the part being ENTERED is the base: the base frame IS the fixed reference,
+  // so its clearance is the right height there too, and retractThroughBaseClearance() already suppresses
+  // the redundant select. The "base != workOffset" this replaced sent that job into the arm below. CR-13.
+  var baseRelative = isTraverse && base != 0;
   writeComment(eComment.Debug, " writeWCS: retract decision -- fixedZRef: " + getFixedZReference()
     + " machineFrame: " + machineFrame + " baseRelative: " + baseRelative
-    + " base: " + base + " C_SafeZAcrossWcs: " + getProperty(properties.spoilboardSafeZAcrossWcs)
-    + " isTraverse: " + isTraverse + " workOffset: " + workOffset);
+    + " base: " + base + " isTraverse: " + isTraverse + " workOffset: " + workOffset);
   if (machineFrame) {
     writeMachineTravelZ("Retract to the travel height in the machine frame before traverse");
   } else if (baseRelative) {
     retractThroughBaseClearance();
   } else if (isTraverse) {
-    writeComment(eComment.Info, "   Retract to Safe Z before WCS change");
-    resetAll();
-    rapidMovementsZ(probeSafeZ());
-    flushMotions();
+    // Unreachable behind Guard B, and an error rather than a move because there is nothing safe to emit:
+    // with no fixed reference, no height means the same thing on both sides of the traverse. What used to
+    // stand here was probeSafeZ() -- the retract level of the section being ENTERED, written BEFORE the
+    // WCS select and so read in the PREVIOUS part's frame, a height belonging to neither part. CR-13.
+    error("Internal: a WCS traverse reached output with no fixed Z reference -- Guard B should have refused this job.");
+    return;
   }
 
   writeComment(eComment.Info, " WCS changed: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset) + " -> " + workOffset);

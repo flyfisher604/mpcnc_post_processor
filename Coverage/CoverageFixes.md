@@ -166,7 +166,8 @@ to match what was seen.
 
 ### FIX
 
-**Status:** `[ ] applied`
+**Status:** `[x] applied` — commit `CR-13: Remove Retract Across Parts and make Guard B unconditional`.
+Named by subject, not by sha, for the reason in the layout table above. `git log --grep "CR-13"`.
 
 **Delete `Retract Across Parts` from the dialog.** Not repair the height it selects — remove the control
 that selects it, because the control has no answer worth giving.
