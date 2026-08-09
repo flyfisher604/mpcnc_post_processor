@@ -157,3 +157,135 @@ no target of any kind** — that path takes no reach and must not have grown one
 default is broken. `Z-100` in CR11c: the units conversion was missed. X or Y on the provisional `G10`: the
 Z-only write is wrong. Record it in the status line above and revise the FIX; do not edit the expectation
 to match what was seen.
+
+---
+
+## CR-13 — with `Retract Across Parts` off, the inter-part traverse height is resolved in one frame and emitted in another
+
+**Finding:** [`CoverageFindings.md` → CR-13](CoverageFindings.md) — Professional, Machine damage, Certain.
+
+### FIX
+
+**Status:** `[ ] applied`
+
+**Delete `Retract Across Parts` from the dialog.** Not repair the height it selects — remove the control
+that selects it, because the control has no answer worth giving.
+
+The case for that is not merely that nobody would want to turn it off. It is that **off does not do what
+its name says.** Read `writeWCS()`: when `crossPart` is false the traverse retract is not suppressed, it is
+*diverted*. The bare `isTraverse` arm still emits `resetAll()`, `rapidMovementsZ(probeSafeZ())`,
+`flushMotions()` — a retract on every traverse, just not the right one. So the checkbox does not read
+"cross-part safety on / off". It reads "retract to the height that clears the fixtures / retract to a
+height belonging to neither part", and the dialog says none of that. An operator who turns it off to save
+a lift does not save the lift; they only stop it being correct.
+
+**And the height in that arm cannot be fixed in place.** This matters, because the obvious narrow fix is to
+resolve `probeSafeZ()` against the *previous* section and emit it *after* the WCS select, closing both
+halves of the finding. That fails. The arm is reached precisely when the job has no fixed Z reference, and
+Guard B already states the reason no height works there: across WCS whose offsets are only known after
+probing at runtime, no single clearance is meaningful. Both frames are unknown to the post; there is no
+number to compute in either. The arm has no correct contents, so the only repair is to make it unreachable.
+
+Removal does exactly that, in three moves.
+
+**Guard B stops being optional.** Today the property gates the guard, so turning it off is the *only* way
+to post a multi-WCS job with `Fixed Z Reference` = None — the configuration the guard exists to refuse.
+Dropping the property from the condition leaves `!usesMachineZDatum() && collectDistinctOffsets().length > 1`,
+which refuses that job outright. The message has to be rewritten anyway, since it currently offers "or turn
+off Retract Across Parts" as a third way out; it should name the two fixed-reference answers and, for the
+operator who can supply neither, posting one job per part.
+
+**`crossPart` collapses into `isTraverse`.** With the property gone, `machineFrame` and `baseRelative` gate
+on the traverse alone. The Debug line that echoed `C_SafeZAcrossWcs` goes with it.
+
+**`baseRelative` widens, and this is the half the finding does not mention.** The test is
+`base != 0 && base != workOffset`. That second clause sends one legitimate job into the broken arm *even
+with the toggle on*: a job that assigns a part to the reserved base WCS itself. Guard A permits this —
+cutting *in* the base is fine, only re-establishing its origin is the error — so with both origin modes on
+`Skip` the job posts and every traverse into that part takes the bare arm. The exclusion is unjustified:
+the base frame *is* the fixed reference, so `Inter Part Travel Z` measured in it is exactly the right height
+whether the part being entered lives in that register or another, and `retractThroughBaseClearance()`
+already suppresses the redundant select for the case where it is the same one. Dropping the clause to
+`base != 0` costs at most one duplicate WCS line and closes the case. Without this, removing the property
+would leave the defect alive on a narrower path — which is why the fix is not one hunk.
+
+**What is left of the arm becomes an error.** After those three, `isTraverse && !machineFrame &&
+!baseRelative` requires `base == 0` and no machine-Z datum on a multi-WCS job, which Guard B has already
+refused. It is unreachable. Deleting it outright would mean a traverse with *no* retract at all if a future
+guard change ever reopened the path — worse than the bug being fixed. So it keeps its shape and raises an
+internal error naming Guard B, which never fires on a valid job and fails loudly if the premise ever breaks.
+
+**Two costs, stated rather than discovered.**
+
+An operator with neither a touch plate nor a homed Z can no longer post a multi-WCS job at all. Today they
+can, by turning the toggle off — and what they get is the traverse this finding says can pass below the next
+part's clamp. A refusal is the honest answer and the guard message must carry the alternative, but this is a
+capability removed, not merely a checkbox tidied.
+
+A stored Setup carrying `false` becomes inert: Fusion ignores a property the post no longer defines, so the
+behaviour reverts to on. That is the safe direction, but a job that posted last week may refuse to post now
+— at Guard B, with the new message, which is the correct outcome arriving as a surprise.
+
+Two descriptions name the deleted control and must move with it: `Fixed Z Reference` says the None answer
+makes `Retract Across Parts` unavailable on a multi-WCS job, which becomes "single-part jobs only, the post
+refuses the other"; and `Subsequent WCS / Part` points at it for the traverse retract, which becomes
+"separate, automatic, and measured in whatever frame Fixed Z Reference names". The user guides and
+`property-reference.md` also carry it (`guide-pro.md` twice, including a step reading "Leave Retract Across
+Parts on") — leave-alone files, so they are flagged here and not touched by the code commit. Removing a
+property is the clearest case there is for re-syncing `property-reference.md`, which `doc-sync` already
+reports behind.
+
+Group 5 loses a field, which is worth something on its own and follows the same argument as the group-3
+fold: a control whose every answer but one is wrong is not a choice, it is a hazard with a label.
+
+### TEST
+
+**Status:** `open`
+
+Four rows, all `posted`. The dialog change is testable from a posted file without opening Fusion's dialog,
+because the file's own property dump records the whole dialog state — a property that has been removed is
+absent from it. One row expects **no file at all**: a guard that refuses is proved by the refusal.
+
+| Test | Proves | Setup delta from defaults | State |
+|---|---|---|---|
+| CR13a | the base route is taken on every traverse and the wrong-frame arm is gone | GRBL/mm, Comment Level `Info`, two parts on G54/G55, `Fixed Z Reference` = Spoilboard, `Reserved WCS` = G59, `Inter Part Travel Z` = 40 | ⬜ |
+| CR13b | the escape hatch is closed — the guard refuses instead of posting | CR13a with `Fixed Z Reference` = None, posted from a Setup that previously had `Retract Across Parts` off | ⬜ |
+| CR13c | the machine-Z route is untouched | CR13a with `Fixed Z Reference` = Machine Z, `Axes Homed and Trusted` = XYZ, `Home at Job Start` = Home, `Inter Part Travel Z` = an absolute machine Z | ⬜ |
+| CR13d | a part assigned to the base WCS takes the base route, not the bare arm | CR13a plus a third part on **G59**, `First WCS / Part` and `Subsequent WCS / Part` both = `Use Active WCS X0 Y0 Z0`, `Probe After Tool Change` off | ⬜ |
+
+**Expect — CR13a.** At the G54 → G55 traverse, in this order:
+
+```
+G59                                       (transit-select the base)
+(   Retract to spoilboard-base clearance G59 before traverse)
+G0 Z40
+G55
+```
+
+The discriminator is an absence with a presence beside it, which is the pairing an absence-based row needs.
+The absence: **`Retract to Safe Z before WCS change` appears nowhere in the file** — that comment is the
+bare arm's own, and it is the token the old build emitted here. The presence: the base-clearance comment
+and its `G0 Z40` in the same block, proving the traverse still retracts and retracts higher. Second absence:
+the property dump lists no `Retract Across Parts` and no `spoilboardSafeZAcrossWcs`.
+
+**Expect — CR13b.** **No output file.** Fusion reports the Guard B error, and the text must name the
+spoilboard answer, the machine-Z answer, and posting one job per part. It must **not** contain the words
+"turn off" — that clause is the removed escape hatch, and its survival would mean the old message shipped.
+This is also the stored-value row: the Setup's remembered `off` must not resurrect the old path, and a file
+appearing at all is the failure.
+
+**Expect — CR13c.** At the traverse, `G53 G0 Z<travel> F<travel speed>` under the machine-frame comment, and
+again no `Retract to Safe Z before WCS change` anywhere. Proves the collapse of `crossPart` into
+`isTraverse` did not disturb the route that was already correct.
+
+**Expect — CR13d.** At the G55 → G59 traverse, the same base-clearance block as CR13a, then the `G59`
+select. A duplicate `G59` line either side of the retract is expected and is not a failure — it is the
+stated cost of dropping `base != workOffset`. Seeing `Retract to Safe Z before WCS change` here is the
+failure this row exists for: it means the widening was omitted and removing the property alone left the
+defect reachable.
+
+**What a fail looks like.** `Retract to Safe Z before WCS change` in any of a/c/d: the arm is still live on
+that path. A file produced by CR13b: Guard B is still gated, or still offers the toggle. The property still
+in any dump: the deletion did not land. An internal-error abort on a/c/d: a guard premise is wrong and the
+`baseRelative` widening should be re-read before anything else. Record it in the status line above and
+revise the FIX; do not edit the expectation to match what was seen.
