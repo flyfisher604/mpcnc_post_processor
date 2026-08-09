@@ -1211,3 +1211,307 @@ in W03c: the post is nagging a job that is set up correctly. `sawGenuineRapid` t
 substitution was not made at that site, and the group turns itself off on the post's own traffic — in W03g's
 case before Fusion has sent a single move. Record it in the status line above and revise the FIX; do not
 edit the expectation to match what was seen.
+
+---
+
+## CR-12 — both `Use Active WCS …, Probe Z0` modes measure the probe target from the Z0 they distrust
+
+**Finding:** [`CoverageFindings.md` → CR-12](CoverageFindings.md) — Professional, Machine damage, Certain.
+
+### FIX
+
+**Status:** `[ ] applied` — designed against the post at `95349d6`. Reconsidered after CR-11 shipped, which
+changed what this entry has to say in three ways: it supplies the mechanism, it inverts the answer to the
+reach question, and its method turns up a third path with the same defect that no finding names.
+
+**CR-11 already built the mechanism, so this fix invents nothing.** `probeTool()` takes a `searchZ` third
+argument that defaults to `G38 Target` ([:3663](../MPCNC_v4.0_Beta2.cps#L3663)), and a Z-only provisional
+origin write immediately before a probe is now the post's settled idiom, in
+[`writeBaseEstablish()` :3017](../MPCNC_v4.0_Beta2.cps#L3017) and in
+[`writeWcsOnStart()`'s `Current XY & Probe Z` arm :3155](../MPCNC_v4.0_Beta2.cps#L3155). CR-12 needs no new
+signature, no new constant and no new control — only the same write, on the paths that still lack it, and
+`G38 Target` then means on those paths exactly what its description already claims it means everywhere.
+
+**One write, in `partProbe()`, keyed on the flag that is already there.** Both modes reach the probe through
+`partProbe()`, which already takes a second argument saying that the active frame's Z0 is stale — passed
+`true` by the first-part path and, wrongly, not by the subsequent-part path, which is the same mode on a
+later part. Renaming it `zUntrusted` and letting it carry the write puts the fix in one place, and the
+rename is the substantive half: the flag was read as *"the traverse height is unknown"*, which is a
+different question and stays asked separately, one clause further down, against
+`fixedZEstablishedInFile()`.
+
+```diff
+ // A part probe: position to the part's Z-probe touch-point (its WCS origin plus the probe XY offset)
+ // and probe Z into the active WCS. `atOrigin` means the tool already sits on the origin, so the
+ // reposition is emitted only when the offset is non-zero; added parts pass false, being over the
+-// previous part. `zUnknown` means the caller emitted no absolute Z before this probe because the active
+-// frame's Z0 is stale, so the traverse runs at whatever height the tool already holds -- only the
+-// first-part "Probe Z" mode passes it. Callers guard tool 0 / jet tools, and the base probe does not
+-// use this at all: it always touches off at the origin, with its own pause setting.
+-function partProbe(atOrigin, zUnknown) {
++// previous part. `zUntrusted` means this WCS's stored Z0 is not believed -- the two "Use Active WCS
++// X0 Y0, Probe Z0" modes, which exist for exactly that reason -- so the probe writes its own
++// provisional Z0 below and no absolute Z was emitted in this frame before it. Whether the traverse
++// HEIGHT is also unknown is a SECOND question, asked separately: on the subsequent-part path the tool
++// holds a height this post just wrote. Callers guard tool 0 / jet tools, and the base probe does not
++// use this at all: it always touches off at the origin, with its own pause setting.
++function partProbe(atOrigin, zUntrusted) {
+```
+
+```diff
+     // The rapid below is at an unknown height, so the file must say so. A WARNING and not an Info
+     // comment: it reports a precondition the operator must satisfy, and Info is gone at Level = Off.
+-    if (zUnknown && !fixedZEstablishedInFile()) {
++    if (zUntrusted && !fixedZEstablishedInFile()) {
+       writeWarning("no Z reference is established, so the XY move below runs at whatever height the"
+         + " tool is holding -- it must be clear of the stock, clamps and fixtures before the program"
+-        + " starts. The G38.2 target that follows is measured from the Z0 already stored in this WCS,"
+-        + " which is the value this mode re-probes because it is not trusted.");
++        + " starts -- and the G38.2 that follows searches G38 Target DOWN FROM THAT HEIGHT, so the"
++        + " target has to be deep enough to reach the stock from wherever you leave the tool.");
+     }
+```
+
+```diff
+     rapidMovementsXY(ox, oy);
+     flushMotions();
+   }
++
++  // Z0 written PROVISIONALLY, overwritten by the probe below, so "G38 Target" is a DISTANCE to search
++  // and not a position measured from the very Z0 this mode was chosen BECAUSE it distrusts. Z ONLY --
++  // the stored X0 Y0 is the other half of what these modes are for and is not this probe's to touch.
++  // After the traverse rather than before it: the traverse is X/Y only, so the height is identical
++  // either way, and here the write sits against the probe it bounds. Nothing reads the tracked Z
++  // between this frame shift and probeTool()'s load-bearing resetAll(), so no reset is needed here --
++  // the same reason writeBaseEstablish() needs none. CR-12.
++  if (zUntrusted) {
++    writeComment(eComment.Info, "   Provisional Z0 at the current height so the probe target is a relative limit");
++    writeWcsOrigin(currentWorkOffset, undefined, undefined, 0);
++  }
++
+   // Attach(before)/detach(after) prompts per probePause: No=neither, Before=attach only,
+```
+
+```diff
+   } else if (onChangeMode == "Probe Z") {
+     // Replicate: auto-position to the stored X0 Y0 (plus probe XY offset) and probe Z. The tool is
+     // still over the PREVIOUS part, so partProbe() travels there first -- X/Y only, Z stays safe.
++    // zUntrusted: this part's stored Z0 is the value this mode exists to re-probe, so the probe writes
++    // a provisional Z0 at the travel height and searches DOWN from there. CR-12.
+     if (canProbe) {
+-      partProbe(false);
++      partProbe(false, true);
+     } else {
+```
+
+**A third path with the same defect, and no finding names it.** CR-12 says "both `Use Active WCS …, Probe
+Z0` modes". Enumerating every part probe the way CR-03's fix had to enumerate every caller of `onRapid()`
+turns up a fourth probe with the identical defect:
+[`writeWCS()`'s `Jog XY & Probe Z` arm :1944](../MPCNC_v4.0_Beta2.cps#L1944) writes
+`writeWcsOrigin(currentWorkOffset, 0, 0, undefined)` — X0 Y0 at the jogged position, **and no Z** — and then
+probes. Its first-part twin at [:3155](../MPCNC_v4.0_Beta2.cps#L3155) writes `0, 0, 0`, the Z of which is
+that arm's provisional value, with the comment saying so. The two arms are the same mode on a different
+part, and one of them has always written the provisional Z0 and the other never has. Nothing about the
+subsequent-part case justifies the difference; the operator has just jogged the tool to the origin, which
+is the strongest possible ground for a provisional write, and it is exactly the ground the first-part twin
+cites. This is a plain omission, and the fix is a one-word change with a guard around it:
+
+```diff
+     writeComment(eComment.Info, "   Set current X,Y position to 0,0");
+-    writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
+     if (canProbe) {
++      // Z0 PROVISIONAL and overwritten by the probe below, exactly as the first-part twin in
++      // writeWcsOnStart() has always written it. This arm wrote no Z at all, so "G38 Target" was
++      // measured from the stored Z0 -- CR-12's defect on a path CR-12 does not name. INSIDE the
++      // canProbe guard, because on a tool that cannot probe nothing would overwrite the provisional
++      // value and the mode would silently become "Jog to X0 Y0 Z0". CR-12.
++      writeComment(eComment.Info, "   Provisional Z0 at the current height so the probe target is a relative limit");
++      writeWcsOrigin(currentWorkOffset, 0, 0, 0);
+       partProbe(true);
+     } else {
+-      writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool)");
++      writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
++      writeComment(eComment.Debug, " writeWCS: probe skipped (tool 0 or jet tool)");
+     }
+```
+
+The trace label goes with it: that line reads `writeWcsOnStart:` inside `writeWCS()`, which the sibling arm
+eleven lines above gets right. A Debug trace that names the wrong function is worth one word in a diff that
+is already touching the line.
+
+**CR-11's other lesson applies here, and its answer comes out the other way.** CR-11 recorded that making a
+target relative decides *where the search starts* and leaves *how far it goes* unanswered, and that
+answering only the first turns an unbounded plunge into a job that reliably refuses to start. That is
+exactly what would happen here, and CR-11's own entry predicted it: *"the reach question applies to CR-12's
+paths too once they are made relative — and there the answer is likely different again, because a part
+probe that overshoots is over the workpiece, not over bare board."*
+
+It is different, and it inverts. The base probe got a long fixed reach because the only thing under the
+tool was the surface being hunted for. Under a part probe is the part: a search that runs its full distance
+without touching — an unplugged plate, a dirty clamp lead — descends that distance through the stock. So
+**the reach stays `G38 Target`**, the operator's number, whose description already states the doctrine
+("deep enough to reach the plate and no deeper"). No constant, no new field, and `probeTool()`'s default arm
+is already correct for these callers, which is why not one of the diffs above passes a third argument.
+
+**What that costs has to be stated, not discovered.** The reach staying short is right and it is not free,
+because on these two modes the *post*, not the operator, decides where the probe starts:
+
+| Path | Where the tool stands when the probe begins | Set by |
+|---|---|---|
+| first part, `Probe Z`, spoilboard base | `Inter Part Travel Z` above the probed spoilboard | `writeBaseEstablish()`'s retract, [:3025](../MPCNC_v4.0_Beta2.cps#L3025) |
+| first part, `Probe Z`, machine-Z datum | `Inter Part Travel Z` as an absolute machine coordinate | [`writeMachineTravelZ()` :2095](../MPCNC_v4.0_Beta2.cps#L2095) |
+| first part, `Probe Z`, no fixed reference | wherever the operator left it | the operator — and both `validateJob()` and the file already warn |
+| subsequent part, `Probe Z` | the retract at the head of the traverse, in whichever frame | [`writeWCS()` :1890-1893](../MPCNC_v4.0_Beta2.cps#L1890) |
+| subsequent part, `Jog XY & Probe Z` | wherever the operator jogged it, a few mm over the stock | the operator, at an `M0` |
+
+Only the last is the case `G38 Target`'s `-10` was sized for. On the four above it, the tool is at a
+clearance chosen to clear *the tallest clamp in the job* — "typically 30-60" by the `Inter Part Travel Z`
+description's own words — so a 10 mm search from there reaches nothing at all on any ordinary job. Shipping
+the provisional write alone would replace a probe measured from an unreadable register with a probe that
+reliably alarms without touching, on the configuration `guide-pro.md` calls the best-practice path and the
+dialog ships as the `Subsequent WCS / Part` default. That is CR-11's mistake, repeated on the other side of
+the machine, and it is the reason this entry carries a `validateJob()` warning as part of the fix rather
+than as a nicety:
+
+```diff
++  // CR-12's other half. Once the target is relative it is finally a number the operator CAN size -- but
++  // on these two modes the post picks the start height, and it picks the one that clears the tallest
++  // clamp. Spoilboard only: under the machine-Z answer "Inter Part Travel Z" is a machine coordinate and
++  // the distance from it down to the stock top is not a number this post has.
++  if ((startMode == "Probe Z" || (multiWcs && changeMode == "Probe Z")) &&
++      getReservedBaseWcs() != 0 && parseInterPartTravelZ() != undefined) {
++    var clearance = parseInterPartTravelZ();
++    var reach = -getProperty(properties.probeG38Target);
++    if (reach >= clearance) {
++      warning(localize("\"G38 Target\" searches " + reach + " mm below the tool, and a \"Use Active WCS "
++        + "X0 Y0, Probe Z0\" probe starts at \"Inter Part Travel Z\" = " + clearance + " mm above the "
++        + "spoilboard -- so a probe that never touches its plate drives to or through the spoilboard "
++        + "surface at probing speed. Shorten the target."));
++    } else {
++      warning(localize("A \"Use Active WCS X0 Y0, Probe Z0\" probe starts at \"Inter Part Travel Z\" = "
++        + clearance + " mm above the spoilboard, and \"G38 Target\" searches " + reach + " mm down from "
++        + "there -- so it touches the plate only on stock thicker than " + (clearance - reach) + " mm. "
++        + "Deepen the target or lower the travel height if this job's stock is thinner than that; the "
++        + "post cannot check, the stock top being the value this probe exists to find."));
++    }
++  }
+```
+
+The `else` arm warns on a correctly configured job too, and that is deliberate rather than overlooked: the
+post holds one of the two numbers and the operator holds the other, so the arithmetic can be *stated* and
+never *decided*. A warning that appears on every job of this shape is the price of the operator being the
+only party who can size the number, and it is a smaller price than a probe that alarms after the traverse.
+
+**The alternative considered, and why not.** The gap the post is missing is `clearance - stockThickness`,
+and stock thickness looks computable: a Z extent is a difference of two Zs in one frame, so it survives not
+knowing where that frame's zero is, and Fusion exposes the stock box. The post could then search the gap
+plus the operator's target, all at probe feed, stopping on contact — the default would keep working and no
+warning would be needed. It is rejected on three counts. It rests on `getWorkpiece()`, which this post has
+never called, so the shape and units of what comes back are unverified here and a walk cannot settle them.
+It assumes the stock sits directly on the spoilboard, which is the base workflow's premise but not a fact —
+parallels, a fixture plate and a vice all break it, and breaking it makes the computed gap *longer* than the
+real one, which is the plunging direction. And it takes a number the operator can see and check out of their
+hands. If `getWorkpiece()` is ever proven against a posted file, it belongs here as a way to *suppress* the
+warning above when the stock is demonstrably thick enough — not as a way to compute the reach.
+
+**Two pieces of prose the fix deletes rather than writes.** Both existing warnings about these modes are
+partly descriptions of the defect. `partProbe()`'s in-file warning ends *"The G38.2 target that follows is
+measured from the Z0 already stored in this WCS, which is the value this mode re-probes because it is not
+trusted"* — that sentence is untrue after the fix and is replaced above. And `validateJob()`'s
+[:1531](../MPCNC_v4.0_Beta2.cps#L1531) warning ends with two clauses that do not presently agree with each
+other — the target is measured from the stored Z0, *and* the operator should "set the target deep enough to
+reach the stock from that start height", which are two different reference points. The fix makes the second
+clause the true one, so the first goes:
+
+```diff
+       + "Z0 already stored in the active WCS, which is the value this mode re-probes because it is not "
+-      + "trusted, so set the target deep enough to reach the stock from that start height."
++      + "trusted."
+```
+
+*(shown against the sentence as it will stand once the paragraph above it is rewritten; the whole warning is
+re-read when the fix is applied, since its subject changes from what the target measures against to what the
+operator must clear.)*
+
+**And the property description, which becomes true on every mode for the first time.** `G38 Target` is the
+one control this finding is about, and CR-11 has already narrowed it once. It stops being a position:
+
+```diff
+-    description: "How far the probe move is allowed to travel before giving up -- a Z POSITION in the part's frame, not a distance. This bounds the PART probes only: the spoilboard base probe has a fixed reach of its own, being the one probe that starts above the stock AND the clamps. On the two Set ... to Current Pos modes the post writes a provisional Z0 first, so -10 (the default) searches to 10 mm below wherever the tool is now. On the two Use Active WCS modes it is measured from that WCS's STORED Z zero instead, which may be anywhere. Deep enough to reach the plate and no deeper: a probe that travels this far without touching is a failed probe, and GRBL raises an alarm and stops the job.",
++    description: "How far DOWN FROM THE TOOL a probe may search before giving up -- a DISTANCE, not a position. This bounds the PART probes only: the spoilboard base probe has a fixed reach of its own, being the one probe that starts above the stock AND the clamps. Every part probe now writes a provisional Z0 at the current height first, so -10 (the default) means \"search 10 mm below wherever the tool is standing when the probe begins\". WHERE IT IS STANDING DEPENDS ON THE MODE. On the Set ... to Current Pos and Jog to ... modes you put it there yourself, a few mm above the stock, and -10 is the right size. On the two Use Active WCS X0 Y0, Probe Z0 modes the POST puts it there, at Inter Part Travel Z -- the height that clears the tallest clamp in the job -- so the target has to be deeper than that height minus your stock thickness or the probe never touches the plate. The post states that arithmetic before it posts. Deep enough to reach the plate and no deeper: a probe that travels this far without touching is a failed probe, and GRBL raises an alarm and stops the job.",
+```
+
+**Nothing is emitted to state the reach, and that is the difference from CR-11.** The base probe got an Info
+comment naming its search depth because 100 mm is a constant no operator can read in the dialog. Here the
+number is `G38 Target`, it is in the dialog, and it is the `Z` word of the `G38.2` block itself — which,
+after this fix, finally means the distance it appears to mean. A comment restating it would be one more line
+in every probe block saying what the next line says.
+
+**What this fix does not reach.** The tool-change re-probe through
+[`onCommand(COMMAND_TOOL_MEASURE)` :2668](../MPCNC_v4.0_Beta2.cps#L2668) gets no provisional write and
+should not: by then this job has established that WCS's Z0 itself, so the stored value is the post's own and
+`G38 Target` is measured from a zero it wrote — which is CR-07's ground, about *which* register it writes,
+not about what the target measures against. The base probe is CR-11's and already fixed. `Use Active WCS X0
+Y0 Z0` (`Skip`) probes nothing at all. And on Marlin `writeWcsOrigin()` falls back to a global `G92`, which
+is what the shipped `Current XY & Probe Z` path already emits there, so the provisional write behaves on
+Marlin exactly as an existing path does — and Guard C keeps every subsequent-part path off Marlin entirely.
+
+**One asymmetry found and left alone.** `writeWCS()`'s `Jog XY & Probe Z` arm says nothing at all when the
+tool cannot probe: it writes X0 Y0, skips the probe, and emits only a Debug trace, where
+[`writeWcsOnStart()`'s twin :3171](../MPCNC_v4.0_Beta2.cps#L3171) writes a `>>> WARNING` that Z0 was not
+established and the job will run against whatever the register holds. The same silence, on a later part.
+It is a warning, not a frame error, and it is not the mechanism this finding is about, so it is recorded
+here rather than folded into the diff.
+
+### TEST
+
+**Status:** `open` — written, not run: the FIX is a proposal. W12f is the row to walk first if it is applied,
+being the only one that tests the half of the fix that is not a provisional origin write.
+
+| Test | Method | Proves | Property set | State |
+|---|---|---|---|---|
+| W12a | walk | the first-part `Use Active WCS X0 Y0, Probe Z0` probe searches from where the tool stands | GRBL/mm, Comment Level `Info`, `First WCS / Part` = `Use Active WCS X0 Y0, Probe Z0`, `Fixed Z Reference` = Spoilboard, `Reserved WCS` = G59, `Inter Part Travel Z` = 40, `G38 Target` = -35, probe XY offset unset, one part on G54, tool 1 | open |
+| W12b | walk | the subsequent-part twin does the same, and the unknown-height warning does **not** follow it there | W12a with two parts (G54, G55) and `Subsequent WCS / Part` = `Use Active WCS X0 Y0, Probe Z0` | open |
+| W12c | walk | the third path — subsequent `Jog to X0 Y0, Probe Z0` — writes the provisional Z0 its first-part twin always wrote | W12b on RepRap with `Subsequent WCS / Part` = `Jog to X0 Y0, Probe Z0` | open |
+| W12d | walk | a tool that cannot probe leaves Z0 alone on that path, so the mode does not become `Jog to X0 Y0 Z0` | W12c with a jet tool | open |
+| W12e | walk | the paths that already write a provisional Z0 gain no second one, and the tool-change re-probe gains none at all | `First WCS / Part` = `Set X0 Y0 to Current Pos, Probe Z0` with the probe XY offset set; then a `Do First Change` job with `Probe After Tool Change` on | open |
+| W12f | walk | the reach warning fires on both sides with the right arithmetic, and stays silent where it has no numbers | W12a at `G38 Target` = -10, then -45; then `Fixed Z Reference` = Machine Z; then = None | open |
+
+**W12a** must show the traverse to the stored X0 Y0 emitted first at whatever height the base establish
+left the tool, then `( Provisional Z0 at the current height so the probe target is a relative limit)` and
+`G10 L20 P1 Z0` — **P1, the part's register, not the base's** — and only then `G38.2 F30 Z-35`. The `Z-35`
+must be the property untouched: no `propertyMmToUnit` applied twice, and no `BASE_PROBE_REACH_MM` anywhere
+on this path. `G10 L20 P1 Z0.8` overwrites the provisional value four blocks later. **I1 frame** — every Z
+in the block is written after the `G54` select, and the provisional origin is written into the register the
+probe then searches in.
+
+**W12b** must show the same three blocks after the traverse retract and the `G55` select, and must **not**
+show the `>>> WARNING: no Z reference is established` line: `zUntrusted` is now true on this path, so the
+warning's second condition is what keeps it away, and Guards B and B' guarantee `fixedZEstablishedInFile()`
+on any job that reaches it. A warning here would mean the two questions the renamed flag separates have been
+run back together.
+
+**W12c** must show `G10 L20 P2 X0 Y0 Z0` after the `M0`, where the post today emits `G10 L20 P2 X0 Y0` and
+no Z word at all. **W12d** must show that same block back to `X0 Y0` with no Z, reached through the `else`
+arm, and the Debug trace naming `writeWCS`.
+
+**W12e** is the presence-based sibling W12a's absences need, and it is the dangerous direction. On `Set X0
+Y0 to Current Pos, Probe Z0` the caller writes `G10 L20 P1 X0 Y0 Z0` and then calls `partProbe(true)` with
+no second argument, so exactly one origin write may appear before the `G38.2`; a second would mean the
+provisional write has been made unconditional and the `Current XY` modes are writing it twice. On the
+tool-change re-probe, `probeTool()` is reached through `onCommand()` and never through `partProbe()`, so no
+provisional write can appear at all — that path's Z0 is one this job established.
+
+**W12f** must show, at `-10`, the second warning naming 40, 10 and 30; at `-45`, the first warning naming 45
+and 40; under Machine Z and under None, neither, `getReservedBaseWcs()` being 0 on both. The point of the
+last two is that the warning claims a distance above the spoilboard, and neither of those answers has one.
+
+**What a fail looks like.** A `G38.2` before the provisional write in W12a or W12b: the write is on the
+wrong side of the traverse. `P6` on the provisional block in W12a: the base's register, meaning
+`currentWorkOffset` was read before the part's select rather than after. A warning in W12b: the flag rename
+has merged two conditions that must stay apart. Two origin writes in W12e, or any origin write on the
+tool-change re-probe: the write has escaped its guard, and on the tool-change path it would overwrite a real
+Z0 with a provisional one — the one direction in this fix that damages a job that is set up correctly. A `Z`
+word on W12d's block: the provisional write is outside `canProbe` and the jet job is silently running to a
+Z0 it never established. Record it in the status line above and revise the FIX; do not edit the expectation
+to match what was seen.
