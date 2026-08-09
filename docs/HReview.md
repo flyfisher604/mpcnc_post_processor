@@ -61,7 +61,7 @@ session **from a build proved identical to `e5db625` — see *Owed***, so no row
 Personas are `conventions.md` → *How to run a test*; defaults are GRBL/mm, `Comment Level` `Info`,
 unless the Setup delta says otherwise.
 
-**✅ 19 PASS · ❌ 0 FAIL · ⬜ 3 UNRUN · ➖ 3 n/a — 25 rows.**
+**✅ 21 PASS · ❌ 0 FAIL · ⬜ 1 UNRUN · ➖ 3 n/a — 25 rows.**
 
 | Test | Proves | Setup | Method | State |
 |---|---|---|---|---|
@@ -88,8 +88,8 @@ unless the Setup delta says otherwise.
 | **HB-15 (A)** | The refusal tells the operator what to fix and claims nothing about a file | `HB-7 (A)`'s configuration exactly — HP-1 + `Start GCode File` = `nofilename`. Today's log is the pre-fix reading | posted | ✅ |
 | **HB-16 (A)** | A `Start GCode File` cannot suppress the post's `G17`, because it replaced the block that writes it — the reading that redirected HB-16's second half. **And the post re-emitted the include's own `G18`**, so a word in a loaded file populates no modal | HP-1 + `Start GCode File` = `G18 Start.txt`, whose only g-code is `G18`, on `HB-2 (A)`'s job. Not a pre/post-fix pair: the fix is a no-op on this path, and the row exists to show *why* | posted | ✅ |
 | **HB-17 (A)** | A job that *names* a fixed Z reference it cannot establish still gets HB-13's warning | HP-1 + **`CNC Firmware` = `Marlin`** + `Fixed Z Reference` = the spoilboard answer + `Reserved WCS` = `G59` + `Inter Part Travel Z` = `40` (the spoilboard answer refuses an unset or non-positive height, so the row cannot post without it) + `First WCS / Part` = `Use Active WCS X0 Y0, Probe Z0`, single Setup. Marlin, so **`HB-13 (A)`'s artifact cannot cover this** — the suppression is the firmware's | posted | ✅ |
-| **HB-18 (A)** | The Marlin base-establish warning keeps its parenthetical — the third call site of HB-14's defect | `HB-17 (A)`'s configuration exactly, and **`HB-18 (A).gcode` is that post re-run pre-fix** — byte-identical bar the timestamp — so the post-fix read is a one-line diff. Read the **whole** of 122: `Marlin` and the reason separated *and* the trailing space gone, both being the same collapsed `)` | posted | ⬜ |
-| **HB-19 (A)** | HB-13's dialog warning stops recommending a remedy the firmware cannot deliver | `HB-17 (A)`'s configuration exactly. **Dialog only** — no artifact holds it, and the pre-fix reading is the operator's report on the `HB-18 (A)` post, quoted there in full: two warnings, the second closing with `"Fixed Z Reference" removes both` on a job that already sets it. Expect that clause replaced, and CR-2's warning still beside it — its co-occurrence here is correct and is not what this row is about | posted | ⬜ |
+| **HB-18 (A)** | The Marlin base-establish warning keeps its parenthetical — the third call site of HB-14's defect | `HB-17 (A)`'s configuration exactly, posted **twice** — once pre-fix as a control, once after — so the read is a one-line diff. Read the **whole** of 122: `Marlin` and the reason separated *and* the trailing space gone, both being the same collapsed `)`. The re-post overwrote the control, so the pre-fix line survives only as this register's quotation of it | posted | ✅ |
+| **HB-19 (A)** | HB-13's dialog warning stops recommending a remedy the firmware cannot deliver | `HB-17 (A)`'s configuration exactly. **Dialog only** — no artifact holds it, and the pre-fix reading is the operator's report on the `HB-18 (A)` post, quoted there in full: two warnings, the second closing with `"Fixed Z Reference" removes both` on a job that already sets it. Expect that clause replaced, and CR-2's warning still beside it — its co-occurrence here is correct and is not what this row is about | posted | ✅ |
 
 ### Expects
 
@@ -167,21 +167,21 @@ passing file (HB-2 (B), HB-4 (A)).
   *by* the answer the first had just declared void. `grep -c G53` = **0**, the spoilboard answer's hole and
   not the machine-Z answer's; `grep -c '( >>> WARNING'` = 0 against three `;` forms, the dialect switch
   rather than a miss. **It found HB-18 and HB-19, in the warnings themselves.**
-- **HB-18 (A) — the fix has landed, the control is on disk, and the read is now a one-line diff.**
-  `HB-18 (A).gcode` was posted pre-fix and is **byte-identical to `HB-17 (A).gcode` bar the timestamp**,
-  with `cat -A` showing 122 end `single global frame $` — the trailing space seen, not inferred. So
-  **only 122 may differ**, and it may differ only into exactly this:
-  `; >>> WARNING: reserved base G59 ignored on Marlin -- no per-WCS registers, single global frame`
-  Anything else that moves is a regression. *The sweep is closed from source rather than by re-reading this
-  file: three of the fourteen pre-fix `writeWarning()` call sites carried literal parentheses in two strings
-  — `writeBaseEstablish()`'s, now 3525, and the rigid-tapping twin, now the single
-  `writeSpeedFeedSyncWarning()` at 3077 — and none of the thirteen that remain does.*
-- **HB-19 (A) — dialog only, and the pre-fix text is captured in full** on that same post, so this is a
-  diff too. The second warning must still open word for word as it did and end
-  `… from that start height. Marlin has no fixed Z reference this post can establish, so that start
-  height is yours to set.` — the `"Fixed Z Reference" removes both` clause gone, nothing else touched.
-  **Read it beside CR-2's, which is correct here and stays** — `Axes Homed and Trusted` is `None`, so CR-2
-  fires on its own merits and the two are independent. A flat "one warning" criterion reads as FAIL.
+- **HB-18 (A) — PASS.** 122 is now `; >>> WARNING: reserved base G59 ignored on Marlin -- no per-WCS
+  registers, single global frame`, and `cat -A` ends it `frame$` — the trailing space gone, the clauses
+  separated, no bracket anywhere. **Both Marlin posts came back 318 lines, the pre-fix control's own
+  count**, so nothing but 122's text moved; 124, 153, `grep -c G53` = 0 and `grep -c '( >>> WARNING'` = 0
+  all read as they did pre-fix, and the two files are again identical bar the timestamp. *A byte-diff
+  against the control is no longer possible — the re-post overwrote it — so "only 122 changed" rests on
+  the recorded pre-fix line, the unchanged length and those four discriminators, not on a live diff.*
+- **HB-19 (A) — PASS at the dialog, on both posts.** The second warning opens word for word as it did and
+  ends `… from that start height. Marlin has no fixed Z reference this post can establish, so that start
+  height is yours to set.`, the `"Fixed Z Reference" removes both` clause gone and nothing else touched.
+  **CR-2's is beside it and byte-identical to the pre-fix report**, which is the trap avoided: `Axes Homed
+  and Trusted` is `None`, so it fires on its own merits and a flat "one warning" criterion would have read
+  as FAIL. *The off-Marlin branch is unexercised here and settled from source — the `else` string is
+  character-identical to the pre-fix one, and `HB-13 (A)`'s dialog already read it. A re-post of that job
+  is the only thing that would catch an inverted ternary, and it costs one post.*
 
 ---
 
@@ -246,11 +246,11 @@ when a row is written that asserts it, or when the artifact it names is supersed
 
 What this register still owes, and why each artifact is worth a post.
 
-- **One finding is open — HB-10, deferred to the professional pass by its own row — and three rows owe a
-  post.** Thirteen artifacts across two sessions cleared every other row on first read, off one build.
-  What is left is `HB-12 (A)`, which needs a Stop include holding an arc, and **HB-18 (A) / HB-19 (A),
-  which need no new configuration at all**: one re-post of `HB-17 (A)`'s job clears both, against the
-  pre-fix control already on disk. **Those two are the only rows whose fix has shipped ahead of them.**
+- **One row is left — `HB-12 (A)`, which needs a Stop include holding an arc — and one finding, HB-10,
+  deferred to the professional pass by its own row.** Everything else closed on fifteen artifacts across
+  two sessions, every one passing on first read, and **every row filed against a shipped fix is ✅**. The
+  two rows that had their fix ship ahead of them, HB-18 (A) and HB-19 (A), were cleared by a single re-post
+  of `HB-17 (A)`'s job, which is what a register earns by naming the exact string it expects.
 - **HB-16's include half is fixed where no row here can watch it.** Its payoff is on the tool-change files
   — group 7, excluded from this register and already carrying HB-10 / `HR-21` / `CR-15`.
 - **The line numbers cited here had already drifted, and this pass fixed only the ones it moved itself.**
@@ -281,7 +281,8 @@ What this register still owes, and why each artifact is worth a post.
   work, so the entry collapses to the artifact, the discriminator actually checked, and **any trap a re-run
   would otherwise walk back into** — which is the only reason a passed entry keeps prose at all. Four of
   them do: HB-2's *block, not line*; HB-3 (B)'s CR-2 paragraph; HB-9's `^(` anchor; HB-16's `G90`/`G21`/
-  `G94` count of 0. Applied across all thirteen passed rows on 2026-08-09, taking the file from its 373
+  `G94` count of 0 — to which HB-19 (A) adds CR-2's co-occurrence, the one trap a row here nearly walked
+  into. Applied across all thirteen passed rows on 2026-08-09, taking the file from its 373
   budget to **301** — the reserve the earlier passes were looking for, since a finding costs one physical
   line however long its cells and only wrapped prose is spendable. **Rule 4's other half is applied too:**
   the Resolution on HB-2, HB-3, HB-4, HB-7, HB-8 and HB-9 is its commit ref plus one clause. *Untouched
