@@ -20,9 +20,32 @@ Each entry is the CR number and the finding's own title, then two sections:
 - **FIX** — what to change and why it works, in plain English. Enough that someone who has not read the
   finding can act on it, and enough that a reviewer can disagree with it before any code is written.
   It names the functions it touches, but the code itself belongs in the diff, not here.
-- **TEST** — how to tell the fix worked: what to post, what to look for in the output, and what would
+- **TEST** — how to tell the fix worked: the emitted block stream, what to look for in it, and what would
   count as a failure. Empty until written. Nothing here may need a controller, a sender console or a
-  dry run — everything is settled from posted output and from the firmware's own source.
+  dry run.
+
+### How a walk is run
+
+The method is the review's own, narrowed: **hand-execution of the callback sequence against the source**,
+tracking module state as it changes — the same method that produced these findings in the first place, and
+described in full in [`CoverageReviewPlan.md` → Method](CoverageReviewPlan.md). Nothing is executed, and a
+walk here is not a re-review: it fixes a property set and follows **only the paths the fix touched**,
+writing the block stream those paths emit.
+
+1. Fix the property set, the firmware, the units and the job shape.
+2. Enter at the callback the change sits under, and hand-execute forward, resolving every helper by
+   reading it — no path is assumed, including the ones the fix did not mean to reach.
+3. Write the emitted blocks in order, with the value of each formatted word computed.
+4. Check the stream against the invariants the fix claims: **I1 frame**, **I5 guard fidelity**,
+   **I6 units** — and, for a removed branch, that it is unreachable from the dialog rather than merely
+   unvisited.
+
+**What a walk settles, and what it does not.** It settles what the source emits and which paths are
+reachable, which is *stronger* than one posted file for absence claims: a token missing from a posted file
+is missing from that configuration, while a token missing from the source is missing from all of them. It
+does not settle host behaviour — how Fusion's `createFormat` renders a value, or how it treats a property
+a stored Setup remembers but the post no longer declares. Where a walk rests on one of those, the row says
+so, and no pass depends on it.
 
 Each section carries its own status line, and the two say different things — a fix can be in the code
 while its test has never been run, and a test can fail on a fix that was applied:
@@ -31,6 +54,11 @@ while its test has never been run, and a test can fail on a fix that was applied
 |---|---|---|
 | FIX | `**Status:** ` | `[ ] applied` while it is still a proposal; `[x] applied` plus the commit **subject** once a commit carries it — a subject survives an amend or a rebase, and the CR id in it makes `git log --grep` find the commit; a sha written here does not survive, because this line ships inside the very commit it names |
 | TEST | `**Status:** ` | `open` — not run, or not yet written; `pass`; `fail — <what was seen>` |
+
+Each row names its **method**: `walk` — hand-executed against the source, per the procedure above; or
+`posted` — a real file from the real post. A `walk` row is complete when the block stream has been written
+out and checked; it does not become "more passed" if a post is taken later, and where the two would answer
+the same question the walk answers it for every configuration rather than one.
 
 A `fail` is not a reason to edit the FIX in place. Say what failed in the test status, then revise the
 FIX above it — the point of the two lines is that the disagreement between them stays visible.
@@ -110,53 +138,85 @@ likely different again, because a part probe that overshoots is over the workpie
 
 ### TEST
 
-**Status:** `open`
+**Status:** `pass` — all four rows walked against the post at `c319e69`.
 
-Four rows, all `posted` — a real file from the real post, read for exact tokens. Two of them come from one
-posted file, because the thing that must be shown is that two probes in the same job now emit *different*
-targets. Nothing here needs a controller: every criterion is a token present or absent in the g-code.
+| Test | Method | Proves | Property set | State |
+|---|---|---|---|---|
+| W11a | walk | the base probe searches a distance from where the tool stands, not a position in a stale register | GRBL/mm, Comment Level `Info`, `Fixed Z Reference` = Spoilboard, `Reserved WCS` = G59, `Probe to Set Base` = `Probe Z`, `Inter Part Travel Z` = 40, one part on G54, tool 1 | ✅ |
+| W11b | walk | the part probe is unchanged — the third argument defaults | the other `probeTool()` call site, same job | ✅ |
+| W11c | walk | the reach converts with the output units | W11a in inches | ✅ |
+| W11d | walk | the RepRap branch carries the same reach, and the `G28` arm did not grow one | W11a on RepRap, `Probe with G38.2` on, then off | ✅ |
 
-| Test | Proves | Setup delta from defaults | State |
-|---|---|---|---|
-| CR11a | the base probe searches a distance from where the tool stands, not a position in a stale register | GRBL/mm, Comment Level `Info`, `Fixed Z Reference` = Spoilboard, `Reserved WCS` = G59, `Probe to Set Base` = `Probe Z`, one milling tool, tool number ≠ 0 | ⬜ |
-| CR11b | the part probe is unchanged — the third argument defaults | same posted file as CR11a, `First WCS / Part` = `Use Active WCS X0 Y0, Probe Z0` | ⬜ |
-| CR11c | the reach converts with the output units | CR11a with the job in inches | ⬜ |
-| CR11d | the RepRap branch carries the same reach | CR11a with firmware = RepRap | ⬜ |
-
-**Expect — CR11a.** Inside the `Establish spoilboard base G59` block, in this order:
+**W11a — walked.** Entered at `writeFirstSection()`. `writeWCS()` emits `G54` and leaves
+`currentWorkOffset = 1`; `writeFixedZReference()` reads `Spoilboard` and calls `writeBaseEstablish()`,
+where `base = 6`, `gname = G59`, `mode = "Probe Z"` and the tool-0 guard passes. `operatingWcs = 1`, so
+`switched` is true. The stream:
 
 ```
-G59                                       (only when the operating WCS is not already G59)
+( Establish spoilboard base G59)
+(   Select base G59 to probe and retract in its own frame)
+G59                                        wcsGcode(6) = 59; currentWorkOffset = 6; resetAll()
 (   Provisional Z0 at the current height so the probe target is a relative limit)
-G10 L20 P6 Z0
+G10 L20 P6 Z0                              writeWcsOrigin(6, undefined, undefined, 0)
 (   Search down to Z-100 from the current height)
-G38.2 F30 Z-100
-G10 L20 P6 Z0.8                           (the real Z0, probe thickness)
+( Probe to Zero Z)                         probePauseBefore/After = false under "Probe Z"
+(   Do Probing)
+(   Set Z to probe thickness: Z0.8)
+(   Retract the tool to 40)
+G38.2 F30 Z-100                            searchZ = -propertyMmToUnit(100) = -100
+G10 L20 P6 Z0.8                            the real Z0
+G0 Z40 F<travel Z>                         retract, base frame, after resetAll()
+(   Restore operating WCS G54 after base probe)
+G54                                        currentWorkOffset = 1
 ```
 
-The discriminator is **`Z-100` on the `G38.2`, not `Z-10`** — that one token is the whole fix, since the
-old file emitted the property's value here. Two absences carry as much as the presences: the provisional
-`G10 L20 P6 Z0` must carry **no X and no Y word**, or the fix has silently zeroed the base's stored XY;
-and no `G38.2 … Z-10` may appear anywhere inside this block.
+**I1 frame** — every absolute Z in the block is written after the `G59` transit-select, and the `G0 Z40`
+retract follows the `G10 L20 P6 Z0.8` that establishes the frame it is measured in. **I6 units** —
+`propertyMmToUnit` is applied once to `BASE_PROBE_REACH_MM` at [:2995](../MPCNC_v4.0_Beta2.cps#L2995) and
+the result is passed through as `searchZ`; `probeTool()` does not re-wrap it.
 
-**Expect — CR11b.** In the *same file*, below the base block, the first part's probe emits
-`G38.2 F30 Z-10` — the property's value, unchanged. A file where both probes read `Z-100` means the
-default was not honoured and every part probe just got a 100 mm reach, which is the dangerous direction.
-The CR-12 warning about probing from a stored Z0 is expected on this path and is not a failure of this
-row. This is the presence-based sibling the absence in CR11a needs.
+Both absences the posted version of this row was going to check are settled more strongly here. The
+provisional origin write passes `undefined` for x and y **at the call site**, and `writeWcsOrigin()` maps
+`undefined` to an omitted word, so no X or Y word can be emitted — not "was not in this file" but "cannot
+be". And `G38.2 … Z-10` cannot appear in this block because `searchZ` is bound before the default arm is
+reached, so `probeG38Target` is never read on this path.
 
-**Expect — CR11c.** `G38.2 F1.181 Z-3.937` and the comment reading `Search down to Z-3.937` — 100 mm
-converted, not 100 inches. A file showing `Z-100` in an inch job means the constant was emitted raw, which
-would command a 2.5 m plunge.
+**W11b — walked.** `probeTool` has exactly two call sites: [:2999](../MPCNC_v4.0_Beta2.cps#L2999) passes
+three arguments, [:2644](../MPCNC_v4.0_Beta2.cps#L2644) passes none. On the second, `searchZ == undefined`
+selects `propertyMmToUnit(getProperty(properties.probeG38Target))` = `-10`, giving `G38.2 F30 Z-10`, and
+`retractZ == undefined` selects `probeSafeZ()` exactly as before. Nothing on that path reads
+`BASE_PROBE_REACH_MM`, so the part probes and the tool-change re-probe emit what they always did. This is
+the presence-based sibling W11a's absences need, and it is the dangerous direction: had the default arm
+broken, every part probe would have gained a 100 mm reach.
 
-**Expect — CR11d.** Same block shape as CR11a with `Z-100` on the `G38.2`, proving the reach reaches the
-non-GRBL branch too. Posting it again with `Probe with G38.2` off must emit `G28 Z` and **no `G38.2` and
-no target of any kind** — that path takes no reach and must not have grown one.
+**W11c — walked.** With `unit == IN`, `propertyMmToUnit(100)` = `100 / 25.4` = `3.937007…`, negated.
+`zFormat` carries 4 decimals in inches, so the `G38.2` word is `Z-3.937`, and `xyzFormat` (also 4) puts
+`Z-3.937` in the comment. **The expectation this row replaced was wrong about the feed**: it read
+`F1.181`, but `fFormat` is `decimals: 2` in inches, so `propertyMmToUnit(30)` = `1.181102…` is emitted as
+**`F1.18`**. The claim that matters is the magnitude — 3.937 inches is 100 mm, and a `Z-100` here would be
+a 2.5 m plunge — and the walk confirms the conversion happens once.
 
-**What a fail looks like.** `Z-10` in CR11a: the third argument is not arriving. `Z-100` in CR11b: the
-default is broken. `Z-100` in CR11c: the units conversion was missed. X or Y on the provisional `G10`: the
-Z-only write is wrong. Record it in the status line above and revise the FIX; do not edit the expectation
-to match what was seen.
+**W11d — walked.** On RepRap with `Probe with G38.2` on (the default), the non-GRBL branch at
+[:3663](../MPCNC_v4.0_Beta2.cps#L3663) formats the same `searchZ`, so the block is W11a's with the same
+`Z-100`. With it off, the branch emits `G28 Z` and no target of any kind: `searchZ` is computed but never
+formatted, so the reach cannot leak onto that path.
+
+**One observation the walk turned up, recorded rather than fixed.** On the `G28` arm the provisional
+`G10 L20 P6 Z0` is still emitted, and there it does nothing — `G28 Z` takes no target, and the real
+`G10 L20 P6 Z0.8` overwrites the provisional value a few blocks later with nothing reading it in between.
+Harmless, and one redundant line on a path most operators never select.
+
+**And one that is not harmless, though CR-11 did not create it.** `Probe with G38.2`'s own description
+records that RRF up to and including 3.1.1 interprets the `G38.2` target as **machine** coordinates while
+this post emits a work-frame target. That was already wrong before this fix; what changed is the size of
+the consequence, since the base probe's word went from `Z-10` to `Z-100`. The mitigation is the one the
+dialog already states — set `Probe with G38.2` **off** on RRF ≤ 3.1.1 — and on that setting this fix emits
+no target at all. It belongs to the professional register when `PReview.md` returns; it is noted here so it
+is not rediscovered.
+
+**What a fail would have looked like.** `Z-10` in W11a: the third argument not arriving. `Z-100` in W11b:
+the default arm broken. `Z-100` in W11c: the conversion missed. An X or Y word on the provisional `G10`:
+the Z-only write wrong. None of these occurred.
 
 ---
 
@@ -241,52 +301,83 @@ fold: a control whose every answer but one is wrong is not a choice, it is a haz
 
 ### TEST
 
-**Status:** `open`
+**Status:** `pass` — all five rows walked against the post at `fbd1591`.
 
-Four rows, all `posted`. The dialog change is testable from a posted file without opening Fusion's dialog,
-because the file's own property dump records the whole dialog state — a property that has been removed is
-absent from it. One row expects **no file at all**: a guard that refuses is proved by the refusal.
+| Test | Method | Proves | Property set | State |
+|---|---|---|---|---|
+| W13a | walk | the base route is taken on every traverse and the wrong-frame arm is gone | GRBL/mm, Comment Level `Info`, two parts on G54/G55, `Fixed Z Reference` = Spoilboard, `Reserved WCS` = G59, `Inter Part Travel Z` = 40 | ✅ |
+| W13b | walk | the escape hatch is closed — Guard B refuses whatever a stored Setup remembers | W13a with `Fixed Z Reference` = None | ✅ |
+| W13c | walk | the machine-Z route is untouched by the `crossPart` collapse | W13a with `Fixed Z Reference` = Machine Z, `Axes Homed and Trusted` = XYZ, `Home at Job Start` = Home | ✅ |
+| W13d | walk | a part assigned to the base WCS takes the base route, not the bare arm | W13a plus a third part on **G59**, `First WCS / Part` and `Subsequent WCS / Part` both = `Use Active WCS X0 Y0 Z0`, `Probe After Tool Change` off | ✅ |
+| W13e | walk | the surviving arm is unreachable, and the new `error()` cannot fire on a job that should post | all four above, plus the first-section entry | ✅ |
 
-| Test | Proves | Setup delta from defaults | State |
-|---|---|---|---|
-| CR13a | the base route is taken on every traverse and the wrong-frame arm is gone | GRBL/mm, Comment Level `Info`, two parts on G54/G55, `Fixed Z Reference` = Spoilboard, `Reserved WCS` = G59, `Inter Part Travel Z` = 40 | ⬜ |
-| CR13b | the escape hatch is closed — the guard refuses instead of posting | CR13a with `Fixed Z Reference` = None, posted from a Setup that previously had `Retract Across Parts` off | ⬜ |
-| CR13c | the machine-Z route is untouched | CR13a with `Fixed Z Reference` = Machine Z, `Axes Homed and Trusted` = XYZ, `Home at Job Start` = Home, `Inter Part Travel Z` = an absolute machine Z | ⬜ |
-| CR13d | a part assigned to the base WCS takes the base route, not the bare arm | CR13a plus a third part on **G59**, `First WCS / Part` and `Subsequent WCS / Part` both = `Use Active WCS X0 Y0 Z0`, `Probe After Tool Change` off | ⬜ |
-
-**Expect — CR13a.** At the G54 → G55 traverse, in this order:
+**W13a — walked.** At the second section, `writeWCS()` has `workOffset = 2`, `currentWorkOffset = 1`, so
+`previousWorkOffset = 1` and `isTraverse` is true. `base = 6`; `machineFrame` is false (the reference is
+Spoilboard, not Machine Z); `baseRelative = isTraverse && base != 0` is **true**, taking
+`retractThroughBaseClearance()`:
 
 ```
-G59                                       (transit-select the base)
 (   Retract to spoilboard-base clearance G59 before traverse)
-G0 Z40
+G59                                        currentWorkOffset was 1, so the select is emitted
+G0 Z40 F<travel Z>                         rapidMovementsZ(interPartTravelZ()) after resetAll()
+( WCS changed: 1 -> 2)
 G55
 ```
 
-The discriminator is an absence with a presence beside it, which is the pairing an absence-based row needs.
-The absence: **`Retract to Safe Z before WCS change` appears nowhere in the file** — that comment is the
-bare arm's own, and it is the token the old build emitted here. The presence: the base-clearance comment
-and its `G0 Z40` in the same block, proving the traverse still retracts and retracts higher. Second absence:
-the property dump lists no `Retract Across Parts` and no `spoilboardSafeZAcrossWcs`.
+**I1 frame** — the retract is emitted after the base is selected, so `Z40` is read in the frame
+`writeBaseEstablish()` established, not in the part's. **I2** — the traverse height is reached before the
+WCS changes, so nothing crosses the bed at a height belonging to the previous part.
 
-**Expect — CR13b.** **No output file.** Fusion reports the Guard B error, and the text must name the
-spoilboard answer, the machine-Z answer, and posting one job per part. It must **not** contain the words
-"turn off" — that clause is the removed escape hatch, and its survival would mean the old message shipped.
-This is also the stored-value row: the Setup's remembered `off` must not resurrect the old path, and a file
-appearing at all is the failure.
+The absence this row exists for is settled by the source rather than by one file: the string
+`Retract to Safe Z before WCS change` no longer occurs in the post, so no configuration can emit it. Same
+for the property dump — `writeAllProperties()` enumerates `for (key in properties)`
+([:2763](../MPCNC_v4.0_Beta2.cps#L2763)), and the key is gone from the object, so it cannot be printed.
 
-**Expect — CR13c.** At the traverse, `G53 G0 Z<travel> F<travel speed>` under the machine-frame comment, and
-again no `Retract to Safe Z before WCS change` anywhere. Proves the collapse of `crossPart` into
-`isTraverse` did not disturb the route that was already correct.
+**W13b — walked.** `validateJob()` reaches Guard B with `base = 0` (the reference is None, so
+`getReservedBaseWcs()` returns 0 before consulting `Reserved WCS`), `!usesMachineZDatum()` true and
+`collectDistinctOffsets().length = 2`. The `error()` fires, before any output. **I5** — the condition now
+reads only the job's own shape and the reference; no property gates it, so there is no setting that
+suppresses it.
 
-**Expect — CR13d.** At the G55 → G59 traverse, the same base-clearance block as CR13a, then the `G59`
-select. A duplicate `G59` line either side of the retract is expected and is not a failure — it is the
-stated cost of dropping `base != workOffset`. Seeing `Retract to Safe Z before WCS change` here is the
-failure this row exists for: it means the widening was omitted and removing the property alone left the
-defect reachable.
+That also disposes of the stored-Setup question a posted row would have had to raise. It does not matter
+whether Fusion still remembers `spoilboardSafeZAcrossWcs = false` from an earlier Setup, because no code
+reads that key any more — the value is unreachable, not merely overridden. This is one of the questions a
+walk answers and a post cannot: a post would only show that *this* Setup behaved.
 
-**What a fail looks like.** `Retract to Safe Z before WCS change` in any of a/c/d: the arm is still live on
-that path. A file produced by CR13b: Guard B is still gated, or still offers the toggle. The property still
-in any dump: the deletion did not land. An internal-error abort on a/c/d: a guard premise is wrong and the
-`baseRelative` widening should be re-read before anything else. Record it in the status line above and
-revise the FIX; do not edit the expectation to match what was seen.
+**W13c — walked.** `machineFrame = isTraverse && usesMachineZDatum()` is true, so the chain takes
+`writeMachineTravelZ()` and emits `G53 G0 Z<travel> F<travel Z>` with its comment, unchanged from before
+the fix — the collapse of `crossPart` into `isTraverse` removed a conjunct that was always true whenever
+this route ran. Guard B does not fire here: its condition is `!usesMachineZDatum()`.
+
+**W13d — walked.** Guard A first, since this job would be refused before it could be walked otherwise:
+`baseOriginWriteReason(6)` computes `onStart = (probeOnStart != "Skip")` = false, `onChange` = false and
+`reprobe` = false, so no trigger can return and the job passes. At the third section, `workOffset = 6`,
+`previousWorkOffset = 2`, `base = 6`. Under the old test `base != workOffset` this was false and the
+section fell into the bare arm; under `base != 0` it is **true**:
+
+```
+(   Retract to spoilboard-base clearance G59 before traverse)
+G59                                        currentWorkOffset 2 != 6, so selected here
+G0 Z40 F<travel Z>
+( WCS changed: 2 -> 6)
+G59                                        writeWCS's own select -- the predicted duplicate
+(   Move to this part's stored origin X0 Y0)
+G0 X0 Y0 F<travel XY>                      onChangeMode "Skip", Z held at 40
+```
+
+The duplicate `G59` is confirmed, is idempotent, and is the stated cost of the widening. The XY move that
+follows happens at the travel height, in the base frame — which is this part's own frame here, so **I1**
+holds for it too.
+
+**W13e — walked.** The surviving `else if (isTraverse)` arm needs `isTraverse && !usesMachineZDatum() &&
+base == 0`. Guard B refuses exactly that conjunction at `onOpen()`, before output, so no job that produces
+a file can reach it: the `error()` is unreachable, which is what it is for. The other direction matters as
+much — it must not fire on a job that *should* post. It cannot: on a first section `previousWorkOffset` is
+`undefined`, so `isTraverse` is false and the whole chain is skipped, which is the path W11a walked through
+on the way to the base establish. A single-WCS job never reaches the chain at all, returning earlier at
+`workOffset == currentWorkOffset`.
+
+**What a fail would have looked like.** The bare arm still emitting on any of a/c/d; Guard B silent in
+W13b, or its message still offering "turn off"; the property surviving in the dump; the internal error
+firing anywhere in a/c/d, which would have meant the `baseRelative` widening was wrong rather than the
+guard. None occurred.

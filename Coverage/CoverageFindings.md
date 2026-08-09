@@ -35,12 +35,12 @@ judgement belongs in a later pass of `CoverageReview.md`, not in an edit here.
 
 ## Ledger
 
-**24 findings — 0 fixed, 24 open.** Ordered by severity; the bodies below are in CR order.
+**24 findings — 2 fixed, 22 open.** Ordered by severity; the bodies below are in CR order.
 
 | Status | Finding | Audience | Severity | Summary |
 |---|---|---|---|---|
-| `[ ]` | CR-11 | Professional | Machine damage | the spoilboard base is probed to a target measured in the frame the probe is establishing |
-| `[ ]` | CR-13 | Professional | Machine damage | with `Retract Across Parts` off, the inter-part traverse height is resolved in one frame and emitted in another |
+| `[x]` | CR-11 | Professional | Machine damage | the spoilboard base is probed to a target measured in the frame the probe is establishing |
+| `[x]` | CR-13 | Professional | Machine damage | with `Retract Across Parts` off, the inter-part traverse height is resolved in one frame and emitted in another |
 | `[ ]` | CR-14 | Professional | Machine damage | the base-establish tool-0 skip leaves the job believing a base was established |
 | `[ ]` | CR-19 | Both | Machine damage | the `M6` tool-change route stops nothing before the change |
 | `[ ]` | CR-21 | Both | Machine damage | `resetPostState()` does not reset the modal formatters, so a second file in one context loses its preamble |
@@ -253,7 +253,8 @@ than rapids, so it ends at the pull-off position by construction.
 
 ### CR-11 — the spoilboard base is probed to a target measured in the frame the probe is establishing
 
-**Status:** `[ ] fixed`
+**Status:** `[x] fixed` — c319e69, a provisional Z0 makes the target relative and the base probe gets its
+own reach; walked in [`CoverageFixes.md` → CR-11](CoverageFixes.md)
 **Audience:** Professional
 **Severity:** Machine damage
 **Confidence:** Certain
@@ -292,7 +293,8 @@ establish they have none.
 
 ### CR-13 — with `Retract Across Parts` off, the inter-part traverse height is resolved in one frame and emitted in another
 
-**Status:** `[ ] fixed`
+**Status:** `[x] fixed` — fbd1591, the control is removed and Guard B is unconditional, so the arm this
+finding names is unreachable; walked in [`CoverageFixes.md` → CR-13](CoverageFixes.md)
 **Audience:** Professional
 **Severity:** Machine damage
 **Confidence:** Certain
