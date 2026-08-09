@@ -2,9 +2,9 @@
 
 > **Resuming a later pass.** This is the in-repo copy, on branch `Coverage_Review`, kept so the method
 > survives the session that produced it. It is the plan as written before the first pass, with only the
-> deliverable's path updated: it now lives beside this file at `Test/CoverageReview.md`. To pick the work
-> up in a fresh session: *"Read Test/CoverageReviewPlan.md and execute it."* Progress is readable from
-> `Test/CoverageReview.md` itself — each story row carries a
+> deliverable's path updated: it now lives beside this file at `Coverage/CoverageReview.md`. To pick the
+> work up in a fresh session: *"Read Coverage/CoverageReviewPlan.md and execute it."* Progress is readable
+> from `Coverage/CoverageReview.md` itself — each story row carries a
 > `pending` / `walked` status, so a resumed session starts at the first `pending` row and needs no other
 > handover. **The first pass walked every row**; a later pass either re-walks a row against changed code or
 > extends the story set, and in both cases the statuses are what says where it stands.
@@ -39,7 +39,7 @@ parser rejects.
 This is a **review of the current source only** — not of the change history, and not of the `.md` files.
 `docs/design.md` is read as secondary context so a deliberate design decision is not filed as a defect,
 but where it disagrees with the Autodesk Fusion post-processor API, the API wins and the disagreement is
-itself a finding. No `.md` other than `Test/CoverageReview.md` is written; `check-docs.js` and the other
+itself a finding. No `.md` other than `Coverage/CoverageReview.md` is written; `check-docs.js` and the other
 repo commands are not run.
 
 **Nothing is executed.** No posting, no harness, no test rig. The method is hand-execution of the
@@ -333,7 +333,7 @@ Every one is **unverified** until its story walks it; any that does not survive 
 
 ---
 
-## Deliverable — `Test/CoverageReview.md`, written incrementally
+## Deliverable — `Coverage/CoverageReview.md`, written incrementally
 
 The file is created before the first walk and **appended after each story group**, so progress is
 visible as it happens rather than arriving at the end. Write points:
