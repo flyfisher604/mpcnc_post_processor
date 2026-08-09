@@ -88,8 +88,8 @@ unless the Setup delta says otherwise.
 | **HB-15 (A)** | The refusal tells the operator what to fix and claims nothing about a file | `HB-7 (A)`'s configuration exactly — HP-1 + `Start GCode File` = `nofilename`. Today's log is the pre-fix reading | posted | ✅ |
 | **HB-16 (A)** | A `Start GCode File` cannot suppress the post's `G17`, because it replaced the block that writes it — the reading that redirected HB-16's second half. **And the post re-emitted the include's own `G18`**, so a word in a loaded file populates no modal | HP-1 + `Start GCode File` = `G18 Start.txt`, whose only g-code is `G18`, on `HB-2 (A)`'s job. Not a pre/post-fix pair: the fix is a no-op on this path, and the row exists to show *why* | posted | ✅ |
 | **HB-17 (A)** | A job that *names* a fixed Z reference it cannot establish still gets HB-13's warning | HP-1 + **`CNC Firmware` = `Marlin`** + `Fixed Z Reference` = the spoilboard answer + `Reserved WCS` = `G59` + `Inter Part Travel Z` = `40` (the spoilboard answer refuses an unset or non-positive height, so the row cannot post without it) + `First WCS / Part` = `Use Active WCS X0 Y0, Probe Z0`, single Setup. Marlin, so **`HB-13 (A)`'s artifact cannot cover this** — the suppression is the firmware's | posted | ✅ |
-| **HB-18 (A)** | The Marlin base-establish warning keeps its parenthetical — the third call site of HB-14's defect | `HB-17 (A)`'s configuration exactly; that file is the pre-fix reading. One `grep` of line 122, but read the **whole** line: the discriminator is that `Marlin` and `no per-WCS` are separated *and* the trailing space is gone, since both are the same collapsed `)` | posted | ⬜ |
-| **HB-19 (A)** | HB-13's dialog warning stops recommending a remedy the firmware cannot deliver | `HB-17 (A)`'s configuration exactly. **Dialog only** — no artifact holds it, and the pre-fix reading is the operator's report on that post: two warnings, the second closing with `"Fixed Z Reference" removes both` on a job that already sets it. Expect that clause replaced, and CR-2's warning still beside it — its co-occurrence here is correct and is not what this row is about | posted | ⬜ |
+| **HB-18 (A)** | The Marlin base-establish warning keeps its parenthetical — the third call site of HB-14's defect | `HB-17 (A)`'s configuration exactly, and **`HB-18 (A).gcode` is that post re-run pre-fix** — byte-identical bar the timestamp — so the post-fix read is a one-line diff. Read the **whole** of 122: `Marlin` and the reason separated *and* the trailing space gone, both being the same collapsed `)` | posted | ⬜ |
+| **HB-19 (A)** | HB-13's dialog warning stops recommending a remedy the firmware cannot deliver | `HB-17 (A)`'s configuration exactly. **Dialog only** — no artifact holds it, and the pre-fix reading is the operator's report on the `HB-18 (A)` post, quoted there in full: two warnings, the second closing with `"Fixed Z Reference" removes both` on a job that already sets it. Expect that clause replaced, and CR-2's warning still beside it — its co-occurrence here is correct and is not what this row is about | posted | ⬜ |
 
 ### Expects
 
@@ -98,120 +98,56 @@ GRBL `gMotionModal` omits a G-word that is already in effect, so name the axis w
 established above them*, never `G0 X…`. Two Expects here were written the other way and mis-stated a
 passing file (HB-2 (B), HB-4 (A)).
 
-- **HB-2 (A)/(B) — PASS, `HB-2 (A).gcode`, re-read on the `HB-11` re-post.** `grep -c '%'` = 0; line 1 is
-  `(Fusion CAM 2704.1.36)`; `M30` is the last g-code **block**, with `writeStop()`'s
-  `( *** STOP end ***)` trailer as the last *line* — the block is the criterion, never the line. *The
-  artifact every other row diffs against is now post-fix, so nothing here cites a superseded baseline.*
-- **HB-3 (A) — PASS both halves, `HB-3 (A).gcode`, dialog confirmed by the operator at the post.** Line
-  114 carries the nothing-was-homed warning and no `$H`, `G28` or `G53` appears anywhere. **(B) — PASS,
-  `HB-3 (B).gcode`, dialog clean.** `$H` at 114 in place of the warning, the file differing from (A) in
-  six lines only and the cutting body identical; because (A) proved a `validateJob()` `warning()` does
-  reach the dialog, (B)'s silence is evidence rather than an untested channel.
-  **Keep (B)'s setup as written.** At HP-1's default `First WCS / Part` = `Current XY & Probe Z` this
-  configuration satisfies all three clauses of CR-2's test at 1580-1581 and the dialog warns —
-  correctly, but against a flat "no dialog warning" that reads as a false FAIL. Moving the mode to
-  `Use Active WCS X0 Y0, Probe Z0`, which 1587-1593 recommends by name, clears the third clause. *The
-  dump spells the declaration `XY`, the enum id for the `XY Only` title.*
-  **"Dialog clean" is no longer the criterion:** HB-13's warning fires here by design, so what (B)
-  proves is the absence of **HB-3's own text**. Still ✅ — its discriminators are `$H` and the six-line
-  diff — and `HB-13 (A).gcode` has since re-posted the configuration, so its line 127 is the current one.
-- **HB-4 (A) — PASS, `HB-4 (A).gcode`; (B) — PASS, `HB-2 (A).gcode` as the absence half, paired with
-  (A).** 127-131 read `G10 L20 P1 X0 Y0 Z0` / the retract comment / `G0 Z5.08 F300` / the offset
-  comment / `X25 Y0 F2500`, in that order, with `Probe XY offset in output units = X25 Y0` in the
-  header. The lift is **absolute, measured from the operator's own height** — the point of placing it
-  after the provisional `Z0`. The two files differ **only** in the offset property, its Resolved-Values
-  line and those four lines, which is HB-4's "a zero-offset job stays byte-identical" shown outright.
-- **HB-5 (A)/(B)/(C) — PASS, all three. HB-5 closes completely**, both channels, both properties.
-  **(A)** `HB-5 (A).gcode`: line **1** — above the generated-by header — is the `format error` warning;
-  Resolved Values reads `Probe SafeZ = Error = 15 -- a fixed height, no F360 level consulted`; the
-  operator's dialog warning quotes `"Safe Z"` and `"15mm"` by title, which attributes it to the probe
-  field rather than to `"Map: Safe Z to Rapid"`. **The substance the row exists for is in the diff:**
-  against `HB-2 (A).gcode` the probe retract moves `G0 Z5.08 F300` → `G0 Z15 F300` and its comment
-  `to 5.08` → `to 15`, section body untouched — the silent 15 mm, now loud in two places. *All three
-  predicted tokens rendered differently — no parentheses round the group (HB-14), `15` not `15.000`,
-  no space before `)`.*
-  **(B)** `HB-5 (B).gcode`: the dialog quotes `"Map: Safe Z to Rapid"`, the file holds **no**
-  `format error` anywhere (`grep -c` = 0) and its diff against `HB-2 (A).gcode` is three lines with
-  **no motion at all** — the exact complement of (A). **That absence is the discriminator and it
-  held:** the dialog warned while the file said nothing, so `validateJob()`'s check is independent of
-  the in-file `writeWarning()` rather than one leaking into the other. *It warns although the property
-  is inert with the mapper off, because `validateJob()` loops both fields unconditionally — HB-5's "two
-  properties documenting each other as same syntax must fail the same way" working as argued, not a
-  false positive: the typo bites the moment group 3 is switched on — which `HB-14 (B)` then did.*
-  **(C)** `HB-2 (A).gcode` as the absence half: no `format error`, both fields `Retract:15`, neither
-  Resolved-Values line saying `Error`.
-- **HB-7 (A) — PASS, and on stronger evidence than the row asked for.** No `.gcode` exists: the run
-  left `HB-7(A).gcode.failed`, 51 bytes, holding the single line
-  `!Error: Failed to post data. See log for details.` — the post engine's own placeholder, with no
-  header, no property dump, no `G54` and no g-code, under a name no sender would stream. **The log
-  names the abort point, which the file's absence alone cannot:** `Failed while processing onOpen().` /
-  `Error at line: 1730`, the pre-flight loop at the head of `validateJob()`'s Guards block, where the
-  pre-fix path reached `error()` from `loadFile()` at step 4 of `writeFirstSection()` — i.e. from
-  `onSection()`, after the stream had started. The refusal is therefore located, not just observed.
-  *The field held `nofilename` — no extension at all, which exercises the message's "check the
-  spelling and the extension" clause more directly than the row's `no_such_file.g` would have.*
-- **HB-8 (A) — PASS both halves, `HB-8 (A)-1.gcode` / `-2.gcode`, 38 seconds apart.** The dumps flip
-  **both** properties in opposite directions — (1) `feedsEnforceFeedrate = true` with
-  `jobSeparateWordsWithSpace = false`, (2) the reverse — so the dialog state demonstrably differed and
-  each property is exercised in both states across the pair. **The flip is in the direction that fails
-  pre-fix:** both leaks were sticky one-way, so post 1 setting the separator empty and `fOutput` forced
-  is what post 2 had to shake off, and it did — (2) has spaces between words and omits `F` where the
-  feed is unchanged. Each file is a **mechanically single-property delta from `HB-2 (A).gcode`**: strip
-  spaces from the baseline's 39 code lines and (1) is identical; strip `F` words from both and (2) is
-  identical. **Beyond what the row asked**, all 13 omitted and 13 retained `F` words in (2) were checked
-  against the modal feed sequence and every one is right, so `{ force: false }` is proved, not merely
-  un-leaked. *The four `M0 (MSG …)` lines keep their spaces in (1) — the separator governs words, not
-  comment bodies, which is load-bearing on Marlin, where that text is what the panel displays.*
-- **HB-9 (A) — PASS, `HB-9 (A).gcode`, and the register's strongest single artifact.** `grep -c '^('` =
-  **2**, both verbatim as predicted: the homing warning (1) and
-  `( >>> WARNING: No matching Coolant channel : Flood requested)` (14) — the two-warning run, since this
-  document's `Face1` asks for **Flood** with both channels `Off`. The absence half is total: no
-  `*** START begin ***`, property dump, `Resolved Values`, ranges or tools table, `Fusion CAM` header,
-  `MOVEMENT_`, `SECTION`, `COMMAND_` or `WCS changed` line, and no `$H`/`G28`/`G53`, as in HB-3 (A). The
-  dialog warning the operator reports is HB-3's `validateJob()` text in full, so **both channels fired
-  for one mistake and neither depends on the other.**
-  **The discriminator the Expect did not ask for is the best of it:** the baseline's two `>>>` lines are
-  `>>> Spindle Speed: Manual` and the coolant warning; at `Off` the warning survives and
-  **`>>> Spindle Speed: Manual` is gone.** `writeWarning()`'s bypass and `writeComment()`'s gate are
-  caught discriminating the *same prefix* inside one file — HB-9's design decision proved, not asserted.
-  **And the 39 code lines are byte-identical to `HB-2 (A).gcode`'s**, so `Comment Level` moves commentary
-  and never g-code. *The four `M0 (MSG …)` prompts survive, correctly — an `M0` at `Off` with no message
-  would be an unexplained pause — and they are why the `^(` form mattered: six lines contain a `(`, so
-  the earlier "the file's only `(` line" wording would have read as a false FAIL.*
-- **HB-11 (A) — PASS, `HB-2 (A).gcode` re-posted.** `grep -c '^()$'` = 0 and `^( )$` = **17**, the count
-  the pre-fix file showed for the two forms combined, so the fix changed the form and not the number.
-  *Every cited line number in this register still holds: `()` sat at 196, and a same-line substitution
-  moved nothing.*
-- **HB-14 — PASS at both call sites, and the two posts turned out to be exact complements.** **(A)**, line
-  **1** of `HB-14 (A).gcode`: `( >>> WARNING: "Safe Z" in "6 - On WCS / Part / Fixture Changes" -- format
-  error, falling back to 15)` — one `(` and one `)`, a single GRBL comment, the group no longer a property
-  name's tail; against `HB-2 (A).gcode` only the warning, the timestamp, the property echo, the
-  Resolved-Values `Error` line and the retract pair (`to 5.08` → `to 15`, `Z5.08` → `Z15`) move. **(B)**,
-  `HB-14 (B).gcode` **146, inside `*** SECTION begin ***`** where (A)'s sits above the header: same shape,
-  `"Map: Safe Z to Rapid"` in `"3 - Map G1s to Rapids …"`, and **placement rather than wording is what
-  attributes it** to 1146. **The two files swap the two properties** — `15mm` on the probe side then on the
-  map side — so file *and* dialog each name the malformed property and stay silent about the valid one, in
-  both directions: 1751's loop over both is read off artifacts, not asserted. *Count undiscriminated: one
-  operation, one warning; `onSection()` 2676 calls `safeZforSection()` unconditionally with no once-flag,
-  which settles per-section from source instead.*
-- **HB-13 (A) — PASS on both posts and the dialog, and the `Off` file is the shortest proof in this
-  register.** `HB-13 (A).gcode` at `Info`: 127 is the `>>> WARNING:` naming both halves, 129 is the
-  traverse it precedes, no Z move before it, and the only `G10 L20` is `P1 Z0.8` at 139 *after* the
-  probe — so (b) stays bounded by the operator's number rather than by the post, deliberately.
-  **`HB-13 (A)-off.gcode` is 42 lines and carries the warning at 7, immediately above `G0 X0 Y0 F2500`.**
-  Its **40 g-code lines are byte-identical** to the `Info` file's, every plain comment is gone, and
-  `>>> Spindle Speed: Manual` is gone with them while both `>>> WARNING:` lines stay — `writeWarning()`'s
-  bypass and `writeComment()`'s gate discriminating the same prefix again, now on the line the fix was
-  written for. **That file is the finding and its fix on one page:** pre-fix it opened
-  `$H` / `G54` / `G90` / `G21` / `G94` / `G17` / `G0 X0 Y0 F2500` with nothing said about the height that
-  traverse runs at. The dialog gave **one** warning quoting `"First WCS / Part"`, CR-2's **absent** as
-  `HB-3 (B)` predicted from the third clause of 1580-1581 — and `HB-17 (A)` has the two co-occurring where
-  `Axes Homed and Trusted` is `None`, the pair complementing rather than overlapping.
-- **HB-15 (A) — PASS, read at the dialog.** The text ends at `or clear the field.`, matching 1792-1794
-  word for word, and claims nothing about truncation — where the pre-fix wording said output stopped
-  "rather than part way through the file it would otherwise have truncated", which the 51-byte
-  `HB-15 (A).gcode.failed` on disk contradicts. **`HB-7 (A)` stays ✅**: no `.gcode` exists, and its
-  discriminators were never the wording.
+- **HB-2 (A)/(B) — PASS, `HB-2 (A).gcode`**, the post-fix baseline every other row diffs against.
+  `grep -c '%'` = 0; line 1 is `(Fusion CAM 2704.1.36)`; **`M30` is the last g-code *block*, with
+  `( *** STOP end ***)` as the last *line* — the block is the criterion, never the line.**
+- **HB-3 (A) — PASS, `HB-3 (A).gcode`**: 114 carries the nothing-was-homed warning, and no `$H`, `G28` or
+  `G53` appears anywhere. **(B) — PASS, `HB-3 (B).gcode`**, `$H` at 114 in its place, six-line diff.
+  **Keep (B)'s setup, and do not use "dialog clean" as its criterion:** at HP-1's default `First WCS /
+  Part` CR-2 satisfies all three clauses of 1580-1581 and warns by design, and HB-13's warning fires on
+  the mode 1587-1593 recommends by name — so what (B) proves is the absence of **HB-3's own text**. A flat
+  "no dialog warning" reads as a false FAIL.
+- **HB-4 (A) — PASS, `HB-4 (A).gcode`; (B) — PASS**, `HB-2 (A).gcode` as the absence half. 127-131 are the
+  provisional `Z0`, the retract and `X25 Y0 F2500` — the lift **absolute, from the operator's own height**
+  — and the two files differ **only** in that property, its Resolved-Values line and those four lines,
+  which is "a zero-offset job stays byte-identical" shown outright.
+- **HB-5 (A)/(B)/(C) — PASS, all three, both channels.** (A) the `format error` warning at line **1** of
+  `HB-5 (A).gcode`, with the probe retract and its comment the only motion that moves. (B) `HB-5
+  (B).gcode` holds **no** `format error` at all while the dialog warns — the two channels independent, and
+  *it warns although the property is inert with the mapper off, which is 1751 looping both fields
+  unconditionally rather than a false positive.* (C) `HB-2 (A).gcode`, neither.
+- **HB-7 (A) — PASS.** No `.gcode` exists; the run left `HB-7(A).gcode.failed`, 51 bytes, holding only
+  `!Error: Failed to post data. See log for details.` **The log locates the abort, which the absence alone
+  cannot:** `Failed while processing onOpen().` / `Error at line: 1730` — the pre-flight loop, where the
+  pre-fix path reached `error()` from `loadFile()` at step 4 of `writeFirstSection()`.
+- **HB-8 (A) — PASS both halves, `HB-8 (A)-1.gcode` / `-2.gcode`.** The pair flips **both** properties in
+  opposite directions, and **the direction is the point**: both leaks were sticky one-way, so post 1
+  setting the separator empty and `fOutput` forced is what post 2 had to shake off, and did. Each file is
+  a mechanically single-property delta from `HB-2 (A).gcode`. *All 26 `F` words in (2) were checked against
+  the modal feed sequence, so `{ force: false }` is proved rather than merely un-leaked.*
+- **HB-9 (A) — PASS, `HB-9 (A).gcode`.** `grep -c '^('` = **2**, the two warnings, with the whole of the
+  header, property dump, `MOVEMENT_`/`SECTION`/`COMMAND_` commentary absent. **The `^(` anchor is the
+  criterion, not "the file's only `(` line":** four `M0 (MSG …)` prompts correctly survive at `Off`, so six
+  lines contain a `(` and the looser reading is a false FAIL. `>>> Spindle Speed: Manual` goes while both
+  `>>> WARNING:` lines stay — the bypass and the gate discriminating the same prefix inside one file — and
+  the 39 code lines are byte-identical to `HB-2 (A).gcode`'s.
+- **HB-11 (A) — PASS**, `HB-2 (A).gcode` re-posted: `grep -c '^()$'` = 0, `^( )$` = **17**, the pre-fix
+  count for the two forms combined, so the form changed and the number did not. *Every line number cited
+  anywhere in this register still holds — a same-line substitution moved nothing.*
+- **HB-14 — PASS at both call sites, and the two posts are exact complements** — `15mm` on the probe field
+  then on the map field, so file *and* dialog each name the malformed property and stay silent about the
+  valid one, in **both** directions, which reads 1751's loop over both off artifacts. **Placement rather
+  than wording attributes (B)** to 1146: `HB-14 (B).gcode` 146 sits inside `*** SECTION begin ***` where
+  (A)'s is at line 1 above the header. *The per-section count is undiscriminated by a one-operation job;
+  `onSection()` 2676 calls `safeZforSection()` unconditionally with no once-flag, settling it from source.*
+- **HB-13 (A) — PASS on both posts and the dialog.** `HB-13 (A)-off.gcode` is 42 lines, the warning at 7
+  immediately above `G0 X0 Y0 F2500`, its **40 g-code lines byte-identical** to the `Info` file's — the
+  finding and its fix on one page, since pre-fix that file said nothing at all about the height the
+  traverse runs at. *(b) stays bounded by the operator's `G38 Target` and not by the post, deliberately:
+  the only `G10 L20` is after the probe.*
+- **HB-15 (A) — PASS at the dialog.** The text ends at `or clear the field.`, matching 1792-1794 word for
+  word, and claims nothing about truncation — which the 51-byte `.failed` on disk would have contradicted.
+  **`HB-7 (A)` stays ✅**: its discriminators were never the wording.
 - **HB-12 (A)** — the Stop file's arc is preceded by `G17`. The discriminator is **order**: `G17` after the
   last `G18` line and before the first line of the loaded footer. `HB-16 (A).gcode` 187 is the pre-fix
   reading on a **post-fix** build — the same `G18 G2 X182.797 Z-0.083 K4.997`, with `G0 Z15.24`, `X0 Y0
@@ -219,37 +155,30 @@ passing file (HB-2 (B), HB-4 (A)).
   `includeStopFile` never takes. That file also shows the park riding in on the retract's modal `G0`, the
   output change a head-of-`onClose()` `G17` would have caused. Note the Stop file **replaces** the Stop
   phase, so check `M30` still arrives before reading the plane; the park is not a check there.
-- **HB-16 (A) — PASS, and the corroborating absence carries it.** 159 is `G17 G2 Y60.598 J21.279 F900`, the
-  first XY arc after the loaded header, and the file holds exactly two `G17`, 159 and 179 — so none before
-  it: `Start()` was replaced, the modal was empty, and the arc emitted its own plane word unaided. `G90`,
-  `G21` and `G94` each `grep -c` **0**, the same substitution dropping all four, while `G54` (115) and the
-  property dump survive above `*** START begin ***` — the include replaced `Start()` and nothing else,
-  which is what makes the `G18`-suppresses-`G17` story impossible. **The include's `G18` (118) is
-  re-emitted by the post at 154**: a word in a loaded file populates the modal in neither direction. The
-  dialog was empty and correctly so — no `warning()` site is reachable here, and 147's coolant
-  `>>> WARNING` is `writeWarning()`, which writes to the stream, never the dialog. *The operator's
-  "reading an external file" notice is Fusion's, not the post's.*
+- **HB-16 (A) — PASS.** 159 is the first XY arc after the loaded header and carries its own `G17`; the file
+  holds exactly two, so none precedes it — `Start()` was replaced, the modal was empty, the arc emitted its
+  plane word unaided. **`G90`, `G21` and `G94` each count 0: the include contract, not a defect**, since
+  naming a Start file replaces the block that writes all four, and a re-run must not read it as FAIL.
+  *The include's own `G18` (118) is re-emitted at 154 — a word in a loaded file populates no modal — and
+  the dialog is correctly empty, no `warning()` site being reachable on this configuration.*
 - **HB-17 (A) — PASS, `HB-17 (A).gcode`, and the discriminator held two lines apart.** 122 is
   `reserved base G59 ignored on Marlin …` from the establish that did not happen and 124 is HB-13's
-  unknown-Z warning on the traverse that did: before the fix the first appeared and the second was
-  suppressed *by* the answer the first had just declared void. `grep -c G53` = **0**, so it is the
-  spoilboard answer's hole and not the machine-Z answer's, and `grep -c '( >>> WARNING'` = 0 with three
-  `; >>> WARNING` lines — the dialect switch, not a miss. **The row found two defects it was not aimed
-  at, in the warnings themselves: HB-18 and HB-19.** *`G92 Z0.8` for `G10 L20`, and every lead-in
-  linearized, both correct on this branch (HB-6).*
-- **HB-18 (A)** — 122 reads `… ignored on Marlin (no per-WCS registers; single global frame)` or whatever
-  survives the sanitizer with the two clauses **separated and no trailing space**, both being the same
-  collapsed `)`. The fix is a wording choice, so the row cannot pre-name the string; what it can require
-  is that `Marlin` and `no per-WCS` no longer abut and that line 122 does not end in whitespace. **Widen
-  the read to a sweep**, since HB-18 is a scoping error rather than a site: `grep -n '("' -c` on every
-  `writeWarning(` argument, or simply re-read the three `; >>> WARNING` lines in this file, whichever the
-  fix's shape makes cheaper.
-- **HB-19 (A)** — the dialog's second warning no longer ends by recommending `"Fixed Z Reference"`, on a
-  job that sets it. **Read it beside CR-2's, which is correct here and stays** — `Axes Homed and Trusted`
-  is `None` on this configuration, so CR-2's stored-offset test fires on its own merits and its
-  co-occurrence with HB-13's is the two tests being independent, not overlapping. That is the trap this
-  row must not walk into: a flat "one warning" criterion would read as FAIL. What changes is one clause
-  of one warning; everything else in both texts should be byte-identical to the operator's pre-fix report.
+  unknown-Z warning on the traverse that did: pre-fix the first appeared while the second was suppressed
+  *by* the answer the first had just declared void. `grep -c G53` = **0**, the spoilboard answer's hole and
+  not the machine-Z answer's; `grep -c '( >>> WARNING'` = 0 against three `;` forms, the dialect switch
+  rather than a miss. **It found HB-18 and HB-19, in the warnings themselves.**
+- **HB-18 (A) — the pre-fix control is on disk, so the post-fix read is a diff.** `HB-18 (A).gcode` is
+  **byte-identical to `HB-17 (A).gcode` bar the timestamp** — neither fix is applied, the `.cps` still at
+  `eea70d1` — and `cat -A` shows 122 ending `single global frame $`, the trailing space seen rather than
+  inferred. So: **only 122 may differ**, with `Marlin` and the reason separated and no trailing whitespace.
+  **The sweep HB-18's scoping error asks for is already settled from source** — of the fifteen
+  `writeWarning()` call sites exactly three carry literal parentheses, 3499 and the twin rigid-tapping
+  string at 3112/3115, so this is three sites and two strings rather than a search.
+- **HB-19 (A) — the pre-fix dialog text is captured in full** on that same post, so this read is a diff
+  too: one clause of one warning goes and everything else stays word for word. **Read it beside CR-2's,
+  which is correct here and stays** — `Axes Homed and Trusted` is `None`, so CR-2's stored-offset test
+  fires on its own merits and the two warnings are independent rather than overlapping. That is the trap:
+  a flat "one warning" criterion reads as FAIL.
 
 ---
 
@@ -336,16 +265,15 @@ What this register still owes, and why each artifact is worth a post.
   the fix HB-14 had just shipped and the other in the fix HB-13 had. **Nothing in a source review reads a
   warning as prose**, and these five are what that costs — the register's own Expects predicted the broken
   form twice.
-- **What empties the Expects section: a row passing.** Once a row is ✅ its pre-run criteria have done
-  their work, so the entry collapses to the artifact, the discriminator actually checked, the build it
-  dates, and any trap a re-run would otherwise walk back into — which is why HB-3 (B) keeps the CR-2
-  paragraph and the other passed entries keep almost nothing. Applied twice on 2026-08-08: to HB-2, HB-3
-  and HB-4, clearing a 322-line overrun, then to those three again plus HB-5 and HB-7 once the build
-  proof let every per-row dating clause go. **Rule 4's other half is applied too:** the Resolution on
-  HB-2, HB-3, HB-4, HB-7, HB-8 and HB-9 is now its commit ref plus one clause. It **freed no lines**, and
-  the "roughly 30" estimate was wrong in kind — a finding is one physical line however long its cells, so
-  the only reserve the size budget can spend is wrapped prose. Next in that reserve: *Checked and found
-  correct*, which retires by its own rule as rows come to assert its entries.
+- **What empties the Expects section: a row passing.** Once a row is ✅ its pre-run criteria have done their
+  work, so the entry collapses to the artifact, the discriminator actually checked, and **any trap a re-run
+  would otherwise walk back into** — which is the only reason a passed entry keeps prose at all. Four of
+  them do: HB-2's *block, not line*; HB-3 (B)'s CR-2 paragraph; HB-9's `^(` anchor; HB-16's `G90`/`G21`/
+  `G94` count of 0. Applied across all thirteen passed rows on 2026-08-09, taking the file from its 373
+  budget to **301** — the reserve the earlier passes were looking for, since a finding costs one physical
+  line however long its cells and only wrapped prose is spendable. **Rule 4's other half is applied too:**
+  the Resolution on HB-2, HB-3, HB-4, HB-7, HB-8 and HB-9 is its commit ref plus one clause. *Untouched
+  and no longer needed: Checked and found correct retires by its own rule as rows come to assert it.*
 - **The build under test is `e5db625` exactly, by file identity rather than by inference.** The `.cps`
   Fusion posts from — `AppData\Roaming\Autodesk\Fusion 360 CAM\Posts\MPCNC_v4.0_Beta2.cps` — is
   byte-identical to this repo's working copy (MD5 `974EA5A1…`), and the working tree's only modified
