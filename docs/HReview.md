@@ -61,7 +61,7 @@ session **from a build proved identical to `e5db625` — see *Owed***, so no row
 Personas are `conventions.md` → *How to run a test*; defaults are GRBL/mm, `Comment Level` `Info`,
 unless the Setup delta says otherwise.
 
-**✅ 18 PASS · ❌ 0 FAIL · ⬜ 4 UNRUN · ➖ 3 n/a — 25 rows.**
+**✅ 19 PASS · ❌ 0 FAIL · ⬜ 3 UNRUN · ➖ 3 n/a — 25 rows.**
 
 | Test | Proves | Setup | Method | State |
 |---|---|---|---|---|
@@ -86,7 +86,7 @@ unless the Setup delta says otherwise.
 | **HB-13 (A)** | The operator is told, in the file and at the dialog, that the traverse and the probe target both depend on where they left the tool | `HB-3 (B)`'s configuration exactly — HP-1 + `Home at Job Start` = `Home`, `Axes Homed and Trusted` = `XY`, `First WCS / Part` = `Use Active WCS X0 Y0, Probe Z0`. Today's file is the pre-fix reading. **Post it twice, `Comment Level` `Info` then `Off`** — the level is the discriminator for half of what the row claims | posted | ✅ |
 | **HB-12 (A)** | A Stop file's XY arcs are not read in the plane the last lead-out left | HP-1 + `Stop GCode File` = a footer whose only motion is one `G2 X… Y… I… J…`, on a job whose final operation has a **Z lead-out** (`HB-2 (A)`'s job qualifies — its last arc is `G18 G2`) | posted | ⬜ |
 | **HB-15 (A)** | The refusal tells the operator what to fix and claims nothing about a file | `HB-7 (A)`'s configuration exactly — HP-1 + `Start GCode File` = `nofilename`. Today's log is the pre-fix reading | posted | ✅ |
-| **HB-16 (A)** | A `Start GCode File` cannot suppress the post's `G17`, because it replaced the block that writes it — the reading that redirected HB-16's second half | HP-1 + `Start GCode File` = a header whose only g-code is `G18`, on `HB-2 (A)`'s job. Not a pre/post-fix pair: the fix is a no-op on this path, and the row exists to show *why* | posted | ⬜ |
+| **HB-16 (A)** | A `Start GCode File` cannot suppress the post's `G17`, because it replaced the block that writes it — the reading that redirected HB-16's second half. **And the post re-emitted the include's own `G18`**, so a word in a loaded file populates no modal | HP-1 + `Start GCode File` = `G18 Start.txt`, whose only g-code is `G18`, on `HB-2 (A)`'s job. Not a pre/post-fix pair: the fix is a no-op on this path, and the row exists to show *why* | posted | ✅ |
 | **HB-17 (A)** | A job that *names* a fixed Z reference it cannot establish still gets HB-13's warning | HP-1 + **`CNC Firmware` = `Marlin`** + `Fixed Z Reference` = the spoilboard answer + `Reserved WCS` = `G59` + `Inter Part Travel Z` = `40` (the spoilboard answer refuses an unset or non-positive height, so the row cannot post without it) + `First WCS / Part` = `Use Active WCS X0 Y0, Probe Z0`, single Setup. Marlin, so **`HB-13 (A)`'s artifact cannot cover this** — the suppression is the firmware's | posted | ✅ |
 | **HB-18 (A)** | The Marlin base-establish warning keeps its parenthetical — the third call site of HB-14's defect | `HB-17 (A)`'s configuration exactly; that file is the pre-fix reading. One `grep` of line 122, but read the **whole** line: the discriminator is that `Marlin` and `no per-WCS` are separated *and* the trailing space is gone, since both are the same collapsed `)` | posted | ⬜ |
 | **HB-19 (A)** | HB-13's dialog warning stops recommending a remedy the firmware cannot deliver | `HB-17 (A)`'s configuration exactly. **Dialog only** — no artifact holds it, and the pre-fix reading is the operator's report on that post: two warnings, the second closing with `"Fixed Z Reference" removes both` on a job that already sets it. Expect that clause replaced, and CR-2's warning still beside it — its co-occurrence here is correct and is not what this row is about | posted | ⬜ |
@@ -212,21 +212,23 @@ passing file (HB-2 (B), HB-4 (A)).
   "rather than part way through the file it would otherwise have truncated", which the 51-byte
   `HB-15 (A).gcode.failed` on disk contradicts. **`HB-7 (A)` stays ✅**: no `.gcode` exists, and its
   discriminators were never the wording.
-- **HB-12 (A)** — the Stop file's arc is preceded by `G17`. The discriminator is **order**: `G17`
-  after the last `G18` line and before the first line of the loaded footer. Today's file is the
-  pre-fix reading — `G18 G2 X182.797 Z-0.083 K4.997` (192) is the last plane code, and `G0 Z15.24`,
-  `X0 Y0 F2500` and `M30` follow it with no `G17`, so a footer arc would have run in ZX. Note the
-  Stop file **replaces** the Stop phase (group 8's own description), so check whether `M30` still
-  arrives at all before reading the plane. The park move is not a check here — it belongs to the
-  built-in block this configuration does not run, and the fix deliberately leaves that block alone.
-- **HB-16 (A)** — the first `G2`/`G3` after the loaded header carries its own `G17` **and there is no
-  `G17` anywhere before it**, which together are the point: `Start()` was replaced, so the post never set
-  the plane, the modal was empty, and the arc emitted its word unaided. Read 159's XY arc, not a later
-  one. **The corroborating absence is the whole reading** — `grep -c` for `G90`, `G21` and `G94` should
-  each be 0 too, since the same substitution drops all four. That is the include contract rather than a
-  defect, and it is what makes the `G18`-suppresses-`G17` story impossible here. Neither the cross-file
-  half (two posts in one context, which the one-`G90`-per-file count says this Fusion is not) nor the
-  tool-file half (group 7) is testable here.
+- **HB-12 (A)** — the Stop file's arc is preceded by `G17`. The discriminator is **order**: `G17` after the
+  last `G18` line and before the first line of the loaded footer. `HB-16 (A).gcode` 187 is the pre-fix
+  reading on a **post-fix** build — the same `G18 G2 X182.797 Z-0.083 K4.997`, with `G0 Z15.24`, `X0 Y0
+  F2500` and `M30` after it and no `G17` — because 2129 sits in the stop-file branch, which an empty
+  `includeStopFile` never takes. That file also shows the park riding in on the retract's modal `G0`, the
+  output change a head-of-`onClose()` `G17` would have caused. Note the Stop file **replaces** the Stop
+  phase, so check `M30` still arrives before reading the plane; the park is not a check there.
+- **HB-16 (A) — PASS, and the corroborating absence carries it.** 159 is `G17 G2 Y60.598 J21.279 F900`, the
+  first XY arc after the loaded header, and the file holds exactly two `G17`, 159 and 179 — so none before
+  it: `Start()` was replaced, the modal was empty, and the arc emitted its own plane word unaided. `G90`,
+  `G21` and `G94` each `grep -c` **0**, the same substitution dropping all four, while `G54` (115) and the
+  property dump survive above `*** START begin ***` — the include replaced `Start()` and nothing else,
+  which is what makes the `G18`-suppresses-`G17` story impossible. **The include's `G18` (118) is
+  re-emitted by the post at 154**: a word in a loaded file populates the modal in neither direction. The
+  dialog was empty and correctly so — no `warning()` site is reachable here, and 147's coolant
+  `>>> WARNING` is `writeWarning()`, which writes to the stream, never the dialog. *The operator's
+  "reading an external file" notice is Fusion's, not the post's.*
 - **HB-17 (A) — PASS, `HB-17 (A).gcode`, and the discriminator held two lines apart.** 122 is
   `reserved base G59 ignored on Marlin …` from the establish that did not happen and 124 is HB-13's
   unknown-Z warning on the traverse that did: before the fix the first appeared and the second was
@@ -312,15 +314,13 @@ when a row is written that asserts it, or when the artifact it names is supersed
 
 What this register still owes, and why each artifact is worth a post.
 
-- **Three findings are open — HB-10, HB-18 and HB-19 — and four rows owe a post.** Every row filed against
-  a fix that has shipped is now ✅: HB-11, HB-13, HB-14, HB-15 and HB-17 all passed on first read off the
-  same build, twelve artifacts in two sessions. What is left is `HB-12 (A)` and `HB-16 (A)` (each needs a
-  small include file, one of which could serve both) and **HB-18 (A) / HB-19 (A), which need no new
-  configuration** — `HB-17 (A)`'s artifact and dialog are already their pre-fix reading. HB-10 is deferred.
-- **HB-16's include half is fixed where no row here can watch it.** Its payoff is on the tool-change
-  include files — group 7, excluded from this register and already carrying HB-10 / `HR-21` / `CR-15`.
-  So `HB-16 (A)` is re-aimed at what a hobbyist post *can* show: that a Start include cannot cause the
-  hazard, because it replaces the block that would have set the plane.
+- **Three findings are open — HB-10, HB-18 and HB-19 — and three rows owe a post.** Every row filed against
+  a fix that has shipped is now ✅: HB-11, HB-13, HB-14, HB-15, HB-16 and HB-17 all passed on first read
+  off the same build, thirteen artifacts in two sessions. What is left is `HB-12 (A)`, which needs a Stop
+  include, and **HB-18 (A) / HB-19 (A), which need no new configuration at all** — `HB-17 (A)`'s artifact
+  and dialog are already their pre-fix reading. HB-10 is deferred to the professional pass by its own row.
+- **HB-16's include half is fixed where no row here can watch it.** Its payoff is on the tool-change files
+  — group 7, excluded from this register and already carrying HB-10 / `HR-21` / `CR-15`.
 - **HB-13 (b) has an answer, and the baseline artifact shows it working.** `HB-2 (A).gcode` 125-127 is the
   sibling mode doing exactly this — `G10 L20 P1 X0 Y0 Z0` under the comment "Provisional Z0 at the
   current height so the probe target is a relative limit" — and the `Z`-only form is separable here
