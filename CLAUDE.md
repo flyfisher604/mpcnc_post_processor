@@ -39,6 +39,10 @@ stale. **`/close-finding <id>` runs the procedure.** Don't ask whether to add th
 Every commit carries a descriptive message — no exceptions, no placeholders, however mechanical the
 change. The message describes **the code change and why**; it never narrates doc bookkeeping.
 
+A commit that acts on a registered finding **leads its subject with the id** — `CR-11: …`, `HB-4: …` — so
+the work on a finding is findable with `git log --grep` and visible in a one-line log. A commit that only
+builds tooling around a register does not take a prefix, however much it mentions one.
+
 ## Before writing to memory
 
 Ask which driving doc should hold the fact instead; if one should, **propose that edit and write no
