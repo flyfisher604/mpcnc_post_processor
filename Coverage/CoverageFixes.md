@@ -381,3 +381,189 @@ on the way to the base establish. A single-WCS job never reaches the chain at al
 W13b, or its message still offering "turn off"; the property surviving in the dump; the internal error
 firing anywhere in a/c/d, which would have meant the `baseRelative` widening was wrong rather than the
 guard. None occurred.
+
+---
+
+## CR-14 — the base-establish tool-0 skip leaves the job believing a base was established
+
+**Finding:** [`CoverageFindings.md` → CR-14](CoverageFindings.md) — Professional, Machine damage, Certain.
+
+### FIX
+
+**Status:** `[ ] applied`
+
+The finding names its own fix — *the skip itself is right; its silence is not, and the predicate should
+reflect what was actually emitted* — and that is the shape of this. But making the predicate honest fixes
+five of the six consumers and leaves the sixth, which is the one that moves the machine. So four parts.
+
+**One predicate, asked from both places.** The condition `writeBaseEstablish()` skips on is
+`tool.number != 0 && !tool.isJetTool()`, and `validateJob()` needs the same answer before any section is
+current. Give it a name and let both sites read it:
+
+```js
+function baseProbeCanRun() { ... getSection(0).getTool() ... }
+```
+
+The **first** section's tool is the right one to ask about, and not an approximation: the establish runs
+once, from `writeFirstSection()`, which `onSection` calls under `isFirstSection()`. A job whose second
+operation carries a real tool still never writes the base. Inside `writeBaseEstablish()` the new call is
+exactly equivalent to what is there now — `tool` *is* section 0's tool at that point — so this part changes
+no output at all. It exists so the two sites cannot drift, which is the same reason `parkCanRetract()` and
+`machineHomesXY()` exist.
+
+**The predicate stops asking the dialog.** `fixedZEstablishedInFile()` currently reads "not Marlin, and the
+dialog names a reference". It should read "…and the reference will actually be established": the spoilboard
+arm is the only one that probes, so it is the only one an unprobeable tool defeats. The machine-Z arm needs
+no change — it emits `G53` and touches no probe — and keeping the test confined to the spoilboard arm is
+what stops this fix leaking into a feature it has nothing to do with.
+
+That one edit corrects five consumers at once, which is the argument for fixing the predicate rather than
+each caller: `partProbe()`'s "no Z reference is established" warning starts firing
+([:3047](../MPCNC_v4.0_Beta2.cps#L3047)); `parkCanRetract()` starts answering no, so
+`writeMachineParkXY()` warns instead of retracting into an unwritten register
+([:2092](../MPCNC_v4.0_Beta2.cps#L2092)); and two `validateJob()` warnings start reaching Fusion's dialog
+([:1531](../MPCNC_v4.0_Beta2.cps#L1531), [:1547](../MPCNC_v4.0_Beta2.cps#L1547)).
+
+A sixth consumer moves the *other* way, and it is worth stating because it looks like a regression and is
+not. The warning at [:1520](../MPCNC_v4.0_Beta2.cps#L1520) — *establishing the fixed Z reference moves the
+tool before "First WCS / Part" records the current position* — currently fires in the tool-0 case, where
+nothing moves the tool at all, because the establish was skipped. It stops firing. That is a false positive
+removed, not a warning lost.
+
+**The silence itself.** The skip's `else` writes a Debug comment, which is invisible at every level an
+operator runs. It should `writeWarning()`, in the same form as the Marlin skip four lines above it — that
+one already got this right, and the two skips should not report differently. A matching `validateJob()`
+warning puts it in Fusion's dialog as well as the file, which is the pattern the tool-change suppression
+warning already uses at [:1554](../MPCNC_v4.0_Beta2.cps#L1554).
+
+**And the consumer the predicate does not reach — Guard B′.** `writeWCS()` takes the base route on
+`baseRelative = isTraverse && base != 0`, and `base` comes from `getReservedBaseWcs()`, which answers which
+register is *reserved*. It has to: Guard A needs that answer whether or not the probe ran. So on a
+multi-WCS job with an unprobeable first tool, every traverse still emits `G59` and `G0 Z<Inter Part Travel
+Z>` into a register nothing has written — a rapid to an absolute height in an unestablished frame, which is
+the machine-damage move this finding is about, and the predicate fix does not touch it.
+
+Routing `baseRelative` through the honest predicate would drop those traverses into the arm CR-13 turned
+into an internal error, which is the wrong answer twice over: the message would say "internal" about an
+ordinary misconfiguration, and it would abort mid-output instead of before it. The right answer is to refuse
+the job at validate time, beside Guard B and for the same reason — a multi-WCS job with no fixed Z reference
+*in fact* is what Guard B exists to refuse, and CR-13 made that guard unconditional precisely so nothing
+could post around it.
+
+So a second site, phrased on the honest predicate and hoisted above the `base == 0` early return that
+currently hides it from this case:
+
+- **Guard B** (unchanged): no fixed Z reference is named at all.
+- **Guard B′** (new): one is named, and this job will not establish it — name the tool, since that is the
+  thing the operator has to change, and the remedy is different from Guard B's.
+
+Two sites rather than one message with a conditional clause, because each names exactly one remedy and the
+post's guards are meant to read that way.
+
+**What this does not do.** It does not make a tool-0 job establish a base — nothing can; a tool that cannot
+touch a plate cannot probe one. A single-WCS spoilboard job with tool 0 still posts, now with two warnings
+and no absolute Z moves into the unwritten register. That is the honest outcome, and it is what the finding
+asks for.
+
+**Diffs, not yet applied.**
+
+```diff
++// The tool the base probe would use is the FIRST section's: writeBaseEstablish() runs once, from
++// writeFirstSection(), which onSection calls under isFirstSection(). Tool 0 and jet tools cannot touch
++// off a plate, so the probe is skipped for them -- rightly, but the reserved base is then never written.
++// Named so validateJob(), which has no current section, and the establish itself cannot disagree. CR-14.
++function baseProbeCanRun() {
++  if (getNumberOfSections() == 0) return false;
++  var t = getSection(0).getTool();
++  return t.number != 0 && !t.isJetTool();
++}
+```
+
+```diff
+ function fixedZEstablishedInFile() {
+-  return fw != eFirmware.MARLIN && fixedZEstablishedAtStart();
++  if (fw == eFirmware.MARLIN) return false;
++  if (!fixedZEstablishedAtStart()) return false;
++  // The spoilboard arm is the only one that PROBES, so it is the only one a tool that cannot probe
++  // silently defeats; the machine-Z arm emits G53 and needs no tool at all. CR-14.
++  return usesMachineZDatum() || baseProbeCanRun();
+ }
+```
+
+```diff
+-  if (tool.number != 0 && !tool.isJetTool()) {
++  if (baseProbeCanRun()) {
+     ...
+   } else {
+-    writeComment(eComment.Debug, " writeBaseEstablish: probe skipped (tool 0 or jet tool)");
++    // A warning and not a Debug comment: this is the same class of skip as the Marlin one above, which
++    // already warns, and Debug is invisible at every level an operator runs. CR-14.
++    writeWarning("reserved base " + gname + " NOT established -- the first operation's tool cannot probe"
++      + " (tool number 0 or a jet tool), so no absolute Z move is made in that frame anywhere in this job");
+   }
+```
+
+```diff
++  // Guard B' -- a fixed Z reference NAMED but not established is the same hazard as none named, and the
++  // dialog cannot tell them apart. Above the base == 0 return below, which would otherwise skip this
++  // case entirely: here a base IS reserved. CR-14.
++  if (!fixedZEstablishedInFile() && getReservedBaseWcs() != 0 && collectDistinctOffsets().length > 1) {
++    error("\"Fixed Z Reference\" = Spoilboard reserves " + wcsName(getReservedBaseWcs()) + ", but the first operation's tool cannot probe it (tool number 0 or a jet tool), so the base is never written and every traverse between parts would move to an absolute height in an unestablished frame. Give the first operation a numbered milling tool, or post one job per part.");
++    return;
++  }
+   var base = getReservedBaseWcs();
+   if (base == 0) {
+```
+
+### TEST
+
+**Status:** `open` — five walks specified below; they cannot be run until the FIX is applied, since a walk
+is of the source.
+
+| Test | Method | Proves | Property set | State |
+|---|---|---|---|---|
+| W14a | walk | the skip is visible, and no absolute Z is emitted in the unwritten frame | GRBL/mm, Comment Level `Info`, **one** part on G54, `Fixed Z Reference` = Spoilboard, `Reserved WCS` = G59, `Inter Part Travel Z` = 40, `At End Park At` = machine X0 Y0, first operation's tool number **0** | ⬜ |
+| W14b | walk | Guard B′ refuses the multi-WCS form rather than traversing into the unwritten base | W14a with a second part on G55 | ⬜ |
+| W14c | walk | a numbered tool is unaffected — the predicate change is confined to the skip | W14a with tool 1 | ⬜ |
+| W14d | walk | the machine-Z answer does not consult the tool at all | W14a with `Fixed Z Reference` = Machine Z, `Axes Homed and Trusted` = XYZ, `Home at Job Start` = Home | ⬜ |
+| W14e | walk | the Marlin exclusion still answers first | W14a on Marlin, tool 1 | ⬜ |
+
+**Expect — W14a.** `writeBaseEstablish()` reaches its `else` and emits the new warning naming `G59`.
+Then, with `fixedZEstablishedInFile()` false: `partProbe()` emits its "no Z reference is established"
+warning on the first part's probe; `validateJob()` raises the `Probe Z`-with-no-reference warning
+([:1531](../MPCNC_v4.0_Beta2.cps#L1531)) and the machine-park warning
+([:1547](../MPCNC_v4.0_Beta2.cps#L1547)) into Fusion's dialog; and `writeMachineParkXY()` takes its
+`!parkCanRetract()` arm, emitting the no-retract warning and **no** `G53` and **no** `G0 Z`. The absence
+that carries the finding: **no `G10 L20 P6` of any kind, and no absolute Z move made while G59 is
+selected, anywhere in the file.** The warning at [:1520](../MPCNC_v4.0_Beta2.cps#L1520) must **not** fire —
+that is the false positive this fix removes, and its survival would mean the predicate is still reading the
+dialog.
+
+The jet-tool half of the condition is walked as a variant of this row rather than its own: laser and plasma
+paths are out of the coverage review's scope by decision, so what is checked here is only that
+`isJetTool()` selects the same skip, not the jet job's own behaviour.
+
+**Expect — W14b.** **No output.** Guard B′ fires at `onOpen()`, before any block, and its text names
+`G59` and the tool. Guard B itself must **not** fire — its condition is `base == 0`, and a base is
+reserved here — so a message about setting `Fixed Z Reference` would mean the two guards are crossed.
+
+**Expect — W14c.** Byte-identical to CR-11's W11a: the full establish block, `G38.2 F30 Z-100`,
+`G10 L20 P6 Z0.8`, `G0 Z40`. No new warning anywhere, and `fixedZEstablishedInFile()` true throughout.
+This is the presence-based sibling W14a's absences need, and the row that catches the dangerous direction —
+a predicate that reads false for everyone would silently disable the base clearance on every job that
+currently works.
+
+**Expect — W14d.** `fixedZEstablishedInFile()` true despite tool 0, because the machine-Z arm returns
+before `baseProbeCanRun()` is consulted. The park retracts with `G53 G0 Z<travel>` as it does today, and no
+new warning appears. A file where the park warns here means the tool test leaked out of the spoilboard arm.
+
+**Expect — W14e.** Unchanged from today: `writeBaseEstablish()` takes its Marlin arm and warns about
+per-WCS registers, `fixedZEstablishedInFile()` is false on the firmware test alone, and neither
+`baseProbeCanRun()` nor Guard B′ is reached — Guard C returns from `validateJob()` above both. Confirms the
+new guard sits below the Marlin exclusion and not above it.
+
+**What a fail looks like.** A `G10 L20 P6` or an absolute Z under G59 in W14a: the skip is still silent to
+its consumers. A file produced by W14b: Guard B′ is not reached, most likely still below the `base == 0`
+return. Any new warning in W14c: the predicate reads false too widely. A park warning in W14d: the tool test
+escaped the spoilboard arm. Record it in the status line above and revise the FIX; do not edit the
+expectation to match what was seen.
