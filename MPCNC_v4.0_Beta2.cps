@@ -1690,6 +1690,16 @@ function validateJob() {
     return;
   }
 
+  // Guard B' -- a fixed Z reference NAMED but not established is the same hazard as none named, and the
+  // dialog cannot tell them apart, so Guard B's own condition (base == 0) reads this job as safe. Below
+  // the slot check deliberately: a base this firmware does not have is the more basic complaint, and
+  // fixing the tool would only surface it next. Its own site rather than a clause on Guard B, because
+  // the remedy is a different one -- the tool, not the dialog. CR-14.
+  if (!fixedZEstablishedInFile() && collectDistinctOffsets().length > 1) {
+    error("\"Fixed Z Reference\" = Spoilboard reserves " + wcsName(base) + ", but the first operation's tool cannot probe it (tool number 0 or a jet tool), so the base is never written and every traverse between parts would move to an absolute height in an unestablished frame. Give the first operation a numbered milling tool, or post one job per part.");
+    return;
+  }
+
   // Guard A -- no redefine of the base.
   var reason = baseOriginWriteReason(base);
   if (reason) {
@@ -2032,12 +2042,26 @@ function fixedZEstablishedAtStart() {
   return usesMachineZDatum() || getReservedBaseWcs() != 0;
 }
 
+// The tool the base probe would use is the FIRST section's: writeBaseEstablish() runs once, from
+// writeFirstSection(), which onSection calls under isFirstSection(). Tool 0 and jet tools cannot touch
+// off a plate, so the probe is skipped for them -- rightly, but the reserved base is then never written.
+// Named so validateJob(), which has no current section, and the establish itself cannot disagree. CR-14.
+function baseProbeCanRun() {
+  if (getNumberOfSections() == 0) return false;
+  var t = getSection(0).getTool();
+  return t.number != 0 && !t.isJetTool();
+}
+
 // True when the job also EMITS the establish, so the tool holds a height this file put it at. The gap
 // between the two is Marlin: the machine-Z answer is refused there outright, and a reserved base
 // passes every guard only for writeBaseEstablish() to warn and return for want of per-WCS registers.
 // Every consumer that reasons about the height the tool holds asks THIS one.
 function fixedZEstablishedInFile() {
-  return fw != eFirmware.MARLIN && fixedZEstablishedAtStart();
+  if (fw == eFirmware.MARLIN) return false;
+  if (!fixedZEstablishedAtStart()) return false;
+  // The spoilboard arm is the only one that PROBES, so it is the only one a tool that cannot probe
+  // silently defeats; the machine-Z arm emits G53 and needs no tool at all. CR-14.
+  return usesMachineZDatum() || baseProbeCanRun();
 }
 
 // Can the end-of-job machine park retract before it crosses the bed? Only into a frame this job
@@ -2960,7 +2984,9 @@ function writeBaseEstablish() {
   // an offset from MACHINE zero, which a power cycle invalidates silently on a machine with no Z home.
   var mode = getProperty(properties.spoilboardBaseEstablish);   // "Probe Z" | "Pause & Probe Z"
 
-  if (tool.number != 0 && !tool.isJetTool()) {
+  // Equivalent to the "tool.number != 0 && !tool.isJetTool()" this replaced -- `tool` IS section 0's
+  // tool here -- but asked through the shared predicate so validateJob() cannot answer differently. CR-14.
+  if (baseProbeCanRun()) {
     // OPERATOR PRECONDITION -- the base is probed WHEREVER THE TOOL ALREADY SITS, no XY move and no
     // probe offset, so park over bare spoilboard or the base silently records the stock top.
     writeComment(eComment.Important, " Establish spoilboard base " + gname);
@@ -3007,7 +3033,10 @@ function writeBaseEstablish() {
       resetAll();
     }
   } else {
-    writeComment(eComment.Debug, " writeBaseEstablish: probe skipped (tool 0 or jet tool)");
+    // A warning and not a Debug comment: this is the same class of skip as the Marlin one above, which
+    // already warns, and Debug is invisible at every level an operator runs. CR-14.
+    writeWarning("reserved base " + gname + " NOT established -- the first operation's tool cannot probe,"
+      + " being tool number 0 or a jet tool, so no absolute Z move is made in that frame anywhere in this job");
   }
 }
 
