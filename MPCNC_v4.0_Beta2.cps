@@ -48,6 +48,16 @@ wcsDefinitions = {
 
 machineMode = undefined; //TYPE_MILLING, TYPE_JET
 
+// How far the SPOILBOARD BASE probe may search, in MM. A DISTANCE below wherever the tool is parked,
+// not a position: writeBaseEstablish() writes a provisional Z0 at that height first, which is what
+// makes a distance meaningful. Deliberately NOT the "G38 Target" property -- that one is sized for a
+// PART probe, which starts a few mm above the stock top, while this probe starts above the stock AND
+// the clamps, so one number cannot serve both. Long is the safe answer here and nowhere else: the base
+// is probed over bare spoilboard by operator precondition, so the only thing under the tool is the
+// surface being looked for. A constant and not a control -- the operator has no number to supply that
+// this does not already cover, and every extra field in group 5 is one more thing to set wrong.
+const BASE_PROBE_REACH_MM = 100;
+
 var eFirmware = {
     MARLIN: "Marlin",  // Marlin 2.x
     GRBL: "Grbl",      // Grbl 1.1
@@ -468,7 +478,7 @@ properties = {
   },
   probeG38Target: {
     title      : "G38 Target",
-    description: "How far the probe move is allowed to travel before giving up -- a Z POSITION in the part's frame, not a distance. On the two Set ... to Current Pos modes the post writes a provisional Z0 first, so -10 (the default) searches to 10 mm below wherever the tool is now. On the two Use Active WCS modes it is measured from that WCS's STORED Z zero instead, which may be anywhere. Deep enough to reach the plate and no deeper: a probe that travels this far without touching is a failed probe, and GRBL raises an alarm and stops the job.",
+    description: "How far the probe move is allowed to travel before giving up -- a Z POSITION in the part's frame, not a distance. This bounds the PART probes only: the spoilboard base probe has a fixed reach of its own, being the one probe that starts above the stock AND the clamps. On the two Set ... to Current Pos modes the post writes a provisional Z0 first, so -10 (the default) searches to 10 mm below wherever the tool is now. On the two Use Active WCS modes it is measured from that WCS's STORED Z zero instead, which may be anywhere. Deep enough to reach the plate and no deeper: a probe that travels this far without touching is a failed probe, and GRBL raises an alarm and stops the job.",
     group      : "probe",
     order      : 70,
     type       : "integer",
@@ -2975,9 +2985,22 @@ function writeBaseEstablish() {
     var pause = (mode == "Pause & Probe Z");
     probePauseBefore = pause;
     probePauseAfter = pause;
+
+    // Z0 written PROVISIONALLY, overwritten by probeTool() below, so the G38.2 target is a distance to
+    // search rather than a position in a register nothing has established yet. Z ONLY -- the base's
+    // stored X0 Y0 is not this probe's to touch. Sound because the base is probed wherever the tool
+    // already sits, which the precondition above requires to be clear spoilboard. Same mechanism as
+    // writeWcsOnStart()'s "Current XY & Probe Z" arm, in the same words. CR-11.
+    writeComment(eComment.Info, "   Provisional Z0 at the current height so the probe target is a relative limit");
+    writeWcsOrigin(base, undefined, undefined, 0);
+
+    // Its own reach, not "G38 Target": see BASE_PROBE_REACH_MM. Stated in the file because the number
+    // is not in the dialog, so this comment is the only place an operator can read it.
+    var reach = -propertyMmToUnit(BASE_PROBE_REACH_MM);
+    writeComment(eComment.Info, "   Search down to Z" + xyzFormat.format(reach) + " from the current height");
     // Retract to the Inter Part Travel Z, not the probe Safe Z -- see probeTool()'s retractZ note.
     // Reached only under Fixed Z Reference = Spoilboard, so the height is in the base's own frame.
-    probeTool(base, interPartTravelZ());
+    probeTool(base, interPartTravelZ(), reach);
 
     // Never leave the base active: restore the operating WCS before the first part's origin write or
     // the section's cutting. The reselect moves nothing, so the cleared Z carries over.
@@ -3606,9 +3629,14 @@ function toolChange() {
 
 // Probe Z and write it as the origin of a WCS. targetWcs defaults to the active work offset; the
 // reserved-base establishment passes the base WCS number so the spoilboard Z lands in that register.
-function probeTool(targetWcs, retractZ) {
+function probeTool(targetWcs, retractZ, searchZ) {
   if (targetWcs == undefined) {
     targetWcs = currentWorkOffset;
+  }
+  // The G38.2 Z word, in output units and in the ACTIVE frame. A caller that has written a provisional
+  // Z0 passes a DISTANCE to search; everyone else gets "G38 Target", which is a position in that frame.
+  if (searchZ == undefined) {
+    searchZ = propertyMmToUnit(getProperty(properties.probeG38Target));
   }
   // Post-probe retract height, in output units and in the ACTIVE frame. The base establish passes the
   // Inter Part Travel Z instead, that retract being in the base's frame and having to clear the stock.
@@ -3629,14 +3657,14 @@ function probeTool(targetWcs, retractZ) {
   if (fw == eFirmware.GRBL) {
     // refer to http://linuxcnc.org/docs/stable/html/gcode/g-code.html#gcode:g38
     // Note this is not using the optional P parameter available on FluidNC (http://wiki.fluidnc.com/en/config/probe)
-    writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probeG38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.probeG38Target))));
+    writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probeG38Speed))), zFormat.format(searchZ));
   }
 
   // Not GRBL
   else {
     // refer http://marlinfw.org/docs/gcode/G038.html
     if (getProperty(properties.probeG382orG28)) {
-      writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probeG38Speed))), zFormat.format(propertyMmToUnit(getProperty(properties.probeG38Target))));
+      writeBlock(gMotionModal.format(38.2), fFormat.format(propertyMmToUnit(getProperty(properties.probeG38Speed))), zFormat.format(searchZ));
     } else {
       writeBlock(gFormat.format(28), 'Z');
     }
