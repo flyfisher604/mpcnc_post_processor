@@ -818,3 +818,256 @@ the dangerous direction, since the operator who turned the property on gets slow
 nothing says why. A first-move comment in W04e: the flag outlived the move it was set for. A `G0` at Z
 0.5905 in W04d: the two callers do not round alike. Record it in the status line above and revise the FIX;
 do not edit the expectation to match what was seen.
+
+---
+
+## CR-03 — group 3 is not gated to the licence it exists for, and nothing warns
+
+**Finding:** [`CoverageFindings.md` → CR-03](CoverageFindings.md) — Hobbyist, Machine damage, Certain.
+
+### FIX
+
+**Status:** `[ ] applied`
+
+The finding offers two remedies — *either the group should be inert when real rapids are seen, or the
+combination should warn*. Take both, from one observation, because each alone is half a fix: inert and
+silent removes the hazard and leaves the operator wondering why the recovery they turned on did nothing,
+and warning without going inert tells the operator about a machine-damage path while still emitting it.
+
+**The post already knows the licence, and knows it from evidence rather than from the dialog.** Fusion
+Personal emits every rapid as a feed move, so `onRapid` is never called and those moves arrive at
+`onLinear` — the review's own recorded fact ([`CoverageReview.md` → The licence dimension](CoverageReview.md),
+[`CoverageReviewPlan.md`](CoverageReviewPlan.md)), and the same fact the post cites in `onSection()` at
+[:2232](../MPCNC_v4.0_Beta2.cps#L2232) when it sets `forceSectionToStartWithRapid`. So **one genuine
+`onRapid` says the licence is Full**, and on a Full licence group 3's premise is false for the whole job:
+there are no rapids to restore, and every conversion it makes can only *add* a rapid Fusion deliberately
+did not make. Nothing needs to be asked of the host, and nothing needs to be added to the dialog — the
+tell arrives on its own, in a callback the post already implements.
+
+**`onRapid()` cannot be that tell as the code stands.** `onLinear()` calls it for both of its conversions,
+so the callback sees the post's own traffic mixed with Fusion's, and a latch set there would trip on the
+*first converted move* — disabling the group on precisely the licence it exists for, which is the worst
+possible direction. So the substitution comes first: `onRapid()`'s entire body is
+`forceSectionToStartWithRapid = false;` followed by `rapidMovements(x, y, z)`, and both conversion arms
+call those two directly instead. After it, `onRapid()` is only ever the kernel's.
+
+That substitution is behaviour-preserving by inspection, not by intention: arm 1 already cleared the flag
+itself, and arm 2 can only run with the flag already false — if the flag were true with the property on,
+arm 1 took the move, and with the property off `isSafeToRapid()` returns false at its own gate. The
+assignment is written into arm 2 anyway rather than argued away, so the substitution is literal and no walk
+has to carry the argument.
+
+**One gate, two conversion sites.** `rapidRecoveryEnabled()` is `the property AND no genuine rapid seen`,
+and it replaces the bare property read in `onLinear()`'s first arm and the one at the top of
+`isSafeToRapid()`. Same reason as CR-04's shared destination test: two sites that must agree about whether
+this job is still being converted should not each hold their own copy of the answer. It is one-directional
+— evidence can turn the group off for the rest of a file and nothing turns it back on, because nothing
+later in the file can un-see a `G0`.
+
+**The warning fires where the evidence appears.** In `onRapid()`, once, on the transition, and only when
+the property is on: a job that left group 3 off is correctly configured and gets nothing. It cannot go in
+`validateJob()` — that runs from `onOpen()`, before any motion callback, so the evidence does not exist
+yet, and this is the one guard in the post whose condition genuinely cannot be known at post time. It is
+not an `error()` either: a Full-licence job with the property on is legal output, merely output the
+operator did not mean to ask for, and the post's job is to stop converting and say so, not to refuse.
+
+The text names what was already emitted rather than claiming nothing was. Under a Full licence the first
+motion of a job is normally the section's opening rapid, so the latch trips before any conversion — but
+*normally* is an assumption about the CAM, which is the exact assumption CR-04 is filed on, so the warning
+tells the operator to check the conversion comments above it instead of promising there are none.
+
+**A title acquires a constraint.** `properties.mapRapidsRestoreRapids.title` is now printed into a
+`writeWarning()`, so it inherits the no-parentheses rule that `mapRapidsSafeZ` already carries at
+[:283](../MPCNC_v4.0_Beta2.cps#L283) — `writeCommentLine()` hands the text to `sanitizeMessageText(_, "()")`,
+which blanks every parenthesis run because a grbl comment cannot nest. The note goes on the property, where
+the next person to edit the title will read it, not on the call site.
+
+**Two lines of documentation.** The group title already says *disable when using full license* and the
+description already says *the F360 Personal edition* — the behaviour was documented and simply not
+enforced. Both now say the post enforces it, which is a different promise from asking the operator to.
+
+**What this does not do.** It does not protect the moves before the first genuine rapid. A Full-licence job
+whose first section opens with a cut converts that cut before any `onRapid` has arrived — which is CR-04
+exactly, and the two findings compose: CR-04 tests the destination of a move the licence latch has not yet
+had evidence to refuse. Nor does it help a Full-licence job containing no rapid at all; there is no
+evidence in that job to read, and no walk can distinguish it from a Personal one. It does not change the
+dialog: the property stays where the operator set it, and the next post of a genuinely Personal job
+converts again.
+
+**Which direction it fails in.** If Fusion Personal ever *did* call `onRapid` — against the review's
+finding and against the comment at `:2232` — the recovery would go inert for the rest of that file and the
+operator would get the un-recovered Personal stream: slow, and safe. The failure the fix removes is a
+genuine cut re-emitted as `G0` at `$110`–`$112`. The two directions are not comparable, and the latch is
+placed so the cheap one is the one that can happen.
+
+**Diffs, not yet applied.**
+
+*The latch, beside the flag it complements ([:1832](../MPCNC_v4.0_Beta2.cps#L1832)):*
+
+```diff
+ var forceSectionToStartWithRapid = false;
++
++// Set by the one caller of onRapid() that is not this post: Fusion. The Personal edition never calls it --
++// every rapid arrives at onLinear as a cut, which is the whole premise of group 3 -- so a single genuine
++// onRapid says the licence is Full and that premise is false for this job. One-directional: nothing later
++// in a file can un-see a G0. CR-03.
++var sawGenuineRapid = false;
+ var sectionComment;
+```
+
+*`resetPostState()` ([:1718](../MPCNC_v4.0_Beta2.cps#L1718)) — a second output file sharing one JavaScript
+context must not inherit the previous file's licence evidence:*
+
+```diff
+   forceSectionToStartWithRapid = false;
++  sawGenuineRapid = false;
+```
+
+*The shared gate, above `isSafeToRapid()` ([:1184](../MPCNC_v4.0_Beta2.cps#L1184)):*
+
+```js
+// May the post still convert a G1 to a G0 in this job? The property says the operator asked for the
+// recovery; the latch says the job has not since proved it does not need it. Both conversion sites ask
+// HERE, so they cannot disagree about a job the post has already stopped converting. CR-03.
+function rapidRecoveryEnabled() {
+  return getProperty(properties.mapRapidsRestoreRapids) && !sawGenuineRapid;
+}
+```
+
+*`isSafeToRapid()`'s gate ([:1186](../MPCNC_v4.0_Beta2.cps#L1186)):*
+
+```diff
+ function isSafeToRapid(x, y, z) {
+-  if (getProperty(properties.mapRapidsRestoreRapids)) {
++  if (rapidRecoveryEnabled()) {
+```
+
+*`onRapid()` ([:2376](../MPCNC_v4.0_Beta2.cps#L2376)) — the tell, and the one warning:*
+
+```diff
+ function onRapid(x, y, z) {
++  // Fusion called this, not the post: onLinear's conversions go straight to rapidMovements(). A real rapid
++  // means a full licence, where group 3 can only ADD rapids Fusion deliberately did not make. Say so once
++  // and stop converting for the rest of the file. CR-03.
++  if (!sawGenuineRapid) {
++    sawGenuineRapid = true;
++
++    if (getProperty(properties.mapRapidsRestoreRapids)) {
++      writeWarning("this job emits real rapids, so it is not a Fusion Personal job -- \""
++        + properties.mapRapidsRestoreRapids.title + "\" is a Personal-edition recovery and is now OFF for the"
++        + " rest of this file. Turn it off in the post dialog and re-post. Any G1 --> G0 comment ABOVE this"
++        + " line converted a move Fusion meant to cut.");
++    }
++  }
++
+   forceSectionToStartWithRapid = false;
+ 
+   rapidMovements(x, y, z);
+ }
+```
+
+*`onLinear()` ([:2386](../MPCNC_v4.0_Beta2.cps#L2386)) — the gate, and the substitution that keeps
+`onRapid()` the kernel's alone:*
+
+```diff
+-  if (getProperty(properties.mapRapidsRestoreRapids) && (forceSectionToStartWithRapid == true)) {
++  if (rapidRecoveryEnabled() && (forceSectionToStartWithRapid == true)) {
+     writeComment(eComment.Important, " First G1 --> G0");
+ 
+     forceSectionToStartWithRapid = false;
+-    onRapid(x, y, z);
++    // NOT onRapid(): that callback is the licence tell now, and a conversion arriving there would latch on
++    // the post's own traffic and disable the group on the licence it exists for. CR-03.
++    rapidMovements(x, y, z);
+   }
+   else if (isSafeToRapid(x, y, z)) {
+     writeComment(eComment.Important, " Safe G1 --> G0");
+ 
+-    onRapid(x, y, z);
++    // Already false whenever this arm is reached -- written out anyway so the substitution above is
++    // literal rather than argued. CR-03.
++    forceSectionToStartWithRapid = false;
++    rapidMovements(x, y, z);
+   }
+```
+
+*The group title ([:110](../MPCNC_v4.0_Beta2.cps#L110)) — it asked the operator to do what the post now does:*
+
+```diff
+-groupDefinitions.mapRapids  = {title: "3 - Map G1s to Rapids - disable when using full license", order: 120};
++groupDefinitions.mapRapids  = {title: "3 - Map G1s to Rapids - Fusion Personal only, ignored on a full license", order: 120};
+```
+
+*The property ([:274](../MPCNC_v4.0_Beta2.cps#L274)) — the new comment, and one sentence on the description:*
+
+```diff
++  // NO PARENTHESES IN THIS TITLE. onRapid() prints it into an in-file warning, whose text goes through
++  // sanitizeMessageText(_, "()") -- see writeWarning(). Same constraint mapRapidsSafeZ carries below.
+   mapRapidsRestoreRapids: {
+     title      : "Map G1s -> G0 Rapids",
+-    description: "... and the first move of every operation.",
++    description: "... and the first move of every operation. Ignored on a full license: the first real G0 in the job switches the mapping off for the rest of the file and writes a warning there, since a full license has no cuts-that-were-rapids to restore.",
+```
+
+**Where this meets CR-04.** Both edit `onLinear()`'s first arm and the same property description. Neither
+depends on the other, and whichever lands second rebases onto the first. Composed, the arm reads:
+
+```js
+  if (rapidRecoveryEnabled() && (forceSectionToStartWithRapid == true)) {
+    forceSectionToStartWithRapid = false;
+
+    if (destinationZIsSafe(z)) {
+      writeComment(eComment.Important, " First G1 --> G0");
+      rapidMovements(x, y, z);
+    }
+    else {
+      writeComment(eComment.Important, " First G1 kept: destination below Safe Z");
+      linearMovements(x, y, z, feed);
+    }
+  }
+```
+
+and the description carries both sentences — CR-04's *when it ends at or above the Safe Z* on the first
+move, then CR-03's *ignored on a full license*. Both de-sync `property-reference.md`, which
+`node docs/doc-sync.js` already reports as behind; the guide is refreshed on its own occasion, not here.
+
+### TEST
+
+**Status:** `open`
+
+Walks, not posted files — and here there is no alternative: exercising either licence needs a seat the
+operator does not have, and the Personal rows could not be posted at all
+([`HReview.md` → HB-20](../docs/HReview.md) records the same refusal, and the offer to stub the `G0` input
+being declined). A walk answers for both licences from one source, by fixing which callback Fusion calls.
+All rows are GRBL/mm, `Comment Level` `Info`, `Safe Z to Rapid` = `Retract:15` on an operation with no
+Fusion retract level, so `safeZHeight` = 15.
+
+| Test | Method | Proves | Callback sequence | State |
+|---|---|---|---|---|
+| W03a | walk | a full-licence job goes inert and says so | `Map G1s -> G0 Rapids` **on**; section 1: `onRapid` to X10 Y10 Z20, `onRapid` to Z2, then `onLinear` to X50 Y10 Z20 with Z constant | open |
+| W03b | walk | the Personal job is untouched — no warning, every conversion as today | on; no `onRapid` ever: first `onLinear` to X10 Y10 Z20, then `onLinear` to X50 Y10 Z20 | open |
+| W03c | walk | a correctly configured full-licence job is not nagged | W03a with `Map G1s -> G0 Rapids` **off** | open |
+| W03d | walk | the warning fires once per file, not once per rapid | W03a continued: a second `onRapid`, then a second section with its own `onRapid` | open |
+| W03e | walk | a converted move does not latch — the group cannot disable itself | W03b, at the `Safe G1 --> G0` move: follow the call into `rapidMovements()` and check `sawGenuineRapid` | open |
+| W03f | walk | the latch does not outlive the file | `resetPostState()` from `onOpen()` with `sawGenuineRapid` true on entry | open |
+
+**What each row must show.** W03a: the first `onRapid` writes exactly one
+`( >>> WARNING: this job emits real rapids ...)` line, with no parenthesis inside it after
+`sanitizeMessageText`, and sets the latch; the `onLinear` that follows reaches `isSafeToRapid()`, which now
+returns false at `rapidRecoveryEnabled()` before reading `safeZHeight` at all, so the move is emitted as
+`G1 X50 Y10 F<feed>` — no ` Safe G1 --> G0` comment and no `G0`. W03b: byte-identical to story A2 in
+[`CoverageReview.md`](CoverageReview.md) — ` First G1 --> G0` then ` Safe G1 --> G0`, both `G0`, and no
+warning line anywhere. W03c: the latch sets but the property gate suppresses the warning, and no output of
+any kind differs from today. W03d: exactly one warning in the file; the second and third `onRapid` take the
+`sawGenuineRapid` short-circuit, and the second section's `onSection()` does not clear it. W03e: the
+conversion reaches `rapidMovements()` without passing through `onRapid()`, so `sawGenuineRapid` is still
+false afterwards and the *next* `onLinear` still converts. W03f: `sawGenuineRapid` is false on return, so a
+Personal job posted after a full-licence one in the same context converts normally.
+
+**What a fail looks like.** Any difference in W03b's or W03e's stream — the recovery has been disabled for
+the licence it exists for, which is the dangerous direction here: the hobbyist gets the slow un-recovered
+stream with a warning that blames a licence they do not hold. A `G0` in W03a: the latch is not reaching one
+of the two conversion sites. Two warnings in W03d: the transition test is not a transition test. A warning
+in W03c: the post is nagging a job that is set up correctly. `sawGenuineRapid` true after W03e: the
+substitution was not made, and the group turns itself off on its own first conversion. Record it in the
+status line above and revise the FIX; do not edit the expectation to match what was seen.
