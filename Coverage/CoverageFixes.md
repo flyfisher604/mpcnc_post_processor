@@ -886,7 +886,35 @@ do not edit the expectation to match what was seen.
 
 ### FIX
 
-**Status:** `[ ] applied`
+**Status:** `deferred` — testing the header text for the hobby version may be the better solution. What is
+in doubt is the **instrument**, not the finding: the finding stands and the design below is complete, but
+the licence may be readable at post time rather than inferred from the first rapid.
+
+**Why it is deferred, and what would settle it.** Fusion states the licence in the file it posts — *"When
+using Fusion 360 for Personal Use, the feedrate of rapid moves is reduced to match the feedrate of cutting
+moves"* — and the design below cites that banner as evidence the premise is a guarantee while still reading
+the licence indirectly, from the first `onRapid()`. If the same text is readable *by the post*, the test
+belongs in `validateJob()` or `onOpen()` and this whole design collapses to a condition asked once, before
+any motion. That would be better on three counts: it closes the one-move window this fix leaves open (a
+full-licence job whose opening callback is an `onLinear` still converts that move untested); it needs no
+latch, no `rapidRecoveryEnabled()` and no substitution at three call sites; and it can warn in the dialog
+rather than partway down the file, where the operator can still act on it.
+
+The question is **does the banner reach the post, or does Fusion write it into the output outside the
+post's sight?** Nothing in `MPCNC_v4.0_Beta2.cps` emits that text, so it is one or the other. It is
+answerable without a licence the operator no longer holds ([`HReview.md` → HB-20](../docs/HReview.md)) and
+without a machine: `onParameter()` at [:2489](../MPCNC_v4.0_Beta2.cps#L2489) already has a catch-all arm
+that writes ` param: <name> = <value>` at Debug for every parameter it does not recognise, so a Personal
+post taken at `Comment Level` = `Debug` shows the banner among those lines if it arrives as a parameter at
+all. Failing a Debug post, an existing Personal file answers it weakly but usefully: a banner sitting in a
+block the post never wrote is Fusion injecting it downstream, and there is nothing for the post to read.
+
+If the answer is *no*, this design is the only instrument available and is applied as written. If it is
+*yes*, the finding is refixed at post time and what survives from below is the documentation edits and,
+possibly, nothing else.
+
+Everything below is the design as it stood when it was written, kept whole so that answering the question
+is the only work a return to this finding needs.
 
 The finding offers two remedies — *either the group should be inert when real rapids are seen, or the
 combination should warn*. Take both, from one observation, because each alone is half a fix: inert and
@@ -1135,7 +1163,9 @@ behind; the guide is refreshed on its own occasion, not here.
 
 ### TEST
 
-**Status:** `open`
+**Status:** `open` — written, and not run: the FIX is deferred, and walking a fix nobody has decided to
+apply would prove only that the walk works. W03g is the row to run first if it is applied — it is the one
+the design failed before the third caller of `onRapid()` was found.
 
 Walks, not posted files — and here there is no alternative: exercising either licence needs a seat the
 operator does not have, and the Personal rows could not be posted at all

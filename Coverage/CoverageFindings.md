@@ -35,8 +35,9 @@ judgement belongs in a later pass of `CoverageReview.md`, not in an edit here.
 
 ## Ledger
 
-**24 findings — 3 fixed, 20 open, 1 withdrawn.** Ordered by severity; the bodies below are in CR order.
-*wdn.* in the status cell means the finding's own premise was settled against it and it is not a defect —
+**24 findings — 3 fixed, 19 open, 1 deferred, 1 withdrawn.** Ordered by severity; the bodies below are in
+CR order. *def.* in the status cell means no fix is being applied until a stated question is settled — the
+box says which, and the design, where there is one, waits in `CoverageFixes.md`. *wdn.* means the finding's own premise was settled against it and it is not a defect —
 the box says which premise, and the designed fix, where there was one, stays in `CoverageFixes.md` unapplied
 in case that premise is ever contradicted. The row is kept rather than deleted so a re-reader of the review
 does not file it a second time.
@@ -48,7 +49,7 @@ does not file it a second time.
 | `[x]` | CR-14 | Professional | Machine damage | the base-establish tool-0 skip leaves the job believing a base was established |
 | `[ ]` | CR-19 | Both | Machine damage | the `M6` tool-change route stops nothing before the change |
 | `[ ]` | CR-21 | Both | Machine damage | `resetPostState()` does not reset the modal formatters, so a second file in one context loses its preamble |
-| `[ ]` | CR-03 | Hobbyist | Machine damage | group 3 is not gated to the licence it exists for, and nothing warns |
+| `[ ]` *def.* | CR-03 | Hobbyist | Machine damage | group 3 is not gated to the licence it exists for, and nothing warns |
 | `[—]` *wdn.* | CR-04 | Hobbyist | Machine damage | the first-move conversion applies no test of any kind to the destination |
 | `[ ]` | CR-12 | Professional | Machine damage | both `Use Active WCS …, Probe Z0` modes measure the probe target from the Z0 they distrust |
 | `[ ]` | CR-16 | Professional | Machine damage | one part machined from several WCS is accepted and traverses to an unset register |
@@ -109,7 +110,11 @@ not surface the prompt and the operator sees an unexplained pause.
 
 ### CR-03 — group 3 is not gated to the licence it exists for, and nothing warns
 
-**Status:** `[ ] fixed`
+**Status:** `[ ] fixed` — **deferred**: the finding stands, the instrument is in doubt. A fix is designed and
+unapplied in [`CoverageFixes.md` → CR-03](CoverageFixes.md), which reads the licence from the first genuine
+`onRapid()`. Testing the header text Fusion writes for the hobby version may be the better solution — a
+post-time test would close the one-move window the latch leaves open and need no latch at all. The question
+that settles it: does that banner reach the post, or does Fusion write it into the output downstream?
 **Audience:** Hobbyist
 **Severity:** Machine damage
 **Confidence:** Certain
