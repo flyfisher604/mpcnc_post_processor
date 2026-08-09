@@ -41,8 +41,7 @@ operator declares.
 **Two things it deliberately did not do.** The **`G53` tool-change park** is `PReview.md` **PR-4** — it
 shares code with §2's Phase 4 reorder and must compose with that design, not pre-empt it. And it left
 `PReview.md` over its size budget, where a Rule-2 pass found nothing *live* had leaked in: the growth is
-unbuilt design and unrun rows, which retire on build. `check-docs.js` prints every current doc-size
-number, so none is repeated here.
+unbuilt design and unrun rows, which retire on build.
 
 **What `hobby-dialog-review` landed (2026-08-07).** A hobbyist-perspective walk of all **69** dialog
 properties — `HReview.md` **HR-29 … HR-38**. Seven output-neutral: the `Axises` title, seven description
@@ -118,7 +117,8 @@ silently. It needs a rotated Setup. Written up in `HReview.md` → *Owed*.
   Close it as a no-op when Phase 4 lands.
 - **Hobbyist review — complete.** `HReview.md`.
 - **Full code review — complete.** 14 fixes at `c73726c`, post-verification owed (item 1 above).
-- **Professional review — not started.** `PReview.md` is a parking lot until it runs.
+- **Professional review — not started.** `PReview.md` is a parking lot until it runs, and is **out of the
+  tree** meanwhile — every pointer to it above reads through `git show 347ce5d:docs/PReview.md`.
 
 ## Completed reviews (archived)
 

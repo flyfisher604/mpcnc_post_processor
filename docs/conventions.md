@@ -11,8 +11,8 @@ Which file owns what is the *Document contracts* table below. It is the only cop
 
 ## Document contracts
 
-Each file has a fixed job. `docs/check-docs.js` enforces the numbers and the tallies — see *Tooling that
-ships with the repo*.
+Each file has a fixed job. **Nothing enforces this table** — it is read in the diff, like every other rule
+here. The size guides are guides: an overrun asks what has stopped being live, and is not a failure.
 
 | File | May contain | Must **not** contain | Size guide |
 |---|---|---|---|
@@ -20,8 +20,8 @@ ships with the repo*.
 | `plan.md` | The checkpoint (baseline, what is true now, **what is left in order**, live risks), phase status, pointers to completed reviews | Design write-ups, findings, test rows, resolved decisions, open questions, backlog detail | **≤ 120 lines** |
 | `conventions.md` | The rules a change must follow — property & dialog conventions, guards, how to run a test, tooling, the harness method — plus these contracts | **Design rationale** (→ `design.md`), status of anything, what is next, unbuilt design | **≤ 300 lines** — an overrun means something live has leaked in, or design has. Do not raise it |
 | `design.md` | Why the shipped behaviour is what it is: the frame model, external firmware facts, the arguments behind orderings that look arbitrary in the source | Rules a session must follow, status of anything, unbuilt design (→ `PReview.md` §6) | **≤ 300 lines** — the one file that **grows with the post**, so this is the one budget expected to move. It moves by argument, in a commit of its own |
-| `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 110 lines + 2 per finding + 9 per register row** — **derived, not fixed:** a register is meant to grow as findings are filed and rows are posted, so the allowance grows with them. What the per-item terms still catch is prose |
-| `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | **≤ 920 lines, and falling.** §2's long form and §3's expansions are unbuilt design and unrun rows; both retire on build. The §3 index table is permanent, everything under it is not |
+| `HReview.md` | Hobbyist findings register (`HB-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 400 lines.** A register is *meant* to grow as findings are filed and rows are posted, so read an overrun as prose sprawl before anything else — the rows themselves are the file doing its job |
+| `PReview.md` — **out of the tree** since `7243869`, recover with `git show 347ce5d:docs/PReview.md`. It returns when the professional review runs (checkpoint item 5); until then its contract stands and its content — PR-1…PR-11, seven `HR-` ids, §2–§6, 65 test rows — is reachable only in git, which is why nothing may be filed against it | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | **≤ 920 lines, and falling.** §2's long form and §3's expansions are unbuilt design and unrun rows; both retire on build. The §3 index table is permanent, everything under it is not |
 | **the user-facing guides** — `README.md`, `docs/guide-hobbyist.md`, `docs/guide-pro.md`, `docs/property-reference.md` | Usage only, split by **reading path**: README is the landing page and the fork between guides; each guide is one path end to end; the reference holds the property tables and carries the `doc-sync` marker recording the ref it last synced to | Anything developer-facing. And **a second copy of the property tables** — one copy, linked from both guides, is the whole point of the split | — |
 | per-user **memory** (outside the repo) | Constraints about the user that hold across projects and cannot be derived from this repo — e.g. no controller hardware is available | **Anything about this post**: its code, conventions, status, findings or history | One short file per fact. Nothing here is reviewed in a diff, which is why so little belongs |
 
@@ -64,10 +64,10 @@ and **nothing mechanical defends it** — no checker reads the post to see wheth
 
 ### The shape of a review document
 
-`HReview.md` and `PReview.md` are the two that exist; a third review pass gets the same shape. It is fixed
-because the two once diverged, and `check-docs.js`, matching HReview's headings only, left the larger
-register ungated. Sections are matched **by name, not by number** — `PReview.md` numbers its sections and
-`HReview.md` does not.
+`HReview.md` is the one in the tree; `PReview.md` and any later pass get the same shape. It is fixed
+because the two once diverged, and the checker that gated them matched HReview's headings only, so the
+larger register went ungated while the run reported clean. That checker is retired and the shape now rests
+on review alone — which is the reason to keep it, not to loosen it.
 
 | § | Section | Holds | Required? |
 |---|---|---|---|
@@ -83,10 +83,10 @@ register ungated. Sections are matched **by name, not by number** — `PReview.m
 moment every row under that id is `✅` it has done its job and **must collapse to what the artifact showed**
 — `— PASS`, the file, the discriminator actually checked, and any trap a re-run would otherwise walk back
 into. Nothing else: not the prediction, not the reasoning that produced it, not the build it dates once the
-register dates the build once. `check-docs.js` **FAILs** on a `✅` id whose *Expect* has no `— PASS`, and on
-a result recorded against rows that are not all `✅`. It is a FAIL and not a WARN because a stale *Expect*
-is wrong in the worst direction — it reads as a criterion still to be met. Four in `HReview.md` predicted
-tokens their own passing file did not contain, and one would have read as a **false FAIL** on a re-run.
+register dates the build once. Collapsing it is part of marking the row `✅`, not a later tidy-up: a stale
+*Expect* is wrong in the worst direction — it reads as a criterion still to be met. Four in `HReview.md`
+predicted tokens their own passing file did not contain, and one would have read as a **false FAIL** on a
+re-run.
 
 **The fields are canonical; the rendering is not.** A test row carries an id, a state marker, a setup
 delta, a method, and an *Expect* naming its discriminator; where the *Expect* needs a g-code block a
@@ -229,34 +229,28 @@ is guarded on the declaration — the same reason the action lives there, and th
 
 | Artifact | Fired by | Checks | Travels? |
 |---|---|---|---|
-| `docs/check-docs.js` | the pre-commit hook, or by hand | The contracts above: size budgets (warn, **derived where the guide says so**), tallies vs their tables, findings-vs-register id completeness, heading ranges and row counts, **that every `✅` id's *Expect* is a result and no unrun id's is** (fail), Rule 3's pointer direction, the `doc-sync` ref on `property-reference.md`. Prints which registers it actually parsed — a checker silent about what it skipped reads as a clean bill of health. **Documents only:** it never reads the `.cps`, and two checks that did have been removed for it | ✅ tracked |
-| `.githooks/pre-commit` | `git commit` — **anyone's**, not just a session's | runs `check-docs.js --staged`; non-zero aborts the commit | ✅ tracked, ❌ **not armed** — see below |
-| `.claude/hooks/post-edit.js` | Claude Code, after every `Edit`/`Write` | `node --check` when the file is the `.cps`; silent for everything else | ✅ tracked |
+| `.claude/hooks/post-edit.js` | Claude Code, after every `Edit`/`Write` | `node --check` when the file is the `.cps`; silent for everything else | ✅ tracked, and **self-arming** through `.claude/settings.json` |
+| `docs/doc-sync.js` | by hand — when touching the guides, or before a release | whether the `.cps` has commits newer than the `doc-sync` marker on `property-reference.md`, and names them | ✅ tracked |
 
-Run the doc check by hand with `node docs/check-docs.js` (working tree) or `--staged` (what a commit
-would record). It is deliberately quiet: `WARN` never fails a commit, only `FAIL` does.
+**Nothing gates the documents.** `check-docs.js` and the `.githooks/pre-commit` that ran it are retired.
+It had grown to nine checks over two registers, of which two had gone **silently dead** — the ids became
+`HB-` and the completeness check stopped matching anything — while the only lines it still printed on a
+passing commit were three size warnings it had no power to fail on. A check that goes quiet when the shape
+moves is worse than none, because it reads as a pass; that is how `PReview.md` went ungated. Every
+contract above is now enforced where the rest of this file is, in review.
 
-**Once per commit, not once per edit.** These checks grade a *finished* document: mid-edit a size WARN
-reports prose still being written, and a tally or *Expect* check fires on a table whose row and count
-land in different edits. Nor does a working-tree run predict the gate, which reads the **index** — only
-`--staged`, after staging, answers what the commit will be judged on.
+`doc-sync.js` survives alone because it answers what no diff shows: the post moves, the property tables do
+not, and only the marker records how far apart they have drifted. It reports and exits 0 — whether a given
+`.cps` commit changed what the dialog says is a judgement, not something to gate on.
 
-**A fresh clone must run this once — nothing else installs it:**
+Claude Code asking for approval the first time a project's `settings.json` hooks block is seen or changes
+is by design, not a fault.
 
-```
-git config core.hooksPath .githooks
-```
-
-`core.hooksPath` lives in `.git/config`, which is **never cloned**, so the tracked `.githooks/pre-commit`
-arrives present but inert. `post-edit.js` — which *does* self-arm, through the tracked
-`.claude/settings.json` — checks for the setting when the `.cps` is edited and prints the command if it
-is missing. That is the only reason the omission cannot go unnoticed. Claude Code asking for approval the
-first time a project's `settings.json` hooks block is seen or changes is by design, not a fault.
-
-**Why the split.** Syntax is meaningful at *every* edit, so `node --check` runs then; deferring it to
-commit lets further edits stack on a broken file. Document contracts are meaningful only once a change is
-settled — the register is updated before the commit lands, not after every intermediate edit — so
-checking them per-edit would fight that rule.
+**Why only that one is automatic.** Syntax is meaningful at *every* edit, so `node --check` runs then;
+deferring it lets further edits stack on a broken file. A document contract is meaningful only once a
+change is settled — the register is updated before the commit lands, not after every intermediate edit —
+which is a poor fit for anything that fires per edit, and, as the retired gate showed, no better a fit for
+something that fires per commit and cannot fail.
 
 ## Working method — harness and tooling
 

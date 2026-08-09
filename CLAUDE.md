@@ -11,7 +11,8 @@ A Fusion 360 post for GRBL / Marlin / RepRap hobby CNC. The deliverable is
    a test, and the harness method and its hard-won lessons.
 3. **`docs/design.md`** — only when changing frame, Z-reference or ordering behaviour. Why the post emits
    what it does, and the firmware facts behind it.
-4. **`docs/HReview.md` / `docs/PReview.md`** — only when a specific finding or test row is in play.
+4. **`docs/HReview.md`** — only when a specific finding or test row is in play. `docs/PReview.md` is
+   **out of the tree** until the professional review runs; recover it with `git show 347ce5d:docs/PReview.md`.
 
 Do not read or search files under `./Test/` unless explicitly asked.
 
@@ -21,16 +22,17 @@ Do not read or search files under `./Test/` unless explicitly asked.
   is applied immediately. Proposing and applying are separate steps.
 - **Never propose a verification that needs a non-GRBL controller, a sender console or a dry run.** Settle
   firmware questions from the firmware's own source and changelog, and cite file and version.
-- `node --check` runs itself on every edit. **`check-docs.js` is a commit gate, not an edit gate** — run
-  it once, on the settled set of doc edits, just before staging; never after each intermediate one. See
-  `docs/conventions.md` → *Tooling that ships with the repo*. A fresh clone must arm the pre-commit hook.
+- `node --check` runs itself on every edit. **Nothing gates the documents** — their contracts in
+  `docs/conventions.md` are enforced in the diff, by a person. `node docs/doc-sync.js` answers the one
+  question a diff cannot: whether `property-reference.md` still matches the post.
 
 ## Registers ship with the code
 
 Update the register **before the commit lands** — not after every intermediate edit, but once the change
-is settled, so the commit carries the code and its row together. Hobbyist → `docs/HReview.md`;
-professional (multi-WCS, spoilboard base, tool changes, Manual NC, dialog) → `docs/PReview.md`.
-**`/close-finding <id>` runs the procedure.** Don't ask whether to add the row — add it.
+is settled, so the commit carries the code and its row together. Hobbyist → `docs/HReview.md`. A
+**professional** finding (multi-WCS, spoilboard base, tool changes, Manual NC, dialog) stays in the
+register it was filed in until `PReview.md` returns — a row split across two files is how seven ids went
+stale. **`/close-finding <id>` runs the procedure.** Don't ask whether to add the row — add it.
 
 ## Commits
 

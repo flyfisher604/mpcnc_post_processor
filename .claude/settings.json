@@ -12,7 +12,7 @@
       "Bash(git for-each-ref *)",
       "Bash(git merge-base *)",
       "Bash(node --check *)",
-      "Bash(node docs/check-docs.js *)",
+      "Bash(node docs/doc-sync.js)",
       "Bash(ls *)",
       "Bash(wc *)",
       "Bash(file *)",

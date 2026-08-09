@@ -86,7 +86,7 @@ run a test*; defaults are GRBL/mm, `Comment Level` `Info`, unless the Setup delt
 
 Every row here has passed, so every entry is a **result**: the artifact, the discriminator actually
 checked, and **any trap a re-run would walk back into** — the only reason a passed entry keeps prose at
-all. `check-docs.js` matches this heading by name and FAILs on a `✅` id whose entry is not a result.
+all. A `✅` id whose entry is not a result is a defect in the register — see `conventions.md`.
 
 - **HB-2 (A)/(B) — PASS, `HB-2 (A).gcode`**, the post-fix baseline every other row diffs against.
   `grep -c '%'` = 0; line 1 is `(Fusion CAM 2704.1.36)`. **Trap: `M30` is the last g-code *block*, with

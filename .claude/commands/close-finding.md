@@ -8,10 +8,11 @@ Close finding **$1** in `MPCNC_v4.0_Beta2.cps`.
 This is the register procedure from `CLAUDE.md` → *Registers ship with the code*. Both halves are
 required, and the register row lands in the **same commit** as the code — not after it.
 
-1. **Locate it.** Find $1's row in `docs/HReview.md` or `docs/PReview.md`. Read the row before the code:
-   it states what the fix has to be true of. If $1 appears in both files, the register that owns it is
-   the one matching the persona — hobbyist is one part, one WCS, one tool, several operations;
-   professional is multi-WCS, spoilboard base, tool changes, Manual NC, the dialog.
+1. **Locate it.** Find $1's row in `docs/HReview.md`, or in the register it was filed in — `PReview.md`
+   is out of the tree until the professional review runs. Read the row before the code: it states what the
+   fix has to be true of. A professional finding (multi-WCS, spoilboard base, tool changes, Manual NC, the
+   dialog) stays where it was filed rather than moving; a row split across two files is how seven ids went
+   stale.
 
 2. **Show the diff before applying it.** Every time, including one-liners. Proposing and applying are
    separate steps. Count the call sites in the code before believing the diff is complete — *every* fix
@@ -30,8 +31,8 @@ required, and the register row lands in the **same commit** as the code — not 
    row. `git show <commit>` holds the buggy code, the diagnosis and the diff. Long form is a promissory
    note, justified only while the work is unbuilt.
 
-6. **Commit.** One message describing **the code change and why** — never the doc bookkeeping. The
-   pre-commit gate re-counts the tallies and the id completeness; if it aborts, fix the register rather
-   than the number it complains about.
+6. **Commit.** One message describing **the code change and why** — never the doc bookkeeping. Nothing
+   re-counts the tallies or the id ranges any more, so check them in the diff: a register that miscounts
+   itself is the failure the retired gate existed to catch.
 
 Do not ask whether to add the row. Add it.
