@@ -39,8 +39,8 @@ parser rejects.
 This is a **review of the current source only** — not of the change history, and not of the `.md` files.
 `docs/design.md` is read as secondary context so a deliberate design decision is not filed as a defect,
 but where it disagrees with the Autodesk Fusion post-processor API, the API wins and the disagreement is
-itself a finding. No `.md` other than `Coverage/CoverageReview.md` is written; `check-docs.js` and the other
-repo commands are not run.
+itself a finding. No `.md` other than `Coverage/CoverageReview.md` is written and no repo command is run.
+(The plan as first written named `check-docs.js` here; it was retired at `46bcf2a`.)
 
 **Nothing is executed.** No posting, no harness, no test rig. The method is hand-execution of the
 callback sequence against the source, tracking module state as it changes.
@@ -364,8 +364,8 @@ No history, no editorial, no reference to prior versions or to why the code is a
 The **Unwalked code** section lists every function and branch no story reached, with the reason — that
 is what turns the review into a release decision rather than a list.
 
-`docs/HReview.md` and `docs/PReview.md` are **not** touched; nothing is committed; `check-docs.js` is
-not run.
+`docs/HReview.md` is **not** touched, nor `docs/PReview.md` should it return to the tree; nothing is
+committed; no repo command is run.
 
 ## Verification
 
