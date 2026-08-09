@@ -1712,8 +1712,22 @@ function validateJob() {
       + "at whatever height the tool is left at -- position it clear of the stock, clamps and "
       + "fixtures before starting the program. The probe that follows measures \"G38 Target\" from the "
       + "Z0 already stored in the active WCS, which this mode re-probes precisely because it is not "
-      + "trusted, so set the target deep enough to reach the stock from that start height. \"Fixed Z "
-      + "Reference\" removes both, by establishing a Z the post can move in itself."));
+      + "trusted, so set the target deep enough to reach the stock from that start height."
+      // The closing recommendation is actionable only where the operator can make
+      // fixedZEstablishedInFile() true, and 2412-2413 is exactly the gap where they cannot: on Marlin
+      // the machine-Z answer is refused outright and a reserved base reaches writeBaseEstablish() only
+      // to be declined for want of per-WCS registers. So the sentence sent the operator to a remedy
+      // this firmware cannot deliver, and a job that took the advice got this same warning back plus
+      // "reserved base ... ignored on Marlin" for its trouble -- HB-17 (A) is that job. HB-17 fixed the
+      // SUPPRESSION reading the dialog's answer where it should have read the file's; this is the
+      // ADVICE doing the same thing one layer up, and the same two-predicate split is the tool for it.
+      // Off Marlin the sentence stays and is right: the warning only fires when
+      // fixedZEstablishedAtStart() is false, so setting the reference does remove both halves. What
+      // replaces it says only what is true here, which is the shape the in-file half already had.
+      // See docs/HReview.md HB-19.
+      + (fw == eFirmware.MARLIN
+        ? " Marlin has no fixed Z reference this post can establish, so that start height is yours to set."
+        : " \"Fixed Z Reference\" removes both, by establishing a Z the post can move in itself.")));
   }
 
   // "At End Park At" = machine X0 Y0 crosses the bed from wherever the last operation ended, and
@@ -3055,6 +3069,15 @@ function onSpindleSpeed(spindleSpeed) {
   setSpindeSpeed(spindleSpeed, tool.clockwise);
 }
 
+// One writer for the two speed-feed-synchronization cases in onCommand(), for the same reason
+// writeSafeZFormatWarning() exists: a warning duplicated at two call sites is a warning that will come
+// to differ at one of them. The text said "Speed-feed synchronization (rigid tapping)" at both, which
+// the sanitizer reduced to "synchronization rigid tapping" -- see writeWarning(). HB-18.
+function writeSpeedFeedSyncWarning() {
+  writeWarning("Speed-feed synchronization for rigid tapping is not supported; a floating/tension tap "
+    + "holder is required");
+}
+
 function onCommand(command) {
   writeComment(eComment.Info, " " + getCommandStringId(command));
 
@@ -3109,10 +3132,10 @@ function onCommand(command) {
       // is a deliberate no-op: the tap feed F360 calculated already assumes a constant
       // spindle RPM, and a floating/tension tap holder is needed to absorb any timing drift.
       // Warned every occurrence (not just once) so every affected move in the file is flagged.
-      writeWarning("Speed-feed synchronization (rigid tapping) is not supported; a floating/tension tap holder is required");
+      writeSpeedFeedSyncWarning();
       return;
     case COMMAND_DEACTIVATE_SPEED_FEED_SYNCHRONIZATION:
-      writeWarning("Speed-feed synchronization (rigid tapping) is not supported; a floating/tension tap holder is required");
+      writeSpeedFeedSyncWarning();
       return;
     case COMMAND_TOOL_MEASURE:
       if (!tool.isJetTool()) {
@@ -3496,7 +3519,10 @@ function writeBaseEstablish() {
   var gname = wcsName(base);
 
   if (fw == eFirmware.MARLIN) {
-    writeWarning("reserved base " + gname + " ignored on Marlin (no per-WCS registers; single global frame)");
+    // Reason set off with "--" and not brackets: see writeWarning(). Pre-fix this emitted
+    // "ignored on Marlin no per-WCS registers; single global frame " -- the reason grafted onto the
+    // firmware's name, and a trailing space. HB-18.
+    writeWarning("reserved base " + gname + " ignored on Marlin -- no per-WCS registers, single global frame");
     return;
   }
 
@@ -3780,7 +3806,14 @@ function writeCommentLine(text) {
 // for is the ordinary group-10 case -- the post rightly emits no coolant code, and at Off it also
 // said nothing about having ignored the request. Off means less commentary, not fewer warnings. The
 // prefix lives here rather than at the call sites so it cannot drift.
-// See docs/HReview.md HB-9.
+//
+// NO PARENTHESES IN THE TEXT PASSED HERE. writeCommentLine() hands it to sanitizeMessageText(_, "()"),
+// which replaces every run of "(" or ")" with a space, because a grbl comment cannot nest and ends at
+// the first ")" -- so a parenthetical does not survive: the brackets become spaces, the two clauses run
+// together where the collapse rule joins them, and a trailing ")" leaves a trailing space the collapse
+// rule cannot reach (it needs a non-space to its right). Use "--" or a comma. This bit three call sites
+// before it was written down, in two strings that both read correctly in the source.
+// See docs/HReview.md HB-9 and HB-18.
 function writeWarning(text) {
   writeCommentLine(" >>> WARNING: " + text);
 }
