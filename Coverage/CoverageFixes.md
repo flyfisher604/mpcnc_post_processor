@@ -52,8 +52,8 @@ while its test has never been run, and a test can fail on a fix that was applied
 
 | Section | Status line | Values |
 |---|---|---|
-| FIX | `**Status:** ` | `[ ] applied` while it is still a proposal; `[x] applied` plus the commit **subject** once a commit carries it — a subject survives an amend or a rebase, and the CR id in it makes `git log --grep` find the commit; a sha written here does not survive, because this line ships inside the very commit it names; `deferred — <why, and what would settle it>` when the design is finished but deliberately not being applied |
-| TEST | `**Status:** ` | `open` — not run, or not yet written; `pass`; `fail — <what was seen>` |
+| FIX | `**Status:** ` | `[ ] applied` while it is still a proposal; `[x] applied` plus the commit **subject** once a commit carries it — a subject survives an amend or a rebase, and the CR id in it makes `git log --grep` find the commit; a sha written here does not survive, because this line ships inside the very commit it names; `deferred — <why, and what would settle it>` when the design is finished but deliberately not being applied; `withdrawn — <the premise that settled it>` when the finding it answers turned out not to be a defect |
+| TEST | `**Status:** ` | `open` — not run, or not yet written; `pass`; `fail — <what was seen>`; `n/a — <why>` where the FIX is withdrawn |
 
 A **deferred** FIX is not a stalled one. It says the design is done and the decision to apply it is being
 withheld on a stated question — most often whether the finding's premise holds — and it keeps the design
@@ -61,6 +61,12 @@ whole so that answering the question is all a return to it needs. Its TEST stays
 nobody has decided to apply proves only that the walk works. The finding's own box in
 `CoverageFindings.md` carries the same word and the same reason, since a reader of the ledger has to see
 that the entry exists and is not being acted on.
+
+A **withdrawn** FIX is the deferral's other ending: the stated question was answered, and the answer was
+that the finding is not a defect. The entry is not deleted and the design is not deleted with it — the
+premise that settled it is written at the top, and the design stays below the line, because a withdrawal
+is only as good as the premise it rests on and a premise can be contradicted later. Its TEST goes to
+`n/a`, and the finding's box in `CoverageFindings.md` carries the same word and the same premise.
 
 Each row names its **method**: `walk` — hand-executed against the source, per the procedure above; or
 `posted` — a real file from the real post. A `walk` row is complete when the block stream has been written
@@ -670,26 +676,52 @@ Record it in the status line above and revise the FIX; do not edit the expectati
 
 ### FIX
 
-**Status:** `deferred` — the design below is complete and unapplied. What is in doubt is the **finding**,
-not the fix: it is not settled that a section's first motion callback ever carries a cutting move.
+**Status:** `withdrawn` — the premise is settled, and against the finding: under Fusion Personal the
+opening motion callback of **every** section is a rapid rendered as a feed move, so the conversion this
+finding objects to is never applied to a cut. The design below is kept, unapplied.
 
-**Why it is deferred, and what would settle it.** CR-04 is filed on the code's silence rather than on an
-observed job — the finding itself grants that a section opening with a positioning move is *"true of
-ordinary Fusion output"* and objects that this is an assumption about the CAM rather than a property of the
-code. That objection stands on its own, but it does not by itself show the dangerous case is reachable, and
-the fix's cost is not zero: it puts a test in front of the one conversion the hobbyist configuration relies
-on for every section, where reading `false` too widely costs the recovery the group exists for.
+**Why it is withdrawn.** The deferral asked one question — *under a full licence, is the first motion of
+every section a `G0`?* — and it is now answered from the other side, as a property of the Personal edition
+rather than of any one job: Fusion Personal **emits no rapids at all**, and a section's first move is the
+positioning move Fusion would have made a rapid, arriving at `onLinear()` because that is the only motion
+callback Personal uses. The posted file says so in its own header — *"When using Fusion 360 for Personal
+Use, the feedrate of rapid moves is reduced to match the feedrate of cutting moves"* — which is the same
+fact the post has always assumed at [`:2232`](../MPCNC_v4.0_Beta2.cps#L2232), now stated by the producer.
 
-The question is answerable, and on the licence the operator has: **under a full licence, is the first
-motion of every section a `G0`?** If it always is, then under Personal that same first move is the
-positioning move the conversion assumes, and there is nothing to guard. The case to hunt is a section
-Fusion links into without retracting first, whose opening motion is a link or lead-in at feed rather than a
-rapid; drilling is not a candidate, since `onCyclePoint()` never reaches `onLinear()`. One posted file from
-a multi-operation job with stay-down linking answers it. Until it is answered, nothing here is applied and
-no walk is run.
+So the first-move conversion is always converting the move it was written for. The dangerous case the
+finding imagines — a section whose opening callback carries a genuine cut — does not occur on the licence
+group 3 exists for. It could occur under a **full** licence, where `onLinear()` really does carry cuts;
+that is CR-03's ground, and CR-03's latch stops group 3 converting anything at the job's first genuine
+`G0`. Two findings do not need one fix between them.
 
-Everything below is the design as it stood when it was written, kept whole so that answering the question
-is the only work a return to this finding needs.
+**What is left, and why it is not a defect either.** The converted move is emitted through
+[`rapidMovements()`](../MPCNC_v4.0_Beta2.cps#L3245), which picks Z-before-XY from
+`_z < getCurrentPosition().z` — a value that knows nothing about the motion the post itself emitted in the
+preamble, since the kernel tracks only its own callbacks. At a section's first move current *equals*
+destination, so that test compares a number with itself, takes the `else` arm and retracts Z before
+traversing XY. That is the safe arm, reached without reasoning. It is nonetheless the right answer in every
+case reachable here, on two grounds:
+
+- Every path that moves Z before the first cut leaves it at a height the post **chose and recorded through
+  `zOutput`**, so the Z word the conversion emits is measured from a height the file itself established:
+  [`probeTool()` :3704](../MPCNC_v4.0_Beta2.cps#L3704) retracts to `probeSafeZ()` after its load-bearing
+  `resetAll()`; [`writeMachineTravelZ()` :2095](../MPCNC_v4.0_Beta2.cps#L2095) brackets its `G53` with
+  `resetAll()` on both sides; [`retractThroughBaseClearance()` :2168](../MPCNC_v4.0_Beta2.cps#L2168)
+  retracts to `interPartTravelZ()` in the base frame; `writeWcsOnStart()`'s `Skip` arm moves to
+  `probeSafeZ()`; [`toolChange()` :3615](../MPCNC_v4.0_Beta2.cps#L3615) leaves the tool at `Tool Change Z`.
+- The paths that emit **no** motion — `writeWcsOnStart()`'s `Current XYZ`, `Jog XYZ` and tool-0/jet arms —
+  leave the tool where the operator put it, and the operator positions the machine safely in Z before the
+  program starts. `partProbe()` already warns in the file when its XY traverse runs at an unestablished
+  height ([:3076](../MPCNC_v4.0_Beta2.cps#L3076)).
+
+Where the destination Z differs from the recorded height — which is every ordinary case, the first move
+being a clearance move above a preamble height — the Z word is emitted first and the XY traverse happens at
+the destination clearance. Where it does not differ, no Z word is emitted and the traverse happens at a
+height the post just wrote. Neither is a rapid into the part.
+
+**The design is kept below the line.** A withdrawal is only as good as its premise. If a Personal job is
+ever seen whose section opens with a genuine cut, this is the fix to reach for, and it needs no
+re-derivation — only a decision.
 
 The finding names its own fix — *a destination Z test costs nothing here* — and names the function to use
 for it: `isSafeToRapid()`, which already exists. The test is right. The function is the wrong one to ask,
@@ -811,8 +843,8 @@ constant-axis tests below still need it:*
 
 ### TEST
 
-**Status:** `open` — written, and not run: the FIX is deferred, and walking a fix nobody has decided to
-apply would prove only that the walk works.
+**Status:** `n/a` — the FIX is withdrawn, so there is nothing to walk. The rows are kept with the design:
+they are the expectations that would have to be met if the premise above were ever contradicted.
 
 Walks, not posted files. The claim is an absence — *no `G0` is emitted for a first move below Safe Z* — and
 absence from the source is absence from every configuration, where absence from one posted file is not. All

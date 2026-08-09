@@ -707,8 +707,10 @@ Booleans: `jobManualSpindlePowerControl` A1/A4 · `jobUseArcs` D7/A3 · `jobSequ
 
 **Licence completeness.** All four cells of licence × `Map G1s -> G0` are walked: A1/A3 (Full, off), A2
 (Personal, on), A2′ (Personal, off), A2″ (Full, on). Every Direction-1 finding states its licence:
-**CR-03** is Full-only, **CR-04** is reached on every section under Personal and on a section opening with a
-cut under Full, and no other finding depends on the licence.
+**CR-03** is Full-only, and no other finding depends on the licence. **CR-04** was filed here as reached on
+every section under Personal; it has since been **withdrawn**, Fusion Personal emitting no rapids at all, so
+a section's opening callback is always the would-be rapid the conversion is written for. See
+[`CoverageFixes.md` → CR-04](CoverageFixes.md).
 
 **Finding reproducibility.** Each of the 24 findings was re-read against the source independently of the
 story that produced it, and each path confirmed reachable from the dialog. Two candidates sighted on the
@@ -724,8 +726,9 @@ first read did **not** survive and are dropped:
 **CR-07**, which is reached from A4, C5 and D4; A4 is credited with the first walk and the other two with the
 interactions specific to them (Guard A's off-by-one in C5, the relocation-route variant in D4).
 
-**Release read.** Seven findings are `Machine damage` or `Wrong part` on a **default or near-default**
-configuration — CR-04, CR-05, CR-06, CR-11, CR-13, CR-15, CR-19 — and CR-18 halts the job on the shipped
+**Release read.** Six findings are `Machine damage` or `Wrong part` on a **default or near-default**
+configuration — CR-05, CR-06, CR-11, CR-13, CR-15, CR-19 (CR-04 was a seventh until it was withdrawn) — and
+CR-18 halts the job on the shipped
 default tool-change route. Those are the set a Beta would need to resolve or document. The remainder are
 either firmware-specific (CR-01, CR-08, CR-09, CR-10, CR-24), configuration-specific (CR-03, CR-12, CR-14,
 CR-16, CR-17, CR-21, CR-22, CR-23), or cosmetic (CR-02, CR-20).

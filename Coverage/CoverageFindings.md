@@ -35,9 +35,11 @@ judgement belongs in a later pass of `CoverageReview.md`, not in an edit here.
 
 ## Ledger
 
-**24 findings — 3 fixed, 20 open, 1 deferred.** Ordered by severity; the bodies below are in CR order.
-*def.* in the status cell means the finding's own premise is in doubt and no fix is being applied until it
-is settled — the box says which question, and the fix, where one is designed, waits in `CoverageFixes.md`.
+**24 findings — 3 fixed, 20 open, 1 withdrawn.** Ordered by severity; the bodies below are in CR order.
+*wdn.* in the status cell means the finding's own premise was settled against it and it is not a defect —
+the box says which premise, and the designed fix, where there was one, stays in `CoverageFixes.md` unapplied
+in case that premise is ever contradicted. The row is kept rather than deleted so a re-reader of the review
+does not file it a second time.
 
 | Status | Finding | Audience | Severity | Summary |
 |---|---|---|---|---|
@@ -47,7 +49,7 @@ is settled — the box says which question, and the fix, where one is designed, 
 | `[ ]` | CR-19 | Both | Machine damage | the `M6` tool-change route stops nothing before the change |
 | `[ ]` | CR-21 | Both | Machine damage | `resetPostState()` does not reset the modal formatters, so a second file in one context loses its preamble |
 | `[ ]` | CR-03 | Hobbyist | Machine damage | group 3 is not gated to the licence it exists for, and nothing warns |
-| `[ ]` *def.* | CR-04 | Hobbyist | Machine damage | the first-move conversion applies no test of any kind to the destination |
+| `[—]` *wdn.* | CR-04 | Hobbyist | Machine damage | the first-move conversion applies no test of any kind to the destination |
 | `[ ]` | CR-12 | Professional | Machine damage | both `Use Active WCS …, Probe Z0` modes measure the probe target from the Z0 they distrust |
 | `[ ]` | CR-16 | Professional | Machine damage | one part machined from several WCS is accepted and traverses to an unset register |
 | `[ ]` | CR-05 | Both | Machine damage | a start include file leaves `G90`, `G21`/`G20`, `G94` and `G17` unwritten, with no warning |
@@ -126,11 +128,12 @@ warn.
 
 ### CR-04 — the first-move conversion applies no test of any kind to the destination
 
-**Status:** `[ ] fixed` — **deferred**: the premise is unconfirmed. The finding grants that a section
-opening with a positioning move is ordinary Fusion output and objects to the assumption, but no job has
-been shown whose first motion callback carries a cut. The fix is designed and unapplied in
-[`CoverageFixes.md` → CR-04](CoverageFixes.md), which names the question that would settle it — under a
-full licence, is the first motion of every section a `G0`?
+**Status:** `[—] fixed` — **withdrawn**: not a defect. Fusion Personal emits no rapids at all, so the
+opening motion callback of **every** section is a would-be rapid rendered as a feed move and the conversion
+is never applied to a cut. Under a full licence `onLinear()` does carry cuts, and that is CR-03's ground:
+its latch stops group 3 converting at the job's first genuine `G0`. The designed fix stays unapplied in
+[`CoverageFixes.md` → CR-04](CoverageFixes.md), together with the audit showing that every path which moves
+Z before the first cut leaves it at a height the post itself established.
 **Audience:** Hobbyist
 **Severity:** Machine damage
 **Confidence:** Certain
