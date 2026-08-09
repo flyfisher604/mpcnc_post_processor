@@ -654,3 +654,167 @@ its consumers. Output of any kind from W14b: Guard B′ is not reached, or its c
 the dialog answers. Any new warning in W14c: the predicate reads false too widely. A park warning in W14d:
 the tool test escaped the spoilboard arm. `:1520` still firing in W14f: the predicate reads the dialog.
 Record it in the status line above and revise the FIX; do not edit the expectation to match what was seen.
+
+---
+
+## CR-04 — the first-move conversion applies no test of any kind to the destination
+
+**Finding:** [`CoverageFindings.md` → CR-04](CoverageFindings.md) — Hobbyist, Machine damage, Certain.
+
+### FIX
+
+**Status:** `[ ] applied`
+
+The finding names its own fix — *a destination Z test costs nothing here* — and names the function to use
+for it: `isSafeToRapid()`, which already exists. The test is right. The function is the wrong one to ask,
+and for the same reason the flag it would be guarding exists at all.
+
+**Why not `isSafeToRapid()`.** Three of its four tests read `getCurrentPosition()`, and a section's first
+move is precisely the place where the post has already written down that it does not trust that value.
+`onSection()` at [:2232](../MPCNC_v4.0_Beta2.cps#L2232) sets the flag because *"the Personal edition emits a
+section's first move as an onLinear rather than a Rapid, leaving current position equal to destination — a
+zero-length vector with no direction to read"*, and `limitFeedByXYZComponents()` at
+[:3269](../MPCNC_v4.0_Beta2.cps#L3269) carries a special case for the same condition. Both readings of that
+claim are bad for `isSafeToRapid()`:
+
+- **Where it holds** — current equals destination — `zConstant` is true, so `isSafeToRapid()` collapses to
+  exactly `zr >= safeZHeight`: the destination test, reached through three comparisons that read one number
+  against itself. The right answer, arrived at by pretending to ask something.
+- **Where it does not** — the Full-licence case the finding names, a section whose first *emitted* move is a
+  cut, so the current position is wherever the last section ended — the `xyConstant` clauses reject any move
+  that changes X and Y. That rejects the **intended** case: a positioning move to the next start point
+  changes X and Y by definition. The group's whole reason for existing would stop working.
+
+Which of the two is true at a given callback is host behaviour, and a walk cannot settle it. A fix that is
+correct either way is available, so take it: split the destination test out and ask only that.
+
+**One test, two callers.** `destinationZIsSafe(z)` is the `zr >= safeZHeight` line lifted out of
+`isSafeToRapid()` with its rounding, and `isSafeToRapid()` then calls it instead of computing it inline.
+Not a tidy-up: a `>=` decided in the third decimal is exactly where two separately-written copies of a test
+drift apart, and the first-move site and the ordinary site have to agree about the boundary or the same
+destination Z converts on one path and not the other. It keeps the comparison exactly as it is today —
+a **rounded destination against an unrounded threshold** — because changing that is a different question
+from this one, and silently changing it inside a machine-damage fix is how a fix acquires a second effect
+nobody reviewed.
+
+**The declined move.** It goes to `linearMovements()`, the arm it would have reached had the flag never been
+set, and gets an `Important` comment saying the conversion was declined. Not a `writeWarning()`: nothing
+hazardous happened. The hazard was the *conversion*; declining it is the post doing its job. A warning would
+fire once per section on any strategy that legitimately opens at depth, and would be warning about a correct
+outcome — which is how operators learn to ignore warnings.
+
+**The flag is spent on the first move either way.** It is cleared before the test, not inside the converting
+arm. The flag means *no rapid has opened this section yet*, and once a motion callback has consumed it that
+is no longer true however the move was emitted. Leaving it set so a later move could pick it up would take
+the defect from "the first move is converted untested" to "an arbitrary later move is converted untested",
+which is worse: a mid-section cut has no claim to be a positioning move at all.
+
+**One line of documentation.** The group-3 property description says the conversion *"covers … the first
+move of every operation"*, without qualification — the description is the only place the unconditional
+behaviour is written down, and after this it is no longer true. It becomes "when it ends at or above the
+Safe Z", matching how the same sentence already qualifies the other two moves it lists. This de-syncs
+`property-reference.md`, which `node docs/doc-sync.js` already reports as behind; the guide is refreshed on
+its own occasion, not here.
+
+**What this does not do.** It tests the destination and nothing else, so a first move that *ends* at or
+above Safe Z while *starting* in material would still convert. Fusion retracts at section end, so the tool
+is in air when a section opens; and this is the same blind spot every other conversion in the group has —
+`isSafeToRapid()`'s `zUp && xyConstant` arm makes exactly the same bet. Widening it is CR-03's and CR-23's
+ground, not this finding's. It also inherits CR-23 whole: with a Safe Z expression of `0`, every
+non-negative Z reads as safe air, and this test will read it that way too.
+
+An undefined `safeZHeight` compares `false` and declines the conversion — the safe direction, and belt and
+braces rather than a live path: `safeZforSection()` assigns on every arm, but only under the same property
+this arm is gated on.
+
+**Diffs, not yet applied.**
+
+*The shared test, between `roundTo()` and `isSafeToRapid()` ([:1183](../MPCNC_v4.0_Beta2.cps#L1183)):*
+
+```js
+// Is this destination Z in the safe zone? The destination half of isSafeToRapid()'s test, split out so the
+// first-move conversion can ask it WITHOUT the current-position half -- at a Section's first move there is
+// no current position worth asking about, which is the very reason forceSectionToStartWithRapid exists.
+// Both callers round the same way, so they cannot disagree about the boundary. CR-04.
+function destinationZIsSafe(z) {
+  return roundTo(z, (unit == MM ? 3 : 4)) >= safeZHeight;
+}
+```
+
+*`isSafeToRapid()` ([:1194](../MPCNC_v4.0_Beta2.cps#L1194)) — the same test, now shared. `zr` stays: the
+constant-axis tests below still need it:*
+
+```diff
+-    let zSafe = (zr >= safeZHeight);
++    let zSafe = destinationZIsSafe(z);
+```
+
+*`onLinear()` ([:2386](../MPCNC_v4.0_Beta2.cps#L2386)):*
+
+```diff
+   if (getProperty(properties.mapRapidsRestoreRapids) && (forceSectionToStartWithRapid == true)) {
+-    writeComment(eComment.Important, " First G1 --> G0");
+-
+-    forceSectionToStartWithRapid = false;
+-    onRapid(x, y, z);
++    // Spent on this move however it is emitted -- a later move is not the one the flag was set for, and
++    // converting THAT one untested would be worse than not converting this one. CR-04.
++    forceSectionToStartWithRapid = false;
++
++    // The flag says only that no Rapid has opened this Section, not that this move is a positioning move.
++    // A section whose first motion is a cut arrives here too, and G0 runs it at $110-$112 with no
++    // feedrate at all. So ask the one test the current position cannot spoil. CR-04.
++    if (destinationZIsSafe(z)) {
++      writeComment(eComment.Important, " First G1 --> G0");
++      onRapid(x, y, z);
++    }
++    else {
++      writeComment(eComment.Important, " First G1 kept: destination below Safe Z");
++      linearMovements(x, y, z, feed);
++    }
+   }
+   else if (isSafeToRapid(x, y, z)) {
+```
+
+*The property description ([:276](../MPCNC_v4.0_Beta2.cps#L276)):*
+
+```diff
+-    description: "... vertical retracts and descents that stay above it, and the first move of every operation.",
++    description: "... vertical retracts and descents that stay above it, and the first move of every operation when it ends at or above the Safe Z.",
+```
+
+### TEST
+
+**Status:** `open`
+
+Walks, not posted files. The claim is an absence — *no `G0` is emitted for a first move below Safe Z* — and
+absence from the source is absence from every configuration, where absence from one posted file is not. All
+rows are GRBL, `Map G1s -> G0 Rapids` **on** except where the row says otherwise, `Comment Level` `Info`,
+and enter at `onLinear` with `onSection()` already run, so `safeZHeight` is resolved.
+
+| Test | Method | Proves | Property set | State |
+|---|---|---|---|---|
+| W04a | walk | a first move that cuts is no longer re-emitted as a rapid | mm, `Safe Z to Rapid` = `Retract:15` on an operation with no Fusion retract level, so `safeZHeight` = 15; first `onLinear` to Z −1.0 with XY moving | open |
+| W04b | walk | the intended case is untouched, at the boundary | W04a, first `onLinear` to Z 15.0 | open |
+| W04c | walk | the property off is byte-identical, and never reaches the new test | W04a with `Map G1s -> G0 Rapids` **off** | open |
+| W04d | walk | the boundary is decided the same way in the other unit | W04a in inches, `Safe Z to Rapid` = `15`; first `onLinear` to Z 0.5906 and, separately, 0.5905 | open |
+| W04e | walk | first-ness is spent by a declined move | W04a, then a second `onLinear` in the same section to Z 20.0 with XY moving | open |
+| W04f | walk | the ordinary conversion path is unchanged by the shared test | W04a, flag already clear, a horizontal `onLinear` at Z 20.0 with Z constant | open |
+
+**What each row must show.** W04a: no ` First G1 --> G0`, no `G0` of any kind, and the move emitted as
+`G1 X… Y… Z-1 F<feed>` under ` First G1 kept: destination below Safe Z` — with `rapidMovements()` never
+entered, so its Z-ordering never gets the chance the finding says it would fail. W04b: the stream is what
+the post emits today, `( First G1 --> G0)` then a `G0`, since `15 >= 15`. W04c: neither
+`destinationZIsSafe()` nor `isSafeToRapid()` is reached past its property gate, and `safeZHeight` being
+`undefined` never matters. W04d: 0.5906 converts and 0.5905 does not, against
+`safeZHeight = propertyMmToUnit(15) = 0.5905511…` — which is the comparison the post makes today, a rounded
+destination against an unrounded threshold, and it must still make it. W04e: the second move carries no
+first-move comment; it reaches `isSafeToRapid()`, which returns false on `xyConstant`, and stays a `G1`.
+W04f: `isSafeToRapid()` returns true through `zConstant` exactly as before the split.
+
+**What a fail looks like.** A `G0` in W04a: the conversion is still untested. Any change to W04b's or
+W04f's stream: the test reads false too widely and the recovery this group exists for has been disabled —
+the dangerous direction, since the operator who turned the property on gets slow cuts instead of rapids and
+nothing says why. A first-move comment in W04e: the flag outlived the move it was set for. A `G0` at Z
+0.5905 in W04d: the two callers do not round alike. Record it in the status line above and revise the FIX;
+do not edit the expectation to match what was seen.
