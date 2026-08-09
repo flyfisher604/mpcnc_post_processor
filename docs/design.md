@@ -196,7 +196,7 @@ each is a place a one-dialect assumption would have shipped a wrong motion:
 
 ### Traverse clearance is not the G1→G0 plane
 
-**"Map: Safe Z to Rapid"** answers a narrower question — "within *this* operation, is Z high enough to
+**Group 3's "Safe Z to Rapid"** answers a narrower question — "within *this* operation, is Z high enough to
 re-emit a cut G1 as a G0?" It is operation-scoped and only populated when the hobby group is on, so it is
 the wrong source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance
 measured in the job's fixed Z reference** ("Inter Part Travel Z").

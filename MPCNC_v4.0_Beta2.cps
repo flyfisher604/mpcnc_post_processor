@@ -278,40 +278,34 @@ properties = {
     scope      : "post"
   },
 
-  mapRapidsRestoreFirstRapids: {
-    title      : "First G1 -> G0 Rapid",
-    description: "Enable to ensure that the first move of a cut starts with a G0 Rapid.",
+  // ONE enabling control and one field. Group 3 answers a single question -- "is the Personal edition
+  // turning this job's rapids into cuts, and may the post turn them back?" -- and until HB-20 it asked
+  // that question three times, with three booleans the dialog presented as peers when they were not:
+  // "Map: Allow Rapid Z" was a sub-condition INSIDE isSafeToRapid() and could do nothing while the master
+  // was off, and "First G1 -> G0 Rapid" was read at onLinear() ALONE, above isSafeToRapid(), so it worked
+  // WITH the master off and the group's own heading did not describe it. Both are folded into the master
+  // below; each fold is recorded at the code it changed. The "Map: " prefix went with them -- it repeated
+  // the group heading, and the one title that lacked it is one of the two that are gone.
+  // See docs/HReview.md HB-20.
+  mapRapidsRestoreRapids: {
+    title      : "Map G1s -> G0 Rapids",
+    description: "Enable to convert G1s back to G0 Rapids where it is safe. Covers the three moves the F360 Personal edition emits as cuts: horizontal moves at or above the Safe Z below, vertical retracts and descents that stay above it, and the first move of every operation.",
     group      : "mapRapids",
     order      : 10,
     type       : "boolean",
     value      : false,
     scope      : "post"
   },
-  mapRapidsRestoreRapids: {
-    title      : "Map: G1s -> G0 Rapids",
-    description: "Enable to convert G1s to G0s Rapids when safe.",
-    group      : "mapRapids",
-    order      : 20,
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
-  },
+  // NO PARENTHESES IN THIS TITLE. writeSafeZFormatWarning() prints it into an in-file warning, and a
+  // warning's text goes through sanitizeMessageText(_, "()") -- see writeWarning(). HB-20 shortened it and
+  // the group heading still carries "Map G1s", which is what HB-14 needed the title plus group to say.
   mapRapidsSafeZ: {
-    title      : "Map: Safe Z to Rapid",
+    title      : "Safe Z to Rapid",
     description: "Z at or above this height is treated as safe air, so a G1 there may be re-emitted as a G0. Same syntax as group 6's Safe Z: a plain number in mm, or Feed:/Retract:/Clearance:<fallback> to use that operation's own Fusion level when it defines one, else the fallback -- Retract:15 (the default) means the Fusion retract level, or 15 mm if the operation has none.",
     group      : "mapRapids",
-    order      : 30,
+    order      : 20,
     type       : "string",
     value      : "Retract:15",
-    scope      : "post"
-  },
-  mapRapidsAllowRapidZ: {
-    title      : "Map: Allow Rapid Z",
-    description: "Enable to include vertical G1 retracts and safe descents as rapids.",
-    group      : "mapRapids",
-    order      : 40,
-    type       : "boolean",
-    value      : false,
     scope      : "post"
   },
 
@@ -519,7 +513,7 @@ properties = {
   },
   probeSafeZ: {
     title      : "Safe Z",
-    description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when the job has no fixed Z reference; with one, that group's clearance -- Inter Part Travel Z -- is used instead). Same syntax as \"Map: Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
+    description: "Safe Z the tool retracts to after probing (also the retract height before an added-part re-probe when the job has no fixed Z reference; with one, that group's clearance -- Inter Part Travel Z -- is used instead). Same syntax as group 3's \"Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
     group      : "probe",
     order      : 90,
     type       : "string",
@@ -1321,6 +1315,17 @@ function isSafeToRapid(x, y, z) {
       // Restore Rapids only when the target Z is safe and
       //   Case 1: Z is not changing, but XY are
       //   Case 2: Z is increasing, but XY constant
+      //   Case 3: Z is decreasing, XY constant, and Z was already safe
+
+      // Cases 2 and 3 were behind their own dialog boolean, "Map: Allow Rapid Z", until HB-20 folded it
+      // into the property this whole function is already gated on. THIS WIDENS WHAT A JOB EMITS: a job
+      // with the mapper on and that boolean off -- the default pairing, so the likely one -- converted
+      // only Case 1 and now converts all three. It is safe on the tests the two cases already carry and
+      // not on the property being gone: both are inside "if (zSafe)", both require XY constant, and the
+      // descent additionally requires the START height to be safe, so neither can rapid into anything the
+      // operator has not declared to be air. What the boolean bought was a way to distrust that
+      // declaration while still trusting it for Case 1, which is not a distinction a hobbyist can act on.
+      // See docs/HReview.md HB-20.
 
       // Z is not changing and we know we are in the safe zone
       if (zConstant) {
@@ -1328,12 +1333,12 @@ function isSafeToRapid(x, y, z) {
       }
 
       // We include moves of Z up as long as xy are constant
-      else if (getProperty(properties.mapRapidsAllowRapidZ) && zUp && xyConstant) {
+      else if (zUp && xyConstant) {
         return true;
       }
 
       // We include moves of Z down as long as xy are constant and z always remains safe
-      else if (getProperty(properties.mapRapidsAllowRapidZ) && (!zUp) && xyConstant && curZSafe) {
+      else if ((!zUp) && xyConstant && curZSafe) {
         return true;
       }
     }
@@ -1714,7 +1719,7 @@ function validateJob() {
       + "Z0 already stored in the active WCS, which this mode re-probes precisely because it is not "
       + "trusted, so set the target deep enough to reach the stock from that start height."
       // The closing recommendation is actionable only where the operator can make
-      // fixedZEstablishedInFile() true, and 2412-2413 is exactly the gap where they cannot: on Marlin
+      // fixedZEstablishedInFile() true, and 2417-2418 is exactly the gap where they cannot: on Marlin
       // the machine-Z answer is refused outright and a reserved base reaches writeBaseEstablish() only
       // to be declined for want of per-WCS registers. So the sentence sent the operator to a remedy
       // this firmware cannot deliver, and a job that took the advice got this same warning back plus
@@ -2837,7 +2842,15 @@ function onLinear(x, y, z, feed) {
   // is enabled then the first move to the start of a section will be at the
   // slowest cutting feedrate, generally Z's feedrate.
 
-  if (getProperty(properties.mapRapidsRestoreFirstRapids) && (forceSectionToStartWithRapid == true)) {
+  // This branch had its own dialog boolean, "First G1 -> G0 Rapid", until HB-20 folded it into the
+  // mapper's master property. Gated on that master and NOT made unconditional, which is the whole of the
+  // decision: unconditional would convert the first move of every operation on a FULL-licence job, where
+  // the group exists to be off and F360 emitted a real G0 the post never saw as a G1 -- the group heading
+  // says "disable when using full license" and unconditional would make it undisableable. So the fold
+  // costs exactly one configuration, master off with first-rapid on, which had no other reason to exist
+  // than that this branch was reachable without the mapper. Recorded because the loss is real and was
+  // named before the edit: see docs/HReview.md HB-20.
+  if (getProperty(properties.mapRapidsRestoreRapids) && (forceSectionToStartWithRapid == true)) {
     writeComment(eComment.Important, " First G1 --> G0");
 
     forceSectionToStartWithRapid = false;
@@ -3894,7 +3907,7 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
   // the first Rapid the current location is the same as the desination location, which creates a 0 length
   // vector. A zero length vector is unusable and so a instead the slowest of the xyLimit or zLimit is used.
   //
-  // Note: if Map: G1 -> Rapid is enabled in the Properties then if the first operation in a Section is a
+  // Note: if "Map G1s -> G0 Rapids" is enabled in the Properties then if the first operation in a Section is a
   // cut (which it should always be) then it will be converted to a Rapid. This prevents ever getting a zero
   // length vector.
     if (xyz.length == 0) {
