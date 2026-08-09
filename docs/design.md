@@ -56,7 +56,7 @@ no such lock and run the move against a machine zero that has moved.
 
 ### The machine frame — capability, then action
 
-`Axises Homed and Trusted` — `None` / `XY Only` / `Z Only` / `XYZ` — is a **fact about the machine**;
+`Axes Homed and Trusted` — `None` / `XY Only` / `Z Only` / `XYZ` — is a **fact about the machine**;
 `Home at Job Start` is **a decision about this job**. Separating them expresses a state the old
 `Home Before Start` enum could not: *homed at the controller, do not home here*.
 
@@ -180,6 +180,7 @@ each is a place a one-dialect assumption would have shipped a wrong motion:
 | Is Marlin's one frame the machine frame? | **Only until the post writes an origin.** `writeWcsOrigin()` uses `G92` on Marlin, issued *at the current position*, so from the first section on, work X0 Y0 and machine X0 Y0 differ by an offset the post never knew — and cannot read back. Undoing it arithmetically is therefore not a route to the machine frame there |
 | `G30` to store a park height | **Dead on all three.** GRBL/LinuxCNC: bare `G30` moves **X and Y too**, and `G30 Z<n>` rapids first to that Z *in the current WCS, offsets included*. Marlin and RRF: `G30` is a **single Z probe** — a plunge. Same trap `G80`–`G83` sets above |
 | Jogging at an `M0` pause | **Not possible on GRBL** — *"a jog command will only be accepted when Grbl is in either the 'Idle' or 'Jog' states"* (Grbl v1.1 Jogging), and `M0` is neither. Only RRF has a real jog-at-pause (`M291 … X1 Y1 Z1`) |
+| `G17` / `G94` off GRBL | **Neither is a free no-op.** Marlin compiles `G17` only under `CNC_WORKSPACE_PLANES` (shipped commented out in `Configuration_adv.h`) and has **no `G93`/`G94` at all** (`gcode.h` 2.1.x) — both reach `parser.unknown_command_warning()`. RRF has `G17` from 2.03 (`G18`/`G19` from 3.3) but gained `G93`/`G94` only in **3.5.1**, "experimentally", and **3.6.3** fixed inverse time mode not being reset at job start. So both stay GRBL-only, and the plane and feed mode a RepRap job inherits are a Start file's problem — `HReview.md` HB-6 |
 | `G38.2` target frame | **Version-bound on RRF.** `G38.x` on Duet 2+ / RRF 3+, and **up to RRF 3.1.1 the target is machine coordinates**, user coordinates after. This post emits a work-frame target, so leaving it On below 3.1.2 probes to the wrong physical Z |
 
 > **The lesson, twice over — and it is why *do the source read before filing a question as needing
@@ -195,7 +196,7 @@ each is a place a one-dialect assumption would have shipped a wrong motion:
 
 ### Traverse clearance is not the G1→G0 plane
 
-**"Map: Safe Z to Rapid"** answers a narrower question — "within *this* operation, is Z high enough to
+**Group 3's "Safe Z to Rapid"** answers a narrower question — "within *this* operation, is Z high enough to
 re-emit a cut G1 as a G0?" It is operation-scoped and only populated when the hobby group is on, so it is
 the wrong source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance
 measured in the job's fixed Z reference** ("Inter Part Travel Z").
@@ -242,10 +243,16 @@ gets. Un-suppressing it where it sits does **not** work:
 The resolution keeps the intent and fixes the placement: the first section's safe arrival happens **after**
 the fixed Z reference is established, in that reference's frame. That exposed a hard limit — **with no
 fixed reference there is no established frame at job start at all**, so no retract can be made safe there.
-That case gets an Info comment instead (`Ensuring that Z is safe. Unknown Z for XY move.`), on the one path
-that deliberately emits no absolute Z move.
+That case gets a `>>> WARNING:` instead, on the one path that deliberately emits no absolute Z move — a
+precondition the operator must satisfy, not commentary, so it bypasses `Comment Level` and the same
+sentence is raised in the post dialog where there is still something to change. The post does **not**
+substitute a relative `G91` lift: it would be the only motion emitted in no frame at all, its extent is
+unknowable on a machine whose Z travel the post cannot see, and it would leave the `G38.2` target — an
+absolute Z in the same stale frame — exactly as unbounded as it found it.
 
 **The machine-Z answer lifts the limit rather than working around it.** A declared, homed machine Z *is* an
 established frame at job start, so on such a machine the arrival emits a real `G53 G0 Z<Inter Part Travel Z>`
-and the comment is suppressed exactly as an established base suppresses it. The limit stands only where it
-is still true: a job that declares no fixed reference at all.
+and the warning is suppressed exactly as an established base suppresses it. The limit stands only where it
+is still true: a job that establishes no fixed reference at all — and *declaring* one is not establishing it
+on Marlin, where neither implementation runs, so the suppression asks `fixedZEstablishedInFile()` and not the
+dialog's own answer.

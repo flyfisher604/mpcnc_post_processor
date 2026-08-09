@@ -21,8 +21,9 @@ Do not read or search files under `./Test/` unless explicitly asked.
   is applied immediately. Proposing and applying are separate steps.
 - **Never propose a verification that needs a non-GRBL controller, a sender console or a dry run.** Settle
   firmware questions from the firmware's own source and changelog, and cite file and version.
-- `node --check` runs itself on every edit, and the document contracts are re-counted at commit — see
-  `docs/conventions.md` → *Tooling that ships with the repo*. A fresh clone must arm the second one.
+- `node --check` runs itself on every edit. **`check-docs.js` is a commit gate, not an edit gate** — run
+  it once, on the settled set of doc edits, just before staging; never after each intermediate one. See
+  `docs/conventions.md` → *Tooling that ships with the repo*. A fresh clone must arm the pre-commit hook.
 
 ## Registers ship with the code
 
@@ -44,6 +45,8 @@ side effect of another task. Repo docs are reviewed in a diff; memories go stale
 
 ## Leave alone
 
-- **`README.md`** — not touched during code changes, only when asked. Its `doc-sync` marker records the
-  ref it last synced to; refresh from `git diff <ref>..HEAD -- MPCNC_v4.0_Beta2.cps`, then re-bump it.
+- **The user guides** — `README.md` and `docs/guide-hobbyist.md` / `guide-pro.md` /
+  `property-reference.md`. Not touched during code changes, only when asked. The **`doc-sync` marker on
+  `property-reference.md`** records the ref they last synced to; refresh from
+  `git diff <ref>..HEAD -- MPCNC_v4.0_Beta2.cps`, then re-bump it.
 - **`Personal.cps`** — a git-excluded test harness, not part of the post.

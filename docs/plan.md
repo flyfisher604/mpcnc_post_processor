@@ -12,12 +12,13 @@ thing to change first if you think something new belongs here.
 
 *Written so a fresh session can resume with no other context. Update it when the situation moves.*
 
-**Baseline.** **`master`.** The three working branches the machine-frame rework was built on —
-`PropertyUpdate` → `machine-frame-design` → `Goto-0,0` — were a linear chain, so `master`
-fast-forwarded onto the tip and all three labels were deleted; every commit is retained and no merge
-commit was made. **`master` is 14 commits ahead of `origin/master` and nothing has been pushed.**
+**Baseline.** **`master`**, now carrying the `design.md` split. Four working branches have closed the same
+way — `PropertyUpdate` → `machine-frame-design` → `Goto-0,0` for the machine-frame rework, then
+`control-review` for the doc split: each a linear chain, so `master` fast-forwarded onto the tip and the
+label was deleted; every commit is retained and no merge commit was made. **`master` is 16 commits ahead
+of `origin/master` and nothing has been pushed.** Work continues on **`hobby-dialog-review`**.
 
-**What landed in those 14.** The property rework (`groupDefinitions`, explicit `order:`, the
+**What the machine-frame range landed.** The property rework (`groupDefinitions`, explicit `order:`, the
 `<groupKey><Name>` key rename), then the machine frame and the fixed Z reference — `PReview.md`
 **PR-1 · PR-2 · PR-3 · PR-5** and `HReview.md` **HR-28** — then **PR-6 · PR-7**: `At End Go to 0,0`
 never said *which* X0 Y0 and it was the last section's WCS, so it is now `At End Park At` = `Off` /
@@ -32,30 +33,53 @@ Together these are **the first changes since `c73726c` to alter what the post em
 half-done; **nothing is posted.** Untracked and deliberate: both `MPCNC_v4.0_Beta*.zip`, and
 `Personal.cps` (a test harness, excluded via `.git/info/exclude` — see `conventions.md`).
 
-**What that rework did, in one line each.** Group 4 became a machine declaration + `Home at Job Start`
-(the action), replacing the `None`/`XY`/`XYZ` enum that conflated the two. Group 5 became
-`Fixed Z Reference` — `None` / `Spoilboard` / `Machine Z` — so a homed machine Z is a second
-implementation of the frame the reserved base used to be the only route to; the machine-Z answer emits
-`G53 G0 Z<Inter Part Travel Z>`, consumes no WCS register and needs no probe. **PR-5 then collapsed the
-two new booleans into one `Axises Homed and Trusted` enum (`None`/`XY Only`/`Z Only`/`XYZ`) and the two
-mutually-exclusive clearance fields into one `Inter Part Travel Z` whose frame follows `Fixed Z
-Reference`** — which forces that field empty by default, since a live default would let an enum flip emit
-a valid-looking height in the wrong frame. Guard B relaxed to *a* datum of
-either kind; four guards and two warnings added; `Probe to Set Base = None` removed. **This resolves the
-standing "Never `G53`" decision** (`PReview.md` §6): the post addresses the machine frame on exactly the
-axes the operator declares.
+**What that rework did** is `design.md` → *The machine frame* and *The fixed Z reference*, which hold the
+model, the rejected alternatives and the enum-flip hazard in full. The one status fact: it **resolves the
+standing "Never `G53`" decision** — the post now addresses the machine frame on exactly the axes the
+operator declares.
 
 **Two things it deliberately did not do.** The **`G53` tool-change park** is `PReview.md` **PR-4** — it
-shares code with §2's Phase 4 reorder and must compose with that design, not pre-empt it. And
-**`PReview.md` is still over its size budget** (1102/920, `WARN` not `FAIL`): a Rule-2 pass found nothing
-*live* had leaked in — the growth is unbuilt design and unrun rows, which retire on build.
-`conventions.md`'s own overrun is closed the other way: the design record moved out to `design.md`,
-leaving it 298/300, with the `Reference — per-machine settings` table still the one section that fails its
-own admission test and still reading as README material.
+shares code with §2's Phase 4 reorder and must compose with that design, not pre-empt it. And it left
+`PReview.md` over its size budget, where a Rule-2 pass found nothing *live* had leaked in: the growth is
+unbuilt design and unrun rows, which retire on build. `check-docs.js` prints every current doc-size
+number, so none is repeated here.
 
-**Where the record lives.** The hobbyist review (`HR-1`…`HR-27`) and the 2026-08-01 whole-file review
-(`CR-1`…`CR-17`) are one register in `HReview.md`: 44 findings, all fixed, closed by design or moved to
-`PReview.md`, except three one-liners and **HR-27**, unstarted. **Neither pass found the factory-default
+**What `hobby-dialog-review` landed (2026-08-07).** A hobbyist-perspective walk of all **69** dialog
+properties — `HReview.md` **HR-29 … HR-38**. Seven output-neutral: the `Axises` title, seven description
+typos, eleven descriptions rewritten to lead with *what to set and can I skip this* (the seven essays were
+re-deriving `design.md`; four stubs said nothing), group titles 4 and 5 now naming who needs them, and
+group 8 finally stating that a Start/Stop file **replaces** its phase while the tool files **add**.
+**Two defaults moved, and only two:** `Scale Feedrate` → on, because the three axis limits it gates were
+silently inert; and the coolant codes → the GRBL dialect, matching the default firmware, where Marlin
+`M42` writes had been posting into GRBL files unchecked. **Group 3's defaults stay off deliberately** — a
+licence workaround is the operator's choice, not the post's — as do the touch-plate-assuming probe default
+and the tool-change default; all three are argued rows rather than silent non-decisions. The 737-line
+README split into a landing page plus `docs/guide-hobbyist.md` / `guide-pro.md` / `property-reference.md`,
+the last carrying the `doc-sync` marker, now re-bumped to `17a20f2`. **The property count was wrong in
+three places and is 69 = 8/7/4/3/5/10/8/5/7/10/2**, which two unrun rows (D3, D5) had been asserting
+wrongly. `conventions.md` traded its README contract row for one covering all four guides, still 298/300.
+
+**What the HB- pass landed (2026-08-08).** Seven of `HReview.md`'s ten `HB-` findings, one commit each and
+each row closed with its code — **HB-2** (the GRBL `%` wrapper dropped), **HB-3** (a `validateJob()`
+warning when `Home at Job Start` can home nothing, plus the ten stale `Axises` HR-29's rename left),
+**HB-4** (retract before the offset probe traverse, gated on the offset), **HB-7** (include filenames
+checked before any output; `HR-27`'s geometry half stays open), **HB-8** (`fOutput` and the word
+separator assigned on both branches), **HB-9** (all thirteen `>>> WARNING:` sites bypass
+`Comment Level`) and **HB-5** (a malformed Safe Z is loud — in the file on the probe side, and at the
+dialog for **both** Safe-Z fields, neither having warned there). **Three change the emitted file** — the
+`%` lines, HB-4's lift, warnings at `Off`; HB-5 only when a field fails to parse — so all twelve live
+`HB-` rows are still `⬜`, `HB-9 (A)` being the register's first `Off` post. **`HB-6` closed by design** —
+`G17`/`G94` are not codes Marlin or pre-3.5.1 RRF have, so emitting them off GRBL buys an unknown-command
+line per job (`design.md` → *Firmware capabilities*). **`HB-10` deferred to the professional review**: the
+dead `Tool Change Probe` property is group-7 work either way, so it goes with item 4. **`PReview.md` and the
+`HR-`/`CR-` register are absent from this branch's working tree**, which is why plan.md is over budget:
+the two paragraphs above are the only surviving summary of what those registers hold.
+
+**Where the record lives.** The hobbyist review (`HR-1`…`HR-39`) and the 2026-08-01 whole-file review
+(`CR-1`…`CR-17`) are one register in `HReview.md`: **49 findings**, all fixed or closed by design, except
+three one-liners and **HR-27**, unstarted. **The seven professional ids — `HR-7`…`HR-10`, `HR-13`,
+`HR-20`, `HR-26` — are in `PReview.md` and nowhere else** (2026-08-07: `HReview.md` had been carrying stub
+rows for all seven, a second place for the same finding to go stale). **Neither pass found the factory-default
 single-operation job broken** — every High/Medium finding needed one dialog field moved off its default.
 Test rows are in `HReview.md`'s test register (hobbyist) and `PReview.md` §3 (professional); nothing else
 records a pass, and the Method column matters as much as the state (`conventions.md` → *How to run a test*).
@@ -64,11 +88,11 @@ records a pass, and the Method column matters as much as the state (`conventions
 
 | | Item | Note |
 |---|---|---|
-| 0 | **Post-verify the machine-frame rework and the end park** | It is unposted, and it changed the dialog and the emitted file. **`PReview.md` REG-MF first** — the GRBL/mm factory-default diff, which must touch only the property dump and the Resolved-Values block. Then **PR-5a** (the enum flip — the one hazard consolidation created, and the row PR-5 lives or dies on), **PR-2a** (the feature actually working), **PR-2c** (nine refusals, each leaving no file — the Marlin one proves the guard sits *above* Guard C's early return), **PR-5b**, and `HReview.md` **HR-28 (A)**. Rows in `PReview.md` §3.6. Then **PR-6d** (the end park's default answer must be a rename, not a behaviour change), **PR-6a–c** and **PR-7a–b**, rows in `PReview.md` §3.7. A node guard harness stands in meanwhile — 38 guard cases + 24 unit checks, green on the working tree and **aborting** against `HEAD` — and it proves logic only, never output. **A pre-post review of the branch then found four defects in PR-2 / PR-6's own landed code — `PReview.md` PR-8 … PR-11, all fixed** — so **PR-10 runs with the §3.6 block** (it fires on the *default* first-part mode) and **PR-8a/b · PR-9 · PR-11 with §3.7** |
-| 1 | **Post-verify the 14 `CR-` fixes** | The four `⬜` rows in `HReview.md`'s test register, **`CR-REG` first** — the GRBL/mm factory-default regression matters most, and it now folds into REG-MF above. `CR-1 (A)` needs `Enable Line #s` on + `Axises Homed and Trusted` off `None` and `Home at Job Start` on, a combination no configuration in the record has used. Two further posts serve `PReview.md` §3.5 |
-| 2 | **Tidy-up sweep** | `HR-19`'s `M291` doubled space; **HR-21 / CR-15** (wire the dead `Tool Change Probe` property into `probeTool()` — Tool Change branch work — or delete it); **HR-24** (`writeWCS()` should read `section.getTool()`, not the global `tool`). All one-liners, none changing output |
+| 0 | **Post-verify the machine-frame rework and the end park** | It is unposted, and it changed the dialog and the emitted file. **`PReview.md` REG-MF first** — the GRBL/mm factory-default diff. **`hobby-dialog-review` re-baselined it:** “factory default” now means `Scale Feedrate` on, so the expected diff is the property dump, the Resolved-Values block **and every `F` word**, and nothing else. **The hobbyist half of that post is already run** (2026-08-08, `HR-33 (A).gcode`): `HReview.md` **HR-33 (A)**, **HR-34 (B)** and **HR-36** are ✅ — feedrates land on `F900`/`F180` by default, matching `HW5` line for line, and no coolant code is reached. **REG-MF itself is still owed**, because that post was diffed against `HW5` rather than a re-post of the pre-change build, and `HW5` is neither factory-default (it carries `Probe Pause` = `Before`) nor pre-machine-frame. The same file already shows REG-MF's Resolved-Values half and **PR-6d**'s motion half holding — `X0 Y0 F2500` still, under the new `machineParkAtEnd = Work` name — but neither can be marked without the right baseline. Then **PR-5a** (the enum flip — the one hazard consolidation created, and the row PR-5 lives or dies on), **PR-2a** (the feature actually working), **PR-2c** (nine refusals, each leaving no file — the Marlin one proves the guard sits *above* Guard C's early return), **PR-5b**, and `HReview.md` **HR-28 (A)**. Rows in `PReview.md` §3.6. Then **PR-6d** (the end park's default answer must be a rename, not a behaviour change), **PR-6a–c** and **PR-7a–b**, rows in `PReview.md` §3.7. A node guard harness stands in meanwhile — 38 guard cases + 24 unit checks, green on the working tree and **aborting** against `HEAD` — and it proves logic only, never output. **A pre-post review of the branch then found four defects in PR-2 / PR-6's own landed code — `PReview.md` PR-8 … PR-11, all fixed** — so **PR-10 runs with the §3.6 block** (it fires on the *default* first-part mode) and **PR-8a/b · PR-9 · PR-11 with §3.7** |
+| 1 | **Post-verify the 14 `CR-` fixes** | The four `⬜` rows in `HReview.md`'s test register, **`CR-REG` first** — the GRBL/mm factory-default regression matters most, and it now folds into REG-MF above. `CR-1 (A)` needs `Enable Line #s` on + `Axes Homed and Trusted` off `None` and `Home at Job Start` on, a combination no configuration in the record has used. Two further posts serve `PReview.md` §3.5 |
+| 2 | **Tidy-up sweep** | `HR-19`'s `M291` doubled space; **HR-24** (`writeWCS()` should read `section.getTool()`, not the global `tool`). Both one-liners, neither changing output. **`HR-21` / `CR-15` / `HB-10` moved out of here to item 4** — they are one property, and both answers are group-7 decisions |
 | 3 | **Dialog-only checks** | **D1** and **D3**'s dialog half (`PReview.md` §3.3). The properties literal is now declared in display order, so if the dialog *still* shows groups out of numeric order, Fusion is not sorting and the zero-padding convention is wrong |
-| 4 | **Open the Tool Change branch** | `PReview.md` §2 — the ordering design and **HR-7/8/9/10/13**, as one unit, **now plus PR-4**: the `G53` park branch is sanctioned and lands here, with the two decided branches unchanged. Design settled for the ordering half; HR-10 and HR-13 have complete diffs and can go first as warm-up commits |
+| 4 | **Open the Tool Change branch** | `PReview.md` §2 — the ordering design and **HR-7/8/9/10/13**, as one unit, **now plus PR-4**: the `G53` park branch is sanctioned and lands here, with the two decided branches unchanged. Design settled for the ordering half; HR-10 and HR-13 have complete diffs and can go first as warm-up commits. **Plus the dead `Tool Change Probe` property — `HR-21` / `CR-15` / `HB-10`** — wired into `probeTool()` or deleted, a decision the ordering design makes for it |
 | 5 | **The professional review proper** | The pass that produces `PReview.md`'s real content. Needs a multi-part / multi-fixture job to post against |
 | 6 | **Jet / laser workstream** | `PReview.md` §5. **J4 is the priority** — group 09 has never appeared in *any* posted file, and CR-10 landed a fix there sight-unseen. The `CR-10 (A)` row is that post. J5 is a design question before it is a test |
 

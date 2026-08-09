@@ -20,9 +20,9 @@ ships with the repo*.
 | `plan.md` | The checkpoint (baseline, what is true now, **what is left in order**, live risks), phase status, pointers to completed reviews | Design write-ups, findings, test rows, resolved decisions, open questions, backlog detail | **≤ 120 lines** |
 | `conventions.md` | The rules a change must follow — property & dialog conventions, guards, how to run a test, tooling, the harness method — plus these contracts | **Design rationale** (→ `design.md`), status of anything, what is next, unbuilt design | **≤ 300 lines** — an overrun means something live has leaked in, or design has. Do not raise it |
 | `design.md` | Why the shipped behaviour is what it is: the frame model, external firmware facts, the arguments behind orderings that look arbitrary in the source | Rules a session must follow, status of anything, unbuilt design (→ `PReview.md` §6) | **≤ 300 lines** — the one file that **grows with the post**, so this is the one budget expected to move. It moves by argument, in a commit of its own |
-| `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 300 lines** — a register grows one line per row |
+| `HReview.md` | Hobbyist findings register (`HR-`, `CR-`) + the test register. Open **questions** ride in the row of the finding they belong to | Professional findings or rows, design write-ups, durable conventions | **≤ 110 lines + 2 per finding + 9 per register row** — **derived, not fixed:** a register is meant to grow as findings are filed and rows are posted, so the allowance grows with them. What the per-item terms still catch is prose |
 | `PReview.md` | Professional findings, professional test rows, **unbuilt design and its open questions** (§6), the jet/laser workstream | Hobbyist-only findings, durable conventions | **≤ 920 lines, and falling.** §2's long form and §3's expansions are unbuilt design and unrun rows; both retire on build. The §3 index table is permanent, everything under it is not |
-| `README.md` | User-facing usage only. Its `doc-sync` marker records the ref it last synced to | Anything developer-facing | — |
+| **the user-facing guides** — `README.md`, `docs/guide-hobbyist.md`, `docs/guide-pro.md`, `docs/property-reference.md` | Usage only, split by **reading path**: README is the landing page and the fork between guides; each guide is one path end to end; the reference holds the property tables and carries the `doc-sync` marker recording the ref it last synced to | Anything developer-facing. And **a second copy of the property tables** — one copy, linked from both guides, is the whole point of the split | — |
 | per-user **memory** (outside the repo) | Constraints about the user that hold across projects and cannot be derived from this repo — e.g. no controller hardware is available | **Anything about this post**: its code, conventions, status, findings or history | One short file per fact. Nothing here is reviewed in a diff, which is why so little belongs |
 
 ### What earns a place
@@ -49,6 +49,10 @@ and **nothing mechanical defends it** — no checker reads the post to see wheth
    this one hold it*. A review document's sections are fixed — see *The shape of a review document*.
 2. **Over the size guide means something has stopped being live.** Check what has quietly become durable
    (→ `conventions.md` or `design.md`) or register-shaped (→ a register) rather than trimming prose.
+   **A register's guide is derived, so this still holds there.** Filing a finding or passing a row raises
+   the allowance by its own cost; going over anyway means the *prose* grew, not the register. A fixed
+   ceiling on `HReview.md` was hit three times in one session and every time the trigger was a test
+   passing — which is the document working, so the number moved instead of the content.
 3. **Never point two ways.** If file A says "written up in B", B must hold the write-up and must not point
    back. A pointer is valid in one direction only: from status toward the register that owns the work.
    (`plan.md` and `PReview.md` §6 once pointed at each other for four items, and neither held the content.)
@@ -74,6 +78,15 @@ register ungated. Sections are matched **by name, not by number** — `PReview.m
 | 5 | **Checked and found correct** | `read`-strength readings. Retires per Rule 4 when a `posted` row supersedes | when non-empty |
 | 6 | **Owed** | What the register itself owes: which artifacts, and why each is worth a post. **Not** the order of work — that is the checkpoint's | yes |
 | 7 | **Design backlog** | Unbuilt design and its open questions. **Only** where the file's contract admits unbuilt design — `PReview.md` does, `HReview.md` does not | optional |
+
+**An *Expect* is pre-run only. A passed row carries a result.** The *Expect* says what to look for; the
+moment every row under that id is `✅` it has done its job and **must collapse to what the artifact showed**
+— `— PASS`, the file, the discriminator actually checked, and any trap a re-run would otherwise walk back
+into. Nothing else: not the prediction, not the reasoning that produced it, not the build it dates once the
+register dates the build once. `check-docs.js` **FAILs** on a `✅` id whose *Expect* has no `— PASS`, and on
+a result recorded against rows that are not all `✅`. It is a FAIL and not a WARN because a stale *Expect*
+is wrong in the worst direction — it reads as a criterion still to be met. Four in `HReview.md` predicted
+tokens their own passing file did not contain, and one would have read as a **false FAIL** on a re-run.
 
 **The fields are canonical; the rendering is not.** A test row carries an id, a state marker, a setup
 delta, a method, and an *Expect* naming its discriminator; where the *Expect* needs a g-code block a
@@ -174,13 +187,13 @@ mm, frame set by `Fixed Z Reference`); the post-probe retract keeps **"Safe Z"**
 
 ## Reference — per-machine settings
 
-Group 4 is `Axises Homed and Trusted` (the declaration) + `Home at Job Start` (the action, including its
+Group 4 is `Axes Homed and Trusted` (the declaration) + `Home at Job Start` (the action, including its
 optional pause) + `At End Park At`; group 5 is `Fixed Z Reference` and the one clearance it gives a frame
 to. The park sits in group 4 rather than group 1 because what it *addresses* is the machine frame and it
 is guarded on the declaration — the same reason the action lives there, and the reason its key is
 `machineParkAtEnd`.
 
-| Machine / firmware | Axises Homed and Trusted | Home at Job Start | Fixed Z Reference (multi-fixture) | Operator does |
+| Machine / firmware | Axes Homed and Trusted | Home at Job Start | Fixed Z Reference (multi-fixture) | Operator does |
 |---|---|---|---|---|
 | LowRider (Marlin or FluidNC) | `XYZ` if Z endstops fitted, else `XY Only` | `Home` | `Machine Z` where Z is declared, else `Spoilboard` `G59` | homes X/Y; work-Z touched off with the plate either way |
 | MPCNC + FluidNC, X/Y switches | `XY Only` | `Home` | `Spoilboard` `G59` | homes X/Y; machine Z n/a, Z set by the work plate |
@@ -201,31 +214,14 @@ is guarded on the declaration — the same reason the action lives there, and th
 
 - **Post the job from Fusion and read the g-code.** Machine dry-runs and physical measurement are out of
   scope — every row must stand on the posted file alone.
-- **Fusion posts with its own copy of the `.cps`** at `%APPDATA%\Autodesk\Fusion 360 CAM\Posts\`. Re-import
-  before every session and **date the output** against a token the newest commit changed, or you will
-  verify a stale build. Absence-based rows pass trivially on a build lacking the feature.
-- **Read the posted file's own property dump before believing a row ran.** It records the whole dialog
-  state; a row can silently not have been exercised.
+- **Read the posted file's own property dump.** It records the whole dialog
+  state.
 - Output goes to `C:\Users\don_m\Documents\Fusion 360\NC Programs\`, **is not in the repo**, and a reused
-  filename destroys evidence. **Name a post for the row it serves** (`HR12a`), not for what the job does,
-  and grep this file for the name first.
-- Setting any group-08 include makes Fusion ask *"This post processor might be unsafe…"* — answer **Yes**.
-  Answering No aborts the post and **invalidates** the row rather than failing it.
-- Defaults unless stated: GRBL/mm, Comment Level `Info`, probe target/speed/thickness `Z-10`/`F30`/`Z0.8`,
-  probe Safe Z resolves to `5.08`. Comments are `( … )` on GRBL, `; …` on Marlin/RRF. `G10 L20 P<n>` on
-  GRBL/RepRap, `G92` on Marlin.
+  filename destroys evidence. **Name a post for the row it serves** (`HR12a`), not for what the job does.
+- Defaults unless stated: GRBL/mm, Comment Level `Info`, probe target/speed/thickness `Z-10`/`F30`/`Z0.8`.
 
-**Method**, strongest first: **`posted`** a real file from the real post — the only method that proves what
-a hobbyist receives · **`harness`** node against functions brace-matched out of the `.cps`, or a post from
-`Personal.cps` — proves *logic*, not output · **`source`** firmware source · **`read`** a reading of the
-post's own control flow — **weaker than the rest**, used only where the artifact a posted row needs does
-not exist.
+**Method**, strongest first: **`posted`** a real file from the real post — the only method that proves what is generated.
 
-**Personas** (setup shorthand): **HP-1** one Setup / one Operation / one tool, pre-jogged XY, touch plate —
-defaults + firmware + travel/max speeds + `Scale Feedrate` on · **HP-2** HP-1 + First WCS/Part =
-`Set X0 Y0 Z0 to Current Pos` · **HP-3** HP-1 + a `Jog to …` mode · **HP-4** HP-1 on Marlin or RepRap ·
-**HP-5** HP-1 + more than one operation. Group 03 is part of the HP-1 *persona*, not of the config a
-verification post must carry — it cannot execute on a paid licence (HW-1).
 
 ---
 
@@ -233,12 +229,17 @@ verification post must carry — it cannot execute on a paid licence (HW-1).
 
 | Artifact | Fired by | Checks | Travels? |
 |---|---|---|---|
-| `docs/check-docs.js` | the pre-commit hook, or by hand | The contracts above: size budgets (warn), tallies vs their tables, findings-vs-register id completeness, heading ranges and row counts, Rule 3's pointer direction, the README `doc-sync` ref. Prints which registers it actually parsed — a checker silent about what it skipped reads as a clean bill of health. **Documents only:** it never reads the `.cps`, and two checks that did have been removed for it | ✅ tracked |
+| `docs/check-docs.js` | the pre-commit hook, or by hand | The contracts above: size budgets (warn, **derived where the guide says so**), tallies vs their tables, findings-vs-register id completeness, heading ranges and row counts, **that every `✅` id's *Expect* is a result and no unrun id's is** (fail), Rule 3's pointer direction, the `doc-sync` ref on `property-reference.md`. Prints which registers it actually parsed — a checker silent about what it skipped reads as a clean bill of health. **Documents only:** it never reads the `.cps`, and two checks that did have been removed for it | ✅ tracked |
 | `.githooks/pre-commit` | `git commit` — **anyone's**, not just a session's | runs `check-docs.js --staged`; non-zero aborts the commit | ✅ tracked, ❌ **not armed** — see below |
 | `.claude/hooks/post-edit.js` | Claude Code, after every `Edit`/`Write` | `node --check` when the file is the `.cps`; silent for everything else | ✅ tracked |
 
 Run the doc check by hand with `node docs/check-docs.js` (working tree) or `--staged` (what a commit
 would record). It is deliberately quiet: `WARN` never fails a commit, only `FAIL` does.
+
+**Once per commit, not once per edit.** These checks grade a *finished* document: mid-edit a size WARN
+reports prose still being written, and a tally or *Expect* check fires on a table whose row and count
+land in different edits. Nor does a working-tree run predict the gate, which reads the **index** — only
+`--staged`, after staging, answers what the commit will be judged on.
 
 **A fresh clone must run this once — nothing else installs it:**
 
@@ -282,7 +283,9 @@ checking them per-edit would fight that rule.
   read nothing at all.** Make its diagnostic **unconditional**, not rejection-only (HR-6).
 - **Absence-based rows need a presence-based sibling posted from the same build** (HR-11 (A)/(B)).
 - **When a code path cannot be reached, question the premise before blaming the CAM.** HW-1 cost three
-  posted files: `isSafeToRapid()` has one caller and is unreachable on a paid licence.
+  posted files. But state the conclusion exactly: `isSafeToRapid()` **is called** on a paid licence — what
+  a paid licence does not reach is a *conversion*, and only while the threshold is left at its default.
+  "Unreachable" was the loose paraphrase, and two user-facing claims were built on it (HR-39).
 - **When a defect suppresses output it makes its own behaviour unverifiable — switch to the branch that
   emits.** HW-2 (B) was unanswerable on the manual path and trivial on the automatic one.
 - **`Personal.cps`** (repo root, git-excluded) is the post with `onRapid()` rerouted into `onLinear()` —
@@ -295,4 +298,4 @@ checking them per-edit would fight that rule.
 - **Write every Pass criterion as something visible in the file** — exact tokens, their order, and what
   must be **absent**. When a row passes, mark it `PASS` outright: no "static PASS" hedging and no note
   explaining what was skipped. Operator-safety facts a file cannot show (*park the tool over bare
-  spoilboard before starting*) belong in code comments, here, and the README — never as a test step.
+  spoilboard before starting*) belong in code comments, here, and the user guides — never as a test step.
