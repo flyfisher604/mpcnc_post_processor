@@ -1220,9 +1220,11 @@ edit the expectation to match what was seen.
 
 ### FIX
 
-**Status:** `[ ] applied` — designed against the post at `95349d6`. Reconsidered after CR-11 shipped, which
-changed what this entry has to say in three ways: it supplies the mechanism, it inverts the answer to the
-reach question, and its method turns up a third path with the same defect that no finding names.
+**Status:** `[x] applied` — commit `CR-12: Give both stored-Z0 part probes a provisional zero of their own`.
+Named by subject rather than sha, for the reason CR-11's entry gives. Designed one commit earlier, and the
+design was a reconsideration of the finding after CR-11 shipped, which changed what this entry has to say in
+three ways: it supplies the mechanism, it inverts the answer to the reach question, and its method turns up a
+third path with the same defect that no finding names.
 
 **CR-11 already built the mechanism, so this fix invents nothing.** `probeTool()` takes a `searchZ` third
 argument that defaults to `G38 Target` ([:3663](../MPCNC_v4.0_Beta2.cps#L3663)), and a Z-only provisional
@@ -1329,15 +1331,15 @@ cites. This is a plain omission, and the fix is a one-word change with a guard a
 +      writeWcsOrigin(currentWorkOffset, 0, 0, 0);
        partProbe(true);
      } else {
--      writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool)");
 +      writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
-+      writeComment(eComment.Debug, " writeWCS: probe skipped (tool 0 or jet tool)");
+       writeComment(eComment.Debug, " writeWCS: probe skipped (tool 0 or jet tool)");
      }
 ```
 
-The trace label goes with it: that line reads `writeWcsOnStart:` inside `writeWCS()`, which the sibling arm
-eleven lines above gets right. A Debug trace that names the wrong function is worth one word in a diff that
-is already touching the line.
+The `undefined` write moves into the `else` arm rather than disappearing: that arm still has to record the
+jogged X0 Y0, and it is the Z it must leave alone. *(An earlier draft of this entry claimed the Debug trace
+on that line named the wrong function. It does not — it reads `writeWCS:`, as the sibling arm above it does.
+The claim was a misreading and no diff carries it.)*
 
 **CR-11's other lesson applies here, and its answer comes out the other way.** CR-11 recorded that making a
 target relative decides *where the search starts* and leaves *how far it goes* unanswered, and that

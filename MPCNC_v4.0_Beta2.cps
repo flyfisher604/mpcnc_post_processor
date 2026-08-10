@@ -469,7 +469,7 @@ properties = {
   },
   probeG38Target: {
     title      : "G38 Target",
-    description: "How far the probe move is allowed to travel before giving up -- a Z POSITION in the part's frame, not a distance. This bounds the PART probes only: the spoilboard base probe has a fixed reach of its own, being the one probe that starts above the stock AND the clamps. On the two Set ... to Current Pos modes the post writes a provisional Z0 first, so -10 (the default) searches to 10 mm below wherever the tool is now. On the two Use Active WCS modes it is measured from that WCS's STORED Z zero instead, which may be anywhere. Deep enough to reach the plate and no deeper: a probe that travels this far without touching is a failed probe, and GRBL raises an alarm and stops the job.",
+    description: "How far DOWN FROM THE TOOL a probe may search before giving up -- a DISTANCE, not a position. This bounds the PART probes only: the spoilboard base probe has a fixed reach of its own, being the one probe that starts above the stock AND the clamps. Every part probe writes a provisional Z0 at the current height first, so -10 (the default) means \"search 10 mm below wherever the tool is standing when the probe begins\". WHERE IT IS STANDING DEPENDS ON THE MODE. On the Set ... to Current Pos and Jog to ... modes you put it there yourself, a few mm above the stock, and -10 is the right size. On the two Use Active WCS X0 Y0, Probe Z0 modes the POST puts it there, at Inter Part Travel Z -- the height that clears the tallest clamp in the job -- so the target has to be deeper than that height minus your stock thickness or the probe never touches the plate. The post states that arithmetic before it posts. Deep enough to reach the plate and no deeper: a probe that travels this far without touching is a failed probe, and GRBL raises an alarm and stops the job.",
     group      : "probe",
     order      : 70,
     type       : "integer",
@@ -1532,14 +1532,35 @@ function validateJob() {
     warning(localize("\"First WCS / Part\" = \"Use Active WCS X0 Y0, Probe Z0\" rapids to the stored "
       + "X0 Y0 before this job has established any Z the post can move in, so that traverse happens "
       + "at whatever height the tool is left at -- position it clear of the stock, clamps and "
-      + "fixtures before starting the program. The probe that follows measures \"G38 Target\" from the "
-      + "Z0 already stored in the active WCS, which this mode re-probes precisely because it is not "
-      + "trusted, so set the target deep enough to reach the stock from that start height."
+      + "fixtures before starting the program. The probe that follows searches \"G38 Target\" DOWN FROM "
+      + "that height, so set the target deep enough to reach the stock from where you leave the tool."
       // The closing recommendation is actionable only where the operator can make
       // fixedZEstablishedInFile() true, and on Marlin they cannot.
       + (fw == eFirmware.MARLIN
         ? " Marlin has no fixed Z reference this post can establish, so that start height is yours to set."
         : " \"Fixed Z Reference\" removes both, by establishing a Z the post can move in itself.")));
+  }
+
+  // CR-12's other half. Once the target is relative it is finally a number the operator CAN size -- but
+  // on these two modes the POST picks the start height, and it picks the one that clears the tallest
+  // clamp. Spoilboard only: under the machine-Z answer "Inter Part Travel Z" is a machine coordinate and
+  // the distance from it down to the stock top is not a number this post has.
+  if ((startMode == "Probe Z" || (multiWcs && changeMode == "Probe Z")) &&
+      getReservedBaseWcs() != 0 && parseInterPartTravelZ() != undefined) {
+    var clearance = parseInterPartTravelZ();
+    var reach = -getProperty(properties.probeG38Target);
+    if (reach >= clearance) {
+      warning(localize("\"G38 Target\" searches " + reach + " mm below the tool, and a \"Use Active WCS "
+        + "X0 Y0, Probe Z0\" probe starts at \"Inter Part Travel Z\" = " + clearance + " mm above the "
+        + "spoilboard -- so a probe that never touches its plate drives to or through the spoilboard "
+        + "surface at probing speed. Shorten the target."));
+    } else {
+      warning(localize("A \"Use Active WCS X0 Y0, Probe Z0\" probe starts at \"Inter Part Travel Z\" = "
+        + clearance + " mm above the spoilboard, and \"G38 Target\" searches " + reach + " mm down from "
+        + "there -- so it touches the plate only on stock thicker than " + (clearance - reach) + " mm. "
+        + "Deepen the target or lower the travel height if this job's stock is thinner than that; the "
+        + "post cannot check, the stock top being the value this probe exists to find."));
+    }
   }
 
   // The machine park crosses the bed, and writeMachineParkXY() can retract first only in a frame THIS
@@ -1921,8 +1942,10 @@ function writeWCS(section) {
   } else if (onChangeMode == "Probe Z") {
     // Replicate: auto-position to the stored X0 Y0 (plus probe XY offset) and probe Z. The tool is
     // still over the PREVIOUS part, so partProbe() travels there first -- X/Y only, Z stays safe.
+    // zUntrusted: this part's stored Z0 is the value this mode exists to re-probe, so the probe writes
+    // a provisional Z0 at the travel height and searches DOWN from there. CR-12.
     if (canProbe) {
-      partProbe(false);
+      partProbe(false, true);
     } else {
       writeComment(eComment.Debug, " writeWCS: probe skipped (tool 0 or jet tool) -- moving to stored X0 Y0");
       resetAll();
@@ -1941,10 +1964,17 @@ function writeWCS(section) {
     warnJogAtPauseOnGrbl();
     askUser("Jog to X0 Y0 above Z0, probe", "Set origin", true);
     writeComment(eComment.Info, "   Set current X,Y position to 0,0");
-    writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
     if (canProbe) {
+      // Z0 PROVISIONAL and overwritten by the probe below, exactly as the first-part twin in
+      // writeWcsOnStart() has always written it. This arm wrote no Z at all, so "G38 Target" was
+      // measured from the stored Z0 -- CR-12's defect on a path CR-12 does not name. INSIDE the
+      // canProbe guard, because on a tool that cannot probe nothing would overwrite the provisional
+      // value and the mode would silently become "Jog to X0 Y0 Z0". CR-12.
+      writeComment(eComment.Info, "   Provisional Z0 at the current height so the probe target is a relative limit");
+      writeWcsOrigin(currentWorkOffset, 0, 0, 0);
       partProbe(true);
     } else {
+      writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
       writeComment(eComment.Debug, " writeWCS: probe skipped (tool 0 or jet tool)");
     }
   }
@@ -3061,11 +3091,13 @@ var probePauseAfter = true;
 // A part probe: position to the part's Z-probe touch-point (its WCS origin plus the probe XY offset)
 // and probe Z into the active WCS. `atOrigin` means the tool already sits on the origin, so the
 // reposition is emitted only when the offset is non-zero; added parts pass false, being over the
-// previous part. `zUnknown` means the caller emitted no absolute Z before this probe because the active
-// frame's Z0 is stale, so the traverse runs at whatever height the tool already holds -- only the
-// first-part "Probe Z" mode passes it. Callers guard tool 0 / jet tools, and the base probe does not
+// previous part. `zUntrusted` means this WCS's stored Z0 is not believed -- the two "Use Active WCS
+// X0 Y0, Probe Z0" modes, which exist for exactly that reason -- so the probe writes its own
+// provisional Z0 below and no absolute Z was emitted in this frame before it. Whether the traverse
+// HEIGHT is also unknown is a SECOND question, asked separately: on the subsequent-part path the tool
+// holds a height this post just wrote. Callers guard tool 0 / jet tools, and the base probe does not
 // use this at all: it always touches off at the origin, with its own pause setting.
-function partProbe(atOrigin, zUnknown) {
+function partProbe(atOrigin, zUntrusted) {
   var ox = probeOffsetX();
   var oy = probeOffsetY();
   var offsetSet = probeOffsetIsSet();
@@ -3073,11 +3105,11 @@ function partProbe(atOrigin, zUnknown) {
     resetAll();
     // The rapid below is at an unknown height, so the file must say so. A WARNING and not an Info
     // comment: it reports a precondition the operator must satisfy, and Info is gone at Level = Off.
-    if (zUnknown && !fixedZEstablishedInFile()) {
+    if (zUntrusted && !fixedZEstablishedInFile()) {
       writeWarning("no Z reference is established, so the XY move below runs at whatever height the"
         + " tool is holding -- it must be clear of the stock, clamps and fixtures before the program"
-        + " starts. The G38.2 target that follows is measured from the Z0 already stored in this WCS,"
-        + " which is the value this mode re-probes because it is not trusted.");
+        + " starts -- and the G38.2 that follows searches G38 Target DOWN FROM THAT HEIGHT, so the"
+        + " target has to be deep enough to reach the stock from wherever you leave the tool.");
     }
     if (offsetSet) {
       writeComment(eComment.Info, "   Move to probe point = origin + offset X" + xyzFormat.format(ox) + " Y" + xyzFormat.format(oy) + ", then probe Z");
@@ -3087,6 +3119,19 @@ function partProbe(atOrigin, zUnknown) {
     rapidMovementsXY(ox, oy);
     flushMotions();
   }
+
+  // Z0 written PROVISIONALLY, overwritten by the probe below, so "G38 Target" is a DISTANCE to search
+  // and not a position measured from the very Z0 this mode was chosen BECAUSE it distrusts. Z ONLY --
+  // the stored X0 Y0 is the other half of what these modes are for and is not this probe's to touch.
+  // After the traverse rather than before it: the traverse is X/Y only, so the height is identical
+  // either way, and here the write sits against the probe it bounds. Nothing reads the tracked Z
+  // between this frame shift and probeTool()'s load-bearing resetAll(), so no reset is needed here --
+  // the same reason writeBaseEstablish() needs none. CR-12.
+  if (zUntrusted) {
+    writeComment(eComment.Info, "   Provisional Z0 at the current height so the probe target is a relative limit");
+    writeWcsOrigin(currentWorkOffset, undefined, undefined, 0);
+  }
+
   // Attach(before)/detach(after) prompts per probePause: No=neither, Before=attach only,
   // Before & After=both (default -- byte-identical to the historical always-prompt behavior).
   var pause = getProperty(properties.probePause);
