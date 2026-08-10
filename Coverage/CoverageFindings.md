@@ -35,7 +35,7 @@ judgement belongs in a later pass of `CoverageReview.md`, not in an edit here.
 
 ## Ledger
 
-**24 findings — 3 fixed, 19 open, 1 deferred, 1 withdrawn.** Ordered by severity; the bodies below are in
+**24 findings — 4 fixed, 18 open, 1 deferred, 1 withdrawn.** Ordered by severity; the bodies below are in
 CR order. *def.* in the status cell means no fix is being applied until a stated question is settled — the
 box says which, and the design, where there is one, waits in `CoverageFixes.md`. *wdn.* means the finding's own premise was settled against it and it is not a defect —
 the box says which premise, and the designed fix, where there was one, stays in `CoverageFixes.md` unapplied
@@ -51,7 +51,7 @@ does not file it a second time.
 | `[ ]` | CR-21 | Both | Machine damage | `resetPostState()` does not reset the modal formatters, so a second file in one context loses its preamble |
 | `[ ]` *def.* | CR-03 | Hobbyist | Machine damage | group 3 is not gated to the licence it exists for, and nothing warns |
 | `[—]` *wdn.* | CR-04 | Hobbyist | Machine damage | the first-move conversion applies no test of any kind to the destination |
-| `[ ]` | CR-12 | Professional | Machine damage | both `Use Active WCS …, Probe Z0` modes measure the probe target from the Z0 they distrust |
+| `[x]` | CR-12 | Professional | Machine damage | both `Use Active WCS …, Probe Z0` modes measure the probe target from the Z0 they distrust |
 | `[ ]` | CR-16 | Professional | Machine damage | one part machined from several WCS is accepted and traverses to an unset register |
 | `[ ]` | CR-05 | Both | Machine damage | a start include file leaves `G90`, `G21`/`G20`, `G94` and `G17` unwritten, with no warning |
 | `[ ]` | CR-23 | Hobbyist | Machine damage | a Safe-Z expression of `0` is accepted, making every non-negative Z "safe air" |
@@ -288,7 +288,10 @@ the `G38.2` would make the target a relative limit here as it is everywhere else
 
 ### CR-12 — both `Use Active WCS …, Probe Z0` modes measure the probe target from the Z0 they distrust
 
-**Status:** `[ ] fixed`
+**Status:** `[x] fixed` — 979297d, `partProbe()` writes a provisional Z0 so the target is a distance to
+search, on the subsequent-part `Jog to X0 Y0, Probe Z0` arm as well — a third path this finding does not name
+— and `validateJob()` states the arithmetic between the target and the travel height the probe starts from;
+walked in [`CoverageFixes.md` → CR-12](CoverageFixes.md)
 **Audience:** Professional
 **Severity:** Machine damage
 **Confidence:** Certain
