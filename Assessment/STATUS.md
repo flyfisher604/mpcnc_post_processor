@@ -297,6 +297,21 @@ aborting from `onOpen()` first. The `workOffset == 0` alias cannot cause or mask
 spoilboard route costs more:** three fields, a numbered milling tool on the first operation, a reserved
 WCS outside the instance range, and one of GRBL's six registers.
 
+**It posts. Confirmed the same day.** With `Fixed Z Reference` = `Machine Z - homed` and `Inter Part Travel
+Z` set, the job posted a file, raising **CR-2's** warning and **PR-10's** and nothing else — which
+**confirms PR-10 leg 1's warning half** (it names `Inter Part Travel Z`, exactly as that row predicts) and
+leaves its in-file discriminator owed. The two dialog edits were the whole cost, as predicted. **`[AUTHOR]`
+on doing it: *"the error message did not help see which parameters needed to be set."*** That is `PR-14`
+landing on a real operator rather than being inferred from the source, and it is why the row stands at
+Low-Med rather than Low.
+
+**But that file must not be run as posted.** First was left at the default, so PR-10's hazard is live: the
+establish moves the tool to travel clearance *before* the origin is recorded, so the part origin is bed
+clearance and the probe searches down from there and never reaches the stock. The warning is the whole of
+PR-10's fix — no arithmetic in the post can know that distance — so acting on it is the operator's step:
+set `First WCS / Part` = `Use Active WCS X0 Y0, Probe Z0`. **`PR-14`'s step 2 was skipped**, so the second
+refusal remains unposted, and it is the leg that carries the finding.
+
 **So 1.1's own framing was too strong and is corrected in place.** *Blocked* → reachable; a capability
 defect → an error-text defect. **`PR-14`**, Low. It also **survives Step 1.2**: making the homed machine
 Guard B's answer removes the first refusal, never the second, because a machine coordinate cannot be

@@ -684,11 +684,15 @@ file.
 > - **The `Fixed Z Reference` / `Reserved WCS` agreement checks** — silent because both are at their
 >   defaults; an operator who reaches for `Reserved WCS` **first** meets a different refusal.
 >
-> **The warning that came with it is correct and is not a second defect.** PR-10's pre-jog warning fires
-> on exactly this configuration — homing moves the tool before `First WCS / Part` records "the current
-> position" — and its advice, `Use Active WCS X0 Y0, Probe Z0`, is *also* what the cure below needs, since
-> otherwise PR-10's other arm fires once a fixed Z reference exists. **Three messages, one configuration:
-> the guards do not contradict each other.** `Multiple work offsets used in program.` is Fusion's own.
+> **The warning that came with it is correct and is not a second defect.** It is **CR-2's** — homing moves
+> the tool before `First WCS / Part` records "the current position" — reworded as advice by PR-1, and
+> `HReview.md` has already posted it, so it is not new evidence. **Not PR-10's**, whose own warning cannot
+> fire while `Fixed Z Reference` is `None`; the two are one line apart in `validateJob()` and are told apart
+> by which control they name, the endstops or `Inter Part Travel Z`. CR-2's advice,
+> `Use Active WCS X0 Y0, Probe Z0`, is *also* what the cure below needs, since otherwise **PR-10's** fires
+> the moment a fixed Z reference exists — which is exactly what the 2026-08-13 successful post then showed.
+> **Three messages, one configuration: the guards do not contradict each other.**
+> `Multiple work offsets used in program.` is Fusion's own.
 >
 > **The minimum configuration that posts today, with no code change — two dialog edits, three for silence.**
 > This machine's group 4 already satisfies every prerequisite the machine-Z answer has:
@@ -702,6 +706,14 @@ file.
 > No reserved WCS, no spoilboard probe, no register spent. **The spoilboard route costs more** — three
 > fields, a numbered milling tool on the first operation (Guard B′), a `Reserved WCS` outside the
 > instances' range (Guard A), and one of GRBL's six registers.
+>
+> **Confirmed by posting, same day.** With those first two edits the job posted a file, raising CR-2's
+> warning and PR-10's and nothing else — so **PR-10 leg 1's warning half is confirmed** and its in-file
+> discriminator is owed. `[AUTHOR]` on doing it: *"the error message did not help see which parameters
+> needed to be set"* — `PR-14` confirmed by the operator rather than inferred from the source, which is why
+> it stands at Low-Med. **The third edit was not made, so that file must not be run**: PR-10's hazard is
+> live in it, the origin being recorded at travel clearance. **Step 2 of the chain was skipped**, so the
+> second refusal is still unposted.
 >
 > **So it is reachable, and the answer to 1.1's own question is: not a capability defect.** The refusal
 > is right — the post cannot invent a clearance height. What is wrong is that the operator learns the
