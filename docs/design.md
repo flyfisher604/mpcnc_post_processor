@@ -193,6 +193,88 @@ each is a place a one-dialect assumption would have shipped a wrong motion:
 
 ---
 
+## Tool changes — two flows, and the code implements neither
+
+**The shipped tool-change code is a bad design and will be replaced rather than repaired.** This section
+is the target, not the behaviour: `findings.md` `PR-15` is the single finding that the code does not comply
+with it, and the per-defect rows filed against the old design were deleted with the design that made them
+defects. Their durable content — the firmware facts and the orderings any implementation must respect —
+is below.
+
+**The premise both flows follow from.** A measured tool change needs a probe, a **subtraction**, and a
+register to hold the result. **The post can supply none of the three.** It cannot compute an offset it will
+not learn until the operator swaps the tool, hours after posting, and it can never read a register back
+(*Selection is deterministic, origin is trusted*). So the post's role is to **arrive correctly, hand over,
+and resume correctly** — never to perform the change. Everything the old design did beyond that was the
+error.
+
+### Flow 1 — the manual change, at the end of a file
+
+**The hobbyist answer, and for a Personal licence the only one:** Fusion Personal does not emit tool changes
+at all, so a two-tool job is two posted files. The post's whole responsibility is to **end the first file so
+the second can start where the first left off**.
+
+- **XY is not lost.** The file ends with the work origin exactly as the job established it — **no
+  `G10 L20`, no `G92`, and no homing**. On Marlin homing is not merely unnecessary but destructive:
+  `set_axis_is_at_home()` zeroes `position_shift`, and re-sending `G54` does not restore it, so the next
+  file would cut against an origin the operator never set. That makes *never home at end of file* a rule,
+  not a preference.
+- **The park is in one stated frame.** The park height and position must say which frame they are measured
+  in and emit that frame — `G53`, which requires a declaration including the parked axes, or the work
+  frame, which drifts per WCS. **Not both meanings on one field**, which is what the shipped
+  `Tool Change X/Y/Z` does today: plain `G0` words the dialog presents as absolute.
+- **Z is the operator's to re-establish**, by re-probing at the start of the next file — the shipped default
+  first-part mode already does exactly this, so Flow 1 adds no mechanism to reach it.
+- **It is an option, not a policy.** A single-tool job must not pay for it.
+
+### Flow 2 — the sender's macro, mid-program
+
+**The work is deferred to whatever owns a tool table, and that is never the post.** The three firmwares
+split on who can do the subtraction:
+
+| Firmware | Who can measure and apply a tool offset |
+|---|---|
+| **RepRapFirmware** | **The machine.** Meta-g-code arithmetic and a real tool table — `G10 L1 P<t> Z`, persisted with `M500 P10` — so a `tpost` macro does it, and `M6` is a genuine call into `tfree`/`tpre`/`tpost` |
+| **GRBL** | **The sender.** No arithmetic, and `G43.1` takes a literal, so the offset must be computed off-controller. `M6` reaches the controller as `error:20 Unsupported command` — the route only exists if the sender intercepts the token before the controller sees it |
+| **Marlin** | **The operator.** No TLO register at all, so the only correction is re-probing and re-zeroing work Z by hand. *(This corrects an earlier bare "no TLO" claim.)* |
+
+**So the post's responsibilities are exactly three, and nothing else is in scope:**
+
+1. **Pre-change setup** — leave the machine in the state the macro is entitled to assume: coolant off,
+   spindle stopped or the operator prompted to stop it, tool clear of the work at a known height in a
+   stated frame.
+2. **Call the macro** — emit the agreed token, once, and nothing around it that the macro will redo.
+3. **Post-change resume** — restore the frame and the modal state the macro may have disturbed, and put
+   the tool back over the work before cutting resumes.
+
+**This is a contract, and the contract is the deliverable.** What the macro may change and what it must
+restore has to be written down, because the post cannot verify any of it. Without that written contract the
+call is a trapdoor. The **token itself is unsettled** — `M6` is the natural candidate and is real on RRF,
+but whether senders intercept it on GRBL is a sender-side fact this project has not yet sourced, and no
+firmware source can settle it. `findings.md` §6 carries the question.
+
+### What any implementation must get right
+
+Carried from the register the old design filled, because each is a defect the rework can reproduce:
+
+- **Resolve the WCS before the change.** A boundary that is both a tool change and a WCS change must select
+  the new frame first, so a post-change re-probe writes into the register that needs it rather than the
+  previous section's. Ordering the change first is the root defect of the shipped code.
+- **Stop coolant and the spindle on *every* route**, not only the one that relocates the tool. That stop is
+  not a property of relocating.
+- **A first change happens before the first part's origin work**, or the part's Z0 is established with the
+  tool the change exists to replace.
+- **No `M84 Z`.** It is Marlin-only, so GRBL halts on it mid-change with the operator holding a tool — and
+  on Marlin a release with no brake sinks an unbalanced gantry in Z. It is a hazard under both readings and
+  goes with the rework.
+- **Post-injected motion goes through `rapidMovements()`**, as every other post-injected move does. Routing
+  it through the post's own `onRapid()` clears `forceSectionToStartWithRapid` and defeats *First G1 → G0* on
+  exactly the sections that use it.
+- **A suppressed change is announced at the dialog as well as in the file.** An operator who reads only the
+  dialog must not learn at the machine that the change was dropped.
+
+---
+
 ## Design notes behind the shipped behaviour
 
 ### Traverse clearance is not the G1→G0 plane

@@ -40,7 +40,7 @@ quoted comment text, never by line number.
 | **2** | Retire the spoilboard base | 1.2 + 1.3 |
 | **3** | Marlin multi-WCS: delete Guard C, add a version floor | a Marlin changelog reading |
 | **4** | Group 6: keep the touch-off, delete the orchestration | 2 and 3 |
-| **5** | Group 7: split it, and build 7b on include files | — (parallel with 1–4) |
+| **5** | Group 7: rebuild the tool change as two flows | — (parallel with 1–4) |
 | **V** | Post-verify what has landed unposted | — |
 | **6** | Clarity | 1–5 |
 | **7** | Documents, once | 1–6 |
@@ -159,44 +159,38 @@ post source rather than observed. **Step 5 is independent** and can run in paral
 - **Done when** — no offered option is non-functional on any supported firmware, and the 24
   hobby files in `HB-Tests/` re-post **byte-identically** for the surviving modes.
 
-## Step 5 — Group 7: split it, and build 7b on include files
+## Step 5 — Group 7: rebuild the tool change as two flows
 
-Independent of 1–4. **This group has not been reviewed or tested**: eight properties, ~65
-lines, five open findings, and **zero posted files exercising a tool change**.
+Independent of 1–4. **The shipped design is being replaced, not repaired** — the design is
+`design.md` → *Tool changes*, and `PR-15` is the one finding that the code does not comply
+with it. Eight properties, ~65 lines, **zero posted files exercising a tool change**, and
+after the register deletion **zero test rows** either.
 
-**5.1 — 7a: end this file so a manual tool change costs nothing.** Personal licence. It is an
-**option, not a policy**. **Never home at end-of-file on Marlin** — homing detaches the next
-file from the origin this one established. **Fix the frame of the park position**:
-`toolChangeX/Y/Z` emit plain `G0` words and are WCS-relative, and the post's own comment at
-:3657 says *"the spot drifts"*. Either emit `G53` and require homing, or rename the fields to
-say they are work-frame — **not both meanings on one field** (`PR-4`). **Leave the work origin
-untouched**: no `G10 L20`, no `G92`. That is the whole point of 7a.
+- **Goal** — the post arrives correctly, hands over, and resumes correctly. It performs no
+  tool change itself, in either flow.
+- **Where** — `toolChange()`; `probeTool()`; `onSection()`'s call order around `writeWCS()`;
+  group 7 entire; `includeProbeFile` in group 8.
 
-**5.2 — 7b: mid-program tool change.** A measured tool change needs a probe, a
-**subtraction**, and a register to hold the result, and the firmwares split on the
-subtraction: **RepRap** has meta-g-code arithmetic and a real tool table (`G10 L1 P<t> Z`,
-persisted by `M500 P10`), so its **machine** can do it via a `tpost` macro; **GRBL** has no
-arithmetic and `G43.1` needs a literal, so the **sender's** macro must; **Marlin** has no TLO
-register at all, so only the **operator** can, by re-probing and re-zeroing work Z. *(This
-corrects `design.md`'s bare "no TLO" — Step 7 carries the rewrite.)* **None of the three
-answers is the post**, which cannot compute an offset it will not learn until the operator
-swaps the tool, hours after posting.
+**5.1 — Flow 1: end this file so a manual tool change costs nothing.** The Personal-licence
+answer, and an **option, not a policy**. The work origin survives untouched — no `G10 L20`, no
+`G92`, and **no homing at end of file**, which on Marlin detaches the next file from the origin
+this one established. **The park gets one frame and says which**: `toolChangeX/Y/Z` emit plain
+`G0` words and are WCS-relative, and the post's own comment at :3657 says *"the spot drifts"*.
 
-**So 7b's deliverable is a contract, not a routine:** a stop in a known place in a stated
-frame; a **named include-file hook at exactly that point**, reusing group 8, which already
-works; and **a written contract for that file** — which frame is active, where the tool is,
-what it may change, what it must restore. Without that contract the hook is a trapdoor.
+**5.2 — Flow 2: call the macro and get out of the way.** Pre-change setup, the call, the
+resume — nothing else. **The deliverable is the contract, not a routine:** what state the
+macro may assume, what it may change, what it must restore. Without it the call is a trapdoor.
+**Blocked on which token the sender keys on** — `findings.md` §6 holds the question, and it is
+the first one in this project that no firmware source can close.
 
-**Fix the WCS bug first, on its own** — `probeTool()` writes into the previous section's WCS
-(`CR-07`, and the post's own comment at :3691). A probe result in the wrong register is a
-crash on the next plunge. A bug, not a design question.
+**5.3 — the shared corrections both flows need**, listed at the foot of `design.md`'s section.
+**Take the ordering one first and on its own:** `onSection()` calls `toolChange()` before
+`writeWCS()`, so a re-probe writes into the previous section's register — the post's own
+comment at :3691 says so — and a probe result in the wrong register is a crash on the next
+plunge. That is a bug, not a design question, and it does not wait for the contract.
 
-**5.3** — with 7a and 7b separated, `PR-4`, `HR-7`, `HR-8`, `HR-9` and `HR-13` each become a
-small change in **one** path rather than a change to shared code. That is why the split comes
-first.
-
-- **Done when** — a **posted two-tool job** exists. The acceptance test is emitted output,
-  not a code review.
+- **Done when** — a **posted two-tool job** exists, `PR-15` closes, and §4 carries the test
+  rows the deletion left owing. The acceptance test is emitted output, not a code review.
 
 ## Step V — Post-verify what has landed unposted
 
@@ -236,10 +230,10 @@ The guides are off-limits during code changes. Do it all here — per-step means
 
 | Document | What falls due |
 |---|---|
-| `design.md` | **The Marlin single-frame row rewritten** — nine registers, not one. **Add** the homing/`position_shift` hazard, the minimum firmware version, the corrected TLO table, and what Step 1.3 emitted. **Remove** the spoilboard-base sections |
-| `property-reference.md` | Regenerate. ~66 → ~60 properties; groups 5 and 11 gone; group 6 retitled. **Its stated count of 69 is already wrong** |
+| `design.md` | **The Marlin single-frame row rewritten** — nine registers, not one. **Add** the homing/`position_shift` hazard, the minimum firmware version, and what Step 1.3 emitted. **Remove** the spoilboard-base sections, and the *Tool changes* section's "the code implements neither" framing once it does |
+| `property-reference.md` | Regenerate. Groups 5 and 11 gone; group 6 retitled; group 7 rebuilt as two flows. **Its stated count of 69 is already wrong** |
 | `guide-pro.md` | State the **operator's** obligations explicitly — every work offset set before the job, one clearance clearing every fixture, machine homed. F360 nowhere states this and the emitted g-code depends on it. And say plainly what is verified and what is not |
-| `guide-hobbyist.md` | Group 7a's end-of-file behaviour; the Marlin do-not-home rule; the minimum Marlin version |
+| `guide-hobbyist.md` | Flow 1's end-of-file behaviour; the Marlin do-not-home rule; the minimum Marlin version |
 | `README.md` | Feature list and the hobbyist/professional split |
 
 ---
@@ -274,6 +268,7 @@ The guides are off-limits during code changes. Do it all here — per-step means
 | Steps 2 and 4 | Step 1.2 — whether the homed path actually posts |
 | Step 3's version floor | the Marlin changelog for #14743 |
 | Step 5's verification | a full-licence posted two-tool file |
+| Step 5's Flow 2 | which token the sender keys on — `findings.md` §6 |
 | `findings.md` §4.1 rows `PA1`, `PB2` | re-scoping against `CR-13` |
 | Group 10 reduction | a coolant persona |
 | Group 9 audit | laser detail — power scaling, dynamic power, enable sequencing, air assist |
@@ -305,7 +300,7 @@ in `guide-pro.md` ⏸️ deferred by the author · `C5` thirteen merged local br
 consolidation — **done**.
 
 **Step 0 — free wins, 2026-08-13.** `0.1` = `C1` ✅ · `0.2` delete `toolChangeDisableZStepper`
-⏸️ deferred to the tool-change solution, and **its registered fix is unsafe** — see `HR-10` ·
+⏸️ deferred to Step 5; `M84 Z` is a hazard on both firmwares and goes with the rework ·
 `0.3` name the reason WCS probing is refused ✅ `f54beb0` · `0.4` collapse the frame predicates
 ✅ · `0.5` group 11 ✅ closed with no edit, handed to `PR-13` · `0.6` the `onCommand` gap ✅
 `f54beb0`, half applied and half refused — `HR-13`.
