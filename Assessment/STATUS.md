@@ -8,17 +8,36 @@ Reviewed HEAD = `CoverageFixes` (3,758 lines).
 2026-08-13 (scope reconciliation, three firmware corrections, and the first posted-output
 evidence in the review).**
 
-**Now on branch `Assessment`**, cut from `CoverageFixes` on 2026-08-13 and carrying two
-commits: `d010fee` restores `docs/PReview.md` (1,118 lines), `40fc3c7` adds these twelve
-documents. Nothing else in the tree has changed and **no post code has been edited.**
+**Now on branch `Assessment`**, cut from `CoverageFixes` on 2026-08-13. `d010fee` restores
+`docs/PReview.md` (1,118 lines), `40fc3c7` adds these twelve documents, `b0ffc33` schedules
+Phase C, and a fourth commit executes C2, C3 and C5. **No post code has been edited.**
 `CoverageFixes` is itself unmerged into `master`, so this branch sits on unmerged work —
 harmless for documents, relevant the moment a code step lands.
 
-**`09-plan.md` now opens with Phase C — Cleanup**, C0–C9, scheduled from
-`10-project-cleanup.md`. It touches no post code, which is why it runs before the critical
-path. Two of its items are corrections rather than tidying: `docs/plan.md`'s Checkpoint
-points at a branch three moves out of date and about to be deleted (**C3**), and the
-`PReview.md` restore falsified four statements in three documents (**C2**).
+**Phase C is done except C4 and one read.** `C0` `C1` `C2` `C3` `C5` complete; **`C4`
+deferred by the author**; `C6` dated and re-scoped, its read still owed before Steps 2 and 5;
+`C7` `C8` `C9` are records, not actions. Nothing in it touched the post.
+
+**Three things Phase C turned up that the plan did not predict:**
+
+1. **C2's four pointers were six.** Found by running C2's own Done-when rather than trusting
+   its table. The two extra were `docs/conventions.md`:24 — whose contract row said
+   ***"nothing may be filed against it"***, a standing ban on using the register `CLAUDE.md`
+   had just been repointed at — and `.claude/commands/close-finding.md`:12, inside the
+   procedure that files findings. A seventh statement, `docs/plan.md`:73–75, was excusing
+   that file's budget overrun on the registers being absent.
+2. **The Checkpoint's Baseline was wrong three ways, not one.** Besides the branch, it said
+   *"`master` is 16 commits ahead of `origin/master` and nothing has been pushed."* It is
+   **6** ahead, and `git reflog show origin/master` records a push on **2026-08-09**
+   (`94241ec`).
+3. **C6 is one branch, not two.** `origin/GRBL_Fixes` is an **ancestor** of
+   `origin/UpdateToolChange`. Both last moved **2023-11-19** and both edit `MPCNC.cps`, a
+   filename that no longer exists — so nothing there can be merged, only re-read by hand.
+
+**One thing left open for the author: `docs/plan.md` is 143 lines against a 120 budget.**
+C3 did not cause the overrun but removed its stated excuse — ~30 lines at :46–77 exist only
+because both registers were out of the tree, and both are back. Trimming another author's
+Checkpoint history is not a mechanical edit, so it was flagged in the file and not done.
 
 ## New evidence that arrived on 2026-08-13
 
@@ -151,21 +170,32 @@ less code than has been written for it.
 | 6 — retention | `06-retention.md` | DONE — **per-property verdicts added** | Reset closed. **Group 6: 10 properties → 9, 14 enum decisions → 9.** Four of ten options don't work on GRBL — the post says so itself |
 | 7 — code map | `07-code-map.md` | DONE — **verdicts revised a second time** | Group 6 is **blocked**, not untested; **Group 5 retires**; Group 7 gets concrete recommendations and 7b moves onto Group 8's include-file hook |
 | 8 — the target | `08-target.md` | DONE — revised | ~3,300–3,450 lines, ~60 properties, **9 groups**, 0 findings, 6 posted multi-part jobs, ≥1 posted tool-change job |
-| 9 — the path | `09-plan.md` | DONE — **rewritten, then given a Phase C** | **Phase C (C0–C9) + 8 steps**, each with Goal / Why / Where / The change / Done when / Findings / **Prompt** |
+| 9 — the path | `09-plan.md` | DONE — **rewritten, given a Phase C, and Phase C now executed** | **Phase C (C0–C9) + 8 steps**, each with Goal / Why / Where / The change / Done when / Findings / **Prompt**. `C0` `C1` `C2` `C3` `C5` done, `C4` deferred, `C6` dated and re-scoped |
 | 10 — project cleanup | `10-project-cleanup.md` | DONE — **now scheduled, not just recommended** | **`PReview.md` restored and committed.** Its items are `09-plan.md` Phase C; this page keeps the reasoning. `design.md` owes six changes including a rewritten line 23 |
 
 ## What to do first
 
-1. ~~Commit the restored `docs/PReview.md`~~ — **done**, `d010fee`. Phase C item C1.
-2. **Phase C, items C2 and C3** — the two stale-pointer fixes. Neither touches the post,
-   both mislead a fresh session today, and **C3 must land before C5** deletes the branch
-   the Checkpoint names.
-3. **Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it.** The critical
-   path: cheap, and able to invalidate Steps 2–4 — which is exactly why it goes first.
-   Needs a Fusion keyboard; the paste-ready prompt is written.
-4. **C4 — a status line in `guide-pro.md`.** Cheapest item in the plan, clearest safety
-   argument, and **the one item that needs explicit permission** because it touches a
-   guide. Its first half needs nothing from Step 1.1.
+1. ~~Commit the restored `docs/PReview.md`~~ — **done**, `d010fee` (C1).
+2. ~~**Phase C, C2 and C3**~~ — **done**, and C3 landed before C5 as required.
+3. ~~**C5, the thirteen merged branches**~~ — **done**, `git branch -d`, tips recorded in the
+   commit message. `git branch` now lists three. **No remote branch was touched**, and remote
+   deletion remains the one irreversible action on that page.
+4. **Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it.** Now the first
+   unfinished thing in the plan. The critical path: cheap, and able to invalidate Steps 2–4 —
+   which is exactly why it goes first. Needs a Fusion keyboard; the paste-ready prompt is
+   written.
+5. **C6's read, owed before Steps 2 and 5** — and now a much smaller job than the page
+   assumed. Read **two commit diffs, not two branches**: `64cd9e6` *"Tool change updated"*
+   (the only surviving record of a pre-current tool-change attempt, and Step 5 rewrites that
+   path) and `ce2c3f7` *"Change to G38.2 from G38.3 for non-GRBL"* (a firmware-dialect
+   decision, Tier 2 by `06-retention.md`). The FluidNC premise is spent — FluidNC is already
+   in the post and in four documents.
+6. **`docs/plan.md`'s 20-line overrun** — decide the trim or raise the budget. See above.
+7. ⏸️ **C4 — a status line in `guide-pro.md`. Deferred by the author 2026-08-13.** Not
+   rejected and not blocked: its first half needs nothing from Step 1.1, so it waits on a
+   decision rather than on evidence. Until it lands, `guide-pro.md` describes the
+   multi-fixture path in the same voice as the 24-file-verified hobby path — a known,
+   accepted gap now rather than an oversight.
 
 ## Environment
 
@@ -178,10 +208,14 @@ less code than has been written for it.
 - Local `[SDK]` evidence: **carried the review** — 490 cached Autodesk posts and **211
   machine definitions** at `AppData/Local/Autodesk/Autodesk Fusion 360/CAM/cache/`.
   **No `marlin.cps` exists.**
-- **Repo changes made:** branch `Assessment`; `docs/PReview.md` restored and committed
-  (`d010fee`); `Assessment/` committed (`40fc3c7`). Both at the author's instruction.
-  Nothing else in the tree. **No post code edited, no register rows written, no memory
-  writes.**
+- **Repo changes made**, all at the author's instruction: branch `Assessment`;
+  `docs/PReview.md` restored (`d010fee`); `Assessment/` committed (`40fc3c7`); Phase C
+  scheduled (`b0ffc33`); then **C2/C3/C5 executed** — edits to `CLAUDE.md`, `docs/plan.md`,
+  `docs/conventions.md`, `Coverage/CoverageFixes.md` and
+  `.claude/commands/close-finding.md`, plus thirteen local branch deletions. **No post code
+  edited, no register rows written, no memory writes, no remote refs touched.**
+- **Document budgets after C2/C3:** `CLAUDE.md` 60/60, `conventions.md` 295/300,
+  `plan.md` **143/120** — the one overrun, and the open item above.
 - **Measurement convention.** PowerShell's `Measure-Object -Line` counts only **non-empty**
   lines — it reported `PReview.md` at 972 where git counted 1,118, and a "correction" on
   this page was wrong for a day because of it. Use `(Get-Content $f).Count` or

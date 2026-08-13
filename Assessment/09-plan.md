@@ -89,10 +89,12 @@ C. Cleanup ────────────────┐ touches no post c
 7. Documents, once ────────┘
 ```
 
-**Phase C is first because it costs nothing and two of its items are actively
+**Phase C was first because it cost nothing and two of its items were actively
 misleading**: `docs/plan.md`'s Checkpoint — the one file `CLAUDE.md` tells every session
-to read first — says work continues on a branch that is three branches out of date, and
-four documents still say `PReview.md` is out of the tree when it is now committed.
+to read first — sent work to a branch three branches out of date, and six documents said
+`PReview.md` was out of the tree after it had been committed. **Both are fixed** (C2, C3),
+and running C2 turned up two pointers this plan had not counted — one of them a standing
+ban on filing against the register `CLAUDE.md` now points at.
 
 **Step 1 is first among the code steps because it is the only one that can invalidate the
 others.** Steps 2–4 assume F360 emits a multi-WCS job the way
@@ -110,8 +112,13 @@ are here. **Nothing in Phase C touches `MPCNC_v4.0_Beta2.cps`**, which is why it
 before the critical path rather than after it — and why it is the cheapest phase in the
 plan by a wide margin.
 
-Two of these are not tidying. **C2 and C3 are corrections to documents that currently
-misdirect a session**, and C4 is a safety statement about behaviour nobody has verified.
+Two of these are not tidying. **C2 and C3 were corrections to documents that misdirected a
+session**, and C4 is a safety statement about behaviour nobody has verified.
+
+**State on 2026-08-13.** `C0` `C1` `C2` `C3` `C5` **done**; `C4` **deferred by the author**;
+`C6` dated and re-scoped, its read still owed before Steps 2 and 5; `C7` `C8` `C9` are
+records rather than actions and need nothing. **Phase C is complete except C4 and C6's read**,
+and it left `MPCNC_v4.0_Beta2.cps` untouched, as it said it would.
 
 *Naming, to avoid one collision: `C1`–`C9` are cleanup items. **Guard C** is the Marlin
 multi-WCS guard in `validateJob()` and belongs to Step 3. They are unrelated.*
@@ -135,64 +142,104 @@ for review documents; it matters the moment a code step lands here, because the 
   found. **This assessment reached its central conclusion only because a `git show`
   happened to be in the instructions.**
 - **Done** — `d010fee`, 1,118 lines, no finding prefix (it builds no finding of its own).
+- **One consequence to note, not fix.** `conventions.md` budgets `PReview.md` at *"≤ 920
+  lines, and falling"* and the file is **1,118**. C1 did not cause that — the file was this
+  size when it left the tree — but the overrun is now visible in a document contract instead
+  of hidden in git. By that same contract an overrun *"asks what has stopped being live"*,
+  and the answer is already written into the budget: §2's long form and §3's expansions are
+  unbuilt design and unrun rows, which **retire on build**. Steps 1–5 are that build. Leave
+  the number alone until then; re-measure it at Step 7.
 
-### C2 — Fix the four pointers C1 just falsified
+### C2 — Fix the pointers C1 falsified ✅ **DONE 2026-08-13**
+
+**There were six, not four.** The two this page missed were found by running its own Done-when instead of
+trusting its table, and one of them mattered more than any of the four: **`docs/conventions.md`:24's
+contract row said *"nothing may be filed against it"*** — a standing prohibition on using the register
+`CLAUDE.md` had just been changed to point at. The other was `.claude/commands/close-finding.md`:12, inside
+the procedure that files findings. A seventh statement, `docs/plan.md`:73–75, justified that file's budget
+overrun on the registers being absent; it is fixed too, and **the trim it was excusing is now owed**.
 
 - **Goal** — no document tells a reader to `git show` a file that is now in the tree.
 - **Why** — C1 was the right move and it **invalidated four statements in three
   documents**. This is the ordinary cost of a restore, and it is exactly the class of
   staleness `CLAUDE.md` warns about: *"a row split across two files is how seven ids went
   stale."*
-- **Where** — verified present on 2026-08-13:
+- **Where** — all six found present and all six fixed on 2026-08-13:
 
-  | File | Line | What it says now |
-  |---|---|---|
-  | `CLAUDE.md` | 14–15 | *"`docs/PReview.md` is **out of the tree** … recover it with `git show 347ce5d:docs/PReview.md`"* |
-  | `CLAUDE.md` | 34 | a professional finding *"stays in the register it was filed in until `PReview.md` returns"* — **it has returned** |
-  | `docs/plan.md` | 120–121 | *"is **out of the tree** meanwhile — every pointer to it above reads through `git show 347ce5d:docs/PReview.md`"* |
-  | `Coverage/CoverageFixes.md` | 227 | *"belongs to the professional register when `PReview.md` returns"* |
+  | File | Line | What it said | Now |
+  |---|---|---|---|
+  | `CLAUDE.md` | 14–15 | *"**out of the tree** … recover it with `git show 347ce5d:…`"* | a plain read-order entry naming what the register holds |
+  | `CLAUDE.md` | 34 | *"stays in the register it was filed in until `PReview.md` returns"* | rule kept, clause dropped, **plus the §6 policy** |
+  | `docs/conventions.md` | 24 | *"until then … **nothing may be filed against it**"* | **in the tree, filed against directly** — the worst of the six |
+  | `.claude/commands/close-finding.md` | 12 | *"is out of the tree until the professional review runs"* | *"holds the professional findings"* |
+  | `docs/plan.md` | 120–121 | *"a parking lot … **out of the tree** meanwhile"* | the deliberate deferral, and §3.1 as the critical path |
+  | `Coverage/CoverageFixes.md` | 227 | *"belongs to the professional register when `PReview.md` returns"* | names `docs/PReview.md` directly |
 
-- **The change** — four small edits. `CLAUDE.md` line 14–15 becomes a plain read-order
-  entry; line 34's rule **survives unchanged in substance** (a professional finding still
-  stays in the register it was filed in) and loses only the *"until … returns"* clause.
-  `Coverage/CoverageFixes.md`:227 can now name `PReview.md` directly.
-- **And settle the policy while it is open.** `10-project-cleanup.md` §6 asks the question
-  the restore does not answer: **if a document is too unfinished to live in the tree, it
-  is too unfinished to hold the only copy of seven open findings.** Either the findings
-  move to the main register or the document stays. **Not both out of sight.** One sentence
-  in `CLAUDE.md` closes it permanently.
-- **Done when** — `grep -rn "out of the tree" .` returns nothing about `PReview.md`, and
-  no document mentions `347ce5d`.
+- **The policy, settled** — `10-project-cleanup.md` §6 asked what the restore does not
+  answer. It is now one clause in `CLAUDE.md` → *Registers ship with the code*: **"no
+  register lives outside the tree: too unfinished to commit is too unfinished to hold the
+  only copy of an open finding."** Stated as a rule about registers rather than about this
+  one file, so it binds the next register too. `conventions.md`:24 carries the same
+  judgement in the contract row, where the prohibition used to be.
+- **Done when** ✅ — `grep -rn "347ce5d|out of the tree"` over everything outside
+  `Assessment/` returns **nothing**. It matches inside `Assessment/` by design: these pages
+  quote the old wording to explain why it was changed.
+- **Budgets held** — `CLAUDE.md` 60/60 (the policy clause spent the last line),
+  `conventions.md` 295/300. **`docs/plan.md` did not**: see C3.
 - **Findings** — none. Documentation correctness, not a defect in the post.
 
-### C3 — `docs/plan.md`'s Checkpoint points at the wrong branch
+### C3 — `docs/plan.md`'s Checkpoint points at the wrong branch ✅ **DONE 2026-08-13**
+
+**The Baseline was wrong about more than the branch.** It also said *"`master` is 16 commits ahead of
+`origin/master` and **nothing has been pushed**"* — and `git reflog show origin/master` records
+`94241ec … update by push`, dated **2026-08-09**. `master` is **6** ahead, and the push did happen. A
+paragraph whose job is to say where the work is was wrong on the branch, the count and the push state at
+once, which is the strongest argument this plan has for why the Checkpoint is read first and trusted least.
 
 - **Goal** — the file every session is told to read first describes where the work
   actually is.
 - **Why** — this is the **resumability contract**. `CLAUDE.md`: *"`docs/plan.md` →
-  Checkpoint — always, first. The only place that says what is next."* It currently reads
-  *"Work continues on **`hobby-dialog-review`**"* — and work has since moved through
-  `Coverage_Review` and `CoverageFixes` to `Assessment`. `hobby-dialog-review` is one of
-  the thirteen branches C5 proposes deleting. **So a fresh session obeying `CLAUDE.md` is
-  sent to a branch that is about to stop existing.**
+  Checkpoint — always, first. The only place that says what is next."* It read *"Work
+  continues on **`hobby-dialog-review`**"* — and work had since moved through
+  `Coverage_Review` and `CoverageFixes` to `Assessment`. `hobby-dialog-review` was one of
+  the thirteen branches C5 deleted. **A fresh session obeying `CLAUDE.md` was being sent to
+  a branch that no longer exists** — which is exactly why C3 landed first.
 - **Where** — `docs/plan.md` [:15-19](docs/plan.md#L15) (Baseline) and
   [:107-121](docs/plan.md#L107) (Phase status).
-- **The change** — three touches, all inside the contract `conventions.md` sets for this
-  file (checkpoint, phase status, review pointers — nothing else):
-  1. **Baseline**: current branch, and that `CoverageFixes` is unmerged.
-  2. **Phase status**: *"Professional review — not started"* is now too blunt. `[AUTHOR]`
-     confirms the deferral was **deliberate** — *"the goal was a Beta3 stable for hobby
-     users"* — and the 24 posted files prove it was executed. Say that, and say that
-     §3.1's six jobs are the critical path.
-  3. **A pointer to `Assessment/`**, one line, so the review is not itself the next thing
-     to go missing. *(Its own status ledger is `Assessment/STATUS.md`; `plan.md` should
-     point, not duplicate — `conventions.md` warns that two files pointing at each other
-     is how content ends up in neither.)*
-- **Done when** — a session that reads only `docs/plan.md` finds the right branch, the
-  right next action, and this review.
+- **The change made** — four touches, all inside the contract `conventions.md` sets for
+  this file (checkpoint, phase status, review pointers — nothing else):
+  1. **Baseline** — `Assessment`, 21 ahead of `master`, `CoverageFixes` unmerged and
+     contributing 18 of them, the thirteen labels deleted, and the corrected push state.
+  2. **Phase status** — *"not started"* was too blunt. Now: the deferral was **deliberate**,
+     the 24 posted files show it executed, what is missing is any *statement* of it, and
+     **§3.1's six never-posted jobs are the critical path**.
+  3. **A pointer to `Assessment/`**, three lines, naming `09-plan.md` and `STATUS.md` and
+     nothing else — *`conventions.md` warns that two files pointing at each other is how
+     content ends up in neither, so this one points and does not summarise.*
+  4. **:73–75**, C2's sixth pointer, which lived in this file.
+- **Done when** ✅ — a session reading only `docs/plan.md` finds the right branch, the right
+  next action and this review.
+- **One thing left open, and it is the author's call.** `plan.md` was **132 lines against a
+  120 budget** before this edit and is **143 after**. The overrun is not new and C3 did not
+  cause it — but C3 removed its stated excuse. The two long paragraphs at :46–77 exist
+  because `PReview.md` and the `HR-`/`CR-` register were out of the working tree and those
+  paragraphs *"are the only surviving summary of what those registers hold."* **Both
+  registers are back**, so roughly thirty lines now duplicate `HReview.md` and `PReview.md`
+  and could go. **Deleting thirty lines of another author's Checkpoint history is not a
+  mechanical edit**, so the sentence was corrected to say the trim is owed and unstarted,
+  and the trim itself was not done. Do it deliberately or raise the budget deliberately.
 - **Findings** — none.
 
-### C4 — A status line in `guide-pro.md` — **needs the author's explicit go-ahead**
+### C4 — A status line in `guide-pro.md` — ⏸️ **DEFERRED 2026-08-13, by the author**
+
+**Deferred, not rejected, and not blocked.** The go-ahead this item asks for was not given; the author
+deferred it on 2026-08-13 while directing C2, C3 and C5. Nothing in `guide-pro.md` was touched. The argument below stands unchanged and the item stays here rather than moving
+to the *Blocked list*, because **nothing external gates its first half** — it waits on a decision, not on
+evidence. Whoever picks it up should re-read the safety argument first and not treat this as a new idea.
+
+**What deferral costs, stated once so the trade is explicit:** until it lands, `guide-pro.md` describes the
+multi-fixture path in the same voice as the 24-file-verified hobby path, and a reader cannot tell them
+apart. That is the gap `05-history.md` identifies; it is now a known, accepted gap rather than an oversight.
 
 - **Goal** — a reader of the professional guide can tell verified behaviour from
   unverified behaviour.
@@ -218,7 +265,15 @@ for review documents; it matters the moment a code step lands here, because the 
 - **Findings** — none of its own; it is the visible half of the gap
   `05-history.md` identifies.
 
-### C5 — Delete thirteen merged local branches
+### C5 — Delete thirteen merged local branches ✅ **DONE 2026-08-13**
+
+All thirteen deleted after C3 landed, with `git branch -d` — never `-D` — so git itself would have refused
+any branch that was not fully merged. Tips recorded in the commit for recovery beyond the reflog:
+`Coverage_Review 5178e72` · `beta3 4b36697` · `comment-clean-up b7d12fb` · `hobby-dialog-review 1ea32a8` ·
+`retire-doc-gate 46bcf2a` · `v4.0-beta2 8189d91` · `v4.0-dev 6b0c0e5` · `v4.0-doc-streamline cedeca4` ·
+`v4.0-f360-compliance 1beb47b` · `v4.0-float-compare adef981` · `v4.0-hreview-fixes 1ccff44` ·
+`v4.0-readme-update b9b6373` · `wcs-reworked-flow cd57a48`. `git branch` now lists **three**:
+`master`, `CoverageFixes`, `Assessment`. **No remote branch was touched.**
 
 - **Goal** — `git branch` shows the two branches that matter instead of fifteen.
 - **Why** — thirteen local branches are **fully merged into `master`**; the work is all
@@ -241,6 +296,32 @@ for review documents; it matters the moment a code step lands here, because the 
   two.
 
 ### C6 — Read the two unmerged remote branches **before** Steps 2 and 5
+
+**Dated 2026-08-13, and the dates change the item. There is only one branch to read, not two.**
+
+| Branch | Last commit | Age | Tip |
+|---|---|---|---|
+| `origin/UpdateToolChange` | **2023-11-19 17:38 −0800** | 2 yr 9 mo | `690e586` *"more"* |
+| `origin/GRBL_Fixes` | **2023-11-19 14:00 −0800** | 2 yr 9 mo | `385edaf` *"Elliminasted the End() function and merged code"* |
+
+- **`GRBL_Fixes` is an ancestor of `UpdateToolChange`** (`git merge-base --is-ancestor` confirms). All
+  seven of its commits are contained in the other branch, which adds exactly two of its own — `64cd9e6`
+  *"Tool change updated"* and `690e586` *"more"*. **Reading `UpdateToolChange` reads both.** The two are
+  not independent lines of work, as this item assumed; they are one line and a tag three hours behind it.
+- **Both edit `MPCNC.cps`** — a filename that no longer exists. The deliverable has been
+  `MPCNC_v4.0_Beta2.cps` since well after these commits, so neither branch can be merged or cherry-picked;
+  anything wanted from them must be **read and re-applied by hand**. That is a different task from the
+  "may already contain part of the answer" this item was written around.
+- **The FluidNC premise is already spent.** Four of the seven shared commits are FluidNC work, and FluidNC
+  is **already in the post** and in `design.md`, `conventions.md`, `README.md` and `guide-hobbyist.md`.
+  Whatever these branches knew about FluidNC either landed or was re-derived.
+- **Still worth the read, for one narrowed reason:** `64cd9e6` *"Tool change updated"* is the only record
+  of a tool-change attempt from before the current design, and **Step 5 rewrites that path**. Read that one
+  commit's diff — not the branch — and `ce2c3f7` *"Change to G38.2 from G38.3 for non-GRBL"*, which is a
+  firmware-dialect decision and therefore Tier 2 by `06-retention.md`.
+- **Delete neither**, unchanged. Both are the only labels holding these commits reachable on the remote.
+
+*Original reasoning, retained:*
 
 - **Goal** — no step re-derives, or silently re-adopts, work that already exists.
 - **Why** — both carry unmerged work and both land squarely on planned steps:
@@ -813,7 +894,7 @@ decisions rather than a campaign to shrink the file.
 
 | Blocked | Waiting on | What it changes |
 |---|---|---|
-| **C4's second half** | **Step 1.1** | Whether the guide can call the multi-WCS feature *blocked* rather than *unverified*. **The first half is not blocked** — the deferral is already `[AUTHOR]`-confirmed |
+| **C4's second half** | **Step 1.1** | Whether the guide can call the multi-WCS feature *blocked* rather than *unverified*. **The first half is not blocked** — the deferral is already `[AUTHOR]`-confirmed, but **the whole item is deferred by the author** as of 2026-08-13, so this row is moot until that reverses |
 | **Steps 2 and 4** | **Step 1.1 + 1.2** | Whether the homed path actually posts |
 | **Step 3's version floor** | Marlin changelog for #14743 | Whether Marlin multi-WCS can be claimed at all |
 | Step 5's verification | a full-licence posted two-tool file | 7b cannot be checked without one |

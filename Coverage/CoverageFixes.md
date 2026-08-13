@@ -224,7 +224,7 @@ records that RRF up to and including 3.1.1 interprets the `G38.2` target as **ma
 this post emits a work-frame target. That was already wrong before this fix; what changed is the size of
 the consequence, since the base probe's word went from `Z-10` to `Z-100`. The mitigation is the one the
 dialog already states — set `Probe with G38.2` **off** on RRF ≤ 3.1.1 — and on that setting this fix emits
-no target at all. It belongs to the professional register when `PReview.md` returns; it is noted here so it
+no target at all. It belongs to the professional register, `docs/PReview.md`; it is noted here so it
 is not rediscovered.
 
 **What a fail would have looked like.** `Z-10` in W11a: the third argument not arriving. `Z-100` in W11b:

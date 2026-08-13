@@ -12,11 +12,19 @@ thing to change first if you think something new belongs here.
 
 *Written so a fresh session can resume with no other context. Update it when the situation moves.*
 
-**Baseline.** **`master`**, now carrying the `design.md` split. Four working branches have closed the same
-way — `PropertyUpdate` → `machine-frame-design` → `Goto-0,0` for the machine-frame rework, then
-`control-review` for the doc split: each a linear chain, so `master` fast-forwarded onto the tip and the
-label was deleted; every commit is retained and no merge commit was made. **`master` is 16 commits ahead
-of `origin/master` and nothing has been pushed.** Work continues on **`hobby-dialog-review`**.
+**Baseline.** Work continues on **`Assessment`**, cut from `CoverageFixes` and **21 commits ahead of
+`master`** — `CoverageFixes` contributes 18 and is **itself unmerged**, so a merge to `master` carries two
+ranges, not one. Working branches close as a linear chain `master` fast-forwards onto, the label then
+deleted: every commit retained, no merge commit made — and because there is no merge commit, this line is
+the only record of the labels. Closed that way: `PropertyUpdate` → `machine-frame-design` → `Goto-0,0`
+(machine-frame rework), `control-review` (the `design.md` split), then `Coverage_Review`. On 2026-08-13 the
+**thirteen** merged labels still in `git branch` were deleted, leaving `master`, `CoverageFixes` and
+`Assessment`; their tips are in that commit's message. **`master` is 6 commits ahead of `origin/master`**
+(`94241ec`, pushed 2026-08-09): the coverage-review range is unpushed.
+
+**The review this branch carries.** `Assessment/` — a complete twelve-document over-engineering assessment.
+**`09-plan.md`** is the ordered plan it recommends, **`STATUS.md`** its state; read those, not a copy here.
+Its **Phase C** repointed this Checkpoint.
 
 **What the machine-frame range landed.** The property rework (`groupDefinitions`, explicit `order:`, the
 `<groupKey><Name>` key rename), then the machine frame and the fixed Z reference — `PReview.md`
@@ -70,9 +78,10 @@ dialog for **both** Safe-Z fields, neither having warned there). **Three change 
 `HB-` rows are still `⬜`, `HB-9 (A)` being the register's first `Off` post. **`HB-6` closed by design** —
 `G17`/`G94` are not codes Marlin or pre-3.5.1 RRF have, so emitting them off GRBL buys an unknown-command
 line per job (`design.md` → *Firmware capabilities*). **`HB-10` deferred to the professional review**: the
-dead `Tool Change Probe` property is group-7 work either way, so it goes with item 4. **`PReview.md` and the
-`HR-`/`CR-` register are absent from this branch's working tree**, which is why plan.md is over budget:
-the two paragraphs above are the only surviving summary of what those registers hold.
+dead `Tool Change Probe` property is group-7 work either way, so it goes with item 4. **Both registers are
+now in the working tree** — `PReview.md` at `d010fee`, `HReview.md` throughout — so the two paragraphs above
+are no longer the only surviving summary of what they hold, and the overrun they were excusing can be trimmed
+against them. **That trim is owed and unstarted**, and it is the author's call rather than a mechanical one.
 
 **Where the record lives.** The hobbyist review (`HR-1`…`HR-39`) and the 2026-08-01 whole-file review
 (`CR-1`…`CR-17`) are one register in `HReview.md`: **49 findings**, all fixed or closed by design, except
@@ -117,8 +126,10 @@ silently. It needs a rotated Setup. Written up in `HReview.md` → *Owed*.
   Close it as a no-op when Phase 4 lands.
 - **Hobbyist review — complete.** `HReview.md`.
 - **Full code review — complete.** 14 fixes at `c73726c`, post-verification owed (item 1 above).
-- **Professional review — not started.** `PReview.md` is a parking lot until it runs, and is **out of the
-  tree** meanwhile — every pointer to it above reads through `git show 347ce5d:docs/PReview.md`.
+- **Professional review — deferred deliberately, not overlooked.** The goal was a Beta3 stable for hobby
+  users and the 24 posted files show it executed; what is missing is any statement of it, so `guide-pro.md`
+  still describes unverified paths in a verified voice. `PReview.md` is **in the tree** (`d010fee`), and its
+  **§3.1 — six never-posted jobs — is the critical path**; the F360 "Multiple WCS Offsets" one may not post.
 
 ## Completed reviews (archived)
 

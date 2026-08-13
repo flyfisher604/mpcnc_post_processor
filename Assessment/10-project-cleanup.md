@@ -212,6 +212,18 @@ branches are merged and can be pruned at leisure — but remote deletion is the 
 irreversible item on this page, so it should be a deliberate separate action, not
 folded into any code phase.
 
+> **Dated 2026-08-13, and the count was wrong: there is one line of work here, not two.**
+> `origin/GRBL_Fixes` is an **ancestor** of `origin/UpdateToolChange` — its seven commits are
+> contained in the other, which adds two of its own. Both last moved **2023-11-19**
+> (`UpdateToolChange` 17:38 −0800, `GRBL_Fixes` 14:00 −0800), two years nine months ago.
+>
+> **Both edit `MPCNC.cps`**, a filename the project no longer has, so neither can be merged
+> or cherry-picked — anything wanted must be re-applied by hand. And the FluidNC premise is
+> spent: four of the shared commits are FluidNC work, and FluidNC is already in the post,
+> `design.md`, `conventions.md`, `README.md` and `guide-hobbyist.md`. What survives is a
+> two-commit read, scheduled as **`09-plan.md` C6**. **Neither branch was deleted**, and no
+> remote ref was touched by C5.
+
 ## 6. One thing to add rather than remove
 
 `CLAUDE.md` currently says `PReview.md` is out of the tree *"until the professional
@@ -230,3 +242,15 @@ the main register, or the document comes back. Not both out of sight.
 > `docs/plan.md`:120–121, `Coverage/CoverageFixes.md`:227. Note that `CLAUDE.md`:34's rule
 > — a professional finding stays in the register it was filed in — **survives in
 > substance**; it loses only its *"until `PReview.md` returns"* clause.
+>
+> **✅ DONE 2026-08-13 — and there were six, not four.** Running C2's Done-when instead of
+> trusting the list above found `docs/conventions.md`:24, whose contract row said
+> ***"nothing may be filed against it"*** — a standing prohibition on using the register, and
+> the worst of the six — and `.claude/commands/close-finding.md`:12, inside the procedure that
+> files findings. A seventh, `docs/plan.md`:73–75, justified that file's budget overrun on the
+> registers being absent.
+>
+> **The policy is settled as a rule about registers, not about this file**, so it binds the
+> next one too. `CLAUDE.md` → *Registers ship with the code* now carries: **"no register lives
+> outside the tree: too unfinished to commit is too unfinished to hold the only copy of an open
+> finding."** `conventions.md`:24 states the same judgement where the prohibition used to be.

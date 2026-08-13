@@ -9,7 +9,7 @@ This is the register procedure from `CLAUDE.md` → *Registers ship with the cod
 required, and the register row lands in the **same commit** as the code — not after it.
 
 1. **Locate it.** Find $1's row in `docs/HReview.md`, or in the register it was filed in — `PReview.md`
-   is out of the tree until the professional review runs. Read the row before the code: it states what the
+   holds the professional findings. Read the row before the code: it states what the
    fix has to be true of. A professional finding (multi-WCS, spoilboard base, tool changes, Manual NC, the
    dialog) stays where it was filed rather than moving; a row split across two files is how seven ids went
    stale.

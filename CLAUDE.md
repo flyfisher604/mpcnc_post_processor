@@ -11,8 +11,8 @@ A Fusion 360 post for GRBL / Marlin / RepRap hobby CNC. The deliverable is
    a test, and the harness method and its hard-won lessons.
 3. **`docs/design.md`** — only when changing frame, Z-reference or ordering behaviour. Why the post emits
    what it does, and the firmware facts behind it.
-4. **`docs/HReview.md`** — only when a specific finding or test row is in play. `docs/PReview.md` is
-   **out of the tree** until the professional review runs; recover it with `git show 347ce5d:docs/PReview.md`.
+4. **`docs/HReview.md`** — only when a specific finding or test row is in play. **`docs/PReview.md`** is the
+   professional register: the seven open `HR-` ids, §3.1's unposted jobs, and the design backlog in §6.
 
 Do not read or search files under `./Test/` unless explicitly asked.
 
@@ -31,8 +31,9 @@ Do not read or search files under `./Test/` unless explicitly asked.
 Update the register **before the commit lands** — not after every intermediate edit, but once the change
 is settled, so the commit carries the code and its row together. Hobbyist → `docs/HReview.md`. A
 **professional** finding (multi-WCS, spoilboard base, tool changes, Manual NC, dialog) stays in the
-register it was filed in until `PReview.md` returns — a row split across two files is how seven ids went
-stale. **`/close-finding <id>` runs the procedure.** Don't ask whether to add the row — add it.
+register it was filed in — a row split across two files is how seven ids went stale. And **no register
+lives outside the tree**: too unfinished to commit is too unfinished to hold the only copy of an open
+finding. **`/close-finding <id>` runs the procedure.** Don't ask whether to add the row — add it.
 
 ## Commits
 
