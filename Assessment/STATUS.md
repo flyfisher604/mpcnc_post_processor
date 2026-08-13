@@ -8,6 +8,18 @@ Reviewed HEAD = `CoverageFixes` (3,758 lines).
 2026-08-13 (scope reconciliation, three firmware corrections, and the first posted-output
 evidence in the review).**
 
+**Now on branch `Assessment`**, cut from `CoverageFixes` on 2026-08-13 and carrying two
+commits: `d010fee` restores `docs/PReview.md` (1,118 lines), `40fc3c7` adds these twelve
+documents. Nothing else in the tree has changed and **no post code has been edited.**
+`CoverageFixes` is itself unmerged into `master`, so this branch sits on unmerged work —
+harmless for documents, relevant the moment a code step lands.
+
+**`09-plan.md` now opens with Phase C — Cleanup**, C0–C9, scheduled from
+`10-project-cleanup.md`. It touches no post code, which is why it runs before the critical
+path. Two of its items are corrections rather than tidying: `docs/plan.md`'s Checkpoint
+points at a branch three moves out of date and about to be deleted (**C3**), and the
+`PReview.md` restore falsified four statements in three documents (**C2**).
+
 ## New evidence that arrived on 2026-08-13
 
 This round was driven by evidence, not opinion. Three sources the review did not have:
@@ -139,17 +151,21 @@ less code than has been written for it.
 | 6 — retention | `06-retention.md` | DONE — **per-property verdicts added** | Reset closed. **Group 6: 10 properties → 9, 14 enum decisions → 9.** Four of ten options don't work on GRBL — the post says so itself |
 | 7 — code map | `07-code-map.md` | DONE — **verdicts revised a second time** | Group 6 is **blocked**, not untested; **Group 5 retires**; Group 7 gets concrete recommendations and 7b moves onto Group 8's include-file hook |
 | 8 — the target | `08-target.md` | DONE — revised | ~3,300–3,450 lines, ~60 properties, **9 groups**, 0 findings, 6 posted multi-part jobs, ≥1 posted tool-change job |
-| 9 — the path | `09-plan.md` | DONE — **rewritten with per-step detail and paste-ready prompts** | 8 steps, each with Goal / Why / Where / The change / Done when / Findings / **Prompt** |
-| 10 — project cleanup | `10-project-cleanup.md` | DONE — revised | **`PReview.md` restored.** `design.md` now owes six changes including a rewritten line 23. `guide-pro.md`'s status line should not wait for Step 7 |
+| 9 — the path | `09-plan.md` | DONE — **rewritten, then given a Phase C** | **Phase C (C0–C9) + 8 steps**, each with Goal / Why / Where / The change / Done when / Findings / **Prompt** |
+| 10 — project cleanup | `10-project-cleanup.md` | DONE — **now scheduled, not just recommended** | **`PReview.md` restored and committed.** Its items are `09-plan.md` Phase C; this page keeps the reasoning. `design.md` owes six changes including a rewritten line 23 |
 
 ## What to do first
 
-1. **Commit the restored `docs/PReview.md`** — it is in the tree but untracked.
-2. **Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it.** It is the
-   critical path, it is cheap, and it can invalidate Steps 2–4 — which is exactly why it
-   goes first.
-3. **A status line in `guide-pro.md`** the day 1.1 confirms the feature does not post.
-   Cheapest item in the plan, clearest safety argument.
+1. ~~Commit the restored `docs/PReview.md`~~ — **done**, `d010fee`. Phase C item C1.
+2. **Phase C, items C2 and C3** — the two stale-pointer fixes. Neither touches the post,
+   both mislead a fresh session today, and **C3 must land before C5** deletes the branch
+   the Checkpoint names.
+3. **Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it.** The critical
+   path: cheap, and able to invalidate Steps 2–4 — which is exactly why it goes first.
+   Needs a Fusion keyboard; the paste-ready prompt is written.
+4. **C4 — a status line in `guide-pro.md`.** Cheapest item in the plan, clearest safety
+   argument, and **the one item that needs explicit permission** because it touches a
+   guide. Its first half needs nothing from Step 1.1.
 
 ## Environment
 
@@ -162,6 +178,11 @@ less code than has been written for it.
 - Local `[SDK]` evidence: **carried the review** — 490 cached Autodesk posts and **211
   machine definitions** at `AppData/Local/Autodesk/Autodesk Fusion 360/CAM/cache/`.
   **No `marlin.cps` exists.**
-- **Repo changes made:** `docs/PReview.md` restored (untracked), at the author's
-  instruction. Nothing else outside `Assessment/`. **No code edited, no register rows
-  written, no commits, no memory writes.**
+- **Repo changes made:** branch `Assessment`; `docs/PReview.md` restored and committed
+  (`d010fee`); `Assessment/` committed (`40fc3c7`). Both at the author's instruction.
+  Nothing else in the tree. **No post code edited, no register rows written, no memory
+  writes.**
+- **Measurement convention.** PowerShell's `Measure-Object -Line` counts only **non-empty**
+  lines — it reported `PReview.md` at 972 where git counted 1,118, and a "correction" on
+  this page was wrong for a day because of it. Use `(Get-Content $f).Count` or
+  `git diff --stat`.

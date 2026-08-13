@@ -31,8 +31,19 @@ therefore carries the same fields:
 | **Findings** | Register rows opened, closed or re-scoped — `CLAUDE.md` requires the row to ship with the commit |
 | **Prompt** | Paste-ready, for a session that has not had this conversation |
 
+**Phase C is the exception**: its items change documents and branches, never the post, so
+there is nothing to discover in the source and no prompt is needed. Each says exactly
+which file and line to edit.
+
 Line numbers will drift as steps land, so every prompt tells the session to locate by
 **symbol and quoted comment text**, and to re-measure before editing.
+
+**How to count lines on this platform.** Every line figure in these documents — the
+3,758-line post, the 288-line `validateJob()`, the ~450–500 to delete — is only as good
+as the tool that produced it, and one of them was wrong twice. PowerShell's
+`Measure-Object -Line` **counts only non-empty lines**: it reported `PReview.md` at 972
+where the file is 1,118. Use `(Get-Content $f).Count`, or `git diff --stat`, and treat any
+figure here that came out suspiciously round as unverified.
 
 ### The rule that governs all of it
 
@@ -62,7 +73,10 @@ line number: the line numbers here are from 2026-08-13 and will have moved.
 ## Ordering, and why
 
 ```
-0. Free wins ──────────────┐ independent, no design dependency
+C. Cleanup ────────────────┐ touches no post code; do it first because two
+                           │ items misdirect a fresh session and one is a
+                           │ safety statement that should not wait
+0. Free wins ──────────────┤ independent, no design dependency
                            │
 1. Multi-WCS: reproduce ───┤ ◄── CRITICAL PATH. Everything after
    the block, then unblock │     depends on what F360 really emits
@@ -75,10 +89,215 @@ line number: the line numbers here are from 2026-08-13 and will have moved.
 7. Documents, once ────────┘
 ```
 
-**Step 1 is first because it is the only step that can invalidate the others.** Steps
-2–4 assume F360 emits a multi-WCS job the way `03-f360-and-firmware.md` §3 describes —
-which is read from Autodesk's post source, not observed. One posted job settles it. If
-it comes out differently, 2–4 get re-planned rather than half-built.
+**Phase C is first because it costs nothing and two of its items are actively
+misleading**: `docs/plan.md`'s Checkpoint — the one file `CLAUDE.md` tells every session
+to read first — says work continues on a branch that is three branches out of date, and
+four documents still say `PReview.md` is out of the tree when it is now committed.
+
+**Step 1 is first among the code steps because it is the only one that can invalidate the
+others.** Steps 2–4 assume F360 emits a multi-WCS job the way
+`03-f360-and-firmware.md` §3 describes — which is read from Autodesk's post source, not
+observed. One posted job settles it. If it comes out differently, 2–4 get re-planned
+rather than half-built.
+
+---
+
+## Phase C — Cleanup
+
+Drawn from `10-project-cleanup.md`, which judged every item by one test: **does it help
+someone execute this plan, or does it cost effort to keep true?** Only the items that pass
+are here. **Nothing in Phase C touches `MPCNC_v4.0_Beta2.cps`**, which is why it can run
+before the critical path rather than after it — and why it is the cheapest phase in the
+plan by a wide margin.
+
+Two of these are not tidying. **C2 and C3 are corrections to documents that currently
+misdirect a session**, and C4 is a safety statement about behaviour nobody has verified.
+
+*Naming, to avoid one collision: `C1`–`C9` are cleanup items. **Guard C** is the Marlin
+multi-WCS guard in `validateJob()` and belongs to Step 3. They are unrelated.*
+
+### C0 — The working branch ✅ **DONE 2026-08-13**
+
+Branch **`Assessment`** cut from `CoverageFixes`; `Assessment/` and `docs/PReview.md`
+committed as `40fc3c7` and `d010fee`. **Note for anyone merging:** `CoverageFixes` is
+itself **not merged into `master`**, so `Assessment` sits on unmerged work. That is fine
+for review documents; it matters the moment a code step lands here, because the merge to
+`master` then carries two ranges rather than one.
+
+### C1 — `docs/PReview.md` into the tree ✅ **DONE 2026-08-13**
+
+- **Goal** — the register that decides the biggest question in this plan is findable by
+  someone browsing the repository.
+- **Why** — it held the **only** copy of seven open findings, of §3.1 (Step 1.3's test
+  register) and of the design backlog, recoverable only as
+  `git show 347ce5d:docs/PReview.md`. `CLAUDE.md` kept it out of the tree *"until the
+  professional review runs"* — but the review cannot run if its own register cannot be
+  found. **This assessment reached its central conclusion only because a `git show`
+  happened to be in the instructions.**
+- **Done** — `d010fee`, 1,118 lines, no finding prefix (it builds no finding of its own).
+
+### C2 — Fix the four pointers C1 just falsified
+
+- **Goal** — no document tells a reader to `git show` a file that is now in the tree.
+- **Why** — C1 was the right move and it **invalidated four statements in three
+  documents**. This is the ordinary cost of a restore, and it is exactly the class of
+  staleness `CLAUDE.md` warns about: *"a row split across two files is how seven ids went
+  stale."*
+- **Where** — verified present on 2026-08-13:
+
+  | File | Line | What it says now |
+  |---|---|---|
+  | `CLAUDE.md` | 14–15 | *"`docs/PReview.md` is **out of the tree** … recover it with `git show 347ce5d:docs/PReview.md`"* |
+  | `CLAUDE.md` | 34 | a professional finding *"stays in the register it was filed in until `PReview.md` returns"* — **it has returned** |
+  | `docs/plan.md` | 120–121 | *"is **out of the tree** meanwhile — every pointer to it above reads through `git show 347ce5d:docs/PReview.md`"* |
+  | `Coverage/CoverageFixes.md` | 227 | *"belongs to the professional register when `PReview.md` returns"* |
+
+- **The change** — four small edits. `CLAUDE.md` line 14–15 becomes a plain read-order
+  entry; line 34's rule **survives unchanged in substance** (a professional finding still
+  stays in the register it was filed in) and loses only the *"until … returns"* clause.
+  `Coverage/CoverageFixes.md`:227 can now name `PReview.md` directly.
+- **And settle the policy while it is open.** `10-project-cleanup.md` §6 asks the question
+  the restore does not answer: **if a document is too unfinished to live in the tree, it
+  is too unfinished to hold the only copy of seven open findings.** Either the findings
+  move to the main register or the document stays. **Not both out of sight.** One sentence
+  in `CLAUDE.md` closes it permanently.
+- **Done when** — `grep -rn "out of the tree" .` returns nothing about `PReview.md`, and
+  no document mentions `347ce5d`.
+- **Findings** — none. Documentation correctness, not a defect in the post.
+
+### C3 — `docs/plan.md`'s Checkpoint points at the wrong branch
+
+- **Goal** — the file every session is told to read first describes where the work
+  actually is.
+- **Why** — this is the **resumability contract**. `CLAUDE.md`: *"`docs/plan.md` →
+  Checkpoint — always, first. The only place that says what is next."* It currently reads
+  *"Work continues on **`hobby-dialog-review`**"* — and work has since moved through
+  `Coverage_Review` and `CoverageFixes` to `Assessment`. `hobby-dialog-review` is one of
+  the thirteen branches C5 proposes deleting. **So a fresh session obeying `CLAUDE.md` is
+  sent to a branch that is about to stop existing.**
+- **Where** — `docs/plan.md` [:15-19](docs/plan.md#L15) (Baseline) and
+  [:107-121](docs/plan.md#L107) (Phase status).
+- **The change** — three touches, all inside the contract `conventions.md` sets for this
+  file (checkpoint, phase status, review pointers — nothing else):
+  1. **Baseline**: current branch, and that `CoverageFixes` is unmerged.
+  2. **Phase status**: *"Professional review — not started"* is now too blunt. `[AUTHOR]`
+     confirms the deferral was **deliberate** — *"the goal was a Beta3 stable for hobby
+     users"* — and the 24 posted files prove it was executed. Say that, and say that
+     §3.1's six jobs are the critical path.
+  3. **A pointer to `Assessment/`**, one line, so the review is not itself the next thing
+     to go missing. *(Its own status ledger is `Assessment/STATUS.md`; `plan.md` should
+     point, not duplicate — `conventions.md` warns that two files pointing at each other
+     is how content ends up in neither.)*
+- **Done when** — a session that reads only `docs/plan.md` finds the right branch, the
+  right next action, and this review.
+- **Findings** — none.
+
+### C4 — A status line in `guide-pro.md` — **needs the author's explicit go-ahead**
+
+- **Goal** — a reader of the professional guide can tell verified behaviour from
+  unverified behaviour.
+- **Why** — the cheapest item in the whole plan and the one with the clearest safety
+  argument. `[AUTHOR]` professional testing was deliberately deferred; **nothing in the
+  repository says so**, and `guide-pro.md` describes the multi-fixture path in the same
+  voice as the verified hobby path. *A hobbyist who believes that path is finished will
+  run it into a fixture.* The deferral was sound sequencing — the only thing wrong with it
+  is that a reader cannot tell.
+- **The permission problem, stated rather than assumed** — `CLAUDE.md`: the guides are
+  *"not touched during code changes, only when asked."* **Phase C is not a code change,
+  but that rule was written to stop exactly this kind of drive-by edit.** So this item is
+  proposed, not scheduled. It is the one thing in Phase C that must be asked for.
+- **The change, split by what is already known:**
+  1. **Now, independent of Step 1** — the deferral is `[AUTHOR]`-confirmed, so a status
+     line can be written today: which paths are verified against posted output (the hobby
+     path, 24 files) and which are not (multi-part, multi-fixture, tool change, laser).
+  2. **After Step 1.1** — add that the F360 "Multiple WCS Offsets" job does not post at
+     all. This half genuinely waits, because 1.1 is what turns `[AUTHOR]` report into a
+     reproduced defect.
+- **Done when** — the guide states its own verification status above the feature
+  descriptions, not in a footnote.
+- **Findings** — none of its own; it is the visible half of the gap
+  `05-history.md` identifies.
+
+### C5 — Delete thirteen merged local branches
+
+- **Goal** — `git branch` shows the two branches that matter instead of fifteen.
+- **Why** — thirteen local branches are **fully merged into `master`**; the work is all
+  there and the labels carry nothing. One of them, `hobby-dialog-review`, is what C3's
+  stale Checkpoint points at — leaving both in place is how a session ends up doing work
+  on a dead branch.
+- **Verified 2026-08-13** by `git branch --merged master` — `Coverage_Review`, `beta3`,
+  `comment-clean-up`, `hobby-dialog-review`, `retire-doc-gate`, `v4.0-beta2`, `v4.0-dev`,
+  `v4.0-doc-streamline`, `v4.0-f360-compliance`, `v4.0-float-compare`,
+  `v4.0-hreview-fixes`, `v4.0-readme-update`, `wcs-reworked-flow`.
+- **Keep** — `master`, `CoverageFixes` and `Assessment`, which are the only two unmerged
+  (`git branch --no-merged master`).
+- **Do C3 first.** Deleting the branch the Checkpoint names, before fixing the Checkpoint,
+  turns a stale pointer into a broken one.
+- **Do not touch the remote branches here.** Twenty of twenty-two are merged and can be
+  pruned at leisure, but **remote deletion is the one irreversible action on this page**
+  and belongs in a deliberate step of its own, never folded into a phase. Two of them are
+  C6.
+- **Done when** — `git branch` lists three names; `git branch --no-merged master` lists
+  two.
+
+### C6 — Read the two unmerged remote branches **before** Steps 2 and 5
+
+- **Goal** — no step re-derives, or silently re-adopts, work that already exists.
+- **Why** — both carry unmerged work and both land squarely on planned steps:
+  - **`origin/UpdateToolChange`** — **Step 5 rewrites the tool-change path.** This branch
+    may hold part of the answer, or an approach already tried and rejected. Either is
+    worth knowing before writing a line. Given `[AUTHOR]` reports Group 7 *"has not been
+    reviewed or tested"*, an abandoned branch is one of the few records of what was
+    attempted.
+  - **`origin/GRBL_Fixes`** — firmware fixes are **Tier 2** material by
+    `06-retention.md`'s classification: knowledge that cannot be re-derived from F360.
+    Anything real in here belongs on the preserve list.
+- **The change** — none. This is a read, and it produces either a preserve-list addition
+  or a note that the branch is superseded.
+- **Done when** — each branch has one recorded sentence: what it contains, and whether
+  anything in it must survive.
+- **Delete neither**, whatever the outcome.
+
+### C7 — Record the `property-reference.md` debt; do not pay it
+
+- **Goal** — nobody trusts a stale generated document in the meantime.
+- **Why** — its marker reads `doc-sync: MPCNC_v4.0_Beta2.cps @ 17a20f2`, and **19 commits
+  have changed the post since that ref** (verified 2026-08-13,
+  `git log 17a20f2..HEAD -- MPCNC_v4.0_Beta2.cps`). **It is out of date before this plan
+  begins**, and Steps 2–4 will invalidate it far more than 19 commits did.
+- **The change** — **nothing now.** Regeneration is Step 7, once, after the deletions;
+  doing it earlier means doing it twice, and the file is off-limits besides. The Phase C
+  action is only to carry the figure so a later session does not re-measure it or, worse,
+  read the file as current.
+- **Done when** — Step 7 regenerates and re-bumps the marker. `node docs/doc-sync.js` is
+  the check.
+
+### C8 — The tooling: no change
+
+Verified against `10-project-cleanup.md` §4 and left alone. `.claude/hooks/post-edit.js`
+(`node --check` on every edit), `docs/doc-sync.js`, `/checkpoint` and `/close-finding` all
+stay. `docs/check-docs.js` is **already retired** (524 lines, `46bcf2a`) for gating more
+than a document contract can carry — the right call, and **nothing left has its problem**:
+`doc-sync.js` checks one factual correspondence instead of trying to enforce prose quality,
+which is precisely the distinction that retirement drew.
+
+One dependency to remember: **`/close-finding` will need updating if the registers ever
+consolidate** — see C9.
+
+### C9 — Register consolidation: deliberately **not** in Phase C
+
+`10-project-cleanup.md` §1 proposes one register, `docs/findings.md`, with the `HB-`,
+`HR-`, `CR-` and `PR-` prefixes kept as origin markers; the four `Coverage/` files
+(3,263 lines) become one section, and `CoverageReviewPlan.md` / `CoverageReview.md` archive
+wholesale as process records of a finished review.
+
+**It belongs after Step 2, not here.** Step 1.3's six posted jobs and Step 2's deletion
+will close or re-scope a dozen rows — CR-11, CR-12, CR-14 and PR-8 close **by deletion**
+alone. Consolidating first means doing the work twice, and it would collide with
+`/close-finding` mid-plan.
+
+**What Phase C does instead: nothing.** Recorded here so the item is not mistaken for an
+oversight.
 
 ---
 
@@ -239,7 +458,7 @@ file.
   PBV3 and PA1, so this is checking, not designing. `[AUTHOR]` confirms the gap is
   deliberate deferral — professional testing postponed to get Beta3 stable for hobby
   users — which makes this **the step that discharges the deferral**.
-- **Where** — `docs/PReview.md` §3.1, now in the tree (0.1).
+- **Where** — `docs/PReview.md` §3.1, now in the tree (**C1**).
 - **The change** — none to the post unless a row fails. Keep the files beside the
   existing 24 in `Documents/Fusion 360/NC Programs/HB-Tests/`, where the hobby-path
   evidence already lives.
@@ -594,6 +813,7 @@ decisions rather than a campaign to shrink the file.
 
 | Blocked | Waiting on | What it changes |
 |---|---|---|
+| **C4's second half** | **Step 1.1** | Whether the guide can call the multi-WCS feature *blocked* rather than *unverified*. **The first half is not blocked** — the deferral is already `[AUTHOR]`-confirmed |
 | **Steps 2 and 4** | **Step 1.1 + 1.2** | Whether the homed path actually posts |
 | **Step 3's version floor** | Marlin changelog for #14743 | Whether Marlin multi-WCS can be claimed at all |
 | Step 5's verification | a full-licence posted two-tool file | 7b cannot be checked without one |

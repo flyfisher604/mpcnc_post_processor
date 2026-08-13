@@ -1,7 +1,14 @@
 # Step 10 — Cleaning up the project
 
 Judged by one test: **does it help someone execute `09-plan.md`, or does it cost
-effort to keep true?** Nothing here has been performed.
+effort to keep true?**
+
+> **Scheduled 2026-08-13.** The items that pass that test are now **Phase C** at the head
+> of `09-plan.md`, as C0–C9, each with a Goal / Why / Where / Done when. **This page is the
+> reasoning; Phase C is the schedule.** Two things changed in the transfer, both recorded
+> below: the branch work is **done** (C0, C1), and **C2 is new** — restoring `PReview.md`
+> falsified four statements in three documents, which is the ordinary cost of a restore and
+> had to be paid somewhere. Everything still unperformed is marked as such.
 
 ---
 
@@ -146,6 +153,16 @@ will run it into a fixture.
 It should not wait for Step 7. **A status line in `guide-pro.md` is worth writing the
 day Step 1.1 confirms the feature does not post.**
 
+> **Scheduled as `09-plan.md` C4, and split** — because half of it is not waiting on
+> anything. The *deferral* is already `[AUTHOR]`-confirmed, so the "what is verified, what
+> is not" line can be written today; only the sentence naming the feature **blocked** waits
+> for 1.1 to turn a report into a reproduced defect.
+>
+> **And C4 is the one Phase C item that must be asked for.** `CLAUDE.md` puts the guides
+> off-limits *"during code changes, only when asked"*. Phase C is not a code change — but
+> that rule exists to stop precisely this kind of drive-by edit, so C4 is proposed rather
+> than scheduled.
+
 ## 4. The tooling
 
 | Item | Verdict |
@@ -171,6 +188,17 @@ distinction the retirement drew. No further tooling change recommended.
 `v4.0-hreview-fixes`, `v4.0-readme-update`, `wcs-reworked-flow`. Thirteen branches,
 zero risk — the work is all in `master`. Keep `master` and `CoverageFixes`.
 
+> **Re-verified 2026-08-13** against `git branch --merged master`: the same thirteen, and
+> now **three** to keep — `master`, `CoverageFixes` and the new `Assessment`. Two cautions
+> that only appeared once this was scheduled as **C5**:
+>
+> - **`hobby-dialog-review` is the branch `docs/plan.md`'s Checkpoint currently sends every
+>   session to.** Delete it before fixing the Checkpoint (**C3**) and a stale pointer
+>   becomes a broken one. C3 goes first.
+> - **`CoverageFixes` is itself not merged into `master`**, and `Assessment` was cut from
+>   it. Irrelevant to review documents; it matters the moment a code step lands, because
+>   the eventual merge carries two ranges rather than one.
+
 **Two remote branches carry unmerged work, and both matter to this plan:**
 
 - **`origin/UpdateToolChange`** — unmerged. Given that `09-plan.md` Phase 2 rewrites
@@ -193,3 +221,12 @@ project the visibility of its own most important open questions.
 **Recommendation:** if a document is too unfinished to live in the tree, it is too
 unfinished to hold the only copy of seven open findings. Either the findings move to
 the main register, or the document comes back. Not both out of sight.
+
+> **Scheduled as the second half of `09-plan.md` C2.** The restore settled the instance;
+> this settles the rule, and one sentence in `CLAUDE.md` does it. Worth doing while C2 has
+> that file open anyway — the four stale pointers and the policy live in the same paragraphs.
+>
+> **The four pointers C1 falsified**, verified 2026-08-13: `CLAUDE.md`:14–15 and :34,
+> `docs/plan.md`:120–121, `Coverage/CoverageFixes.md`:227. Note that `CLAUDE.md`:34's rule
+> — a professional finding stays in the register it was filed in — **survives in
+> substance**; it loses only its *"until `PReview.md` returns"* clause.
