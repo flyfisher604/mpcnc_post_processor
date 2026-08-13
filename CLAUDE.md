@@ -3,18 +3,13 @@
 A Fusion 360 post for GRBL / Marlin / RepRap hobby CNC. The deliverable is
 `MPCNC_v4.0_Beta2.cps`; everything else in the repo supports it.
 
-## Read in this order
+## Read `docs/plan.md` first
 
-1. **`docs/plan.md` → *Checkpoint*** — always, first. The only place that says what is next.
-   `/checkpoint` reads it and reports in ten lines.
-2. **`docs/conventions.md`** — when writing code. The guards, the property and dialog rules, how to run
-   a test, and the harness method and its hard-won lessons.
-3. **`docs/design.md`** — only when changing frame, Z-reference or ordering behaviour. Why the post emits
-   what it does, and the firmware facts behind it.
-4. **`docs/HReview.md`** — only when a specific finding or test row is in play. **`docs/PReview.md`** is the
-   professional register: the seven open `HR-` ids, §3.1's unposted jobs, and the design backlog in §6.
+**It is the only file that says what is next.** Start at its *Checkpoint*, and reach everything else from
+there — `docs/findings.md` when a specific finding or test row is in play, `docs/design.md` when changing
+frame, Z-reference or ordering behaviour. Do not read or search under `./Test/` unless asked.
 
-Do not read or search files under `./Test/` unless explicitly asked.
+Each of those files states its own rules at its foot. Follow them when you edit it.
 
 ## Changing the post
 
@@ -25,14 +20,14 @@ Do not read or search files under `./Test/` unless explicitly asked.
 - `node --check` runs itself on every edit. **Nothing gates the documents** — every rule in them is
   enforced in the diff, by a person.
 
-## Registers ship with the code
+## Findings ship with the code
 
-Update the register **before the commit lands** — not after every intermediate edit, but once the change
-is settled, so the commit carries the code and its row together. Hobbyist → `docs/HReview.md`. A
-**professional** finding (multi-WCS, spoilboard base, tool changes, Manual NC, dialog) stays in the
-register it was filed in — a row split across two files is how seven ids went stale. And **no register
-lives outside the tree**: too unfinished to commit is too unfinished to hold the only copy of an open
-finding. **`/close-finding <id>` runs the procedure.** Don't ask whether to add the row — add it.
+Update the row in `docs/findings.md` **before the commit lands** — not after every intermediate edit, but
+once the change is settled, so the commit carries the code and its row together. The procedure is at the
+foot of that file. Don't ask whether to add the row — add it.
+
+**No register lives outside the tree:** too unfinished to commit is too unfinished to hold the only copy of
+an open finding.
 
 ## Commits
 
@@ -54,4 +49,6 @@ side effect of another task. Repo docs are reviewed in a diff; memories go stale
 - **The user guides** — `README.md` and `docs/guide-hobbyist.md` / `guide-pro.md` /
   `property-reference.md`. Not touched during code changes, only when asked — and **when they fall behind
   the post, that is the author's call to make**, not something a session detects or acts on.
-- **`Personal.cps`** — a git-excluded test harness, not part of the post.
+- **`Personal.cps`** — a git-excluded test harness, not part of the post. What it is, is in `design.md`.
+- **`Assessment/`** — the analysis this plan came from, dated 2026-08-13. Read it for evidence, never for
+  where things live: its file pointers predate the document consolidation.
