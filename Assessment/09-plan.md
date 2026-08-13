@@ -119,8 +119,9 @@ session**, and C4 is a safety statement about behaviour nobody has verified.
 **closed by the author's ruling — the two remote branches are to be deleted unread**, which
 also means **C6 no longer gates Steps 2 and 5**; `C4` **deferred by the author**; `C7` `C8`
 `C9` are records rather than actions and need nothing. The phase left
-`MPCNC_v4.0_Beta2.cps` untouched, as it said it would. **One command is outstanding** —
-`git push origin --delete UpdateToolChange GRBL_Fixes`, C6.
+`MPCNC_v4.0_Beta2.cps` untouched, as it said it would. **Nothing is outstanding**: the author ran
+`git push origin --delete UpdateToolChange GRBL_Fixes` on 2026-08-13, and `git ls-remote --heads`
+confirms both are gone. **Step 0 then landed the phase's first post code** — 0.3, 0.4, 0.6.
 
 *Naming, to avoid one collision: `C1`–`C9` are cleanup items. **Guard C** is the Marlin
 multi-WCS guard in `validateJob()` and belongs to Step 3. They are unrelated.*
@@ -308,12 +309,12 @@ because the reasoning that failed is instructive: this page valued the branches 
 without ever checking **what file they edit** or **how far the post had moved since**. Both answers are
 below and both defeat the premise. **A branch is not a record worth keeping merely because it is unmerged.**
 
-**Deletion status.** The two **local archive tags exist** — `archive/UpdateToolChange` → `690e586`,
-`archive/GRBL_Fixes` → `385edaf` — so the commits stay reachable in this clone after the remote refs go.
-**The remote deletion itself is not done**: it needs
-`git push origin --delete UpdateToolChange GRBL_Fixes`, one command, run by the author. `690e586` is
-contained by **no other ref**, which is why the anchors were set first. Drop them with
-`git tag -d archive/UpdateToolChange archive/GRBL_Fixes` if the history is genuinely unwanted.
+**Deletion status — done 2026-08-13.** The author ran
+`git push origin --delete UpdateToolChange GRBL_Fixes`, and `git ls-remote --heads origin` no longer lists
+either. The two **local archive tags** — `archive/UpdateToolChange` → `690e586`, `archive/GRBL_Fixes` →
+`385edaf` — were set **before** the push because `690e586` was contained by no other ref, and they are now
+**the only refs anywhere that reach that history**: the tags were never pushed, so this clone holds it
+alone. `git tag -d archive/UpdateToolChange archive/GRBL_Fixes` discards it for good.
 
 *The dates and the reasoning that produced the ruling, retained:*
 
@@ -554,18 +555,49 @@ of Marlin by construction. **The remaining predicates are untouched**, Step 2 de
 - **Done when** — `parkCanRetract` no longer exists; output byte-identical.
 - **Findings** — none; internal.
 
-### 0.5 — Fold Group 11 (Duet, 2 properties) into the firmware selector
+### 0.5 — Group 11 (Duet, 2 properties) — 🚫 **DELETION REFUSED by the author 2026-08-13**
 
-`groupDefinitions.duet` at [:118](MPCNC_v4.0_Beta2.cps#L118) — **:118, not the :117 this line said until
-2026-08-13**. Two properties for a variant `jobSelectedFirmware` already names. 11 groups → 10, and
-**66 properties → 64** if both fold away rather than relocate — 66 because 0.2 is deferred and nothing
-that landed touched the count. **Re-count at the edit rather than trusting any figure here**; `doc-sync`
-is 19 commits behind (C7) and cannot arbitrate. Re-run `node docs/doc-sync.js`.
+> **The author's ruling: the two fields stay.** *"There would be nowhere to change this g-code if
+> incorrect."* **That is now more than a principle — the g-code IS incorrect on current firmware**, and
+> the escape hatch is the only thing that lets an operator fix it without waiting for a release. Filed as
+> **`PR-13`** in `docs/PReview.md`, with the source citations.
+>
+> **`09-plan.md` overreached here, and `07-code-map.md` did not.** The code map's verdict is *"**Keep or
+> fold** into the firmware selector; two controls is not a problem worth solving"* (:258). This page
+> carried that forward as *"Fold"* and then wrote an acceptance count that assumed deletion. Nothing new
+> was learned in between — the option was simply dropped in transcription, and the count made it look
+> decided.
 
-⚠️ **This is now the only item left in Step 0, and it owns the `REG-MF` collision on its own.** It deletes
-two properties and moves a group boundary, so it is the change that invalidates the factory-default
-baseline before that baseline has ever been posted. Post `REG-MF` first, or accept re-posting it — but
-decide before editing, not after. Nothing else in Step 0 touches the property dump any more.
+**What the two properties actually emit.** `onSection()`'s `fw == eFirmware.REPRAP` branch writes the
+property value **verbatim** when the section type changes — which on a milling-only job is the first
+section of every job. Read from `Duet3D/RepRapFirmware` `src/GCodes/GCodes2.cpp` at `2.05` and at
+`master`: on **RRF 2.05** every parameter of both strings is parsed and means what the tooltip implies;
+on **RRF 3.x** `M453` is read for `S` alone, so `duetMillingMode`'s `P2 I0 R30000 F200` sets no pin, no
+maximum RPM and no PWM frequency **and reports no error**, while `duetLaserMode` keeps `R` and `F`/`Q` but
+loses `P2 I0`, the laser pin having moved to `C"pin"` / `M950`. The full table is in PR-13.
+
+**So the answer to *is the g-code correct* is: yes on RRF 2.05, and one part in five for `M453` on
+RRF 3.x.** No claim here rests on running a Duet — both readings are from the firmware's own switch
+statement, and neither string has ever appeared in a posted file.
+
+**What is left of 0.5, if anything.** Two live options, and the difference is whether a *key* moves:
+
+1. **Relocate, don't delete** — set both properties' `group` to the firmware selector's. A `group:` is a
+   display attribute, so **no key changes and no saved setting resets**; the property count stays at 66
+   and both fields remain editable. Delivers the only benefit 0.5 ever claimed, 11 groups → 10.
+   **Still touches the property dump**, which echoes keys beneath group titles, so `REG-MF` is affected
+   either way — but by a re-heading rather than by two deletions.
+2. **Leave group 11 alone.** Two controls is not a problem worth solving, which is what the code map
+   said. Costs one group in the dialog and nothing else.
+
+⚠️ **Whichever is chosen, `REG-MF` is still owed first or knowingly re-posted after** — 0.5 is the last
+item in Step 0 that moves the property dump at all. Under option 1 the acceptance figures are **66
+properties unchanged, 11 groups → 10**; the *"66 → 64"* on this line until 2026-08-13 assumed the
+deletion that has now been refused. **Re-count at the edit either way**; `doc-sync` is 19 commits behind
+(C7) and cannot arbitrate. Re-run `node docs/doc-sync.js`.
+
+**`groupDefinitions.duet` is at [:118](MPCNC_v4.0_Beta2.cps#L118)** — :118, not the :117 this line said
+until 2026-08-13.
 
 ### 0.6 — HR-13, the `onCommand` gap ✅ **DONE 2026-08-13 — half applied, half refused**
 

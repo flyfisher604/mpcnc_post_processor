@@ -49,11 +49,11 @@ everything the README puts outside the hobbyist's reach:
 
 ## 2. Findings
 
-**✅ 11 fixed · ◑ 2 part-fixed · ⬜ 6 open — 19 findings.** The `HR-` ids were found by the hobbyist pass
+**✅ 11 fixed · ◑ 2 part-fixed · ⬜ 7 open — 20 findings.** The `HR-` ids were found by the hobbyist pass
 and reclassified as professional, and are **kept deliberately** so commit history, `HReview.md` and this
 file all name the same defect the same way; `PR-` ids were found by this file's own machine-frame review,
-**except PR-12**, which the over-engineering assessment found and which continues the series rather than
-opening a fourth one in a file that already carries three. Committed code is the eleven `PR-` fixes plus
+**except PR-12 and PR-13**, which the over-engineering assessment found and which continue the series
+rather than opening a fourth one in a file that already carries three. Committed code is the eleven `PR-` fixes plus
 HR-13's landed half; every other `HR-` diff is a proposal, not a record.
 **PR-8 … PR-11 are defects in PR-2 / PR-6's own landed code**, found by a review of the branch before it
 was ever posted, and they are separate ids rather than clauses on PR-6 because commit messages cite ids
@@ -72,6 +72,7 @@ and a `✅ fixed` row must not quietly cover a second fix.
 | **PR-9** | PR-6's `G53 G0 X0 Y0` park block carries **no `F` word**, alone among the post's rapids — `rapidMovementsXY`/`Z` and its own sibling `writeMachineTravelZ()` all emit one. On firmware that honours the modal feedrate for `G0`, the longest move in the job crosses the bed at whatever feed the last **cut** commanded | Medium | `fFormat` (not `fOutput` — `resetAll()` has just cleared the tracked `F`) at `Travel Speed XY`, matching `writeMachineTravelZ()` exactly | ✅ fixed |
 | **PR-10** | PR-2 made the preamble **move the tool** — step 5 establishes the fixed Z reference, step 6 records the first part's origin — so under **both** implementations the "current position" step 6 reads is bed clearance. `Set X0 Y0 to Current Pos, Probe Z0` (the **default**) then writes HR-1's provisional `Z0` there, turning `G38 Target -10` into a 10 mm descent from bed clearance: the probe never reaches the stock and the controller alarms. `Set X0 Y0 Z0 to Current Pos` fails quieter and worse — clearance *becomes* the part's `Z0`. The spoilboard half predates PR-2; the machine-Z answer is a second route to it, and none of PR-2's six guards covers either | Med-High | Post-time `warning()` naming the establish as the cause and the two sound modes as the answer. **Not a code fix, and cannot be one:** the distance from clearance to the stock top is exactly what the probe exists to discover. The `Jog to …` modes are deliberately exempt — there the operator positions the tool *after* the establish, which is the condition HR-1's provisional `Z0` was sound under all along | ✅ fixed |
 | **PR-11** | HR-28's post-time GRBL jog warning tests `Subsequent WCS / Part` unconditionally, but that control is consulted only on a genuine WCS change (`writeWCS()`'s `isTraverse`) — so a **single-WCS** job warns about a pause its file will not contain. Its neighbour, the stored-offset warning, already carried the gate | Low-Med | `multiWcs` hoisted to one local and applied to the subsequent-part half only. The first-part half stays ungated: that mode runs on every job | ✅ fixed |
+| **PR-13** | **Group 11's two properties carry RRF 2.x g-code as their defaults, and on every current RepRapFirmware most of it is parsed by nothing.** `duetMillingMode` = `M453 P2 I0 R30000 F200` and `duetLaserMode` = `M452 P2 I0 R255 F200`, written verbatim by `onSection()`'s RepRap branch whenever the section type changes. **RRF 3.x reads `M453` for `S` alone** — and answers `Spindle management has been moved to M950` if it is there — so `P2 I0 R30000 F200` sets **no pin, no maximum RPM and no PWM frequency**, silently: the job selects CNC mode and runs on whatever `config.g` last configured. `M452` fares better, RRF 3.x still reading `R` and `F`/`Q`, but `P2 I0` is dropped there too, so **the laser pin is never assigned by this command**. Both strings are valid on RRF 2.05, which is what they were written for. **Neither has ever been posted** — group 11 has no test row, and `J4` records that group 9 has never appeared in any posted file either | Low-Med | **Not started — and it is the reason the two fields must stay editable.** The post cannot know a board's pin numbers or which RRF major version is on it, so an operator-supplied string is the only answer that can be right; this is group 8's argument, an escape hatch rather than a feature. What is owed is defaults that work on RRF 3, a tooltip naming the version each form belongs to, and a decision on whether the post should say anything when it writes a string it cannot check. **`Assessment/09-plan.md` 0.5's *fold* is refused by the author on exactly this ground** | ⬜ open |
 | **HR-7** | `toolChange()` clobbers `forceSectionToStartWithRapid`, defeating "First G1 → G0" on every tool-change section | Medium | Lands with the Phase 4 reorder below | ⬜ open |
 | **HR-8** | Post-injected motion never updates Fusion's tracked position | Medium | Lands with Phase 4. Confirmed unreachable on any hobbyist path (2026-08-01) | ⬜ open |
 | **HR-9** | `Do First Change` with `Probe After Tool Change` off zeroes Z against the wrong tool | Medium | Lands with Phase 4 | ⬜ open |
@@ -126,6 +127,30 @@ into the correct WCS. Test matrix in §3.4.
 > witnessed it on a one-tool job. Do not re-file it here.
 
 ---
+
+### PR-13 — group 11's Duet mode strings are RRF 2.x g-code — **Low-Medium** · `READ`
+
+**Reaches it:** `CNC Firmware` = a RepRap/Duet answer, and a section whose type differs from the last —
+which on a milling-only job is **the first section of every job**, so the milling string is written on
+every Duet post. `onSection()`, the `fw == eFirmware.REPRAP` branch, writes the property value verbatim.
+
+**What each parameter does, by firmware major version.** `[SDK]`-grade both ways: read from
+`Duet3D/RepRapFirmware` `src/GCodes/GCodes2.cpp` at tag `2.05` and at `master`.
+
+| | RRF **2.05** | RRF **3.x** (current) |
+|---|---|---|
+| **`M453`** (`duetMillingMode`) | Parses `S` (spindle slot), `P` (pin array), `I` (invert), `F` (PWM frequency), `R` (max RPM), `T` (tool) — every parameter in the default string is read and means what the tooltip implies | Parses **`S` only**, and errors on it: `reply.copy("Spindle management has been moved to M950")`. `P`, `I`, `R`, `F` are **never looked at**. The command still selects CNC mode; it configures nothing, and says nothing about not having |
+| **`M452`** (`duetLaserMode`) | Parses `P` (laser pin), `I` (invert), `S` (sticky power), `F` (PWM frequency), `R` (max power) | Parses `C` (pin name), `F`**/`Q`** (PWM frequency), `S`, `R` (max power). So `R255` and `F200` still work — but `P2 I0` is ignored, and **the laser pin is assigned by `C"pin"` or a prior `M950`, not here** |
+
+Duet3D's own migration guide says the same of `M453` — *"you will need to change this command because the
+parameters have changed"*, with the frequency parameter *"now Q (to match M950) instead of F"* `[DOC]`.
+
+**So the honest answer to "is this g-code correct?" is: on RRF 2.05 yes, on RRF 3.x `M453` is one part in
+five and `M452` is three parts in five.** Nothing errors, which is the part worth fixing: a Duet operator
+who set `R30000` expecting it to bound spindle speed gets no indication that the number went nowhere.
+
+**Not a defect in the properties — a defect in their defaults**, and the reason to keep the fields is
+exactly that the post got this wrong and an operator can correct it without waiting for a release.
 
 ### HR-7 — `toolChange()` clobbers `forceSectionToStartWithRapid`, defeating "First G1 → G0" on every tool-change section — **Medium** · `READ`
 
@@ -378,7 +403,7 @@ operation in the same post is unaffected and still expands to plain `G0`/`G1`.
 
 ## 3. Test register
 
-**✅ 0 PASS · ❌ 0 FAIL · ⬜ 61 UNRUN · ➖ 6 n/a or moved — 67 rows.** Nothing professional has been
+**✅ 0 PASS · ❌ 0 FAIL · ⬜ 62 UNRUN · ➖ 6 n/a or moved — 68 rows.** Nothing professional has been
 verified yet; this is the whole of what the professional side owes. Absorbed from the Beta-2 test plan.
 
 Every row is a delta from the defaults fixed in `conventions.md` → *How to run a test*; the one
@@ -437,6 +462,7 @@ hold it, and the *Expect* must exist in exactly one place.
 | **HR-13** | `onCommand` no longer discards silently, and says so at Comment Level `Off` | Manual NC *Orientate spindle* on an operation, then again at Comment Level `Off` | posted | §3.8 | ⬜ |
 | **PR-12** | A probing operation refuses with the post's own reason, and still refuses | any Inspection / probing operation, GRBL | posted | §3.8 | ⬜ |
 | **REG-S0** | Step 0.3 / 0.4 / 0.6 move no byte of an ordinary job | GRBL/mm defaults, no Manual NC, no probing operation | posted | §3.8 | ⬜ |
+| **PR-13** | The Duet mode string is written once per section-type change, and is the property's value verbatim | `CNC Firmware` = RepRap, a milling job, then a milling + laser job | posted | §2 | ⬜ |
 | **HR-20** | Tapping beyond a warning on the manual path | a drill + tap job, automatic spindle | posted | §2 | ⬜ |
 | **PR-1a** | The capability/action split emits what the old enum did, and nothing when the action is off | group 04 declarations × `Home at Job Start`, GRBL then Marlin | posted | §3.6 | ⬜ |
 | **PR-1b** | The stored-offset warning fires on the trusting modes and **never** on the `Jog …` modes | 2-WCS job, `Axes Homed and Trusted` = `None` off, each origin mode in turn | posted | §3.6 | ⬜ |
@@ -1159,7 +1185,7 @@ this section when it empties** — Rule 4.
 
 What this register owes, not the order to do it in — that is the checkpoint's job.
 
-1. **Every one of the 67 rows** — the figure here read `37` until 2026-08-13, a count left behind when §3
+1. **Every one of the 68 rows** — the figure here read `37` until 2026-08-13, a count left behind when §3
    absorbed the Beta-2 test plan; §3's own header has been right all along. Nothing professional has been
    posted. §3.1 is the largest untested area in the post and needs a job nobody has built: a 2-copy
    Replicate or a two-Setup job.

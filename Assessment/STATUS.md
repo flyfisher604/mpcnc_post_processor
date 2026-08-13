@@ -272,17 +272,22 @@ is named. `REG-S0` in `PReview.md` §3.8 is the row that proves it.
    thing in the plan that does not wait on a decision. The critical path: cheap, and able to
    invalidate Steps 2–4 — which is exactly why it goes first. Needs a Fusion keyboard; the
    paste-ready prompt is written.
-6. **0.5 — fold group 11, and decide `REG-MF` before editing.** The last of Step 0, and the only
-   item left that moves the property dump. Runs from the repository alone, so it can go while 1.1
-   waits on Fusion time; the decision it needs is *post the baseline first, or accept re-posting
-   it.*
-7. ~~**C6's read**~~ — **overruled by the author: the two branches are to be deleted unread.**
-   Over two years old, and they edit `MPCNC.cps`, a filename the project no longer has. **One
-   command is outstanding**, run by the author:
-   `git push origin --delete UpdateToolChange GRBL_Fixes`. Local tags
-   `archive/UpdateToolChange` (`690e586`) and `archive/GRBL_Fixes` (`385edaf`) anchor the tips
-   first, because `690e586` is contained by no other ref; drop them with `git tag -d` if the
-   history is genuinely unwanted. **C6 no longer gates Steps 2 and 5.**
+6. **0.5 — deletion refused by the author; choose *relocate* or *leave alone*.** The two Duet
+   fields stay. The reason held up under checking and then got stronger: **both defaults are RRF
+   2.x g-code**, and on RRF 3.x `M453` is parsed for `S` alone, so `M453 P2 I0 R30000 F200` sets
+   no pin, no max RPM and no PWM frequency **and reports no error** — filed as **PR-13**, with the
+   `GCodes2.cpp` citations from tags `2.05` and `master`. `07-code-map.md` had said *"keep or
+   fold"*; `09-plan.md` transcribed it as *"fold"* and wrote an acceptance count that assumed
+   deletion. What is left is a display question: move both `group:` attributes next to the firmware
+   selector (**no key changes, nothing resets**, 11 groups → 10) or leave group 11 standing. Either
+   way it is **the last item in Step 0 that moves the property dump**, so `REG-MF` is still owed
+   first or knowingly re-posted after.
+7. ~~**C6's read**~~ — **overruled by the author, and now closed.** The two branches were over two
+   years old and edit `MPCNC.cps`, a filename the project no longer has, so they were deleted
+   unread. `git push origin --delete UpdateToolChange GRBL_Fixes` was **run by the author on
+   2026-08-13**. The local tags `archive/UpdateToolChange` (`690e586`) and `archive/GRBL_Fixes`
+   (`385edaf`) still anchor the tips — **they are now the only refs that reach that history**;
+   `git tag -d` drops them if it is genuinely unwanted. **C6 gates nothing.**
 8. **`docs/plan.md`'s 20-line overrun** — decide the trim or raise the budget. See above.
 9. ⏸️ **C4 — a status line in `guide-pro.md`. Deferred by the author 2026-08-13.** Not
    rejected and not blocked: its first half needs nothing from Step 1.1, so it waits on a

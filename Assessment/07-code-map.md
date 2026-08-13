@@ -40,7 +40,7 @@ the code is justified. Both prior verdicts are kept so the trajectory is visible
 | 8 — External Include Files | 5 | ~36 | 1% | **Keep, and it gains a job** — the tool-change hook | keep | same |
 | 9 — Laser | 7 | ~74 | 2% | **Keep — persona confirmed, unexercised** | keep | defer |
 | 10 — Coolant | 10 | ~97 | 2.6% | **Reduce** — still no persona | reduce | cut candidate |
-| 11 — Duet | 2 | ~20 | 0.5% | **Fold** into the firmware selector | keep or fold | same |
+| 11 — Duet | 2 | ~20 | 0.5% | **Keep the fields** — relocating them is optional (PR-13, author 2026-08-13) | keep or fold | same |
 
 ### What changed on 2026-08-13, and why the arithmetic moved back
 
@@ -256,7 +256,14 @@ no action.**
   the *opposite* of over-engineering: an escape hatch instead of a feature.
 - **Group 1 — Job, 8 properties.** **Keep.** Infrastructure and comment level.
 - **Group 11 — Duet, 2 properties.** **Keep or fold** into the firmware selector;
-  two controls is not a problem worth solving.
+  two controls is not a problem worth solving. **Settled 2026-08-13 — keep the
+  fields.** `09-plan.md` 0.5 had hardened this row's *"keep or fold"* into *"fold"*
+  and then written an acceptance count assuming the two properties were deleted;
+  the author refused it. The reason turned out to be stronger than dialog economy:
+  **both defaults are RRF 2.x g-code**, and on RRF 3.x `M453` is parsed for `S`
+  alone, so most of `duetMillingMode` reaches nothing and says nothing about it.
+  An editable string is the only thing that lets an operator correct that.
+  `PReview.md` **PR-13** carries the firmware citations.
 
 ## Gaps — real need with no code
 

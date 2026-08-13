@@ -228,8 +228,20 @@ folded into any code phase.
 > **records of attempts** without checking what file they edit or how far the post had moved.
 > They edit `MPCNC.cps`, and the post has since gained the machine frame, the fixed Z
 > reference, the `G10 L20` rework and Phases 1–4. **Unmerged is not the same as valuable.**
-> Local tags `archive/UpdateToolChange` and `archive/GRBL_Fixes` anchor the tips; the remote
-> deletion is one command, run by the author.
+> **The deletion ran on 2026-08-13** — `git push origin --delete UpdateToolChange GRBL_Fixes`, by the
+> author; `git ls-remote --heads origin` no longer lists either. `archive/UpdateToolChange` and
+> `archive/GRBL_Fixes` anchor the tips **locally and nowhere else** — the tags were never pushed, so
+> this clone is now the only place that history exists.
+>
+> **Counted after the push: 18 remote branches besides `master`, and all 18 are ancestors of local
+> `master`** — `git merge-base --is-ancestor` on every one, none unmerged. **11 are labels C5 deleted
+> locally** (`beta3`, `comment-clean-up`, `hobby-dialog-review`, the six `v4.0-*`, `v4.0-readme-update`
+> and `wcs-reworked-flow`); `Coverage_Review` and `retire-doc-gate` were never pushed, which is why 13
+> local deletions leave 11 remote survivors. The other 7 predate that set: `CustomCoolant`,
+> `PropertyUpdate`, `V1.beta1`, `V1.beta2`, `v1.beta3`, `v1.beta4`, `v1.beta5`. Pruning them is safe on
+> that evidence and remains *"a deliberate separate action"* — **not scheduled, and not to be folded
+> into a code step.** The more consequential remote fact is unchanged: **`origin/master` at `94241ec`
+> is 6 commits behind local `master`**, and the `Assessment` branch is not pushed at all.
 
 ## 6. One thing to add rather than remove
 
