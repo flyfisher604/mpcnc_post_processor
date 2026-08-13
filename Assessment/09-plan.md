@@ -410,7 +410,8 @@ oversight.
 No design dependency, no ordering constraint between them, each independently
 committable.
 
-> **Readiness checked 2026-08-13. Step 0 can start; two things to settle first.**
+> **Status 2026-08-13: 0.1 · 0.3 · 0.4 · 0.6 done · 0.2 deferred · 0.5 is all that is left.**
+> Readiness was checked first, and the check is kept below because Step 1 inherits its conclusions.
 >
 > **What holds.** The post is **untouched at 3,758 lines** — the exact tree this plan was written
 > against — so every line reference in Steps 0 and 1 is still valid. Spot-checked and exact:
@@ -421,16 +422,25 @@ committable.
 > Both registers are readable in the tree (C1), Phase C is done, and **C6 no longer gates
 > anything**.
 >
-> **Two things to settle before committing any of Step 0:**
+> **Both things this block asked to be settled are settled — 2026-08-13.**
 >
-> 1. **The register destination, fixed above in 0.2 and 0.6.** Both close professional ids whose
->    rows are in `PReview.md` and nowhere else. The prompts used to say `HReview.md`.
-> 2. **Step 0 changes the property dump, and `plan.md`'s own item 0 is still owed.** REG-MF — the
->    GRBL/mm factory-default baseline post — expects *"the property dump, the Resolved-Values
->    block and every `F` word, and nothing else."* **0.2 and 0.5 delete three properties between
->    them**, so any Step 0 commit invalidates that baseline before it has ever been established.
->    Either post REG-MF first, or accept that it is re-posted after Step 0 — but decide, rather
->    than discovering it. *This is the collision `05-history.md` warns produces work twice.*
+> 1. **The register destination.** Fixed in 0.2, 0.3 and 0.6: every row went to `PReview.md`, which is
+>    the only file that carries these ids. The prompts used to say `HReview.md`.
+> 2. **The `REG-MF` collision is off the table for now.** With **0.2 deferred by the author**, the three
+>    items that landed — 0.3, 0.4, 0.6 — add, remove and rename **no property**, so the property dump
+>    does not move and the baseline is not invalidated before it exists. **The collision returns with
+>    0.5**, which folds group 11 and deletes two properties: post `REG-MF` before it, or accept
+>    re-posting. Deciding it at 0.5 rather than now is the whole of the change here. *This is the
+>    collision `05-history.md` warns produces work twice.*
+>
+> **What actually happened when Step 0 was run, and the reason it is worth reading twice:** three of the
+> four items departed from their own instructions, and each departure was found by checking the plan's
+> claim rather than executing it. 0.2's registered fix contradicts a safety comment 800 lines away.
+> 0.3's prescribed `>>> WARNING:` comment would have been written into a file the abort prevents. 0.6's
+> *"apply it as written"* covered a diff that fails at Comment Level `Off` and an `M1` that ends the job
+> on RepRap. **Only 0.4 landed as written, and it is the one item with no register row behind it.** The
+> pattern to carry into Step 1: a complete diff in a register is a proposal that was never run, and its
+> age is not evidence.
 
 ### 0.1 — `docs/PReview.md` back in the tree ✅ **DONE — moved to Phase C, item C1**
 
@@ -438,7 +448,16 @@ Restored **and committed**: `d010fee` on branch `Assessment`, 1,118 lines. It ho
 only copy of seven open findings and of §3.1, which is Step 1.3's test register. See
 **C1**.
 
-### 0.2 — Delete `toolChangeDisableZStepper` and its `M84 Z`
+### 0.2 — Delete `toolChangeDisableZStepper` and its `M84 Z` — ⏸️ **DEFERRED 2026-08-13, by the author**
+
+**Held for the complete tool-change solution**, with Phase 4 and HR-7 / HR-8 / HR-9. It was on the Step 0
+list as a free win because its diff was self-contained; the readiness check below found it is not free —
+the registered fix and this item's fix are **incompatible**, and choosing between them is a decision about
+what a tool change should do, which is the thing the tool-change work exists to settle. `PReview.md`'s
+HR-10 row now carries the ⚠️ so the unsafe diff cannot be picked up as a warm-up commit, and the long form
+carries it again at the diff itself. **Nothing below is stale — read it when the tool-change work starts.**
+One consequence worth keeping: with 0.2 held, **Step 0 no longer deletes a property**, so `REG-MF` survives
+it (see 0.5, which still does).
 
 - **Goal** — the post can no longer emit a command that drops the gantry onto the work.
 - **Why** — HR-10, and **the post already knows**. At
@@ -488,7 +507,19 @@ only copy of seven open findings and of §3.1, which is Step 1.3's test register
   > **in docs/PReview.md**, and a replacement Do→Get row — the existing one passes on `M84 Z`
   > being present on Marlin. Do not substitute a timeout variant — say why in the proposal.
 
-### 0.3 — Name the reason WCS probing is refused
+### 0.3 — Name the reason WCS probing is refused ✅ **DONE 2026-08-13**
+
+**Landed, with one deliberate departure from *The change* below: the reason goes in `error()`, not in a
+`>>> WARNING:` comment.** `cycleNotSupported()` calls `error()`, so the post **aborts and produces no
+file** — a comment would have been written into output the operator never receives, and the dialog, which
+is the only channel they do get, would still have carried Autodesk's generic text. So `cycleNotSupported()`
+is replaced rather than kept: one `error(localize(…))` naming the reason and the two things that do work.
+Keeping the call as well would have changed nothing, the first `error()` being the one Fusion reports.
+That matches what the post already does at the tool-orientation and radius-compensation refusals, which
+replace the SDK's generic text with their own for exactly this reason. **Filed as `PR-12` in
+`docs/PReview.md`** — *"new HR row"* below meant that register anyway, the `HR-` series living there, and
+§1 puts *"Machining Extension — probing / Inspection strategies"* in professional scope. Verified by
+**§3.8**; `node --check` passes.
 
 - **Goal** — an operator who tries an F360 probing operation learns why it cannot work,
   and what to do instead.
@@ -504,7 +535,15 @@ only copy of seven open findings and of §3.1, which is Step 1.3's test register
 - **Done when** — a probing operation still refuses to post, and says why.
 - **Findings** — new HR row.
 
-### 0.4 — Collapse the frame predicates (partial)
+### 0.4 — Collapse the frame predicates (partial) ✅ **DONE 2026-08-13**
+
+**Landed as specified.** `parkCanRetract()` is gone; both callers — `validateJob()`'s warning and
+`writeMachineParkXY()` — read `fixedZEstablishedInFile()` directly, which is a pure inline, so **no output
+byte moves**. Two register rows named the deleted alias and both now say so: `PReview.md` **PR-8**, whose
+fix created it, and `HReview.md` **HB-17**, which argued for keeping the park's own name. What those rows
+actually bought is *one* predicate behind both call sites, and that survives — it is the name that went.
+Each call site's comment absorbed what the deleted header said, including that the answer is false on all
+of Marlin by construction. **The remaining predicates are untouched**, Step 2 deleting two of them outright.
 
 - **Goal** — remove the alias now; defer the rest.
 - **Why** — `parkCanRetract()` [:2101](MPCNC_v4.0_Beta2.cps#L2101) is
@@ -517,18 +556,44 @@ only copy of seven open findings and of §3.1, which is Step 1.3's test register
 
 ### 0.5 — Fold Group 11 (Duet, 2 properties) into the firmware selector
 
-`groupDefinitions.duet` at [:117](MPCNC_v4.0_Beta2.cps#L117). Two properties for a
-variant `jobSelectedFirmware` already names. 11 groups → 10. Re-run
-`node docs/doc-sync.js`.
+`groupDefinitions.duet` at [:118](MPCNC_v4.0_Beta2.cps#L118) — **:118, not the :117 this line said until
+2026-08-13**. Two properties for a variant `jobSelectedFirmware` already names. 11 groups → 10, and
+**66 properties → 64** if both fold away rather than relocate — 66 because 0.2 is deferred and nothing
+that landed touched the count. **Re-count at the edit rather than trusting any figure here**; `doc-sync`
+is 19 commits behind (C7) and cannot arbitrate. Re-run `node docs/doc-sync.js`.
 
-### 0.6 — HR-13, the `onCommand` gap
+⚠️ **This is now the only item left in Step 0, and it owns the `REG-MF` collision on its own.** It deletes
+two properties and moves a group boundary, so it is the change that invalidates the factory-default
+baseline before that baseline has ever been posted. Post `REG-MF` first, or accept re-posting it — but
+decide before editing, not after. Nothing else in Step 0 touches the property dump any more.
 
-Unchanged from the previous plan: `onCommand` silently discards commands it does not
-name ([:2641-2706](MPCNC_v4.0_Beta2.cps#L2641)). A complete diff per `PReview.md`:281.
+### 0.6 — HR-13, the `onCommand` gap ✅ **DONE 2026-08-13 — half applied, half refused**
 
-**Its row is in `docs/PReview.md` too** — the same professional-register rule as 0.2, and
-`HReview.md` does not carry it. Unlike HR-10, this diff has **not** been found to conflict with
-anything, so apply it as written rather than superseding it.
+`onCommand` silently discarded commands it did not name. **Its row is in `docs/PReview.md`**, the same
+professional-register rule as 0.2, and `HReview.md` does not carry it.
+
+**The line that stood here — *"this diff has not been found to conflict with anything, so apply it as
+written"* — was wrong, and this is the second registered diff in Step 0 that does not survive being
+checked.** Two defects, one in each half:
+
+1. **The warning.** The diff used `writeComment(eComment.Important, " >>> WARNING: …")`. That is gated on
+   Comment Level, and HR-13's own complaint is that *"at Comment Level `Important` or `Off` not even the
+   naming comment survives."* At `Off` the fix would have vanished exactly like the thing it fixes, and it
+   would have re-opened `HReview.md` **HB-9**, which routed all thirteen `>>> WARNING:` sites through
+   `writeWarning()` precisely so a warning outlives the gate. **Landed through `writeWarning()`.**
+2. **`case COMMAND_OPTIONAL_STOP: M1` — refused, on the firmware's own source.** The diff's premise is
+   *"`M1` is supported by all three targets, so there is no reason to drop it."* True of the parsers, false
+   of the behaviour, and the three disagree in the worst possible way: grbl 1.1 `grbl/gcode.c` has
+   `case 1: break; // Optional stop not supported. Ignore.` — **accepted, no error, nothing pauses**;
+   RepRapFirmware `src/GCodes/GCodes2.cpp` handles `case 0: // Stop`, `case 1: // Sleep`, `case 2: // Stop`
+   in one block, so mid-file `M1` **ends the job**; only Marlin does what Fusion means
+   (`Marlin/src/gcode/lcd/M0_M1.cpp`, under HB-1's `HAS_RESUME_CONTINUE`). **So the diff would have shipped
+   a no-op on the default firmware and a job abort on another.** *Optional stop* now warns instead of
+   vanishing, and is honoured nowhere; promoting it to an unconditional `M0` is a dialog decision and is
+   filed in `PReview.md` §6.
+
+**HR-13 is `◑ part-fixed`, not fixed** — the silence is gone, the command is still not honoured. Its long
+form is kept for the half that is owed, and the three firmware citations live in it. Verified by **§3.8**.
 
 ---
 

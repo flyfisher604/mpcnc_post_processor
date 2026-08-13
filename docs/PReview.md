@@ -7,9 +7,11 @@
 > the professional's chair, walking every multi-WCS / multi-fixture / tool-change path — is still
 > owed, and will add findings this file does not have.
 >
-> **Almost nothing here is committed code.** Every finding below is unimplemented and its diffs are
-> proposals rather than records — with one exception, **HR-20**, whose manual-spindle half was
-> part-fixed on 2026-07-31 alongside `HReview.md` HR-12.
+> **The two id series are not in the same state, and the difference matters when reading a row.** Every
+> `HR-` diff below is a proposal rather than a record, with two exceptions — **HR-20**, part-fixed
+> 2026-07-31 alongside `HReview.md` HR-12, and **HR-13**, part-fixed 2026-08-13 by Step 0.6 of
+> `Assessment/09-plan.md`. The `PR-` findings are the other way round: all but PR-4 are **landed code**,
+> and none of it has been posted.
 
 **Standing rule** for updating this register — add the Do→Get row in the same commit, retire the long
 form on close — is `CLAUDE.md` → *Registers ship with the code*, and `/close-finding` runs it.
@@ -47,10 +49,12 @@ everything the README puts outside the hobbyist's reach:
 
 ## 2. Findings
 
-**✅ 10 fixed · ◑ 1 part-fixed · ⬜ 7 open — 18 findings.** The `HR-` ids were found by the hobbyist pass
+**✅ 11 fixed · ◑ 2 part-fixed · ⬜ 6 open — 19 findings.** The `HR-` ids were found by the hobbyist pass
 and reclassified as professional, and are **kept deliberately** so commit history, `HReview.md` and this
-file all name the same defect the same way; `PR-` ids were found by this file's own machine-frame review.
-Only the ten `PR-` fixes are committed code — every `HR-` diff below is a proposal, not a record.
+file all name the same defect the same way; `PR-` ids were found by this file's own machine-frame review,
+**except PR-12**, which the over-engineering assessment found and which continues the series rather than
+opening a fourth one in a file that already carries three. Committed code is the eleven `PR-` fixes plus
+HR-13's landed half; every other `HR-` diff is a proposal, not a record.
 **PR-8 … PR-11 are defects in PR-2 / PR-6's own landed code**, found by a review of the branch before it
 was ever posted, and they are separate ids rather than clauses on PR-6 because commit messages cite ids
 and a `✅ fixed` row must not quietly cover a second fix.
@@ -64,21 +68,24 @@ and a `✅ fixed` row must not quietly cover a second fix.
 | **PR-5** | The machine-frame rework left the dialog asking **two questions per concept**: group 4 posed one machine's homing as two independent booleans, and group 5 carried two clearance fields that `Fixed Z Reference` made **mutually exclusive** — never both read, read at the same two moments, and naming the same physical plane | Medium | Group 4 → `Axes Homed and Trusted` (`None`/`XY Only`/`Z Only`/`XYZ`), information-identical to the booleans, read only through `machineHomesXY()`/`machineHomesZ()`. Group 5 → one `Inter Part Travel Z` whose frame follows `Fixed Z Reference`. **The merge forces the empty default**: with a live default, flipping the enum would emit a valid-looking height in the wrong frame under no guard. Two new spoilboard guards (unset, and `<= 0` — the detectable direction of the flip) and a frame-naming header echo carry the residual risk. 71 → 70 properties. **Three keys replaced, so all three settings reset** — a release-notes item | ✅ fixed |
 | **PR-6** | `At End Go to 0,0` never said **which** X0 Y0, and it is the **last section's WCS** — so on a multi-part job the tool parks at whichever fixture Fusion happened to order last, and re-ordering operations silently moves the park point. Same species as PR-4's `Tool Change Z` | Medium | Enum `Off` / `Work X0 Y0` / `Machine X0 Y0`, default `Work` (today's behaviour, now named). The machine answer is **firmware-split, not firmware-excluded**: `G53 G0 X0 Y0` on GRBL/RepRap, `G28 X Y` on Marlin — which re-establishes the frame instead of addressing it, so it needs neither `CNC_COORDINATE_SYSTEMS` nor `Home at Job Start`. Guard requires X/Y declared on every firmware, and `Home at Job Start` on GRBL/RepRap only. Retracts before parking when a fixed Z reference exists, closing **HR-16**'s Z half for this path. **boolean→enum resets the setting, and asymmetrically — anyone who had it OFF gets the move back ON**. Relocated to group 4 and rekeyed by **PR-7** | ✅ fixed |
 | **PR-7** | Group 4 still asked **two questions about one homing decision** — `Home at Job Start` plus `Prompt Before Home`, the second **inert whenever the first was off** and saying so in its own tooltip: four dialog settings, three distinct behaviours. And PR-6's new park sat in group 1 while being guarded by group 4 | Medium | One enum, `Home at Job Start` = `Off` / `Home` / `Pause, then Home`, read only through `homesAtJobStart()` / `promptsBeforeHome()`. **Unlike PR-5's axis merge this is not information-preserving — it deletes the meaningless state**, which is the stronger reason to merge and the one PR-5 could not claim. `At End Park At` moved to group 4 and its key renamed `machineParkAtEnd` so the prefix matches the group, per this file's own key convention. Group 4 is now declaration / action / park; group 1 loses a control. **Both key changes reset those settings**, and the homing one resets to `Off` — the inert direction, deliberately: the reverse would add unexpected motion to a job that never asked for it | ✅ fixed |
-| **PR-8** | PR-6's park asked *is a base reserved?* where it needed *was a fixed Z reference **established**?*, and the two differ on Marlin. A Marlin job with `Fixed Z Reference = Spoilboard` + `At End Park At = Machine` passes every guard — the park's own guard sits **above** Guard C's Marlin return, the base's RepRap-slot check **below** it — and then transits a base `writeBaseEstablish()` refused to write, emitting `G55` / `G0 Z40` / `G54` on a firmware where `G54`–`G59` is itself a build option, and `Gundefined` for a `G59.1`–`G59.3` base. The same test also let the **no-fixed-reference** job park in silence: a full-diagonal bed crossing at the last operation's finishing Z, while `onClose()`'s comment asserted the opposite | Med-High | One predicate, `parkCanRetract()` = *not Marlin* **and** `fixedZEstablishedAtStart()`, read by the emission and by a new post-time `warning()` so the two cannot drift. When it is false the park now says so in the file rather than retracting into a frame that does not exist — the honest statement of `HReview.md` **HR-16** reached down a second path, not a fix for it. `onClose()`'s comment corrected | ✅ fixed |
+| **PR-8** | PR-6's park asked *is a base reserved?* where it needed *was a fixed Z reference **established**?*, and the two differ on Marlin. A Marlin job with `Fixed Z Reference = Spoilboard` + `At End Park At = Machine` passes every guard — the park's own guard sits **above** Guard C's Marlin return, the base's RepRap-slot check **below** it — and then transits a base `writeBaseEstablish()` refused to write, emitting `G55` / `G0 Z40` / `G54` on a firmware where `G54`–`G59` is itself a build option, and `Gundefined` for a `G59.1`–`G59.3` base. The same test also let the **no-fixed-reference** job park in silence: a full-diagonal bed crossing at the last operation's finishing Z, while `onClose()`'s comment asserted the opposite | Med-High | One predicate, `parkCanRetract()` = *not Marlin* **and** `fixedZEstablishedAtStart()`, read by the emission and by a new post-time `warning()` so the two cannot drift. When it is false the park now says so in the file rather than retracting into a frame that does not exist — the honest statement of `HReview.md` **HR-16** reached down a second path, not a fix for it. `onClose()`'s comment corrected. **`parkCanRetract()` no longer exists** — Step 0.4 inlined it on 2026-08-13, the name having outlived its purpose once `fixedZEstablishedInFile()` carried the firmware test; both callers still read that one function, so what this row bought — the emission and the warning cannot disagree — is unchanged | ✅ fixed |
 | **PR-9** | PR-6's `G53 G0 X0 Y0` park block carries **no `F` word**, alone among the post's rapids — `rapidMovementsXY`/`Z` and its own sibling `writeMachineTravelZ()` all emit one. On firmware that honours the modal feedrate for `G0`, the longest move in the job crosses the bed at whatever feed the last **cut** commanded | Medium | `fFormat` (not `fOutput` — `resetAll()` has just cleared the tracked `F`) at `Travel Speed XY`, matching `writeMachineTravelZ()` exactly | ✅ fixed |
 | **PR-10** | PR-2 made the preamble **move the tool** — step 5 establishes the fixed Z reference, step 6 records the first part's origin — so under **both** implementations the "current position" step 6 reads is bed clearance. `Set X0 Y0 to Current Pos, Probe Z0` (the **default**) then writes HR-1's provisional `Z0` there, turning `G38 Target -10` into a 10 mm descent from bed clearance: the probe never reaches the stock and the controller alarms. `Set X0 Y0 Z0 to Current Pos` fails quieter and worse — clearance *becomes* the part's `Z0`. The spoilboard half predates PR-2; the machine-Z answer is a second route to it, and none of PR-2's six guards covers either | Med-High | Post-time `warning()` naming the establish as the cause and the two sound modes as the answer. **Not a code fix, and cannot be one:** the distance from clearance to the stock top is exactly what the probe exists to discover. The `Jog to …` modes are deliberately exempt — there the operator positions the tool *after* the establish, which is the condition HR-1's provisional `Z0` was sound under all along | ✅ fixed |
 | **PR-11** | HR-28's post-time GRBL jog warning tests `Subsequent WCS / Part` unconditionally, but that control is consulted only on a genuine WCS change (`writeWCS()`'s `isTraverse`) — so a **single-WCS** job warns about a pause its file will not contain. Its neighbour, the stored-offset warning, already carried the gate | Low-Med | `multiWcs` hoisted to one local and applied to the subsequent-part half only. The first-part half stays ungated: that mode runs on every job | ✅ fixed |
 | **HR-7** | `toolChange()` clobbers `forceSectionToStartWithRapid`, defeating "First G1 → G0" on every tool-change section | Medium | Lands with the Phase 4 reorder below | ⬜ open |
 | **HR-8** | Post-injected motion never updates Fusion's tracked position | Medium | Lands with Phase 4. Confirmed unreachable on any hobbyist path (2026-08-01) | ⬜ open |
 | **HR-9** | `Do First Change` with `Probe After Tool Change` off zeroes Z against the wrong tool | Medium | Lands with Phase 4 | ⬜ open |
-| **HR-10** | `Disable Z Stepper` emits Marlin-only `M84 Z` on GRBL | Medium | **Complete diff, independent of the reorder** — can go first as a warm-up commit | ⬜ open |
-| **HR-13** | `onCommand` silently discards every command it does not name | Low-Med | **Complete diff, independent of the reorder** — can go first as a warm-up commit | ⬜ open |
+| **HR-10** | `Disable Z Stepper` emits Marlin-only `M84 Z` on GRBL | Medium | ⚠️ **Do not apply the diff in the long form below.** It keeps the property and guards it by firmware, so Marlin still gets the bare `M84 Z`, and its Pass line *requires* that — while the post's own comment at the program-end `M84 S60` is that a bare `M84` releases at once and an unbalanced LowRider gantry with no brake sinks in Z when it does. **The dialect fix would leave the hazard standing on the one firmware that can execute it.** Filed as a dialect bug, it is also a safety bug; nobody saw it because the two facts sat in different files. **Deferred by the author 2026-08-13** to the complete tool-change solution, with Phase 4 and HR-7 / HR-8 / HR-9 — not a warm-up commit after all | ⬜ open |
+| **HR-13** | `onCommand` silently discards every command it does not name | Low-Med | `<sha>` (2026-08-13, Step 0.6) — **the silence is fixed; the `M1` half is refused, and the diff this row promised was wrong.** Every unnamed command now reaches a `writeWarning()` below the `switch`, so it survives Comment Level `Off` — this row's own diff used `writeComment(eComment.Important, …)`, which is the very gate it complains about and would have re-opened HB-9. **`case COMMAND_OPTIONAL_STOP: M1` was NOT applied:** its premise, *"`M1` is supported by all three targets"*, is true of the parser and false of the behaviour — see the long form for the three citations. So *Optional stop* now warns instead of vanishing, and is still not honoured | ◑ part-fixed |
+| **PR-12** | **An F360 probing operation refused with Autodesk's generic cycle text, so the one dialog the operator ever sees said nothing they could act on** — and the refusal is permanent, not a gap waiting to be filled: a probing operation asks the *control* to measure several points and **compute** an offset, which GRBL and Marlin have no arithmetic to do. `onCyclePoint()` called `cycleNotSupported()`, whose message names the cycle and stops. **Raised by the over-engineering assessment** (`Assessment/03-f360-and-firmware.md` §5b), which also settled that the refusal itself is correct — expanding a probing cycle would emit plain `G0`/`G1` with no `G38` at all and drive the tool into the work at feed rate | Low | `<sha>` (2026-08-13, Step 0.3) — one `error(localize(…))` in place of `cycleNotSupported()`, naming the reason and the two things that do work: set the offset by hand in the sender, or use the post's own Z touch-off. **`error()` and not a `>>> WARNING:` comment**, which is what the plan prescribed: the post aborts here, so there is no file for a comment to be read in, and the operator's only channel is the dialog. Same shape as the tool-orientation and radius-compensation refusals, which already replace the SDK's generic text with the post's own | ✅ fixed |
 | **HR-20** | Tapping is not really implemented | Medium | Manual path prompts (via HR-12); the automatic path always emitted `M4`. **Not tool-change work and does not wait for Phase 4** — it is here only because tapping was *decided* to be professional | ◑ part-fixed |
 | **HR-26** | The base-clearance retract has no tool-0 / jet guard though the base *establish* does, so a jet job transits a base whose Z0 was never set — an absolute `G0 Z` in an unestablished frame | Medium | **Not started.** Write-up, the reproduction and the three candidate fixes are §3.4's row. Belongs to §5's jet workstream, but it is a Guard-B-shaped hole rather than a jet feature gap. **Row added 2026-08-07** when `HReview.md` stopped carrying a stub copy — the finding is unchanged | ⬜ open |
 
-The five tool-change findings — HR-7, HR-8, HR-9, HR-10, HR-13 — land **as one unit** with the ordering
-rework below, rather than patching the same section-boundary code twice. HR-10 and HR-13 are the
-exception that can go first, being independent of the reorder.
+The five tool-change findings — HR-7, HR-8, HR-9, HR-10, HR-13 — were to land **as one unit** with the
+ordering rework below, rather than patching the same section-boundary code twice, and HR-10 and HR-13 were
+named as the two that could go first. **That is now four, and one:** HR-13 landed alone on 2026-08-13
+because `onCommand()` is not section-boundary code at all and never was; HR-10 turned out to be the
+opposite of a warm-up commit and is deferred to the tool-change work with the other three.
 
 #### Phase 4 — tool-change ordering + base-relative park *(design settled; not built)*
 
@@ -243,6 +250,10 @@ by their exact dialog titles. Second post with the re-probe **on**: no warning, 
 
 ### HR-10 — `Disable Z Stepper` emits Marlin-only `M84 Z` on GRBL — **Medium** · `READ`
 
+> ⚠️ **The diff below is unsafe and must not be applied as written** — it preserves the bare `M84 Z` on
+> Marlin, and its Pass line requires it. See the row above. The write-up is kept because the *diagnosis*
+> is sound and the tool-change work needs it; only the remedy is wrong.
+
 **Reaches it:** GRBL, group 07 enabled with `Disable Z Stepper` on — a reasonable choice on a
 machine whose Z drifts under a heavy spindle.
 
@@ -282,31 +293,29 @@ present, no warning — proving the Marlin path is untouched.
 
 **Reaches it:** Manual NC *Optional stop*, *Display message*, or *Orientate spindle*.
 
-`onCommand()` opens with an `Info` comment naming the command, then a `switch` with no `default:`.
-`COMMAND_STOP` → `M0`; `COMMAND_OPTIONAL_STOP` → nothing at all. So Manual NC *Optional stop*
-produces no `M1`, and at Comment Level `Important` or `Off` not even the naming comment survives —
-the instruction vanishes without trace. `M1` is supported by all three targets, so there is no
-reason to drop it; and an explicit `default:` turns every future gap into a visible warning.
+**The silence is closed** (Step 0.6, 2026-08-13): every command the `switch` does not name now reaches a
+`writeWarning()` below it, so the operator is told the instruction was dropped even at Comment Level
+`Off`. The write-up survives for the half that is **still owed**, and because the reasoning that stopped
+it needs to be findable.
 
-```diff
-     case COMMAND_STOP:
-       writeBlock(mFormat.format(0));
-       return;
-+    case COMMAND_OPTIONAL_STOP:
-+      writeBlock(mFormat.format(1));
-+      return;
-   }
-+
-+  // Anything not named above reaches here. The Info comment at the top of this function is the only
-+  // trace otherwise, and it disappears entirely at Comment Level Important/Off.
-+  writeComment(eComment.Important, " >>> WARNING: command " + getCommandStringId(command)
-+    + " is not supported by this post and was not emitted");
- }
-```
+**What is still owed: `Optional stop` is warned about, not honoured.** This row asked for
+`case COMMAND_OPTIONAL_STOP: writeBlock(mFormat.format(1))`, on the grounds that *"`M1` is supported by
+all three targets, so there is no reason to drop it."* That is true of the **parsers** and false of the
+**behaviour** — all three accept `M1` and all three do something different with it:
 
-**Verify (Do → Get).** *Do:* add Manual NC *Optional stop* to an operation and post. *Get:* `M1` at
-the Manual NC's position. **Pass:** `M1` present. Second check: Manual NC *Orientate spindle* → a
-`>>> WARNING: command COMMAND_ORIENTATE_SPINDLE …` comment appears instead of silence.
+| Firmware | `M1` | Source |
+|---|---|---|
+| **GRBL** | Parsed and **ignored**. Nothing pauses, and no `error:` is returned — so the file streams clean and the stop the operator asked for simply does not happen | grbl 1.1, `grbl/gcode.c`, modal group M4: `case 1: break; // Optional stop not supported. Ignore.` |
+| **RepRapFirmware** | **Ends the job.** `M0`, `M1` and `M2` are handled in one block, so an *optional stop* placed mid-file stops or cancels the print at that line | `Duet3D/RepRapFirmware`, `src/GCodes/GCodes2.cpp`: `case 0: // Stop`, `case 1: // Sleep`, `case 2: // Stop` |
+| **Marlin** | Does what Fusion means — waits for an LCD click, `M1` being identical to `M0` in the handler — and only under HB-1's `HAS_RESUME_CONTINUE` gate | `MarlinFirmware/Marlin` 2.1.x, `Marlin/src/gcode/gcode.cpp` `#if HAS_RESUME_CONTINUE / case 0: / case 1: M0_M1(); break;` and `src/gcode/lcd/M0_M1.cpp` |
+
+So the diff would have emitted a **no-op on the default firmware and a job abort on another**. Warning
+and emitting nothing is the honest answer and is what landed. **The open question is a dialog decision,
+not a bug fix:** promote *Optional stop* to an unconditional `M0` — which does pause on all three, and is
+what `COMMAND_STOP` already emits — or leave it refused? Promoting changes what the operator asked for,
+which is why it is not folded into a warm-up commit. **§6** carries it.
+
+**Verify (Do → Get).** In §3.8.
 
 ---
 
@@ -369,7 +378,7 @@ operation in the same post is unaffected and still expands to plain `G0`/`G1`.
 
 ## 3. Test register
 
-**✅ 0 PASS · ❌ 0 FAIL · ⬜ 58 UNRUN · ➖ 7 n/a or moved — 65 rows.** Nothing professional has been
+**✅ 0 PASS · ❌ 0 FAIL · ⬜ 61 UNRUN · ➖ 6 n/a or moved — 67 rows.** Nothing professional has been
 verified yet; this is the whole of what the professional side owes. Absorbed from the Beta-2 test plan.
 
 Every row is a delta from the defaults fixed in `conventions.md` → *How to run a test*; the one
@@ -425,7 +434,9 @@ hold it, and the *Expect* must exist in exactly one place.
 | **HR-8** | Tracked position after post-injected motion | — verified by **P8**'s matrix | — | §2 | ➖ |
 | **HR-9** | `Do First Change` zeroes Z against the right tool | — verified by **P8**'s matrix | — | §2 | ➖ |
 | **HR-10** | `Disable Z Stepper` is not Marlin-only | — has a complete diff; folds into **P8** | — | §2 | ➖ |
-| **HR-13** | `onCommand` no longer discards silently | — has a complete diff; folds into **P8** | — | §2 | ➖ |
+| **HR-13** | `onCommand` no longer discards silently, and says so at Comment Level `Off` | Manual NC *Orientate spindle* on an operation, then again at Comment Level `Off` | posted | §3.8 | ⬜ |
+| **PR-12** | A probing operation refuses with the post's own reason, and still refuses | any Inspection / probing operation, GRBL | posted | §3.8 | ⬜ |
+| **REG-S0** | Step 0.3 / 0.4 / 0.6 move no byte of an ordinary job | GRBL/mm defaults, no Manual NC, no probing operation | posted | §3.8 | ⬜ |
 | **HR-20** | Tapping beyond a warning on the manual path | a drill + tap job, automatic spindle | posted | §2 | ⬜ |
 | **PR-1a** | The capability/action split emits what the old enum did, and nothing when the action is off | group 04 declarations × `Home at Job Start`, GRBL then Marlin | posted | §3.6 | ⬜ |
 | **PR-1b** | The stored-offset warning fires on the trusting modes and **never** on the `Jog …` modes | 2-WCS job, `Axes Homed and Trusted` = `None` off, each origin mode in turn | posted | §3.6 | ⬜ |
@@ -922,6 +933,38 @@ regression row and should run first**; the rest exercise a path that has never e
       the homing action at `Off` and the park at `Work X0 Y0` — both keys were replaced, and `Off` is the
       inert direction for the one that moves the machine.
 
+### 3.8 Step 0 of the over-engineering plan (landed unposted)
+
+Added 2026-08-13. `Assessment/09-plan.md` Step 0 items **0.3**, **0.4** and **0.6**, landed together. None
+adds, removes or renames a property, so **the property dump does not move and `REG-MF` is not invalidated**
+— which is why these three could land before it is posted where 0.2 and 0.5 cannot.
+
+- [ ] **PR-12 — a probing operation refuses in the post's own words.** *Do:* any Fusion Inspection /
+      probing operation in an otherwise ordinary GRBL job, and post it. *Get:* **no output file**, and
+      Fusion's error dialog reading `WCS probing is not supported. A probing operation asks the controller
+      to measure several points and then COMPUTE the work offset from them; …` through to
+      `… or use this post's own Z touch-off in the "On WCS / Part / Fixture Changes" property group.`
+      **Pass: the refusal still happens** — the discriminator is the *absence* of a posted file, not the
+      presence of the text. A message that arrived alongside a file would mean the abort had been lost,
+      which is the one regression this change could cause. Second post, the same job with the probing
+      operation **suppressed**: it posts, byte-identical to before — `isProbeOperation()` is unchanged and
+      must still be reached only by a probing cycle. *Needs the Machining Extension to author the
+      operation, so it is the one row here a Personal licence cannot run.*
+- [ ] **HR-13 — an unnamed command warns instead of vanishing.** *Do:* add Manual NC *Orientate spindle*
+      to an operation and post at the default Comment Level `Info`. *Get:* at the Manual NC's position,
+      the existing `( COMMAND_ORIENTATE_SPINDLE)` trace **followed by**
+      `( >>> WARNING: command COMMAND_ORIENTATE_SPINDLE is not supported by this post and was not emitted)`.
+      **Pass:** the warning is present. *Discriminator — post the same job again at Comment Level `Off`:
+      the `( COMMAND_…)` trace disappears and the warning stays.* That is the whole point of the row and
+      the one thing this row's own proposed diff would have failed. Third post, Manual NC **Stop**:
+      `M0` and **no warning**, proving a named command is untouched.
+- [ ] **REG-S0 — an ordinary job is byte-identical.** *Do:* GRBL/mm factory defaults, no Manual NC and no
+      probing operation; re-post any verified reference job. **Pass: byte-for-byte identical output.** All
+      three changes are unreachable on that job — 0.4 is a pure inline, 0.3 fires only on a probing cycle,
+      0.6 only on a command the `switch` does not name, and every command the post routes itself is named.
+      *If anything differs, the likeliest cause is that Fusion's kernel calls `onCommand()` with something
+      unnamed on every job, which is exactly what the old silence would have hidden.*
+
 ---
 
 ## 4. Checked and found correct — do not re-run
@@ -1088,6 +1131,12 @@ Professional or nice-to-have; none is scheduled, and none is a defect.
   all a panel change can do; the durable fix is a `validateJob()` warning when the selected code's dialect
   and `CNC Firmware` disagree. Cheap — the dialect is already in each option's title. The same argument
   covers `Use custom`, where the post cannot know the dialect at all and should say nothing.
+- **Manual NC *Optional stop* — promote it to `M0`, or leave it refused?** HR-13's landed half warns that
+  the command was dropped; this is the decision about honouring it. `M1` is not available: it is ignored by
+  GRBL and ends the job on RRF (citations in HR-13). `M0` pauses on all three and is what `COMMAND_STOP`
+  already emits — but it makes an *optional* stop unconditional, which is not what the operator asked for,
+  and the post has no way to offer the choice the control lacks. **A dialog question, not a defect**: a
+  group-1 property, or a documented "use Stop, not Optional stop" line in the guides.
 - **`permittedCommentChars` global.** A comparable community GRBL post declares it; research whether it
   adds real kernel-side filtering on top of `sanitizeMessageText()` before adding — may be informational.
 - **Global-metadata gaps.** Optionally `model`. Cosmetic.
@@ -1110,9 +1159,12 @@ this section when it empties** — Rule 4.
 
 What this register owes, not the order to do it in — that is the checkpoint's job.
 
-1. **Every one of the 37 rows.** Nothing professional has been posted. §3.1 is the largest untested area
-   in the post and needs a job nobody has built: a 2-copy Replicate or a two-Setup job.
+1. **Every one of the 67 rows** — the figure here read `37` until 2026-08-13, a count left behind when §3
+   absorbed the Beta-2 test plan; §3's own header has been right all along. Nothing professional has been
+   posted. §3.1 is the largest untested area in the post and needs a job nobody has built: a 2-copy
+   Replicate or a two-Setup job.
 2. **J4 first among the jet rows** — group `09` has never appeared in *any* posted file, and CR-10
    landed a fix there sight-unseen. `HReview.md`'s `CR-10 (A)` is that post and serves both registers.
 3. **P8 waits on Phase 4.** It is the matrix that proves the tool-change reorder, so it cannot run until
-   §2's five findings land.
+   §2's tool-change findings land — **four of them, not five**: HR-13 left that unit on 2026-08-13, and
+   HR-10 joined it, having been named as a warm-up commit and turned out to be the opposite.

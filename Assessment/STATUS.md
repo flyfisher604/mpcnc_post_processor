@@ -9,14 +9,19 @@ Reviewed HEAD = `CoverageFixes` (3,758 lines).
 evidence in the review).**
 
 **Now on branch `Assessment`**, cut from `CoverageFixes` on 2026-08-13. `d010fee` restores
-`docs/PReview.md` (1,118 lines), `40fc3c7` adds these twelve documents, `b0ffc33` schedules
-Phase C, and a fourth commit executes C2, C3 and C5. **No post code has been edited.**
-`CoverageFixes` is itself unmerged into `master`, so this branch sits on unmerged work —
-harmless for documents, relevant the moment a code step lands.
+`docs/PReview.md`, `40fc3c7` adds these twelve documents, `b0ffc33` schedules Phase C, a fourth
+commit executes C2/C3/C5, a fifth closes C6 and checks Steps 0 and 1 for readiness, and a sixth
+**lands the first post code of the plan — Step 0.3, 0.4 and 0.6.** `CoverageFixes` is itself
+unmerged into `master`, so this branch sits on unmerged work — which stopped being merely
+academic the moment that sixth commit landed.
 
-**Phase C is done except C4 and one read.** `C0` `C1` `C2` `C3` `C5` complete; **`C4`
-deferred by the author**; `C6` dated and re-scoped, its read still owed before Steps 2 and 5;
-`C7` `C8` `C9` are records, not actions. Nothing in it touched the post.
+**Phase C is done except C4.** `C0` `C1` `C2` `C3` `C5` complete; **`C4` deferred by the
+author**; **`C6` closed by deleting both branches unread**, one remote command outstanding;
+`C7` `C8` `C9` are records, not actions. Nothing in Phase C touched the post.
+
+**Step 0 is done except 0.5**, with **0.2 deferred by the author** to the complete tool-change
+solution. See *Step 0 executed* below: three of its four items departed from their own written
+instructions, and two registered "complete diffs" turned out to be unsafe.
 
 **Three things Phase C turned up that the plan did not predict:**
 
@@ -173,7 +178,7 @@ less code than has been written for it.
 | 6 — retention | `06-retention.md` | DONE — **per-property verdicts added** | Reset closed. **Group 6: 10 properties → 9, 14 enum decisions → 9.** Four of ten options don't work on GRBL — the post says so itself |
 | 7 — code map | `07-code-map.md` | DONE — **verdicts revised a second time** | Group 6 is **blocked**, not untested; **Group 5 retires**; Group 7 gets concrete recommendations and 7b moves onto Group 8's include-file hook |
 | 8 — the target | `08-target.md` | DONE — revised | ~3,300–3,450 lines, ~60 properties, **9 groups**, 0 findings, 6 posted multi-part jobs, ≥1 posted tool-change job |
-| 9 — the path | `09-plan.md` | DONE — **rewritten, given a Phase C, and Phase C now executed** | **Phase C (C0–C9) + 8 steps**, each with Goal / Why / Where / The change / Done when / Findings / **Prompt**. `C0` `C1` `C2` `C3` `C5` done, `C4` deferred, `C6` dated and re-scoped |
+| 9 — the path | `09-plan.md` | DONE — **rewritten, given a Phase C, and Phase C and most of Step 0 now executed** | **Phase C (C0–C9) + 8 steps**, each with Goal / Why / Where / The change / Done when / Findings / **Prompt**. `C0` `C1` `C2` `C3` `C5` done, `C4` deferred, `C6` closed unread; **Step 0: 0.3 / 0.4 / 0.6 done, 0.2 deferred, 0.5 left** |
 | 10 — project cleanup | `10-project-cleanup.md` | DONE — **now scheduled, not just recommended** | **`PReview.md` restored and committed.** Its items are `09-plan.md` Phase C; this page keeps the reasoning. `design.md` owes six changes including a rewritten line 23 |
 
 ## Readiness for Steps 0 and 1 — checked 2026-08-13
@@ -212,10 +217,48 @@ is a decision.**
 4. **The decision: Step 0 invalidates a baseline that has never been established.** `plan.md`'s
    outstanding item 0 (REG-MF) expects a diff of *"the property dump, the Resolved-Values block
    and every `F` word."* **0.2 and 0.5 delete three properties between them.** Post REG-MF first,
-   or accept re-posting it after Step 0 — but decide it deliberately.
+   or accept re-posting it after Step 0 — but decide it deliberately. **Now narrowed to 0.5
+   alone** — see below.
 
-**Recommended order:** settle (4), then run **0.2 → 0.6 → 0.3 → 0.4 → 0.5** from the repository
-while 1.1 waits on Fusion time. 0.5 is last because it is the one that also moves a group boundary.
+## Step 0 executed — 2026-08-13
+
+**0.3, 0.4 and 0.6 are landed code. 0.2 is deferred by the author** to the complete tool-change
+solution, with Phase 4 and HR-7 / HR-8 / HR-9. **0.5 is all that remains of Step 0.**
+
+**The `REG-MF` collision is deferred with 0.2, not resolved.** None of the three items that landed
+adds, removes or renames a property, so the property dump does not move and the baseline is still
+postable from `HEAD`. **0.5 brings the collision back on its own** — it deletes two properties and
+moves a group boundary — so that decision is now attached to 0.5 in the plan rather than to Step 0
+as a whole.
+
+**Three of the four items departed from their own written instructions, and every departure came
+from checking the plan's claim instead of executing it.**
+
+- **0.3 — the reason belongs in `error()`, not in a `>>> WARNING:` comment.** The plan said emit a
+  warning comment and keep `cycleNotSupported()`. But `cycleNotSupported()` calls `error()`, so the
+  post **aborts and writes no file**: the comment would have gone into output the operator never
+  receives, while the dialog — their only channel — kept Autodesk's generic text. One
+  `error(localize(…))` replaces it, matching the tool-orientation and radius-compensation refusals.
+  Filed as **PR-12**, ✅ fixed.
+- **0.4 — landed exactly as written**, and it is the only item with no register row behind it.
+- **0.6 — the registered diff was wrong in both halves.** *(a)* It used
+  `writeComment(eComment.Important, …)`, which is gated on Comment Level — so at `Off` the fix
+  would have vanished exactly like the silence it fixes, re-opening `HReview.md` **HB-9**. Landed
+  through `writeWarning()`. *(b)* `case COMMAND_OPTIONAL_STOP: M1` is **refused on the firmware's
+  own source**: grbl 1.1 `grbl/gcode.c` has `case 1: break; // Optional stop not supported.
+  Ignore.` — no pause, no error; RepRapFirmware `src/GCodes/GCodes2.cpp` handles `case 0: // Stop`,
+  `case 1: // Sleep`, `case 2: // Stop` in one block, so mid-file `M1` **ends the job**; only
+  Marlin does what Fusion means. **The diff would have shipped a no-op on the default firmware and
+  a job abort on another.** HR-13 is **◑ part-fixed**: the silence is gone, *Optional stop* is
+  honoured nowhere, and promoting it to `M0` is filed as a dialog question in `PReview.md` §6.
+
+**The lesson to carry into Step 1: a complete diff sitting in a register is a proposal that was
+never run, and its age is not evidence.** Two of the three registered diffs Step 0 touched were
+unsafe or self-defeating.
+
+**No output byte moves on an ordinary job** — 0.4 is a pure inline, 0.3 fires only on a probing
+cycle, 0.6 only on a command the `switch` does not name, and every command the post routes itself
+is named. `REG-S0` in `PReview.md` §3.8 is the row that proves it.
 
 ## What to do first
 
@@ -224,19 +267,24 @@ while 1.1 waits on Fusion time. 0.5 is last because it is the one that also move
 3. ~~**C5, the thirteen merged branches**~~ — **done**, `git branch -d`, tips recorded in the
    commit message. `git branch` now lists three. **No remote branch was touched**, and remote
    deletion remains the one irreversible action on that page.
-4. **Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it.** Now the first
-   unfinished thing in the plan. The critical path: cheap, and able to invalidate Steps 2–4 —
-   which is exactly why it goes first. Needs a Fusion keyboard; the paste-ready prompt is
-   written.
-5. ~~**C6's read**~~ — **overruled by the author: the two branches are to be deleted unread.**
+4. ~~**Step 0's repository work**~~ — **0.3, 0.4 and 0.6 done**; **0.2 deferred by the author**.
+5. **Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it.** The first unfinished
+   thing in the plan that does not wait on a decision. The critical path: cheap, and able to
+   invalidate Steps 2–4 — which is exactly why it goes first. Needs a Fusion keyboard; the
+   paste-ready prompt is written.
+6. **0.5 — fold group 11, and decide `REG-MF` before editing.** The last of Step 0, and the only
+   item left that moves the property dump. Runs from the repository alone, so it can go while 1.1
+   waits on Fusion time; the decision it needs is *post the baseline first, or accept re-posting
+   it.*
+7. ~~**C6's read**~~ — **overruled by the author: the two branches are to be deleted unread.**
    Over two years old, and they edit `MPCNC.cps`, a filename the project no longer has. **One
    command is outstanding**, run by the author:
    `git push origin --delete UpdateToolChange GRBL_Fixes`. Local tags
    `archive/UpdateToolChange` (`690e586`) and `archive/GRBL_Fixes` (`385edaf`) anchor the tips
    first, because `690e586` is contained by no other ref; drop them with `git tag -d` if the
    history is genuinely unwanted. **C6 no longer gates Steps 2 and 5.**
-6. **`docs/plan.md`'s 20-line overrun** — decide the trim or raise the budget. See above.
-7. ⏸️ **C4 — a status line in `guide-pro.md`. Deferred by the author 2026-08-13.** Not
+8. **`docs/plan.md`'s 20-line overrun** — decide the trim or raise the budget. See above.
+9. ⏸️ **C4 — a status line in `guide-pro.md`. Deferred by the author 2026-08-13.** Not
    rejected and not blocked: its first half needs nothing from Step 1.1, so it waits on a
    decision rather than on evidence. Until it lands, `guide-pro.md` describes the
    multi-fixture path in the same voice as the 24-file-verified hobby path — a known,
@@ -257,10 +305,19 @@ while 1.1 waits on Fusion time. 0.5 is last because it is the one that also move
   `docs/PReview.md` restored (`d010fee`); `Assessment/` committed (`40fc3c7`); Phase C
   scheduled (`b0ffc33`); then **C2/C3/C5 executed** — edits to `CLAUDE.md`, `docs/plan.md`,
   `docs/conventions.md`, `Coverage/CoverageFixes.md` and
-  `.claude/commands/close-finding.md`, plus thirteen local branch deletions. **No post code
-  edited, no register rows written, no memory writes, no remote refs touched.**
-- **Document budgets after C2/C3:** `CLAUDE.md` 60/60, `conventions.md` 295/300,
-  `plan.md` **143/120** — the one overrun, and the open item above.
+  `.claude/commands/close-finding.md`, plus thirteen local branch deletions; then **C6 closed**
+  and **Step 0.3 / 0.4 / 0.6 landed**.
+- **`MPCNC_v4.0_Beta2.cps` is edited from Step 0 onwards** — this line said *"no post code
+  edited"* until 2026-08-13. 3,758 → 3,786 lines, `node --check` passing, and **no output byte
+  moves on an ordinary job** (`REG-S0`). Register rows were written with it, in the same commit,
+  to `docs/PReview.md` (PR-12, HR-13, HR-10, PR-8, §3.8, §6) and `docs/HReview.md` (HB-17).
+  **No memory writes and no remote refs touched**, still.
+- **Document budgets after Step 0:** `CLAUDE.md` 60/60, `conventions.md` 295/300,
+  `plan.md` **143/120** — the open item above. `PReview.md` is **1,167** against a stated
+  *"≤ 920, and falling"*: it grew 49 lines here, because a register that carries a landed fix has
+  to carry its Do→Get row too. That budget was written for a file expected to shrink as the
+  professional review closed it out, and it retires when the review runs; it is not a reason to
+  file a row somewhere else, which is how seven ids went stale.
 - **Measurement convention.** PowerShell's `Measure-Object -Line` counts only **non-empty**
   lines — it reported `PReview.md` at 972 where git counted 1,118, and a "correction" on
   this page was wrong for a day because of it. Use `(Get-Content $f).Count` or

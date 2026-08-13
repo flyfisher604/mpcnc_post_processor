@@ -1564,8 +1564,9 @@ function validateJob() {
   }
 
   // The machine park crosses the bed, and writeMachineParkXY() can retract first only in a frame THIS
-  // JOB ESTABLISHED. A warning, not a guard: Fusion's own retract covers an ordinary milling job.
-  if (getProperty(properties.machineParkAtEnd) == "Machine" && !parkCanRetract()) {
+  // JOB ESTABLISHED -- the same fixedZEstablishedInFile() the park itself reads, so this warning and the
+  // file cannot disagree. A warning, not a guard: Fusion's own retract covers an ordinary milling job.
+  if (getProperty(properties.machineParkAtEnd) == "Machine" && !fixedZEstablishedInFile()) {
     warning(localize("\"At End Park At\" = machine X0 Y0 crosses the bed to the homing corner, but "
       + "this job establishes no fixed Z reference to retract in, so the tool makes that crossing "
       + "at whatever Z the last operation left it at. Set \"Fixed Z Reference\", or park at work "
@@ -2094,14 +2095,6 @@ function fixedZEstablishedInFile() {
   return usesMachineZDatum() || baseProbeCanRun();
 }
 
-// Can the end-of-job machine park retract before it crosses the bed? Only into a frame this job
-// established, which is the fixed Z reference and nothing else -- so on Marlin the answer is always no
-// however the dialog is set. Read by validateJob()'s warning and by writeMachineParkXY(), so the two
-// cannot drift apart. Its own name because the park's callers ask about the park.
-function parkCanRetract() {
-  return fixedZEstablishedInFile();
-}
-
 // Human-readable G-code name for a workOffset number, for comments/errors.
 function wcsName(n) {
   return n <= 6 ? ("G" + (53 + n)) : ("G59." + (n - 6));
@@ -2142,8 +2135,10 @@ function writeMachineTravelZ(reason) {
 // post never knew and cannot read back.
 function writeMachineParkXY() {
   // Retract before crossing the bed -- potentially a full diagonal. Only a job that ESTABLISHED a
-  // fixed Z reference can retract at all, which is what parkCanRetract() answers.
-  if (!parkCanRetract()) {
+  // fixed Z reference can retract at all, which is what fixedZEstablishedInFile() answers -- and it is
+  // false on all of Marlin by construction, however the dialog is set. validateJob() reads the same
+  // predicate for its warning, so the two cannot drift.
+  if (!fixedZEstablishedInFile()) {
     writeWarning("no retract before parking at machine X0 Y0 --"
       + (fw == eFirmware.MARLIN && getReservedBaseWcs() != 0
           ? " the reserved spoilboard base was not established on Marlin, so there is no frame to"
@@ -2470,8 +2465,20 @@ function isProbeOperation() {
 function onCyclePoint(x, y, z) {
   // WCS/inspection probing cannot be faked by expansion, which would emit plain G0/G1 moves with no
   // G38 at all. This post's own Z touch-off is separate; see probeTool().
+  //
+  // error() and not cycleNotSupported(): both abort, and the abort is right -- an F360 probing operation
+  // asks the CONTROL to measure several points and compute an offset from them, so on firmware with no
+  // arithmetic it is unimplementable rather than merely unimplemented. But the SDK helper names the
+  // cycle and stops there, and a refusal that is permanent has to carry the alternative or the operator
+  // has nowhere to go. The reason goes in the error() text rather than a warning comment because an
+  // aborted post leaves no file for a comment to be read in.
   if (isProbeOperation()) {
-    cycleNotSupported();
+    error(localize("WCS probing is not supported. A probing operation asks the controller to measure "
+      + "several points and then COMPUTE the work offset from them; GRBL and Marlin have no arithmetic, "
+      + "so there is no g-code to expand it into -- and expanding it anyway would emit plain G0/G1 moves "
+      + "with no G38 at all, driving the tool into the work at feed rate. Set the work offset by hand in "
+      + "the sender, or use this post's own Z touch-off in the \"On WCS / Part / Fixture Changes\" "
+      + "property group."));
     return;
   }
   expandCyclePoint(x, y, z);
@@ -2702,6 +2709,27 @@ function onCommand(command) {
       writeBlock(mFormat.format(0));
       return;
   }
+
+  // Anything this switch does not name reaches here. Until HR-13 it returned in silence: the Info
+  // comment at the top of this function was the only trace, and at Comment Level Important or Off not
+  // even that survives, so a Manual NC instruction left nothing behind at all. Below the switch rather
+  // than as a default: case so a future case that breaks instead of returning is caught too.
+  //
+  // writeWarning(), NOT writeComment(eComment.Important, ...) as HR-13's own diff proposed: HB-9's rule
+  // is that a warning outlives the level gate, and this one has no validateJob() twin to survive in --
+  // Manual NC is invisible to a post-time pass over the properties.
+  //
+  // COMMAND_OPTIONAL_STOP deliberately gets NO case emitting M1, which is the other half of what HR-13
+  // asked for, on the grounds that "M1 is supported by all three targets". All three parse it and it
+  // means three different things. grbl 1.1 grbl/gcode.c: "case 1: break; // Optional stop not supported.
+  // Ignore." -- accepted, no error, and nothing pauses. RepRapFirmware src/GCodes/GCodes2.cpp handles
+  // "case 0: // Stop", "case 1: // Sleep" and "case 2: // Stop" in one block, so mid-file it ENDS THE
+  // JOB. Only Marlin does what Fusion means: Marlin/src/gcode/lcd/M0_M1.cpp waits for the LCD, and only
+  // under HB-1's HAS_RESUME_CONTINUE. An optional stop this post cannot keep is better refused out loud
+  // than emitted as a no-op on the default firmware and a job abort on another; promoting it to an
+  // unconditional M0 changes what the operator asked for and is a dialog decision, not this fix.
+  writeWarning("command " + getCommandStringId(command) + " is not supported by this post and was not "
+    + "emitted");
 }
 
 function resetAll() {
