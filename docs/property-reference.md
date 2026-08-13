@@ -1,8 +1,3 @@
-<!-- doc-sync: MPCNC_v4.0_Beta2.cps @ 17a20f2
-     This file documents the post's dialog as of the commit above. It is NOT kept in sync
-     automatically. To refresh it, review only what changed in the post since that ref:
-       git diff 17a20f2..HEAD -- MPCNC_v4.0_Beta2.cps
-     Then bump the ref to the new HEAD. -->
 Property reference — every setting in the dialog
 ====
 

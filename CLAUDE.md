@@ -22,9 +22,8 @@ Do not read or search files under `./Test/` unless explicitly asked.
   is applied immediately. Proposing and applying are separate steps.
 - **Never propose a verification that needs a non-GRBL controller, a sender console or a dry run.** Settle
   firmware questions from the firmware's own source and changelog, and cite file and version.
-- `node --check` runs itself on every edit. **Nothing gates the documents** — their contracts in
-  `docs/conventions.md` are enforced in the diff, by a person. `node docs/doc-sync.js` answers the one
-  question a diff cannot: whether `property-reference.md` still matches the post.
+- `node --check` runs itself on every edit. **Nothing gates the documents** — every rule in them is
+  enforced in the diff, by a person.
 
 ## Registers ship with the code
 
@@ -53,7 +52,6 @@ side effect of another task. Repo docs are reviewed in a diff; memories go stale
 ## Leave alone
 
 - **The user guides** — `README.md` and `docs/guide-hobbyist.md` / `guide-pro.md` /
-  `property-reference.md`. Not touched during code changes, only when asked. The **`doc-sync` marker on
-  `property-reference.md`** records the ref they last synced to; refresh from
-  `git diff <ref>..HEAD -- MPCNC_v4.0_Beta2.cps`, then re-bump it.
+  `property-reference.md`. Not touched during code changes, only when asked — and **when they fall behind
+  the post, that is the author's call to make**, not something a session detects or acts on.
 - **`Personal.cps`** — a git-excluded test harness, not part of the post.
