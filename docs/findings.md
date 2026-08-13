@@ -26,6 +26,14 @@ because commit messages cite them and must still resolve.
 > rows** are renamed `FCR-` here — do not use zero-padding as the discriminator. Commit
 > messages and code comments dated before `c73726c` that say `CR-n` mean the older series.
 
+> **Nine `HR-` ids resolve to git only, and this predates the consolidation.** `HR-1`,
+> `HR-2`, `HR-4`, `HR-5`, `HR-11`, `HR-14`, `HR-15`, `HR-17` and `HR-23` lead commit
+> subjects but had already been dissolved out of the hobbyist register before this file was
+> built — verified against `HReview.md` at its last commit, which held none of them. They
+> are the 2026-07-31 pass, all fixed; recover any of them with `git log --grep=HR-<n>`.
+> Rows are **not** reconstructed here: the fixes are landed and the argument is in the
+> commits. Recorded so the gap is not re-discovered as a loss.
+
 **Professional** is multi-WCS, spoilboard base, tool changes, Manual NC and the dialog
 audit. **Hobbyist** is a Personal-licence user, one part, one WCS, one tool, several
 operations. The distinction no longer routes a finding to a different file; it survives
