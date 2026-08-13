@@ -4,10 +4,11 @@ The **why** behind `MPCNC_v4.0_Beta2.cps`, for the parts of it the code cannot s
 rest of the record reads against, the external firmware facts each decision rests on, and the arguments
 behind orderings that look arbitrary in the source.
 
-Unlike `conventions.md`, this file **grows with the post** — a change to what the post emits may earn a
-paragraph here. Two tests gate the entry and both are in `conventions.md` → *Document contracts*: the fact
-must be one the code cannot state, and it must be either **the model** or **a trap**. A design choice that
-is merely true stays in the code, and several hundred of them do.
+This file **grows with the post** — a change to what the post emits may earn a paragraph here. Two tests
+gate the entry: the fact must be one **the code cannot state**, and it must be either **the model** — the
+shared vocabulary the rest is unreadable without — or **a trap**, where someone reached the wrong answer or
+the wrong answer fails silently. A design choice that is merely true stays in the code, and several hundred
+of them do.
 
 ---
 
@@ -128,7 +129,7 @@ that is why the probe XY offset never applies to it: the establish runs before a
 target could be trusted. The consequence is real and silent — **whatever is under the tool becomes the
 base's Z0**, so parking over the stock records the stock top as "the spoilboard" and every clearance from
 it is short by the stock thickness. **Mitigation is documentation, not code**; the durable fix is unbuilt,
-in `PReview.md` §6. Ignored on Marlin (warned), which has no registers to reserve.
+in `findings.md` §6. Ignored on Marlin (warned), which has no registers to reserve.
 
 **Machine Z — one absolute height, collected, never derived.** A height read off the DRO *after* homing is
 already in the controller's own frame, which is what makes it immune to everything below. Units are not: a
@@ -180,7 +181,7 @@ each is a place a one-dialect assumption would have shipped a wrong motion:
 | Is Marlin's one frame the machine frame? | **Only until the post writes an origin.** `writeWcsOrigin()` uses `G92` on Marlin, issued *at the current position*, so from the first section on, work X0 Y0 and machine X0 Y0 differ by an offset the post never knew — and cannot read back. Undoing it arithmetically is therefore not a route to the machine frame there |
 | `G30` to store a park height | **Dead on all three.** GRBL/LinuxCNC: bare `G30` moves **X and Y too**, and `G30 Z<n>` rapids first to that Z *in the current WCS, offsets included*. Marlin and RRF: `G30` is a **single Z probe** — a plunge. Same trap `G80`–`G83` sets above |
 | Jogging at an `M0` pause | **Not possible on GRBL** — *"a jog command will only be accepted when Grbl is in either the 'Idle' or 'Jog' states"* (Grbl v1.1 Jogging), and `M0` is neither. Only RRF has a real jog-at-pause (`M291 … X1 Y1 Z1`) |
-| `G17` / `G94` off GRBL | **Neither is a free no-op.** Marlin compiles `G17` only under `CNC_WORKSPACE_PLANES` (shipped commented out in `Configuration_adv.h`) and has **no `G93`/`G94` at all** (`gcode.h` 2.1.x) — both reach `parser.unknown_command_warning()`. RRF has `G17` from 2.03 (`G18`/`G19` from 3.3) but gained `G93`/`G94` only in **3.5.1**, "experimentally", and **3.6.3** fixed inverse time mode not being reset at job start. So both stay GRBL-only, and the plane and feed mode a RepRap job inherits are a Start file's problem — `HReview.md` HB-6 |
+| `G17` / `G94` off GRBL | **Neither is a free no-op.** Marlin compiles `G17` only under `CNC_WORKSPACE_PLANES` (shipped commented out in `Configuration_adv.h`) and has **no `G93`/`G94` at all** (`gcode.h` 2.1.x) — both reach `parser.unknown_command_warning()`. RRF has `G17` from 2.03 (`G18`/`G19` from 3.3) but gained `G93`/`G94` only in **3.5.1**, "experimentally", and **3.6.3** fixed inverse time mode not being reset at job start. So both stay GRBL-only, and the plane and feed mode a RepRap job inherits are a Start file's problem — `findings.md` HB-6 |
 | `G38.2` target frame | **Version-bound on RRF.** `G38.x` on Duet 2+ / RRF 3+, and **up to RRF 3.1.1 the target is machine coordinates**, user coordinates after. This post emits a work-frame target, so leaving it On below 3.1.2 probes to the wrong physical Z |
 
 > **The lesson, twice over — and it is why *do the source read before filing a question as needing
@@ -256,3 +257,58 @@ and the warning is suppressed exactly as an established base suppresses it. The 
 is still true: a job that establishes no fixed reference at all — and *declaring* one is not establishing it
 on Marlin, where neither implementation runs, so the suppression asks `fixedZEstablishedInFile()` and not the
 dialog's own answer.
+
+### Computing a safe height is not the post's job
+
+**And Autodesk agrees in code.** *Z untrusted* means the controller was never told where its own frame is,
+so an absolute machine height is not approximately right — it is **arbitrary**. A relative lift is always
+*exact*; only its **sufficiency** is unknown. That is why a warning is the correct response and an error is
+not: erroring would refuse the hand-zeroed hobbyist, who is 24 of the 24 posted files. When Autodesk's own
+post is in this situation it emits *"Ensure the clearance height will clear the part and or fixtures"* — a
+warning and a comment, nothing else.
+
+**Asking for a travel height fills a hole rather than duplicating a field.** F360 has a machine-frame safe-Z
+slot, `getRetractPlane()`, and **no way for an operator to fill it** — zero occurrences across 211 cached
+machine definitions, and `setRetractPlane` commented out in all 159 posts that mention it.
+
+**The legitimate exception:** where the program **itself** homed, the frame is known for the rest of that
+program and an absolute retract is honest — a condition the post can verify, because it emitted the homing.
+
+### The post does not reach into F360's job
+
+F360 **never learns where the fixtures are**, so it cannot compute a path between work offsets and does not
+claim to. This is read from Autodesk's own machine-definition files, not from this project's documents. The
+consequence is that inter-part traverse logic has to live in the post or nowhere — which is why the post
+carries it, and why the *orchestration* above it belongs to the operator instead.
+
+---
+
+## Working on the post
+
+**Guards should attempt to be executed when `onOpen` runs.** Where a guard runs decides what a rejected job
+leaves on disk: `onOpen()` refuses before any output, so the job writes **no file at all**, while a guard in
+`onSection()` leaves a **truncated `.gcode`** an operator may not notice. `validateJob()` runs from
+`onOpen()` and already walks `getSection(i)`, so a guard needing section data can still live there.
+
+**Properties** use the combined-inline `properties = {}` form, read with `getProperty(properties.key)`.
+
+**`Personal.cps`** (repo root, git-excluded) is the post with `onRapid()` rerouted into `onLinear()` — the
+only way to reach the group-3 code, since a paid licence emits real `G0`s. Re-create it from the current
+`.cps`; its evidence is about *logic*, never about what the post emits.
+
+**`git commit -m` with a PowerShell here-string mangles messages containing double quotes.** Write the
+message to a file and use `git commit -F`, or pipe it in.
+
+---
+
+## References
+
+- **PostProcessor API class reference** — <https://cam.autodesk.com/posts/reference/classPostProcessor.html>
+- **Post Processor Training Guide (PDF)** — <https://cam.autodesk.com/posts/posts/guides/Post%20Processor%20Training%20Guide.pdf>
+- **Dumper post** — emits every property/parameter/section value Fusion exposes; run it before relying on
+  anything: <https://cam.autodesk.com/hsmposts?p=dump>
+- **Library of existing posts** — <https://cam.autodesk.com/hsmposts> · **Forum** —
+  <https://forums.autodesk.com/t5/hsm-post-processor-forum/bd-p/218>
+
+Firmware: Marlin <https://marlinfw.org/meta/gcode/> · GRBL 1.1 <https://github.com/gnea/grbl/wiki> ·
+FluidNC <http://wiki.fluidnc.com/> · Duet/RRF <https://docs.duet3d.com/User_manual/Reference/Gcodes>

@@ -173,10 +173,14 @@ say they are work-frame — **not both meanings on one field** (`PR-4`). **Leave
 untouched**: no `G10 L20`, no `G92`. That is the whole point of 7a.
 
 **5.2 — 7b: mid-program tool change.** A measured tool change needs a probe, a
-**subtraction**, and a register to hold the result — and **none of the three answers is the
-post** (the TLO table is in `design.md`): RepRap's machine can do it via `tpost`, GRBL needs
-the sender's macro, Marlin has no TLO register at all. The post cannot compute an offset it
-will not learn until the operator swaps the tool, hours after posting.
+**subtraction**, and a register to hold the result, and the firmwares split on the
+subtraction: **RepRap** has meta-g-code arithmetic and a real tool table (`G10 L1 P<t> Z`,
+persisted by `M500 P10`), so its **machine** can do it via a `tpost` macro; **GRBL** has no
+arithmetic and `G43.1` needs a literal, so the **sender's** macro must; **Marlin** has no TLO
+register at all, so only the **operator** can, by re-probing and re-zeroing work Z. *(This
+corrects `design.md`'s bare "no TLO" — Step 7 carries the rewrite.)* **None of the three
+answers is the post**, which cannot compute an offset it will not learn until the operator
+swaps the tool, hours after posting.
 
 **So 7b's deliverable is a contract, not a routine:** a stop in a known place in a stated
 frame; a **named include-file hook at exactly that point**, reusing group 8, which already
