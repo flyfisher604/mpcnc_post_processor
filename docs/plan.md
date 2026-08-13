@@ -129,8 +129,8 @@ silently. It needs a rotated Setup. Written up in `HReview.md` → *Owed*.
 - **Professional review — deferred deliberately, not overlooked.** The goal was a Beta3 stable for hobby
   users and the 24 posted files show it executed; what is missing is any statement of it, so `guide-pro.md`
   still describes unverified paths in a verified voice. `PReview.md` is **in the tree** (`d010fee`), and its
-  **§3.1 is the critical path**. Its F360 "Multiple WCS Offsets" job **does not post** — Guard B, correctly,
-  and reachable in two dialog edits: `PR-14`, the register's first posted professional evidence (2026-08-13).
+  **§3.1 is the critical path**. Its F360 "Multiple WCS Offsets" job **posts, in three dialog edits** — Guard
+  B refused the default, correctly: `PR-14`, the register's first posted professional evidence (2026-08-13).
 
 ## Completed reviews (archived)
 

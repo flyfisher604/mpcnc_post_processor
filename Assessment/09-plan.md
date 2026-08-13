@@ -644,11 +644,15 @@ form is kept for the half that is owed, and the three firmware citations live in
 **The critical path.** Nothing after it should be designed until 1.1 has produced a
 file.
 
-> **Readiness checked 2026-08-13; 1.1 ran the same day. The step is unblocked and 1.2 is next.**
+> **Readiness checked 2026-08-13; 1.1 ran and closed the same day. → NEXT: 1.2, and it needs a decision,
+> not a keyboard.**
 >
-> **1.1 is done** — `[AUTHOR]` built the job from **Multiple WCS Offsets** and posted it, and the guard
-> that refused it is identified in source from its verbatim text. **1.2 and 1.3 no longer wait on
-> anything but a decision.** The evidence is below and the finding is `PR-14` in `docs/PReview.md`.
+> **1.1 is closed** — `[AUTHOR]` built the job from **Multiple WCS Offsets**, and posted it **three times**:
+> refused by Guard B at group-5 defaults, posting-with-two-warnings after two dialog edits, and **clean
+> after a third**. The guard is identified in source from its verbatim text; **the capability was never
+> missing.** So **1.2 and 1.3 wait on nothing**, and 1.2's own justification is narrower than it was
+> written to be — read its corrected *Why* strand 2 before designing it. Evidence below; finding `PR-14`
+> in `docs/PReview.md`.
 >
 > **The licence is not a barrier here**, which is worth stating because it blocks other steps.
 > Guard B fires on `!usesMachineZDatum() && collectDistinctOffsets().length > 1`
@@ -660,7 +664,7 @@ file.
 > `Retract Across Parts`, **deleted by CR-13**. Two of the six rows cannot be run as written, so
 > re-scoping them is the first action of 1.3, not a surprise partway through.
 
-### 1.1 — Reproduce the failure and file it — ✅ **DONE 2026-08-13**
+### 1.1 — Reproduce the failure and file it — ✅ **DONE and CLOSED 2026-08-13**
 
 > **Result: Guard B, identified from its verbatim text, and it fired correctly.** The job was an F360
 > Setup with **Multiple WCS Offsets** ticked, 2 instances, on GRBL with group 5 at factory defaults and
@@ -719,6 +723,20 @@ file.
 > is right — the post cannot invent a clearance height. What is wrong is that the operator learns the
 > requirement one refusal at a time. Filed as **`PR-14`** (Low, error text), with a three-post test row
 > in `PReview.md` §3.6 whose first post is the one that ran.
+>
+> **CLOSED 2026-08-13 by a third post, `Multi_WCS (b)`, with the third edit made** — `Multiple work
+> offsets used in program.` and **nothing else**. Fusion's own line is not the post's, so **every guard
+> in `validateJob()` is now silent on this job**, and the silence is checkable: `Use Active WCS …`
+> excludes both `Current …` modes, which is the gate on **CR-2's** warning ([:1473](MPCNC_v4.0_Beta2.cps#L1473))
+> and on **PR-10's** ([:1520](MPCNC_v4.0_Beta2.cps#L1520)); the GRBL jog warning's silence
+> ([:1508](MPCNC_v4.0_Beta2.cps#L1508)) excludes both `Jog to …` modes; and `!homedXY`'s two warnings
+> staying silent confirms group 4 was not disturbed. **Both mode-sensitive gates therefore have their
+> negative control** — the same job, one field different, no warning — which is the half a fired warning
+> can never supply. `[AUTHOR]`'s reading, accepted: **the failure was operator error, and the confusing
+> route to the setting is the separate issue.** That is exactly how it is filed — Guard B ✅ correct,
+> `PR-14` ⬜ against the error text. **1.1 owes nothing further.** Two legs remain open, and neither is
+> this step's: `PR-14`'s **step 2** (the second refusal, still unposted) and reading the file
+> `Multi_WCS (b)` emitted, which is **`PR-2a`/`PR-2b`** — both tracked in `PReview.md` §3.6.
 
 - **Goal** — a recorded, reproducible statement of what F360's "Multiple WCS Offsets"
   feature does today when posted.
@@ -799,6 +817,13 @@ file.
   4. **Do not delete the spoilboard path here.** Step 2 does that, after this is proven.
 - **Done when** — the 1.1 job posts on GRBL with only Group 4 properties set, and the
   traverse is `G53`-framed. **Read the emitted file; do not infer it.**
+  **Baseline, measured 2026-08-13:** that job already posts on GRBL with Group 4 plus **two** Group 5
+  fields, warning-free once `First WCS / Part` is a `Use Active WCS …` mode. So this step's own measure is
+  **one field removed, not a job newly enabled** — `Fixed Z Reference` stops being asked for and
+  `Inter Part Travel Z` cannot be. **And the `G53` half is readable now, before any code is written:**
+  `Multi_WCS (b)` is on disk and is `PReview.md` **`PR-2a`**'s job. Read it first — if the traverse is
+  already `G53`-framed at today's settings, this step is measured against a known-good file instead of a
+  prediction, and `PR-2a`/`PR-2b`/`PR-2d` come off it rather than off a re-post.
 - **Findings** — 1.1's row is **`PR-14`**, and this step does **not** close it: `PR-14` is the two-step
   refusal, and 1.2 removes only the first step. Closing it needs the error text to name
   `Inter Part Travel Z` and the group both cures live in — cheap, and worth doing *inside* this step so

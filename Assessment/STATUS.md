@@ -25,13 +25,16 @@ executed* below: three of its four active items departed from their own written 
 two registered "complete diffs" turned out to be unsafe. **`REG-MF` was never invalidated** — no
 property was added, removed, renamed or relocated, so the property dump has not moved.
 
-**Step 1.1 is DONE — 2026-08-13, and it is the first posted professional evidence this project has.**
-`[AUTHOR]` built the multi-WCS job from **Multiple WCS Offsets** and posted it: the refusal is **Guard
-B**, identified from its verbatim text, and it fired **correctly**. Filed as **`PR-14`** — Low, and error
-*text* rather than logic: the refusal names its cures in prose, names neither the group they live in nor
-`Inter Part Travel Z`, and the operator who takes the cure it recommends is **refused a second time** for
-that field. It is reachable in two dialog edits. **The next unfinished thing in the plan is Step 1.2**,
-which is now a decision rather than a wait — see *Step 1.1 executed* below.
+**Step 1.1 is DONE AND CLOSED — 2026-08-13, and it is the first posted professional evidence this project
+has.** `[AUTHOR]` built the multi-WCS job from **Multiple WCS Offsets** and posted it **three times**: the
+refusal is **Guard B**, identified from its verbatim text and firing **correctly**; two dialog edits make it
+post; a third makes it post **clean**, `Multiple work offsets used in program.` — Fusion's own — and no post
+warning at all. Filed as **`PR-14`** — Low-Med, and error *text* rather than logic: the refusal names its
+cures in prose, names neither the group they live in nor `Inter Part Travel Z`, and the operator who takes
+the cure it recommends is **refused a second time** for that field. **The author's verdict, accepted: the
+failed post was operator error, and the route to the setting is the separate issue** — which is how it was
+already filed. **The next unfinished thing in the plan is Step 1.2**, a decision rather than a wait, and it
+now has a real file to be measured against — see *Step 1.1 executed* below.
 
 **Three things Phase C turned up that the plan did not predict:**
 
@@ -305,7 +308,16 @@ on doing it: *"the error message did not help see which parameters needed to be 
 landing on a real operator rather than being inferred from the source, and it is why the row stands at
 Low-Med rather than Low.
 
-**But that file must not be run as posted.** First was left at the default, so PR-10's hazard is live: the
+**And with the third edit it posts clean — `Multi_WCS (b)`, the same day.** `First WCS / Part` set to a
+`Use Active WCS …` mode returned `Multiple work offsets used in program.` and **nothing else**. That line is
+Fusion's, not the post's, so **every guard in `validateJob()` is silent on this job** — the refusal chain is
+walked end to end and it ends in a file. The pair of posts is also the **negative control** both
+mode-sensitive warnings lacked: one field apart, CR-2's and PR-10's on then off, which is the half a fired
+warning can never supply. **`Multi_WCS (b)` is `PReview.md` `PR-2a`'s file** and only the reading is owed —
+confirm from its own property dump that First is `Use Active WCS X0 Y0, Probe Z0` and not
+`Use Active WCS X0 Y0 Z0`, since both silence the warnings and only the first is that row's.
+
+**But the *earlier* file must not be run as posted.** First was left at the default there, so PR-10's hazard is live: the
 establish moves the tool to travel clearance *before* the origin is recorded, so the part origin is bed
 clearance and the probe searches down from there and never reaches the stock. The warning is the whole of
 PR-10's fix — no arithmetic in the post can know that distance — so acting on it is the operator's step:
@@ -339,16 +351,25 @@ still cannot be posted as written, which is plan 1.3's first action.
 5. ~~**Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it**~~ — **done 2026-08-13.**
    Guard B, from its verbatim text, firing correctly; filed as **`PR-14`**. It did exactly what the
    critical path promised: it **invalidated part of Steps 1–4's premise** before any of it was designed.
-   *Blocked* is wrong — two dialog edits post the job — so 1.2 is a **discoverability** step, not a
-   capability one, and `PR-14` outlives it.
-6. **Step 1.2: make the homed machine the answer to Guard B.** **Now the next unfinished thing in the
-   plan**, and it needs a decision rather than a keyboard: 1.1's evidence says the capability is already
+   *Blocked* is wrong — two dialog edits post the job, three post it silently — so 1.2 is a
+   **discoverability** step, not a capability one, and `PR-14` outlives it. **Closed:** 1.1 itself owes
+   nothing; the two open legs belong to `PR-14` (step 2) and `PR-2a` (the reading), in `PReview.md` §3.6.
+6. **Read the two `.gcode` files already on disk.** *The cheapest professional evidence this project has
+   ever had within reach*, and it needs no Fusion sitting — both files are posted and unread. From
+   `Multi_WCS (b)`: the header `Inter Part Travel Z in output units = … -- absolute machine Z` echo, the
+   job-start `( Establish fixed Z reference -- homed machine Z)` + `G53 G0 Z<travel>` pair, and the
+   `G54 → G55` boundary — that is **`PR-2a`** and **`PR-2b`** in one pass, and it settles whether the
+   traverse is `G53`-framed *before* 1.2 designs anything around the claim that it is. From the earlier
+   two-edit file: whether `(   Provisional Z0 at the current height …)` sits adjacent to that `G53`, which
+   is **`PR-10`** leg 1's in-file half.
+7. **Step 1.2: make the homed machine the answer to Guard B.** **The next unfinished thing in the plan**,
+   and it needs a decision rather than a keyboard: 1.1's evidence says the capability is already
    there, so what 1.2 buys is the default and the route to it. Read 1.2's corrected *Why* strand 2 first —
-   the version written before 1.1 ran overstates the cost of today's route. **Two cheap things to fold in:**
-   `PR-14`'s error clause (name `Inter Part Travel Z` and the group), and `PReview.md` **`PR-2a`**, whose
-   job is exactly 1.1's job at the settings that post — run it and read its `G53` blocks rather than
-   posting the same job twice. **`REG-MF` is still postable from `HEAD`** — the property dump never moved.
-7. ~~**0.5 — group 11**~~ — **closed 2026-08-13 with no edit: the fields stay, and group 11 is left
+   the version written before 1.1 ran overstates the cost of today's route — and its new **Baseline**
+   line, which fixes the measure at *one field removed*, not *a job newly enabled*. **One cheap thing to
+   fold in:** `PR-14`'s error clause, naming `Inter Part Travel Z`, the group both cures live in, and
+   `Use Active WCS X0 Y0, Probe Z0`. **`REG-MF` is still postable from `HEAD`** — the property dump never moved.
+8. ~~**0.5 — group 11**~~ — **closed 2026-08-13 with no edit: the fields stay, and group 11 is left
    standing until the `PR-` findings are handled.** Deletion was refused, and the reason got
    stronger under checking: **both defaults are RRF 2.x g-code**, and on RRF 3.x `M453` is parsed
    for `S` alone, so `M453 P2 I0 R30000 F200` sets no pin, no max RPM and no PWM frequency **and
@@ -357,14 +378,14 @@ still cannot be posted as written, which is plan 1.3's first action.
    wrote an acceptance count that assumed deletion. The one surviving option — relocating both
    `group:` attributes beside the firmware selector, which changes no key and resets nothing —
    rides with PR-13, so the dialog move and the default rewrite cost one baseline instead of two.
-8. ~~**C6's read**~~ — **overruled by the author, and now closed.** The two branches were over two
+9. ~~**C6's read**~~ — **overruled by the author, and now closed.** The two branches were over two
    years old and edit `MPCNC.cps`, a filename the project no longer has, so they were deleted
    unread. `git push origin --delete UpdateToolChange GRBL_Fixes` was **run by the author on
    2026-08-13**. The local tags `archive/UpdateToolChange` (`690e586`) and `archive/GRBL_Fixes`
    (`385edaf`) still anchor the tips — **they are now the only refs that reach that history**;
    `git tag -d` drops them if it is genuinely unwanted. **C6 gates nothing.**
-9. **`docs/plan.md`'s 20-line overrun** — decide the trim or raise the budget. See above.
-10. ⏸️ **C4 — a status line in `guide-pro.md`. Deferred by the author 2026-08-13.** Not
+10. **`docs/plan.md`'s 20-line overrun** — decide the trim or raise the budget. See above.
+11. ⏸️ **C4 — a status line in `guide-pro.md`. Deferred by the author 2026-08-13.** Not
    rejected and not blocked: its first half needs nothing from Step 1.1, so it waits on a
    decision rather than on evidence. Until it lands, `guide-pro.md` describes the
    multi-fixture path in the same voice as the 24-file-verified hobby path — a known,
