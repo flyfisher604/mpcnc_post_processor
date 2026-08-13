@@ -49,10 +49,10 @@ everything the README puts outside the hobbyist's reach:
 
 ## 2. Findings
 
-**✅ 11 fixed · ◑ 2 part-fixed · ⬜ 7 open — 20 findings.** The `HR-` ids were found by the hobbyist pass
+**✅ 11 fixed · ◑ 2 part-fixed · ⬜ 8 open — 21 findings.** The `HR-` ids were found by the hobbyist pass
 and reclassified as professional, and are **kept deliberately** so commit history, `HReview.md` and this
 file all name the same defect the same way; `PR-` ids were found by this file's own machine-frame review,
-**except PR-12 and PR-13**, which the over-engineering assessment found and which continue the series
+**except PR-12, PR-13 and PR-14**, which the over-engineering assessment found and which continue the series
 rather than opening a fourth one in a file that already carries three. Committed code is the eleven `PR-` fixes plus
 HR-13's landed half; every other `HR-` diff is a proposal, not a record.
 **PR-8 … PR-11 are defects in PR-2 / PR-6's own landed code**, found by a review of the branch before it
@@ -73,6 +73,7 @@ and a `✅ fixed` row must not quietly cover a second fix.
 | **PR-10** | PR-2 made the preamble **move the tool** — step 5 establishes the fixed Z reference, step 6 records the first part's origin — so under **both** implementations the "current position" step 6 reads is bed clearance. `Set X0 Y0 to Current Pos, Probe Z0` (the **default**) then writes HR-1's provisional `Z0` there, turning `G38 Target -10` into a 10 mm descent from bed clearance: the probe never reaches the stock and the controller alarms. `Set X0 Y0 Z0 to Current Pos` fails quieter and worse — clearance *becomes* the part's `Z0`. The spoilboard half predates PR-2; the machine-Z answer is a second route to it, and none of PR-2's six guards covers either | Med-High | Post-time `warning()` naming the establish as the cause and the two sound modes as the answer. **Not a code fix, and cannot be one:** the distance from clearance to the stock top is exactly what the probe exists to discover. The `Jog to …` modes are deliberately exempt — there the operator positions the tool *after* the establish, which is the condition HR-1's provisional `Z0` was sound under all along | ✅ fixed |
 | **PR-11** | HR-28's post-time GRBL jog warning tests `Subsequent WCS / Part` unconditionally, but that control is consulted only on a genuine WCS change (`writeWCS()`'s `isTraverse`) — so a **single-WCS** job warns about a pause its file will not contain. Its neighbour, the stored-offset warning, already carried the gate | Low-Med | `multiWcs` hoisted to one local and applied to the subsequent-part half only. The first-part half stays ungated: that mode runs on every job | ✅ fixed |
 | **PR-13** | **Group 11's two properties carry RRF 2.x g-code as their defaults, and on every current RepRapFirmware most of it is parsed by nothing.** `duetMillingMode` = `M453 P2 I0 R30000 F200` and `duetLaserMode` = `M452 P2 I0 R255 F200`, written verbatim by `onSection()`'s RepRap branch whenever the section type changes. **RRF 3.x reads `M453` for `S` alone** — and answers `Spindle management has been moved to M950` if it is there — so `P2 I0 R30000 F200` sets **no pin, no maximum RPM and no PWM frequency**, silently: the job selects CNC mode and runs on whatever `config.g` last configured. `M452` fares better, RRF 3.x still reading `R` and `F`/`Q`, but `P2 I0` is dropped there too, so **the laser pin is never assigned by this command**. Both strings are valid on RRF 2.05, which is what they were written for. **Neither has ever been posted** — group 11 has no test row, and `J4` records that group 9 has never appeared in any posted file either | Low-Med | **Not started — and it is the reason the two fields must stay editable.** The post cannot know a board's pin numbers or which RRF major version is on it, so an operator-supplied string is the only answer that can be right; this is group 8's argument, an escape hatch rather than a feature. What is owed is defaults that work on RRF 3, a tooltip naming the version each form belongs to, and a decision on whether the post should say anything when it writes a string it cannot check. **`Assessment/09-plan.md` 0.5's *fold* is refused by the author on exactly this ground**, and group 11 is then **left standing for this pass to handle** — so this row also inherits 0.5's one surviving option, **relocating both properties beside the firmware selector** (a `group:` is a display attribute: no key changes, nothing resets, 11 groups → 10). Take it *with* the default rewrite, not before: both re-head or re-value the property dump, and doing them together costs one baseline instead of two | ⬜ open |
+| **PR-14** | **The multi-WCS path refuses twice, and the first refusal does not name the field the second one wants.** `[AUTHOR]` posted an F360 Setup with **Multiple WCS Offsets** ticked, 2 instances, group 5 at factory defaults, and got Guard B verbatim — **correctly**: `Fixed Z Reference` = `None`, two distinct offsets, no frame in which one clearance height is meaningful. But that error names its two cures **in prose** — *"the spoilboard answer"*, *"the machine-Z answer"* — never by the enum titles the operator has to find (`Spoilboard - probed into a reserved WCS`, `Machine Z - homed`) nor by the group holding them (`5 - Fixed Z Reference - multi-part jobs only`), and it does not mention `Inter Part Travel Z` **at all**. Apply the cure it recommends and the post refuses **again** — the machine-Z branch's own `parseInterPartTravelZ()` guard — for that height — empty by default under both answers, deliberately, by **PR-5**. So a supported F360 feature costs **two failed posts and a bench measurement** before it emits a byte, and the operator learns the requirement one refusal at a time | Low | **Not started, and no logic is at fault** — the reproduction confirms Guard B fires exactly as designed. This is error *text*: one clause naming `Inter Part Travel Z` and the group both cures live in, so the first refusal states the whole requirement instead of the half the operator can act on. **It survives Step 1.2.** Making the homed machine Guard B's own answer removes the *first* refusal and not the second: `Inter Part Travel Z` is a machine-specific measurement whose wrong value sends the tool to a wrong height at travel speed, so no default can ever be right and one dialog field is irreducible. **Also the first posted evidence for Guard B**, which §4 had from the guard harness only | ⬜ open |
 | **HR-7** | `toolChange()` clobbers `forceSectionToStartWithRapid`, defeating "First G1 → G0" on every tool-change section | Medium | Lands with the Phase 4 reorder below | ⬜ open |
 | **HR-8** | Post-injected motion never updates Fusion's tracked position | Medium | Lands with Phase 4. Confirmed unreachable on any hobbyist path (2026-08-01) | ⬜ open |
 | **HR-9** | `Do First Change` with `Probe After Tool Change` off zeroes Z against the wrong tool | Medium | Lands with Phase 4 | ⬜ open |
@@ -403,8 +404,10 @@ operation in the same post is unaffected and still expands to plain `G0`/`G1`.
 
 ## 3. Test register
 
-**✅ 0 PASS · ❌ 0 FAIL · ⬜ 62 UNRUN · ➖ 6 n/a or moved — 68 rows.** Nothing professional has been
-verified yet; this is the whole of what the professional side owes. Absorbed from the Beta-2 test plan.
+**✅ 0 PASS · ❌ 0 FAIL · ⬜ 63 UNRUN · ➖ 6 n/a or moved — 69 rows.** Nothing professional has **passed**
+yet; this is the whole of what the professional side owes. Absorbed from the Beta-2 test plan. One row has
+begun: **PR-14**'s first of three posts ran 2026-08-13 and is recorded in §3.6 — a row is ✅ only when
+every leg of it has been read, so it still counts as unrun.
 
 Every row is a delta from the defaults fixed in `conventions.md` → *How to run a test*; the one
 convention worth restating here, because half these rows turn on it, is that Marlin uses `G92` and
@@ -470,6 +473,7 @@ hold it, and the *Expect* must exist in exactly one place.
 | **PR-2b** | The first section's arrival emits a real absolute Z instead of the `Unknown Z` comment | as PR-2a, First = `Use Active WCS X0 Y0, Probe Z0` | posted | §3.6 | ⬜ |
 | **PR-2c** | Every new guard refuses, and leaves **no file** | each of the nine new `error()` conditions | posted | §3.6 | ⬜ |
 | **PR-2d** | `Inter Part Travel Z` converts mm → inch in both the block and the header echo | as PR-2a, output units **inch** | posted | §3.6 | ⬜ |
+| **PR-14** | The refusal chain the multi-WCS operator actually walks: Guard B, then the travel-height guard, then a file | **Multiple WCS Offsets** × 2 instances, GRBL, group 5 at defaults — then two edits | posted | §3.6 | ⬜ |
 | **PR-3** | `Probe to Set Base` no longer offers `None`, and the base always probes | base reserved, dialog + a post | dialog | §3.6 | ⬜ |
 | **PR-4** | The `G53` tool-change park lands at one physical spot under two WCS | — verified by **P8**'s matrix once Phase 4 lands | — | §2 | ➖ |
 | **PR-6a** | The machine park emits `G53 G0 X0 Y0` as its own block, X/Y only | GRBL, declaration `XY Only` + `Home at Job Start` = `Home`, `At End Park At = Machine X0 Y0` | posted | §3.7 | ⬜ |
@@ -544,10 +548,15 @@ Mechanically an ordinary inter-WCS traverse plus a re-probe — supported today.
 the part, so the outgoing-frame Safe Z is a valid clearance and no base is required. *(The flip /
 re-clamp variant remains future work.)*
 
-> **Settings note (Guard B).** For a single-part two-WCS job use **Retract Across Parts = Off** with
-> no base: the inter-WCS traverse still retracts to the probe Safe Z in the *outgoing* frame, which
-> clears the part. Leaving Retract Across Parts **on** without a base trips Guard B — it cannot tell
-> one part's two WCS from two fixtures.
+> **Settings note (Guard B) — rewritten 2026-08-13; the old advice cannot be followed.** It said to use
+> **Retract Across Parts = Off** with no base. **CR-13 deleted that property and made Guard B
+> unconditional**, so both halves are gone: there is no toggle, and *every* job with two distinct work
+> offsets now needs a `Fixed Z Reference` — `Machine Z - homed` (no register spent, no base probe, needs
+> `Axes Homed and Trusted` ⊇ Z and X/Y, `Home at Job Start` ≠ `Off`, and a measured `Inter Part Travel Z`)
+> or `Spoilboard` with a `Reserved WCS`. **PA1 and PB2 therefore cannot be posted as written** — that is
+> `09-plan.md` 1.3's first action, and it applies to this note too. What Guard B still cannot do is tell
+> one part's two WCS from two fixtures; that complaint outlived its toggle and belongs to Step 1.2.
+> The cost of *discovering* any of this from the dialog is **PR-14**.
 
 - [ ] **PA1 — new WCS from a machined face, operator jogs the new datum.** Setup 1 → WCS `1`; Setup 2
       → WCS `2` on a machined face. Subsequent = `Jog to X0 Y0, Probe Z0`; Retract Across Parts off,
@@ -848,6 +857,21 @@ the functions do not exist) prove *logic and block shape*, never what a machine 
 - [ ] **PR-2d — units.** PR-2a in **inch**. **Pass:** `G53 G0 Z-0.4724`, and the header echo reading the
       same number. An unconverted number here is a 25.4× error in the one move that cannot be sanity-
       checked against a work zero.
+- [ ] **PR-14 — the refusal chain, three posts of one job.** *Do:* one F360 Setup with **Multiple WCS
+      Offsets** ticked and **Number of Instances** 2, posted three times, changing one thing each time:
+      (1) group 5 at factory defaults; (2) `Fixed Z Reference` = `Machine Z - homed`, nothing else;
+      (3) plus `Inter Part Travel Z` = the absolute machine Z read off the DRO. *Get:* (1) Guard B,
+      (2) the travel-height guard, (3) a file. **Pass: no `.gcode` on disk for 1 or 2** — both are
+      `onOpen()` guards, so the discriminator is the *absence of the output file* — and step 3 posts.
+      **Step 1 ran 2026-08-13** with `Axes Homed and Trusted` = `XYZ` and `Home at Job Start` = `Home`,
+      returning Guard B's text verbatim, PR-10's pre-jog warning, and Fusion's own
+      `Multiple work offsets used in program.`; **steps 2 and 3 are owed at the same keyboard.**
+      *Discriminator for the finding rather than the guard: step 2 exists at all* — an operator who does
+      what step 1's error told them to do is refused a second time, for a field it never named.
+      Step 3 **is PR-2a's job**: run it there and read its blocks there, and set First =
+      `Use Active WCS X0 Y0, Probe Z0` as PR-2a already specifies, or PR-10's warning fires on the
+      default first-part mode. **The first posted exercise of Guard B** — §4 checked it from the guard
+      harness, which cannot show what the dialog says next.
 - [ ] **PR-3 — `Probe to Set Base = None` is gone.** *Do:* open the dialog with a preset that had it set,
       then post with a base reserved. **Pass:** two options, not three; the saved value has reset to
       `Pause, Probe Z, Pause`; a base `G38.2` is present and the old
@@ -1185,10 +1209,13 @@ this section when it empties** — Rule 4.
 
 What this register owes, not the order to do it in — that is the checkpoint's job.
 
-1. **Every one of the 68 rows** — the figure here read `37` until 2026-08-13, a count left behind when §3
-   absorbed the Beta-2 test plan; §3's own header has been right all along. Nothing professional has been
-   posted. §3.1 is the largest untested area in the post and needs a job nobody has built: a 2-copy
-   Replicate or a two-Setup job.
+1. **Every one of the 69 rows** — the figure here read `37` until 2026-08-13, a count left behind when §3
+   absorbed the Beta-2 test plan; §3's own header has been right all along. §3.1 is the largest untested
+   area in the post and needed a job nobody had built: a 2-copy Replicate or a two-Setup job. **That
+   blocker is down.** `[AUTHOR]` built a multi-WCS job on 2026-08-13 from **Multiple WCS Offsets** — one
+   Setup, a checkbox and an instance count, which is cheaper than either — and posted it (PR-14). Whether
+   it substitutes for the rows written around *Replicate* specifically is a judgement at the keyboard;
+   what it certainly gives is two distinct work offsets, which is what Guard B and most of §3.1 turn on.
 2. **J4 first among the jet rows** — group `09` has never appeared in *any* posted file, and CR-10
    landed a fix there sight-unseen. `HReview.md`'s `CR-10 (A)` is that post and serves both registers.
 3. **P8 waits on Phase 4.** It is the matrix that proves the tool-change reorder, so it cannot run until

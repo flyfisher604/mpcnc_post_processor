@@ -23,8 +23,15 @@ author**; **`C6` closed by deleting both branches unread**, one remote command o
 solution; **0.5 closed with no edit**, group 11 left standing until the `PR-` pass. See *Step 0
 executed* below: three of its four active items departed from their own written instructions, and
 two registered "complete diffs" turned out to be unsafe. **`REG-MF` was never invalidated** — no
-property was added, removed, renamed or relocated, so the property dump has not moved. **The next
-unfinished thing in the plan is Step 1.1**, which needs a Fusion keyboard.
+property was added, removed, renamed or relocated, so the property dump has not moved.
+
+**Step 1.1 is DONE — 2026-08-13, and it is the first posted professional evidence this project has.**
+`[AUTHOR]` built the multi-WCS job from **Multiple WCS Offsets** and posted it: the refusal is **Guard
+B**, identified from its verbatim text, and it fired **correctly**. Filed as **`PR-14`** — Low, and error
+*text* rather than logic: the refusal names its cures in prose, names neither the group they live in nor
+`Inter Part Travel Z`, and the operator who takes the cure it recommends is **refused a second time** for
+that field. It is reachable in two dialog edits. **The next unfinished thing in the plan is Step 1.2**,
+which is now a decision rather than a wait — see *Step 1.1 executed* below.
 
 **Three things Phase C turned up that the plan did not predict:**
 
@@ -181,7 +188,7 @@ less code than has been written for it.
 | 6 — retention | `06-retention.md` | DONE — **per-property verdicts added** | Reset closed. **Group 6: 10 properties → 9, 14 enum decisions → 9.** Four of ten options don't work on GRBL — the post says so itself |
 | 7 — code map | `07-code-map.md` | DONE — **verdicts revised a second time** | Group 6 is **blocked**, not untested; **Group 5 retires**; Group 7 gets concrete recommendations and 7b moves onto Group 8's include-file hook |
 | 8 — the target | `08-target.md` | DONE — revised | ~3,300–3,450 lines, ~60 properties, **9 groups**, 0 findings, 6 posted multi-part jobs, ≥1 posted tool-change job |
-| 9 — the path | `09-plan.md` | DONE — **rewritten, given a Phase C, and Phase C and Step 0 now executed** | **Phase C (C0–C9) + 8 steps**, each with Goal / Why / Where / The change / Done when / Findings / **Prompt**. `C0` `C1` `C2` `C3` `C5` done, `C4` deferred, `C6` closed unread; **Step 0 complete — 0.3 / 0.4 / 0.6 landed, 0.2 deferred, 0.5 closed unedited** |
+| 9 — the path | `09-plan.md` | DONE — **rewritten, given a Phase C, and Phase C and Step 0 now executed** | **Phase C (C0–C9) + 8 steps**, each with Goal / Why / Where / The change / Done when / Findings / **Prompt**. `C0` `C1` `C2` `C3` `C5` done, `C4` deferred, `C6` closed unread; **Step 0 complete — 0.3 / 0.4 / 0.6 landed, 0.2 deferred, 0.5 closed unedited**; **Step 1.1 done — Guard B reproduced, `PR-14` filed** |
 | 10 — project cleanup | `10-project-cleanup.md` | DONE — **now scheduled, not just recommended** | **`PReview.md` restored and committed.** Its items are `09-plan.md` Phase C; this page keeps the reasoning. `design.md` owes six changes including a rewritten line 23 |
 
 ## Readiness for Steps 0 and 1 — checked 2026-08-13
@@ -195,7 +202,7 @@ are in the tree. Phase C is done and C6 gates nothing.
 Fusion keyboard, and 1.2 and 1.3 queue behind it. The **licence is not a barrier for 1.1** — Guard
 B fires on `!usesMachineZDatum() && collectDistinctOffsets().length > 1`, which never reads the
 licence, and the refusal precedes any rapid. Step 5's verification is the one that needs a full
-licence.
+licence. **Both readings held: 1.1 ran on 2026-08-13 and the licence never came into it.**
 
 **Four defects the readiness check found in the plan itself. Three are fixed in `09-plan.md`; one
 is a decision.**
@@ -264,6 +271,48 @@ unsafe or self-defeating.
 cycle, 0.6 only on a command the `switch` does not name, and every command the post routes itself
 is named. `REG-S0` in `PReview.md` §3.8 is the row that proves it.
 
+## Step 1.1 executed — 2026-08-13
+
+**The job posted nothing, which is the result.** An F360 Setup with **Multiple WCS Offsets** ticked, 2
+instances, GRBL, group 5 at factory defaults, group 4 at `Axes Homed and Trusted` = `XYZ` and `Home at
+Job Start` = `Home`. **Guard B**, verbatim. `[POSTED]` for the messages; there is no file, and its absence
+is the discriminator, these being `onOpen()` guards.
+
+**Identified by text, not by line.** Fusion said *line 1703*, which cannot settle it on its own: Guard B's
+`if` is at 1703 in the working tree, and its `error()` was at 1703 before Step 0 added a comment above it.
+The message matches Guard B character for character and no other guard's, so the identification is exact
+anyway — and the near-miss is a standing warning about the plan's line references. **Two were re-verified
+and had drifted a line** (Guard B, Guard B′); `09-plan.md` now carries the checked numbers.
+
+**The other four candidates were excluded, not assumed away.** Guard C's silence *proves* the firmware is
+not Marlin. Guard B′, the RepRap slot check and Guard A are **structurally unreachable** below
+`if (base == 0) { … return; }`. The work-offset range check is never reached at all, `validateJob()`
+aborting from `onOpen()` first. The `workOffset == 0` alias cannot cause or mask it —
+`collectDistinctOffsets()` applies the same alias, so two instances still count two.
+
+**Two dialog edits post this job today, and no code change is needed to reach it.** `Fixed Z Reference` =
+`Machine Z - homed`, then `Inter Part Travel Z` = the absolute machine Z off the DRO. This machine's group
+4 already satisfies all four of the machine-Z answer's guards. A third edit — `First WCS / Part` =
+`Use Active WCS X0 Y0, Probe Z0` — buys silence, and is what PR-10's warning already advised. **The
+spoilboard route costs more:** three fields, a numbered milling tool on the first operation, a reserved
+WCS outside the instance range, and one of GRBL's six registers.
+
+**So 1.1's own framing was too strong and is corrected in place.** *Blocked* → reachable; a capability
+defect → an error-text defect. **`PR-14`**, Low. It also **survives Step 1.2**: making the homed machine
+Guard B's answer removes the first refusal, never the second, because a machine coordinate cannot be
+defaulted — a wrong one moves the tool at travel speed.
+
+**One blocker fell out of the way.** `PReview.md` §8 said §3.1 *"needs a job nobody has built: a 2-copy
+Replicate or a two-Setup job."* **Multiple WCS Offsets is a third and cheaper route to two distinct work
+offsets** — one Setup, a checkbox, an instance count — so §3.1 and plan 1.3 are no longer waiting on a job
+that has to be built. Whether it substitutes for the rows written around *Replicate* specifically is a
+judgement at the keyboard.
+
+**And one stale note was corrected while the area was open.** `PReview.md` §3.1's *Settings note (Guard
+B)* still told the operator to set **Retract Across Parts = Off** — a property **CR-13 deleted**, on a
+guard **CR-13 made unconditional**. Left standing it would have cost the next Fusion sitting; PA1 and PB2
+still cannot be posted as written, which is plan 1.3's first action.
+
 ## What to do first
 
 1. ~~Commit the restored `docs/PReview.md`~~ — **done**, `d010fee` (C1).
@@ -272,12 +321,19 @@ is named. `REG-S0` in `PReview.md` §3.8 is the row that proves it.
    commit message. `git branch` now lists three. **No remote branch was touched**, and remote
    deletion remains the one irreversible action on that page.
 4. ~~**Step 0**~~ — **complete.** 0.3, 0.4 and 0.6 landed; 0.2 deferred; 0.5 closed with no edit.
-5. **Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it.** **Now the next
-   unfinished thing in the plan**, and nothing in the repository blocks it. The critical path:
-   cheap, and able to invalidate Steps 2–4 — which is exactly why it goes first. Needs a Fusion
-   keyboard; the paste-ready prompt is written. **`REG-MF` can be posted in the same sitting** —
-   the property dump never moved, so the baseline is still available from `HEAD`.
-6. ~~**0.5 — group 11**~~ — **closed 2026-08-13 with no edit: the fields stay, and group 11 is left
+5. ~~**Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it**~~ — **done 2026-08-13.**
+   Guard B, from its verbatim text, firing correctly; filed as **`PR-14`**. It did exactly what the
+   critical path promised: it **invalidated part of Steps 1–4's premise** before any of it was designed.
+   *Blocked* is wrong — two dialog edits post the job — so 1.2 is a **discoverability** step, not a
+   capability one, and `PR-14` outlives it.
+6. **Step 1.2: make the homed machine the answer to Guard B.** **Now the next unfinished thing in the
+   plan**, and it needs a decision rather than a keyboard: 1.1's evidence says the capability is already
+   there, so what 1.2 buys is the default and the route to it. Read 1.2's corrected *Why* strand 2 first —
+   the version written before 1.1 ran overstates the cost of today's route. **Two cheap things to fold in:**
+   `PR-14`'s error clause (name `Inter Part Travel Z` and the group), and `PReview.md` **`PR-2a`**, whose
+   job is exactly 1.1's job at the settings that post — run it and read its `G53` blocks rather than
+   posting the same job twice. **`REG-MF` is still postable from `HEAD`** — the property dump never moved.
+7. ~~**0.5 — group 11**~~ — **closed 2026-08-13 with no edit: the fields stay, and group 11 is left
    standing until the `PR-` findings are handled.** Deletion was refused, and the reason got
    stronger under checking: **both defaults are RRF 2.x g-code**, and on RRF 3.x `M453` is parsed
    for `S` alone, so `M453 P2 I0 R30000 F200` sets no pin, no max RPM and no PWM frequency **and
@@ -286,14 +342,14 @@ is named. `REG-S0` in `PReview.md` §3.8 is the row that proves it.
    wrote an acceptance count that assumed deletion. The one surviving option — relocating both
    `group:` attributes beside the firmware selector, which changes no key and resets nothing —
    rides with PR-13, so the dialog move and the default rewrite cost one baseline instead of two.
-7. ~~**C6's read**~~ — **overruled by the author, and now closed.** The two branches were over two
+8. ~~**C6's read**~~ — **overruled by the author, and now closed.** The two branches were over two
    years old and edit `MPCNC.cps`, a filename the project no longer has, so they were deleted
    unread. `git push origin --delete UpdateToolChange GRBL_Fixes` was **run by the author on
    2026-08-13**. The local tags `archive/UpdateToolChange` (`690e586`) and `archive/GRBL_Fixes`
    (`385edaf`) still anchor the tips — **they are now the only refs that reach that history**;
    `git tag -d` drops them if it is genuinely unwanted. **C6 gates nothing.**
-8. **`docs/plan.md`'s 20-line overrun** — decide the trim or raise the budget. See above.
-9. ⏸️ **C4 — a status line in `guide-pro.md`. Deferred by the author 2026-08-13.** Not
+9. **`docs/plan.md`'s 20-line overrun** — decide the trim or raise the budget. See above.
+10. ⏸️ **C4 — a status line in `guide-pro.md`. Deferred by the author 2026-08-13.** Not
    rejected and not blocked: its first half needs nothing from Step 1.1, so it waits on a
    decision rather than on evidence. Until it lands, `guide-pro.md` describes the
    multi-fixture path in the same voice as the 24-file-verified hobby path — a known,

@@ -644,11 +644,11 @@ form is kept for the half that is owed, and the three firmware citations live in
 **The critical path.** Nothing after it should be designed until 1.1 has produced a
 file.
 
-> **Readiness checked 2026-08-13: nothing is missing, and the whole step waits on one person.**
+> **Readiness checked 2026-08-13; 1.1 ran the same day. The step is unblocked and 1.2 is next.**
 >
-> **1.1 needs the author at a Fusion keyboard** and produces evidence, not code — so it cannot be
-> started from the repository, and 1.2 and 1.3 both wait behind it. That is the plan working as
-> designed, not a gap.
+> **1.1 is done** — `[AUTHOR]` built the job from **Multiple WCS Offsets** and posted it, and the guard
+> that refused it is identified in source from its verbatim text. **1.2 and 1.3 no longer wait on
+> anything but a decision.** The evidence is below and the finding is `PR-14` in `docs/PReview.md`.
 >
 > **The licence is not a barrier here**, which is worth stating because it blocks other steps.
 > Guard B fires on `!usesMachineZDatum() && collectDistinctOffsets().length > 1`
@@ -660,7 +660,53 @@ file.
 > `Retract Across Parts`, **deleted by CR-13**. Two of the six rows cannot be run as written, so
 > re-scoping them is the first action of 1.3, not a surprise partway through.
 
-### 1.1 — Reproduce the failure and file it
+### 1.1 — Reproduce the failure and file it — ✅ **DONE 2026-08-13**
+
+> **Result: Guard B, identified from its verbatim text, and it fired correctly.** The job was an F360
+> Setup with **Multiple WCS Offsets** ticked, 2 instances, on GRBL with group 5 at factory defaults and
+> group 4 at `Axes Homed and Trusted` = `XYZ`, `Home at Job Start` = `Home`. Fusion reported the error at
+> **line 1703** — which cannot by itself settle which line, because Guard B's `if` is at 1703 in the
+> working tree and its `error()` was at 1703 before Step 0 added a comment above it. The **text** settles
+> it: it matches Guard B character for character, and no other guard's does.
+>
+> **What the silences prove**, each one a guard that did *not* fire:
+> - **Guard C** (`Marlin has a single coordinate frame`) — did not fire, so the selected firmware is not
+>   Marlin. Guard C returns, so Guard B is only reachable at all on GRBL/RepRap.
+> - **Guard B′** (`the first operation's tool cannot probe it`), the **RepRap slot check** and **Guard A**
+>   (base redefine) — **structurally unreachable here**, all three sitting below `if (base == 0) { … return; }`,
+>   and `getReservedBaseWcs()` is 0 because `Fixed Z Reference` is not `Spoilboard`.
+> - **The work-offset range check** in `writeWCS()` — never reached: `error()` in `validateJob()` runs
+>   from `onOpen()` and aborts before any section is written. Had it been reached, `G54`/`G55` are in
+>   range on GRBL anyway.
+> - **The `workOffset == 0` → WCS 1 alias** — active but incapable of being the cause *or* of masking it:
+>   `collectDistinctOffsets()` applies the same alias, so a job whose instances report `0` and `1` still
+>   counts two.
+> - **The `Fixed Z Reference` / `Reserved WCS` agreement checks** — silent because both are at their
+>   defaults; an operator who reaches for `Reserved WCS` **first** meets a different refusal.
+>
+> **The warning that came with it is correct and is not a second defect.** PR-10's pre-jog warning fires
+> on exactly this configuration — homing moves the tool before `First WCS / Part` records "the current
+> position" — and its advice, `Use Active WCS X0 Y0, Probe Z0`, is *also* what the cure below needs, since
+> otherwise PR-10's other arm fires once a fixed Z reference exists. **Three messages, one configuration:
+> the guards do not contradict each other.** `Multiple work offsets used in program.` is Fusion's own.
+>
+> **The minimum configuration that posts today, with no code change — two dialog edits, three for silence.**
+> This machine's group 4 already satisfies every prerequisite the machine-Z answer has:
+> 1. `Fixed Z Reference` = **`Machine Z - homed`** (group 5). Its four guards — not Marlin · `Axes Homed
+>    and Trusted` ⊇ Z · `Home at Job Start` ≠ `Off` · ⊇ X/Y — **are already met by `XYZ` + `Home`.**
+> 2. `Inter Part Travel Z` = the absolute machine Z off the sender's DRO, signed, often negative. **This
+>    is the second refusal**, and the first one never mentions it: `PR-14`.
+> 3. For no warnings: `First WCS / Part` = **`Use Active WCS X0 Y0, Probe Z0`**, which is what the
+>    fired warning already advised.
+>
+> No reserved WCS, no spoilboard probe, no register spent. **The spoilboard route costs more** — three
+> fields, a numbered milling tool on the first operation (Guard B′), a `Reserved WCS` outside the
+> instances' range (Guard A), and one of GRBL's six registers.
+>
+> **So it is reachable, and the answer to 1.1's own question is: not a capability defect.** The refusal
+> is right — the post cannot invent a clearance height. What is wrong is that the operator learns the
+> requirement one refusal at a time. Filed as **`PR-14`** (Low, error text), with a three-post test row
+> in `PReview.md` §3.6 whose first post is the one that ran.
 
 - **Goal** — a recorded, reproducible statement of what F360's "Multiple WCS Offsets"
   feature does today when posted.
@@ -669,18 +715,26 @@ file.
   errors out.** Everything in `07-code-map.md` was written treating this path as
   *untested*. It is worse: **it is blocked.** A supported F360 feature cannot produce a
   file, which makes this a defect rather than a gap.
+  **Corrected by the result: *blocked* was too strong.** The path is reachable in **two dialog edits**,
+  and the guard is right to refuse the default — the post cannot invent a clearance height. What is
+  defective is the route to the cure, which is a smaller finding than this bullet expected. `PR-14`
+  carries the claim that survived; this paragraph is kept for what it predicted and how.
 - **Where** — F360 first. Then trace the error in `validateJob()`
   [:1448](MPCNC_v4.0_Beta2.cps#L1448).
 - **The change** — none. This step produces **evidence**.
-- **Done when** — for a 2-instance GRBL job the exact error text is captured and the
-  guard is identified in source. **Expected: Guard B** at
-  [:1702](MPCNC_v4.0_Beta2.cps#L1702), because `Fixed Z Reference` defaults to `None`
-  so `usesMachineZDatum()` is false. **Confirm rather than assume** — it could instead
-  be the range check at [:1887](MPCNC_v4.0_Beta2.cps#L1887), Guard B′ at
-  [:1719](MPCNC_v4.0_Beta2.cps#L1719), or the `workOffset == 0` alias.
-- **Findings** — **open a row before fixing anything.** A default-configuration refusal
-  of a supported F360 feature belongs in the register.
-- **Prompt**
+- **Done when** — ✅ **met.** For a 2-instance GRBL job the exact error text is captured and the guard is
+  identified in source. **Expected: Guard B** — **and it was Guard B**, at
+  [:1703](MPCNC_v4.0_Beta2.cps#L1703), because `Fixed Z Reference` defaults to `None` so
+  `usesMachineZDatum()` is false. The three alternatives were checked and excluded rather than assumed
+  away: the range check at [:1887](MPCNC_v4.0_Beta2.cps#L1887) is never reached (`onOpen()` aborts first),
+  Guard B′ at [:1720](MPCNC_v4.0_Beta2.cps#L1720) is unreachable below `base == 0`'s early return, and the
+  `workOffset == 0` alias cannot cause or mask it. **Line references re-verified against the working tree
+  2026-08-13** — Guard B and Guard B′ had each drifted one line, which is also why the error line Fusion
+  reported could not identify the guard on its own.
+- **Findings** — ✅ **`PR-14`**, opened in `docs/PReview.md` §2 before anything was fixed, with a
+  three-post row in §3.6 whose first post is the one that ran. Severity **Low**, not the Med-High this
+  bullet's framing implied, and the fix is error text rather than logic.
+- **Prompt** *(spent — answered 2026-08-13; kept because 1.2 inherits its last question)*
   > `[AUTHOR]` reports that an F360 Setup with "Multiple WCS Offsets" ticked (Post
   > Process tab → Number of Instances, WCS Offset Increment) fails to post with this
   > post. I will paste the error text and the failed output.
@@ -702,7 +756,15 @@ file.
 - **Why** — three strands meeting:
   1. Guard B's **reasoning is correct** — a multi-WCS traverse needs a frame that
      outlives one WCS.
-  2. Its **route is wrong** — satisfying it means finding Group 5, understanding a
+  2. Its **route is wrong** — but **less wrong than this said; corrected by 1.1's evidence.** Only the
+     *spoilboard* route needs a reserved WCS, a probed base and four more guards. The **machine-Z** route
+     needs no register, no probe and no base, and on the machine 1.1 was run from its four guards were
+     **already satisfied by group 4** — so the real cost is `Fixed Z Reference` + `Inter Part Travel Z`,
+     two fields, discovered one refusal at a time (`PR-14`). **What this step buys is therefore
+     discoverability and defaults, not capability**, and it must not be sold as the latter: the capability
+     landed with PR-2. Note also that **1.2 cannot remove the second field** — a machine coordinate is
+     irreducibly operator-supplied — so `PR-14`'s text fix is owed whether or not this step runs.
+     The original claim, kept: satisfying it means finding Group 5, understanding a
      reserved WCS and a probed base, and clearing four more guards. So the default
      configuration of a supported feature is a refusal, and the error names two
      subsystems the operator has never heard of.
@@ -725,7 +787,12 @@ file.
   4. **Do not delete the spoilboard path here.** Step 2 does that, after this is proven.
 - **Done when** — the 1.1 job posts on GRBL with only Group 4 properties set, and the
   traverse is `G53`-framed. **Read the emitted file; do not infer it.**
-- **Findings** — closes 1.1's row; re-scopes CR-13, which made Guard B unconditional.
+- **Findings** — 1.1's row is **`PR-14`**, and this step does **not** close it: `PR-14` is the two-step
+  refusal, and 1.2 removes only the first step. Closing it needs the error text to name
+  `Inter Part Travel Z` and the group both cures live in — cheap, and worth doing *inside* this step so
+  the operator meets one complete sentence instead of two halves. Also re-scopes CR-13, which made Guard B
+  unconditional, and **`PReview.md` §3.1's Guard B settings note**, rewritten 2026-08-13 for the same
+  reason.
 
 ### 1.3 — Post the six `PReview.md` §3.1 jobs
 
