@@ -30,9 +30,12 @@ deferred by the author**; `C6` dated and re-scoped, its read still owed before S
    *"`master` is 16 commits ahead of `origin/master` and nothing has been pushed."* It is
    **6** ahead, and `git reflog show origin/master` records a push on **2026-08-09**
    (`94241ec`).
-3. **C6 is one branch, not two.** `origin/GRBL_Fixes` is an **ancestor** of
-   `origin/UpdateToolChange`. Both last moved **2023-11-19** and both edit `MPCNC.cps`, a
-   filename that no longer exists — so nothing there can be merged, only re-read by hand.
+3. **C6 is one branch, not two — and the author then closed it by deleting both.**
+   `origin/GRBL_Fixes` is an **ancestor** of `origin/UpdateToolChange`. Both last moved
+   **2023-11-19** and both edit `MPCNC.cps`, a filename that no longer exists. On those facts
+   the ruling was to delete them unread rather than read them, reversing both of C6's
+   conclusions. **The page had valued them as records of attempts without ever checking what
+   file they edit or how far the post had moved** — unmerged is not the same as valuable.
 
 **One thing left open for the author: `docs/plan.md` is 143 lines against a 120 budget.**
 C3 did not cause the overrun but removed its stated excuse — ~30 lines at :46–77 exist only
@@ -173,6 +176,47 @@ less code than has been written for it.
 | 9 — the path | `09-plan.md` | DONE — **rewritten, given a Phase C, and Phase C now executed** | **Phase C (C0–C9) + 8 steps**, each with Goal / Why / Where / The change / Done when / Findings / **Prompt**. `C0` `C1` `C2` `C3` `C5` done, `C4` deferred, `C6` dated and re-scoped |
 | 10 — project cleanup | `10-project-cleanup.md` | DONE — **now scheduled, not just recommended** | **`PReview.md` restored and committed.** Its items are `09-plan.md` Phase C; this page keeps the reasoning. `design.md` owes six changes including a rewritten line 23 |
 
+## Readiness for Steps 0 and 1 — checked 2026-08-13
+
+**Step 0: ready, and it is the only work that can start from the repository alone.** The post is
+**untouched at 3,758 lines** — the exact tree the plan was written against — so every line
+reference holds; spot-checks were exact. Every symbol Steps 0 and 1 name exists. Both registers
+are in the tree. Phase C is done and C6 gates nothing.
+
+**Step 1: nothing is missing, but the whole step waits on the author.** 1.1 produces evidence at a
+Fusion keyboard, and 1.2 and 1.3 queue behind it. The **licence is not a barrier for 1.1** — Guard
+B fires on `!usesMachineZDatum() && collectDistinctOffsets().length > 1`, which never reads the
+licence, and the refusal precedes any rapid. Step 5's verification is the one that needs a full
+licence.
+
+**Four defects the readiness check found in the plan itself. Three are fixed in `09-plan.md`; one
+is a decision.**
+
+1. **0.2 and 0.6 sent their register rows to the wrong file.** Both close professional ids —
+   **HR-10 and HR-13 live in `docs/PReview.md` and nowhere else**; `grep` finds neither in
+   `HReview.md`, because the duplicate stubs were deleted on 2026-08-07 to stop precisely this.
+   Following the old prompt would have re-created the failure that cost seven ids. **Fixed.**
+2. **0.2's fix contradicts HR-10's registered fix, and 0.2 is the right one.** `PReview.md`:262-277
+   holds a complete diff that **keeps** the property and guards it by firmware — warn on GRBL,
+   still emit the bare `M84 Z` on Marlin, with a Pass line requiring `M84 Z` **present** there. The
+   post's own comment at :1827-1828, on that same non-GRBL branch, says a bare `M84` *"releases at
+   once, and an unbalanced LowRider gantry with no brake sinks in Z when it does."* **The
+   registered fix leaves the documented hazard standing on the only firmware that can execute
+   it.** HR-10 was filed as a dialect bug and is also a safety bug; the two facts were in
+   different files. 0.2 must **supersede** the diff and **rewrite the Do→Get row**, not apply it.
+   **Recorded in the plan.**
+3. **0.2's acceptance count was wrong at both ends** — *"Properties 72 → 71."* A direct count of
+   the properties literal (:123-952) gives **66**, so it is 66 → 65. `plan.md`'s 69 is also stale,
+   predating CR-13 and `bf0c2bd`. **`doc-sync` cannot arbitrate — it is 19 commits behind.**
+   **Fixed.**
+4. **The decision: Step 0 invalidates a baseline that has never been established.** `plan.md`'s
+   outstanding item 0 (REG-MF) expects a diff of *"the property dump, the Resolved-Values block
+   and every `F` word."* **0.2 and 0.5 delete three properties between them.** Post REG-MF first,
+   or accept re-posting it after Step 0 — but decide it deliberately.
+
+**Recommended order:** settle (4), then run **0.2 → 0.6 → 0.3 → 0.4 → 0.5** from the repository
+while 1.1 waits on Fusion time. 0.5 is last because it is the one that also moves a group boundary.
+
 ## What to do first
 
 1. ~~Commit the restored `docs/PReview.md`~~ — **done**, `d010fee` (C1).
@@ -184,12 +228,13 @@ less code than has been written for it.
    unfinished thing in the plan. The critical path: cheap, and able to invalidate Steps 2–4 —
    which is exactly why it goes first. Needs a Fusion keyboard; the paste-ready prompt is
    written.
-5. **C6's read, owed before Steps 2 and 5** — and now a much smaller job than the page
-   assumed. Read **two commit diffs, not two branches**: `64cd9e6` *"Tool change updated"*
-   (the only surviving record of a pre-current tool-change attempt, and Step 5 rewrites that
-   path) and `ce2c3f7` *"Change to G38.2 from G38.3 for non-GRBL"* (a firmware-dialect
-   decision, Tier 2 by `06-retention.md`). The FluidNC premise is spent — FluidNC is already
-   in the post and in four documents.
+5. ~~**C6's read**~~ — **overruled by the author: the two branches are to be deleted unread.**
+   Over two years old, and they edit `MPCNC.cps`, a filename the project no longer has. **One
+   command is outstanding**, run by the author:
+   `git push origin --delete UpdateToolChange GRBL_Fixes`. Local tags
+   `archive/UpdateToolChange` (`690e586`) and `archive/GRBL_Fixes` (`385edaf`) anchor the tips
+   first, because `690e586` is contained by no other ref; drop them with `git tag -d` if the
+   history is genuinely unwanted. **C6 no longer gates Steps 2 and 5.**
 6. **`docs/plan.md`'s 20-line overrun** — decide the trim or raise the budget. See above.
 7. ⏸️ **C4 — a status line in `guide-pro.md`. Deferred by the author 2026-08-13.** Not
    rejected and not blocked: its first half needs nothing from Step 1.1, so it waits on a

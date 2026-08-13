@@ -220,9 +220,16 @@ folded into any code phase.
 > **Both edit `MPCNC.cps`**, a filename the project no longer has, so neither can be merged
 > or cherry-picked — anything wanted must be re-applied by hand. And the FluidNC premise is
 > spent: four of the shared commits are FluidNC work, and FluidNC is already in the post,
-> `design.md`, `conventions.md`, `README.md` and `guide-hobbyist.md`. What survives is a
-> two-commit read, scheduled as **`09-plan.md` C6**. **Neither branch was deleted**, and no
-> remote ref was touched by C5.
+> `design.md`, `conventions.md`, `README.md` and `guide-hobbyist.md`.
+>
+> **✅ Closed 2026-08-13 by the author, against this page's recommendation: delete both,
+> unread.** *"Over 2 years old and has been replaced by the more recent changes."* The
+> recommendation above was wrong in a way worth keeping visible — it valued the branches as
+> **records of attempts** without checking what file they edit or how far the post had moved.
+> They edit `MPCNC.cps`, and the post has since gained the machine frame, the fixed Z
+> reference, the `G10 L20` rework and Phases 1–4. **Unmerged is not the same as valuable.**
+> Local tags `archive/UpdateToolChange` and `archive/GRBL_Fixes` anchor the tips; the remote
+> deletion is one command, run by the author.
 
 ## 6. One thing to add rather than remove
 

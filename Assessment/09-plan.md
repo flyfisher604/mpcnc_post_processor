@@ -115,10 +115,12 @@ plan by a wide margin.
 Two of these are not tidying. **C2 and C3 were corrections to documents that misdirected a
 session**, and C4 is a safety statement about behaviour nobody has verified.
 
-**State on 2026-08-13.** `C0` `C1` `C2` `C3` `C5` **done**; `C4` **deferred by the author**;
-`C6` dated and re-scoped, its read still owed before Steps 2 and 5; `C7` `C8` `C9` are
-records rather than actions and need nothing. **Phase C is complete except C4 and C6's read**,
-and it left `MPCNC_v4.0_Beta2.cps` untouched, as it said it would.
+**State on 2026-08-13. Phase C is complete.** `C0` `C1` `C2` `C3` `C5` **done**; `C6`
+**closed by the author's ruling — the two remote branches are to be deleted unread**, which
+also means **C6 no longer gates Steps 2 and 5**; `C4` **deferred by the author**; `C7` `C8`
+`C9` are records rather than actions and need nothing. The phase left
+`MPCNC_v4.0_Beta2.cps` untouched, as it said it would. **One command is outstanding** —
+`git push origin --delete UpdateToolChange GRBL_Fixes`, C6.
 
 *Naming, to avoid one collision: `C1`–`C9` are cleanup items. **Guard C** is the Marlin
 multi-WCS guard in `validateJob()` and belongs to Step 3. They are unrelated.*
@@ -273,7 +275,8 @@ any branch that was not fully merged. Tips recorded in the commit for recovery b
 `retire-doc-gate 46bcf2a` · `v4.0-beta2 8189d91` · `v4.0-dev 6b0c0e5` · `v4.0-doc-streamline cedeca4` ·
 `v4.0-f360-compliance 1beb47b` · `v4.0-float-compare adef981` · `v4.0-hreview-fixes 1ccff44` ·
 `v4.0-readme-update b9b6373` · `wcs-reworked-flow cd57a48`. `git branch` now lists **three**:
-`master`, `CoverageFixes`, `Assessment`. **No remote branch was touched.**
+`master`, `CoverageFixes`, `Assessment`. **No remote branch was touched by C5** — the two the author later
+ruled on are C6's, deleted deliberately and separately, exactly as the caution below asked.
 
 - **Goal** — `git branch` shows the two branches that matter instead of fifteen.
 - **Why** — thirteen local branches are **fully merged into `master`**; the work is all
@@ -295,9 +298,24 @@ any branch that was not fully merged. Tips recorded in the commit for recovery b
 - **Done when** — `git branch` lists three names; `git branch --no-merged master` lists
   two.
 
-### C6 — Read the two unmerged remote branches **before** Steps 2 and 5
+### C6 — The two unmerged remote branches — ✅ **CLOSED 2026-08-13: not read, deleted**
 
-**Dated 2026-08-13, and the dates change the item. There is only one branch to read, not two.**
+**The author overruled this item, and the dates are why.** Presented with the ages below, the ruling was:
+*"the correct action is to ignore this code as it is over 2 years old and has been replaced by the more
+recent changes. Delete."* **This reverses the item's own two conclusions** — that the branches were worth a
+read before Steps 2 and 5, and that neither should be deleted. Recorded rather than quietly rewritten,
+because the reasoning that failed is instructive: this page valued the branches as *records of attempts*,
+without ever checking **what file they edit** or **how far the post had moved since**. Both answers are
+below and both defeat the premise. **A branch is not a record worth keeping merely because it is unmerged.**
+
+**Deletion status.** The two **local archive tags exist** — `archive/UpdateToolChange` → `690e586`,
+`archive/GRBL_Fixes` → `385edaf` — so the commits stay reachable in this clone after the remote refs go.
+**The remote deletion itself is not done**: it needs
+`git push origin --delete UpdateToolChange GRBL_Fixes`, one command, run by the author. `690e586` is
+contained by **no other ref**, which is why the anchors were set first. Drop them with
+`git tag -d archive/UpdateToolChange archive/GRBL_Fixes` if the history is genuinely unwanted.
+
+*The dates and the reasoning that produced the ruling, retained:*
 
 | Branch | Last commit | Age | Tip |
 |---|---|---|---|
@@ -315,11 +333,16 @@ any branch that was not fully merged. Tips recorded in the commit for recovery b
 - **The FluidNC premise is already spent.** Four of the seven shared commits are FluidNC work, and FluidNC
   is **already in the post** and in `design.md`, `conventions.md`, `README.md` and `guide-hobbyist.md`.
   Whatever these branches knew about FluidNC either landed or was re-derived.
-- **Still worth the read, for one narrowed reason:** `64cd9e6` *"Tool change updated"* is the only record
-  of a tool-change attempt from before the current design, and **Step 5 rewrites that path**. Read that one
-  commit's diff — not the branch — and `ce2c3f7` *"Change to G38.2 from G38.3 for non-GRBL"*, which is a
-  firmware-dialect decision and therefore Tier 2 by `06-retention.md`.
-- **Delete neither**, unchanged. Both are the only labels holding these commits reachable on the remote.
+- ~~**Still worth the read, for one narrowed reason:** `64cd9e6` *"Tool change updated"* is the only record
+  of a tool-change attempt from before the current design, and **Step 5 rewrites that path**.~~ **Overruled.**
+  A 2023 tool-change attempt against a differently-named file, predating the machine frame, the fixed Z
+  reference, the `G10 L20` rework and Phases 1–4, is not a design input to Step 5 — it is archaeology about
+  a post that no longer exists. `ce2c3f7`'s `G38.2`/`G38.3` question likewise: `docs/design.md` already
+  carries the current firmware-dialect answer, and `Coverage/CoverageFixes.md`:222–228 already holds the one
+  live `G38.2` concern (the RRF ≤ 3.1.1 machine-frame target). **Nothing here is Tier 2 that the tree does
+  not already hold.**
+- **Consequence for Steps 2 and 5: none. C6 no longer gates either.** That is a real simplification —
+  this item was the only Phase C entry with a claim on a code step.
 
 *Original reasoning, retained:*
 
@@ -387,6 +410,28 @@ oversight.
 No design dependency, no ordering constraint between them, each independently
 committable.
 
+> **Readiness checked 2026-08-13. Step 0 can start; two things to settle first.**
+>
+> **What holds.** The post is **untouched at 3,758 lines** — the exact tree this plan was written
+> against — so every line reference in Steps 0 and 1 is still valid. Spot-checked and exact:
+> `toolChangeDisableZStepper` :552 and its emission :3672-3676, the `M84 S60` comment :1827-1830,
+> Guard B :1698-1705, the homing statement :1669, `groupDefinitions.duet` :118 (the plan says
+> :117, off by one). Every symbol Steps 0 and 1 name is present: `cycleNotSupported`,
+> `parkCanRetract`, `usesMachineZDatum`, `machineHomesXY`, `parseInterPartTravelZ`, `validateJob`.
+> Both registers are readable in the tree (C1), Phase C is done, and **C6 no longer gates
+> anything**.
+>
+> **Two things to settle before committing any of Step 0:**
+>
+> 1. **The register destination, fixed above in 0.2 and 0.6.** Both close professional ids whose
+>    rows are in `PReview.md` and nowhere else. The prompts used to say `HReview.md`.
+> 2. **Step 0 changes the property dump, and `plan.md`'s own item 0 is still owed.** REG-MF — the
+>    GRBL/mm factory-default baseline post — expects *"the property dump, the Resolved-Values
+>    block and every `F` word, and nothing else."* **0.2 and 0.5 delete three properties between
+>    them**, so any Step 0 commit invalidates that baseline before it has ever been established.
+>    Either post REG-MF first, or accept that it is re-posted after Step 0 — but decide, rather
+>    than discovering it. *This is the collision `05-history.md` warns produces work twice.*
+
 ### 0.1 — `docs/PReview.md` back in the tree ✅ **DONE — moved to Phase C, item C1**
 
 Restored **and committed**: `d010fee` on branch `Assessment`, 1,118 lines. It holds the
@@ -407,8 +452,26 @@ only copy of seven open findings and of §3.1, which is Step 1.3's test register
   [:3672-3676](MPCNC_v4.0_Beta2.cps#L3672).
 - **The change** — delete both. Do **not** substitute `M84 S<timeout>`: the purpose was
   to free the axis by hand, which a timeout does not do.
-- **Done when** — `M84` appears only at :1827-1833. Properties 72 → 71.
-- **Findings** — closes HR-10.
+- **Done when** — `M84` appears only at :1827-1833. **Properties 66 → 65** — *not* 72 → 71, which
+  this line said until 2026-08-13 and which was wrong at both ends. A direct count of the
+  properties literal ([:123-952](MPCNC_v4.0_Beta2.cps#L123)) gives **66**; `plan.md`'s 69 is
+  itself stale, predating CR-13's deletion of `Retract Across Parts` and `bf0c2bd`'s fold of
+  group 3. **`doc-sync` cannot arbitrate** — it is 19 commits behind (C7). Re-count, don't trust.
+- **Findings** — **HR-10, and its row is in `docs/PReview.md`, not `HReview.md`.** It is one of
+  the seven professional ids that live there **and nowhere else**; `grep HR-10 docs/HReview.md`
+  returns nothing, because the duplicate stub rows were deleted on 2026-08-07 for exactly this
+  reason. `CLAUDE.md`: a professional finding *"stays in the register it was filed in."*
+- ⚠️ **This change supersedes HR-10's registered fix rather than applying it — read the row
+  first.** `PReview.md`:262-277 carries a **complete diff that keeps the property** and guards
+  it by firmware: warn on GRBL, and **still emit the bare `M84 Z` on Marlin**. Its Pass line
+  requires *"`M84 Z` present"* on a Marlin post. But the post's own end-of-job comment at
+  [:1827-1828](MPCNC_v4.0_Beta2.cps#L1827) — **on that same non-GRBL branch** — is why `M84 S60`
+  is used there: *"a bare `M84` releases at once, and an unbalanced LowRider gantry with no brake
+  sinks in Z when it does."* **The registered fix would leave the documented hazard standing on
+  the one firmware family that can execute it.** HR-10 was filed as a dialect bug; it is also a
+  safety bug, and nobody noticed because the two facts sat in different files. So: retire the
+  long form per `/close-finding` step 5, say in the commit that the diff was superseded and why,
+  and **rewrite the Do→Get row** — its current Pass criterion asserts the thing this fix removes.
 - **Prompt**
   > In MPCNC_v4.0_Beta2.cps the property `toolChangeDisableZStepper` ("Disable Z
   > Stepper") emits a bare `M84 Z` at the tool-change position. Find the property and
@@ -416,8 +479,14 @@ only copy of seven open findings and of §3.1, which is Step 1.3's test register
   > Then find the comment near the program-end `M84 S60` explaining why a bare M84 is
   > unsafe on an unbalanced gantry, and quote it.
   >
-  > Propose a diff deleting the property and the emission entirely, plus the HR-10 row
-  > for docs/HReview.md. Do not substitute a timeout variant — say why in the proposal.
+  > Then read HR-10's own row and long form in **docs/PReview.md** — not HReview.md, which
+  > does not have it. That long form already carries a complete diff, and it is a *different*
+  > fix: it keeps the property and guards it by firmware, so Marlin still gets the bare M84 Z.
+  > Say whether that fix is compatible with the End() comment you just quoted.
+  >
+  > Propose a diff deleting the property and the emission entirely, plus the updated HR-10 row
+  > **in docs/PReview.md**, and a replacement Do→Get row — the existing one passes on `M84 Z`
+  > being present on Marlin. Do not substitute a timeout variant — say why in the proposal.
 
 ### 0.3 — Name the reason WCS probing is refused
 
@@ -455,7 +524,11 @@ variant `jobSelectedFirmware` already names. 11 groups → 10. Re-run
 ### 0.6 — HR-13, the `onCommand` gap
 
 Unchanged from the previous plan: `onCommand` silently discards commands it does not
-name ([:2641-2706](MPCNC_v4.0_Beta2.cps#L2641)). A complete diff per `PReview.md`.
+name ([:2641-2706](MPCNC_v4.0_Beta2.cps#L2641)). A complete diff per `PReview.md`:281.
+
+**Its row is in `docs/PReview.md` too** — the same professional-register rule as 0.2, and
+`HReview.md` does not carry it. Unlike HR-10, this diff has **not** been found to conflict with
+anything, so apply it as written rather than superseding it.
 
 ---
 
@@ -463,6 +536,22 @@ name ([:2641-2706](MPCNC_v4.0_Beta2.cps#L2641)). A complete diff per `PReview.md
 
 **The critical path.** Nothing after it should be designed until 1.1 has produced a
 file.
+
+> **Readiness checked 2026-08-13: nothing is missing, and the whole step waits on one person.**
+>
+> **1.1 needs the author at a Fusion keyboard** and produces evidence, not code — so it cannot be
+> started from the repository, and 1.2 and 1.3 both wait behind it. That is the plan working as
+> designed, not a gap.
+>
+> **The licence is not a barrier here**, which is worth stating because it blocks other steps.
+> Guard B fires on `!usesMachineZDatum() && collectDistinctOffsets().length > 1`
+> ([:1702](MPCNC_v4.0_Beta2.cps#L1702)) — no part of that reads the licence, and a refusal happens
+> before any rapid is emitted. Contrast **Step 5's** verification, which genuinely needs a
+> full-licence two-tool post (*Blocked list*).
+>
+> **One thing to fix inside 1.3 before it runs**, already recorded there: PA1 and PB2 expect
+> `Retract Across Parts`, **deleted by CR-13**. Two of the six rows cannot be run as written, so
+> re-scoping them is the first action of 1.3, not a surprise partway through.
 
 ### 1.1 — Reproduce the failure and file it
 
