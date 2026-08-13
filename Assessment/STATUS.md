@@ -19,9 +19,12 @@ academic the moment that sixth commit landed.
 author**; **`C6` closed by deleting both branches unread**, one remote command outstanding;
 `C7` `C8` `C9` are records, not actions. Nothing in Phase C touched the post.
 
-**Step 0 is done except 0.5**, with **0.2 deferred by the author** to the complete tool-change
-solution. See *Step 0 executed* below: three of its four items departed from their own written
-instructions, and two registered "complete diffs" turned out to be unsafe.
+**Step 0 is COMPLETE.** 0.1 · 0.3 · 0.4 · 0.6 landed; **0.2 deferred** to the complete tool-change
+solution; **0.5 closed with no edit**, group 11 left standing until the `PR-` pass. See *Step 0
+executed* below: three of its four active items departed from their own written instructions, and
+two registered "complete diffs" turned out to be unsafe. **`REG-MF` was never invalidated** — no
+property was added, removed, renamed or relocated, so the property dump has not moved. **The next
+unfinished thing in the plan is Step 1.1**, which needs a Fusion keyboard.
 
 **Three things Phase C turned up that the plan did not predict:**
 
@@ -178,7 +181,7 @@ less code than has been written for it.
 | 6 — retention | `06-retention.md` | DONE — **per-property verdicts added** | Reset closed. **Group 6: 10 properties → 9, 14 enum decisions → 9.** Four of ten options don't work on GRBL — the post says so itself |
 | 7 — code map | `07-code-map.md` | DONE — **verdicts revised a second time** | Group 6 is **blocked**, not untested; **Group 5 retires**; Group 7 gets concrete recommendations and 7b moves onto Group 8's include-file hook |
 | 8 — the target | `08-target.md` | DONE — revised | ~3,300–3,450 lines, ~60 properties, **9 groups**, 0 findings, 6 posted multi-part jobs, ≥1 posted tool-change job |
-| 9 — the path | `09-plan.md` | DONE — **rewritten, given a Phase C, and Phase C and most of Step 0 now executed** | **Phase C (C0–C9) + 8 steps**, each with Goal / Why / Where / The change / Done when / Findings / **Prompt**. `C0` `C1` `C2` `C3` `C5` done, `C4` deferred, `C6` closed unread; **Step 0: 0.3 / 0.4 / 0.6 done, 0.2 deferred, 0.5 left** |
+| 9 — the path | `09-plan.md` | DONE — **rewritten, given a Phase C, and Phase C and Step 0 now executed** | **Phase C (C0–C9) + 8 steps**, each with Goal / Why / Where / The change / Done when / Findings / **Prompt**. `C0` `C1` `C2` `C3` `C5` done, `C4` deferred, `C6` closed unread; **Step 0 complete — 0.3 / 0.4 / 0.6 landed, 0.2 deferred, 0.5 closed unedited** |
 | 10 — project cleanup | `10-project-cleanup.md` | DONE — **now scheduled, not just recommended** | **`PReview.md` restored and committed.** Its items are `09-plan.md` Phase C; this page keeps the reasoning. `design.md` owes six changes including a rewritten line 23 |
 
 ## Readiness for Steps 0 and 1 — checked 2026-08-13
@@ -217,19 +220,20 @@ is a decision.**
 4. **The decision: Step 0 invalidates a baseline that has never been established.** `plan.md`'s
    outstanding item 0 (REG-MF) expects a diff of *"the property dump, the Resolved-Values block
    and every `F` word."* **0.2 and 0.5 delete three properties between them.** Post REG-MF first,
-   or accept re-posting it after Step 0 — but decide it deliberately. **Now narrowed to 0.5
-   alone** — see below.
+   or accept re-posting it after Step 0 — but decide it deliberately. **Resolved by not arising:**
+   both items were declined, so no Step 0 commit moved the dump. See below.
 
 ## Step 0 executed — 2026-08-13
 
 **0.3, 0.4 and 0.6 are landed code. 0.2 is deferred by the author** to the complete tool-change
-solution, with Phase 4 and HR-7 / HR-8 / HR-9. **0.5 is all that remains of Step 0.**
+solution, with Phase 4 and HR-7 / HR-8 / HR-9. **0.5 is closed with no edit** — the two Duet fields
+stay and group 11 is left standing until the `PR-` findings are handled. **Step 0 is done.**
 
-**The `REG-MF` collision is deferred with 0.2, not resolved.** None of the three items that landed
-adds, removes or renames a property, so the property dump does not move and the baseline is still
-postable from `HEAD`. **0.5 brings the collision back on its own** — it deletes two properties and
-moves a group boundary — so that decision is now attached to 0.5 in the plan rather than to Step 0
-as a whole.
+**The `REG-MF` collision never happened.** No item that landed adds, removes, renames or relocates
+a property, so the property dump has not moved and the factory-default baseline can be posted
+whenever there is Fusion time. It was avoided by the two items that would have caused it — 0.2 and
+0.5 — being declined on their own merits, not by sequencing around it. **It returns at Step 5**,
+which splits group 7, and at whatever the `PR-` pass does with group 11.
 
 **Three of the four items departed from their own written instructions, and every departure came
 from checking the plan's claim instead of executing it.**
@@ -267,21 +271,21 @@ is named. `REG-S0` in `PReview.md` §3.8 is the row that proves it.
 3. ~~**C5, the thirteen merged branches**~~ — **done**, `git branch -d`, tips recorded in the
    commit message. `git branch` now lists three. **No remote branch was touched**, and remote
    deletion remains the one irreversible action on that page.
-4. ~~**Step 0's repository work**~~ — **0.3, 0.4 and 0.6 done**; **0.2 deferred by the author**.
-5. **Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it.** The first unfinished
-   thing in the plan that does not wait on a decision. The critical path: cheap, and able to
-   invalidate Steps 2–4 — which is exactly why it goes first. Needs a Fusion keyboard; the
-   paste-ready prompt is written.
-6. **0.5 — deletion refused by the author; choose *relocate* or *leave alone*.** The two Duet
-   fields stay. The reason held up under checking and then got stronger: **both defaults are RRF
-   2.x g-code**, and on RRF 3.x `M453` is parsed for `S` alone, so `M453 P2 I0 R30000 F200` sets
-   no pin, no max RPM and no PWM frequency **and reports no error** — filed as **PR-13**, with the
-   `GCodes2.cpp` citations from tags `2.05` and `master`. `07-code-map.md` had said *"keep or
-   fold"*; `09-plan.md` transcribed it as *"fold"* and wrote an acceptance count that assumed
-   deletion. What is left is a display question: move both `group:` attributes next to the firmware
-   selector (**no key changes, nothing resets**, 11 groups → 10) or leave group 11 standing. Either
-   way it is **the last item in Step 0 that moves the property dump**, so `REG-MF` is still owed
-   first or knowingly re-posted after.
+4. ~~**Step 0**~~ — **complete.** 0.3, 0.4 and 0.6 landed; 0.2 deferred; 0.5 closed with no edit.
+5. **Step 1.1: reproduce the "Multiple WCS Offsets" failure and file it.** **Now the next
+   unfinished thing in the plan**, and nothing in the repository blocks it. The critical path:
+   cheap, and able to invalidate Steps 2–4 — which is exactly why it goes first. Needs a Fusion
+   keyboard; the paste-ready prompt is written. **`REG-MF` can be posted in the same sitting** —
+   the property dump never moved, so the baseline is still available from `HEAD`.
+6. ~~**0.5 — group 11**~~ — **closed 2026-08-13 with no edit: the fields stay, and group 11 is left
+   standing until the `PR-` findings are handled.** Deletion was refused, and the reason got
+   stronger under checking: **both defaults are RRF 2.x g-code**, and on RRF 3.x `M453` is parsed
+   for `S` alone, so `M453 P2 I0 R30000 F200` sets no pin, no max RPM and no PWM frequency **and
+   reports no error** — filed as **PR-13**, with `GCodes2.cpp` citations from tags `2.05` and
+   `master`. `07-code-map.md` had said *"keep or fold"*; `09-plan.md` transcribed it as *"fold"* and
+   wrote an acceptance count that assumed deletion. The one surviving option — relocating both
+   `group:` attributes beside the firmware selector, which changes no key and resets nothing —
+   rides with PR-13, so the dialog move and the default rewrite cost one baseline instead of two.
 7. ~~**C6's read**~~ — **overruled by the author, and now closed.** The two branches were over two
    years old and edit `MPCNC.cps`, a filename the project no longer has, so they were deleted
    unread. `git push origin --delete UpdateToolChange GRBL_Fixes` was **run by the author on

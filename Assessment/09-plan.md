@@ -411,8 +411,13 @@ oversight.
 No design dependency, no ordering constraint between them, each independently
 committable.
 
-> **Status 2026-08-13: 0.1 · 0.3 · 0.4 · 0.6 done · 0.2 deferred · 0.5 is all that is left.**
-> Readiness was checked first, and the check is kept below because Step 1 inherits its conclusions.
+> ## ✅ **Step 0 is COMPLETE — 2026-08-13**
+>
+> **0.1 · 0.3 · 0.4 · 0.6 landed. 0.2 deferred to the tool-change solution. 0.5 closed with no edit.**
+> Readiness was checked before any of it, and the check is kept below because Step 1 inherits its
+> conclusions. **`REG-MF` was never invalidated**: no property was added, removed, renamed or relocated,
+> so the property dump has not moved and the baseline can be posted whenever there is Fusion time.
+> **The next unfinished thing in this plan is Step 1.1**, which needs a Fusion keyboard.
 >
 > **What holds.** The post is **untouched at 3,758 lines** — the exact tree this plan was written
 > against — so every line reference in Steps 0 and 1 is still valid. Spot-checked and exact:
@@ -427,12 +432,12 @@ committable.
 >
 > 1. **The register destination.** Fixed in 0.2, 0.3 and 0.6: every row went to `PReview.md`, which is
 >    the only file that carries these ids. The prompts used to say `HReview.md`.
-> 2. **The `REG-MF` collision is off the table for now.** With **0.2 deferred by the author**, the three
->    items that landed — 0.3, 0.4, 0.6 — add, remove and rename **no property**, so the property dump
->    does not move and the baseline is not invalidated before it exists. **The collision returns with
->    0.5**, which folds group 11 and deletes two properties: post `REG-MF` before it, or accept
->    re-posting. Deciding it at 0.5 rather than now is the whole of the change here. *This is the
->    collision `05-history.md` warns produces work twice.*
+> 2. **The `REG-MF` collision never happened.** With **0.2 deferred** and **0.5 closed without an edit**,
+>    the three items that landed — 0.3, 0.4, 0.6 — add, remove, rename and relocate **no property**, so
+>    the property dump has not moved and the baseline can be posted at any time. *This is the collision
+>    `05-history.md` warns produces work twice, and it was avoided by the two items that would have
+>    caused it being declined on their own merits, not by sequencing.* **It returns at Step 5**, which
+>    splits group 7, and at whatever the `PR-` pass does with group 11.
 >
 > **What actually happened when Step 0 was run, and the reason it is worth reading twice:** three of the
 > four items departed from their own instructions, and each departure was found by checking the plan's
@@ -457,8 +462,8 @@ the registered fix and this item's fix are **incompatible**, and choosing betwee
 what a tool change should do, which is the thing the tool-change work exists to settle. `PReview.md`'s
 HR-10 row now carries the ⚠️ so the unsafe diff cannot be picked up as a warm-up commit, and the long form
 carries it again at the diff itself. **Nothing below is stale — read it when the tool-change work starts.**
-One consequence worth keeping: with 0.2 held, **Step 0 no longer deletes a property**, so `REG-MF` survives
-it (see 0.5, which still does).
+One consequence worth keeping: with 0.2 held **and 0.5 closed unedited, Step 0 deletes no property at all**,
+so `REG-MF` came through it untouched.
 
 - **Goal** — the post can no longer emit a command that drops the gantry onto the work.
 - **Why** — HR-10, and **the post already knows**. At
@@ -555,12 +560,23 @@ of Marlin by construction. **The remaining predicates are untouched**, Step 2 de
 - **Done when** — `parkCanRetract` no longer exists; output byte-identical.
 - **Findings** — none; internal.
 
-### 0.5 — Group 11 (Duet, 2 properties) — 🚫 **DELETION REFUSED by the author 2026-08-13**
+### 0.5 — Group 11 (Duet, 2 properties) — ✅ **CLOSED 2026-08-13: no change, and Step 0 is done**
 
-> **The author's ruling: the two fields stay.** *"There would be nowhere to change this g-code if
-> incorrect."* **That is now more than a principle — the g-code IS incorrect on current firmware**, and
-> the escape hatch is the only thing that lets an operator fix it without waiting for a release. Filed as
-> **`PR-13`** in `docs/PReview.md`, with the source citations.
+> **The author's ruling, in two parts.** First, **the two fields stay** — *"there would be nowhere to
+> change this g-code if incorrect."* Then, having seen that the g-code **is** incorrect on current
+> firmware: **leave group 11 alone for now, and address it when the `PR-` findings are handled.**
+> So `MPCNC_v4.0_Beta2.cps` is not edited by this item at all, and the relocation option below is not
+> taken — it is deferred to the professional pass, where `PR-13` already carries the real work.
+>
+> **Two consequences, both good:**
+>
+> - **Step 0 is complete.** 0.1 · 0.3 · 0.4 · 0.6 landed, 0.2 is deferred to the tool-change solution,
+>   and 0.5 closes without an edit.
+> - **`REG-MF` is no longer blocked or blocking.** Nothing that landed in Step 0 adds, removes, renames
+>   or *relocates* a property, so the property dump has not moved a byte and the factory-default baseline
+>   can be posted whenever there is Fusion time. **The collision `05-history.md` warned about did not
+>   happen** — not because it was managed, but because the two items that would have caused it were both
+>   declined on their merits. It returns at Step 5, which splits group 7.
 >
 > **`09-plan.md` overreached here, and `07-code-map.md` did not.** The code map's verdict is *"**Keep or
 > fold** into the firmware selector; two controls is not a problem worth solving"* (:258). This page
@@ -580,24 +596,18 @@ loses `P2 I0`, the laser pin having moved to `C"pin"` / `M950`. The full table i
 RRF 3.x.** No claim here rests on running a Duet — both readings are from the firmware's own switch
 statement, and neither string has ever appeared in a posted file.
 
-**What is left of 0.5, if anything.** Two live options, and the difference is whether a *key* moves:
+**What was on the table, kept for the `PR-` pass rather than deleted.** The one option that survived
+refusal was **relocation, not deletion**: set both properties' `group` to the firmware selector's. A
+`group:` is a display attribute, so **no key changes and no saved setting resets**, the property count
+stays at 66 and both fields remain editable — 11 groups → 10, which is the only benefit 0.5 ever claimed.
+It is **not taken now** and is not urgent: it would still re-head the property dump, and it buys a dialog
+tidy-up in the same group of properties `PR-13` is going to rewrite the defaults of. **Doing both at once
+costs one baseline instead of two.**
 
-1. **Relocate, don't delete** — set both properties' `group` to the firmware selector's. A `group:` is a
-   display attribute, so **no key changes and no saved setting resets**; the property count stays at 66
-   and both fields remain editable. Delivers the only benefit 0.5 ever claimed, 11 groups → 10.
-   **Still touches the property dump**, which echoes keys beneath group titles, so `REG-MF` is affected
-   either way — but by a re-heading rather than by two deletions.
-2. **Leave group 11 alone.** Two controls is not a problem worth solving, which is what the code map
-   said. Costs one group in the dialog and nothing else.
-
-⚠️ **Whichever is chosen, `REG-MF` is still owed first or knowingly re-posted after** — 0.5 is the last
-item in Step 0 that moves the property dump at all. Under option 1 the acceptance figures are **66
-properties unchanged, 11 groups → 10**; the *"66 → 64"* on this line until 2026-08-13 assumed the
-deletion that has now been refused. **Re-count at the edit either way**; `doc-sync` is 19 commits behind
-(C7) and cannot arbitrate. Re-run `node docs/doc-sync.js`.
-
-**`groupDefinitions.duet` is at [:118](MPCNC_v4.0_Beta2.cps#L118)** — :118, not the :117 this line said
-until 2026-08-13.
+**Figures for whoever picks it up:** 66 properties **unchanged** either way — the *"66 → 64"* that stood
+on this line until 2026-08-13 assumed the deletion that was refused, and `plan.md`'s 69 is staler still.
+**Re-count at the edit**; `doc-sync` is 19 commits behind (C7) and cannot arbitrate. `groupDefinitions.duet`
+is at [:118](MPCNC_v4.0_Beta2.cps#L118) — :118, not the :117 this line said until 2026-08-13.
 
 ### 0.6 — HR-13, the `onCommand` gap ✅ **DONE 2026-08-13 — half applied, half refused**
 
