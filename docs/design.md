@@ -102,10 +102,7 @@ unlike the axis declaration, **this merge deleted a state rather than renaming o
 whenever homing was off, so two booleans offered four settings of which only three did anything. **`$H` uses `writeln()`, not
 `writeBlock()`** — GRBL recognises `$` only as the line's first character (CR-1).
 
-### ▶ Target — the fixed Z reference is the machine's own homed Z
-
-*Lands with `plan.md` Step 2. Until it does the post also offers a probed spoilboard base; that
-implementation is being deleted, and nothing new is written against it.*
+### The fixed Z reference is the machine's own homed Z
 
 A frame whose Z0 does not move with stock thickness — the only frame in which one clearance height is
 meaningful across parts of differing thickness, which is why the cross-part safe-Z feature requires one
@@ -116,10 +113,10 @@ in group 4, beside it.
 **The field is the opt-in — there is no enum and no boolean.** The frame exists when the machine declares Z
 homed **and** `Machine Travel Z` parses, and it does not otherwise. The field **ships empty**, so an
 untouched dialog has no frame and a factory-default job emits exactly what it emits today; filling it is
-the whole act of choosing one, **at any offset count**. Group 5 ceases to exist and the field moves to
-group 4, because a height in the machine frame is meaningless beside a declaration that the machine has
-one. **Two controls that must agree is the failure mode being retired here**, so this design does not add
-another; the header echo names the frame and its height, which is all a second control would have said.
+the whole act of choosing one, **at any offset count**. It lives in **group 4**, beside the declaration,
+because a height in the machine frame is meaningless without one. **Two controls that must agree is the
+failure mode this retired**, so the design does not add another; the header echo names the frame and its
+height, which is all a second control would have said.
 
 **Multi-part is where the frame stops being optional.** A job using more than one work offset must have it
 or be refused (Guard B): the tool has to clear the fixtures on its way between parts, and no single
@@ -127,6 +124,11 @@ clearance height is meaningful across origins that are only known after probing 
 job is never refused for want of one** — it simply gains what the frame is for, when the field is filled: a
 real absolute Z at the first section's arrival instead of a warning, and a retract before the end-of-job
 park crosses the bed.
+
+**The frame itself is Z-only; the X/Y requirement belongs to the workflow.** A `G53` Z move needs machine
+Z trustworthy and nothing else, so a single-part job on a `Z Only` machine may use it. What needs a homed
+X/Y zero is *traversing between stored work offsets*, which is multi-part work — so that requirement sits
+on Guard B as a **second, separately worded refusal**, and the frame predicate carries no trace of it.
 
 **Marlin can have a homed Z. What it loses is the ability to keep addressing it.** Homing per axis is a
 *machine* capability, and Marlin has it outright — `G28 Z` is genuinely independent there (firmware table
@@ -325,9 +327,7 @@ it from the wrong zero entirely, and how wrong is unknowable to the post. F360 h
 machine table" height at all. The only sound use of an expression here would be as a **floor**
 (`max(constant, resolved)`), never a substitute.
 
-### ▶ Target — the cross-part retract enters no WCS at all
-
-*Lands with `plan.md` Step 2.*
+### The cross-part retract enters no WCS at all
 
 Every traverse between work offsets retracts with a single `G53 G0 Z<Machine Travel Z>` **before** the
 destination WCS is selected, so no height is ever computed in a frame whose Z origin the job has not
