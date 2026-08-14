@@ -9,16 +9,13 @@ behaves as it does is `design.md`.
 contributes 18 of them and is **itself unmerged**, so a merge to `master` carries two
 ranges, not one. `master` is 6 commits ahead of `origin/master`; `Assessment` is unpushed.
 
-**What is true now.** Phase C and Step 0 are done. **Step 1.1 is done and closed** — the
-multi-WCS job posts, in three dialog edits, and the refusal chain is filed as `PR-14`. The
-post is otherwise untouched by this plan since Step 0.
+**What is true now.** Phase C, Step 0 and **Steps 1.1 and 1.2 are done and closed** — a
+multi-WCS job posts, and on a machine declared homed it posts with every group-5 field left
+at its default. `PR-14` closed with 1.2. The post is otherwise untouched by this plan.
 
-**What is next: Step 1.2's four test rows.** `Multi_WCS (b)` is read: its traverse is already
-`G53 G0 Z-10`-framed at all three WCS changes, so the capability was proven before the code
-changed. **Step 1.2's code is applied and unposted.** What is owed is four posts, in
-`findings.md` §4 — `PR-2e` (the derived frame, a two-line diff against `Multi_WCS (b)`),
-`PR-2f` (`Home at Job Start = Off` now posts), `PR-2g` (single-part unchanged) and `PR-14`
-(both refusals). Nothing else moves until they run.
+**What is next: Step 1.3** — the six multi-part jobs in `findings.md` §4.1, the largest
+unverified area in the post. Its first move is not a post: `PA1` and `PB2` cite
+`Retract Across Parts`, which `CR-13` deleted, and re-scoping them is itself a finding.
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
@@ -36,9 +33,8 @@ quoted comment text, never by line number.
 
 | | Item | Blocked on |
 |---|---|---|
-| **1.2** | Make the homed machine the answer to Guard B | — |
-| **1.3** | Post the six multi-part jobs — `findings.md` §4.1 | 1.2 |
-| **2** | Retire the spoilboard base | 1.2 + 1.3 |
+| **1.3** | Post the six multi-part jobs — `findings.md` §4.1 | — |
+| **2** | Retire the spoilboard base | 1.3 |
 | **3** | Marlin multi-WCS: delete Guard C, add a version floor | a Marlin changelog reading |
 | **4** | Group 6: keep the touch-off, delete the orchestration | 2 and 3 |
 | **5** | Group 7: rebuild the tool change as two flows | — (parallel with 1–4) |
@@ -51,27 +47,6 @@ others.** Steps 2–4 assume F360 emits a multi-WCS job a particular way, read f
 post source rather than observed. **Step 5 is independent** and can run in parallel.
 
 ---
-
-## Step 1.2 — Make the homed machine the answer to Guard B
-
-- **Goal** — a homed machine posts a multi-WCS job from a configuration the operator can
-  reach without learning the spoilboard subsystem.
-- **Why** — Guard B's reasoning is right: a multi-WCS traverse needs a frame that outlives
-  one WCS. Its *route* is wrong. Only the spoilboard route needs a reserved WCS, a probed
-  base and four more guards; the **machine-Z** route needs none of them, and on the machine
-  1.1 was run from, its four guards were already satisfied by group 4. **What this buys is
-  discoverability and defaults, not capability** — the capability landed with `PR-2`.
-- **Where** — Guard B :1698-1705; `usesMachineZDatum()` :2012; `machineHomesXY/Z()`
-  :2019-2026; `parseInterPartTravelZ()` :2054; the machine-Z branch :1645-1672.
-- **The change — applied, unposted.** `getFixedZReference()` derives `Machine Z` for a
-  multi-part job on a machine declared `XYZ` homed, so `None` means *nothing chosen here*
-  rather than *no frame*. `Home at Job Start` is **not** required — the declaration is the
-  trust assertion, GRBL's alarm lock enforces it, and RepRap takes a warning instead. Guard B
-  now refuses in one sentence naming the homed machine; the travel-height refusal names its
-  field and group. The spoilboard path is untouched — Step 2 deletes it.
-- **Done when** — `PR-2e`, `PR-2f`, `PR-2g` and `PR-14` are ticked in `findings.md` §4.
-  **Read the emitted files; do not infer them.** `PR-2e` is the measure: one dialog field
-  removed, two lines of the file changed, and no g-code.
 
 ## Step 1.3 — Post the six multi-part jobs
 
@@ -198,7 +173,7 @@ and it proves logic only, never output.
   **and every `F` word**, and nothing else. It is still owed because the closest run was
   diffed against a file that is neither factory-default nor pre-machine-frame.
 - Then `PR-5a` (the enum flip — the one hazard consolidation created, and the row `PR-5`
-  lives or dies on), `PR-2a`, `PR-2c`, `PR-5b`, `HR-28 (A)`; then `PR-6d`, `PR-6a–c`,
+  lives or dies on), `PR-2c`, `PR-5b`, `HR-28 (A)`; then `PR-6d`, `PR-6a–c`,
   `PR-7a–b`, `PR-8a/b`, `PR-9`, `PR-11`; then `FCR-3`, `FCR-4`, `FCR-5`, `FCR-13`.
 - **Dialog-only:** `D1` and `D3`. The properties literal is now declared in display order, so
   if the dialog *still* shows groups out of numeric order, Fusion is not sorting and the
@@ -260,7 +235,7 @@ The guides are off-limits during code changes. Do it all here — per-step means
 
 | Blocked | Waiting on |
 |---|---|
-| Steps 2 and 4 | Step 1.2 — whether the homed path actually posts |
+| Steps 2 and 4 | Step 1.3 — the six multi-part jobs |
 | Step 3's version floor | the Marlin changelog for #14743 |
 | Step 5's verification | a full-licence posted two-tool file |
 | Step 5's Flow 2 | which token the sender keys on — `findings.md` §6 |
@@ -307,6 +282,14 @@ at all. Filed as **`PR-14`** — error *text*, not logic. The author's verdict, 
 failed post was operator error, and the route to the setting is the separate issue. **It did
 what the critical path promised — it invalidated part of Steps 1–4's premise before any of it
 was built.**
+
+**Step 1.2 — the homed machine answers Guard B ✅ closed 2026-08-14, `c0ceb86`.**
+`getFixedZReference()` derives `Machine Z` for a multi-part job on a machine declared `XYZ`
+homed, so the operator reaches the frame from group 4 and never visits the spoilboard
+subsystem; `Home at Job Start` is not required, because the declaration is the trust
+assertion. Six rows posted and passed — `findings.md` §5. **The measure held:** the same job
+that produced `Multi_WCS (b).gcode` posts with `Fixed Z Reference` back at its factory `None`
+and **two lines of the file change, no g-code.** `PR-14` closed with it.
 
 *`Assessment/00-08` and `10` are the analysis this plan came from. They are dated
 2026-08-13 and their file pointers predate this consolidation; read them for evidence, not for

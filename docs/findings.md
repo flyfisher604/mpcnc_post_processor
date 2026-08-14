@@ -51,7 +51,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**21 open (one of them deferred) · 2 part-fixed — 23 entries.**
+**20 open (one of them deferred) · 2 part-fixed — 22 entries.**
 
 ### PR-15 — the tool-change code does not comply with the tool-change design — High
 
@@ -89,23 +89,6 @@ is written on every Duet post. Never yet posted.
 **The fields stay editable** — the post cannot know a board's pins or its RRF major version.
 Take the relocation of both properties beside the firmware selector *with* the default
 rewrite: both re-head the property dump, so together they cost one baseline instead of two.
-
-### PR-14 — the multi-WCS refusal did not name the field the second refusal wants — Low-Med · ◑ fix applied, unrun
-
-**Problem.** Guard B named its cures in prose — *"the spoilboard answer"*, *"the machine-Z
-answer"* — never by the enum titles the operator had to find, nor by the group holding them,
-and never mentioned `Inter Part Travel Z`. Taking the cure it recommended, the post refused
-**again**, at `parseInterPartTravelZ()`'s guard, for that field. A supported F360 feature cost
-two failed posts and a bench measurement before it emitted a byte.
-
-**Reproduce.** F360 Setup with **Multiple WCS Offsets**, 2 instances, GRBL, group 5 at factory
-defaults. Post.
-
-**Fix.** Applied, unrun. The **first** refusal is gone: a multi-part job on a machine declared
-homed in X/Y and Z takes the machine's own Z frame with no group-5 visit, so Guard B is now
-reachable only on a machine declared as not homing and says so in one sentence. The **second**
-names `Inter Part Travel Z` and the group it lives in — it cannot be removed, being a
-machine-specific measurement no default can be right about. Closes when its §4 row passes.
 
 ### HR-13 — `onCommand` silently discards every command it does not name — Low-Med · ◑ part-fixed
 
@@ -340,7 +323,7 @@ and fine.
 
 ## 3. Closed findings
 
-**32 fixed · 2 closed by design · 1 withdrawn — 35 rows.** Permanent: commit messages and
+**33 fixed · 2 closed by design · 1 withdrawn — 36 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -376,6 +359,7 @@ diagnosis, the diff and the argument.
 | **PR-10** | PR-2 made the preamble move the tool, so the two `… to Current Pos` first-part modes record bed clearance as the origin | Med-High | Post-time `warning()`. **Not a code fix and cannot be one** — the distance from clearance to stock is what the probe exists to discover. `CR-15` is the defaults half | ✅ |
 | **PR-11** | HR-28's GRBL jog warning tested `Subsequent WCS / Part` on single-WCS jobs, which never consult it | Low-Med | `multiWcs` applied to the subsequent-part half only | ✅ |
 | **PR-12** | An F360 probing operation refused with Autodesk's generic cycle text, so the one dialog the operator sees said nothing actionable | Low | `f54beb0` — the post's own `error()`, naming the reason and the two things that do work. The refusal itself is correct: GRBL and Marlin cannot compute an offset | ✅ |
+| **PR-14** | The multi-WCS refusal named its cure in prose, and the cure it recommended refused again for a field it never mentioned | Low-Med | `c0ceb86` — the first refusal is gone entirely: a homed machine's Z frame is now derived, so Guard B is reachable only on a machine declared as not homing. The second cannot be removed and now names `Inter Part Travel Z` and its group | ✅ |
 | **CR-04** | The first-move conversion applies no test of any kind to the destination | — | **Withdrawn — not a defect.** Fusion Personal emits no rapids, so every section's opening callback is a would-be rapid and the conversion never reaches a cut. Under a full licence that is `CR-03`'s ground. Designed fix unapplied, in git | ➖ |
 | **CR-11** | The spoilboard base is probed to a target measured in the frame the probe is establishing | Machine damage | `c319e69` — a provisional Z0 makes the target relative, and the base probe gets its own reach | ✅ |
 | **CR-12** | Both `Use Active WCS …, Probe Z0` modes measure the probe target from the Z0 they distrust | Machine damage | `979297d` — `partProbe()` writes a provisional Z0, on a third path this finding does not name | ✅ |
@@ -386,7 +370,8 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**⬜ 64 UNRUN · ❌ 0 FAIL · ➖ 1 n/a — 65 rows.** Nothing professional has passed.
+**⬜ 59 UNRUN · ❌ 0 FAIL · ➖ 1 n/a — 60 rows.** **No §4.1 row has run** — the origin-mode
+dispatch across parts and fixtures is entirely unverified, and it is the largest such area.
 **No row exercises a tool change** — the nine that did were deleted with the design they
 tested, and their replacements are written as `plan.md` Step 5 lands.
 
@@ -427,13 +412,9 @@ posted file can show it.
 | **P9** | Spoilboard surfacing on the base | multi-WCS job with a section cutting *on* the base | posted | — | ⬜ |
 | **PR-1a** | The capability/action split emits what the old enum did, and nothing when the action is off | group 4 declarations × `Home at Job Start`, GRBL then Marlin | posted | — | ⬜ |
 | **PR-1b** | The stored-offset warning fires on the trusting modes and **never** on the `Jog …` modes | 2-WCS job, each origin mode in turn | posted | — | ⬜ |
-| **PR-2a** | A multi-WCS job on a homed-Z machine posts with **no** reserved base, one `G53` per traverse | 2 WCS, `Fixed Z Reference = Machine Z`, `Inter Part Travel Z = -12` | posted | — | ⬜ |
-| **PR-2b** | The first section's arrival emits a real absolute Z instead of the `Unknown Z` comment | as PR-2a, First = `Use Active WCS X0 Y0, Probe Z0` | posted | — | ⬜ |
+| **PR-2b** | The first section's arrival emits a real absolute Z instead of the `Unknown Z` comment | multi-WCS, `Fixed Z Reference = Machine Z`, `Inter Part Travel Z = -12`, First = `Use Active WCS X0 Y0, Probe Z0` | posted | — | ⬜ |
 | **PR-2c** | Every new guard refuses, and leaves **no file** | each of the nine new `error()` conditions | posted | — | ⬜ |
-| **PR-2d** | `Inter Part Travel Z` converts mm → inch in both the block and the header echo | as PR-2a, output units **inch** | posted | — | ⬜ |
-| **PR-2e** | The frame is **derived**: a multi-WCS job posts with `Fixed Z Reference` never touched — four `G53 G0 Z-10 F300`, and a Resolved Values line saying the frame came from the declaration. Two lines differ from `Multi_WCS (b).gcode` and **no g-code does** | the `Multi_WCS` job, `XYZ` + `Home`, `Inter Part Travel Z = -10`, **`Fixed Z Reference = None`**, `Comment Level` `Debug` | posted | — | ⬜ |
-| **PR-2f** | The declaration alone carries the frame — `Home at Job Start` = `Off` **posts** on GRBL where it refused before, no `$H`, every `G53` intact | as PR-2e, `Home at Job Start` = **`Off`** | posted | — | ⬜ |
-| **PR-2g** | The derivation is gated on multi-WCS — a single-part job is untouched: `Fixed Z reference = None` and **no `G53` anywhere** | any one-part job at factory defaults, byte-diffed against its saved baseline | posted | — | ⬜ |
+| **PR-2d** | `Inter Part Travel Z` converts mm → inch in both the block and the header echo | multi-WCS, `Fixed Z Reference = Machine Z`, `Inter Part Travel Z = -12`, output units **inch** | posted | — | ⬜ |
 | **PR-3** | `Probe to Set Base` no longer offers `None`, and the base always probes | base reserved, dialog + a post | dialog | — | ⬜ |
 | **PR-5a** | The enum flip — the one hazard consolidation created | `Fixed Z Reference` flipped with a live `Inter Part Travel Z` | posted | — | ⬜ |
 | **PR-5b** | The frame-naming header echo | as PR-5a | posted | — | ⬜ |
@@ -449,7 +430,6 @@ posted file can show it.
 | **PR-10** | The fixed-Z establish warns off the two `… to Current Pos` first-part modes | `Machine Z`, then `Spoilboard`, First = each `Current` mode then each `Jog` mode | posted | — | ⬜ |
 | **PR-11** | The GRBL jog warning is silent on a single-WCS job whose *subsequent* mode is a `Jog` mode | one WCS, Subsequent = `Jog to X0 Y0, Probe Z0` | posted | — | ⬜ |
 | **PR-13** | The Duet mode string is written once per section-type change, verbatim | `CNC Firmware` = RepRap, a milling job, then milling + laser | posted | — | ⬜ |
-| **PR-14** | The refusal chain is now two honest stops, not three: Guard B names the homed machine and group 4 and **leaves no file**; the travel-height refusal names `Inter Part Travel Z` **and its group** | from PR-2e — `Axes Homed and Trusted` = **`None`**; then back to `XYZ` with `Inter Part Travel Z` **empty** | posted | — | ⬜ |
 | **HR-13** | `onCommand` no longer discards silently, and says so at Comment Level `Off` | Manual NC *Orientate spindle*, then again at Comment Level `Off` | posted | — | ⬜ |
 | **HR-20** | Tapping beyond a warning on the manual path | a drill + tap job, automatic spindle | posted | — | ⬜ |
 | **HR-26** | The base-clearance retract has no tool-0 / jet guard though the base *establish* does | jet tool + multi-WCS + base | posted | — | ⬜ |
@@ -537,8 +517,10 @@ emits `G0 Z<probeSafeZ>` then `G0 X0 Y0`; a jet/tool-0 first part emits the `X0 
 
 ## 5. Passed tests
 
-**✅ 23 PASS · ❌ 0 FAIL · ➖ 3 n/a — 26 tests in 19 rows** (an `(A)`/`(B)` pair shares a
-row), all hobbyist, posted 2026-08-08 from a build proved identical to `e5db625`. Every one
+**✅ 30 PASS · ❌ 0 FAIL · ➖ 3 n/a — 33 tests in 26 rows** (an `(A)`/`(B)` pair shares a
+row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
+`e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
+`PR-2g`, `PR-2h`, `PR-14a` and `PR-14b` were posted 2026-08-14 from `c0ceb86`. Every one
 passed on first read; none was ever marked ❌.
 
 | Test | Result |
@@ -562,6 +544,13 @@ passed on first read; none was ever marked ❌.
 | **HB-18 (A)** | :122 ends `frame$` under `cat -A`. Both Marlin posts came back **318 lines, the pre-fix control's own count** — nothing but :122's text moved |
 | **HB-19 (A)** | At the dialog, on both posts. **Trap: CR-2's warning is beside it, byte-identical to the pre-fix report** — a flat "one warning" criterion reads this PASS as a FAIL |
 | **HB-20 (A)** | By **code walk** — the one ✅ with no artifact, and the reason is a licence: exercising the mapper needs the Personal edition. The branch chain is value-identical, not merely equivalent (`&&` returns its right operand), and every operand is `let`-bound above the chain from pure reads, so dropping a conjunct skips no computation, call or output. **Trap: this is an identity proof for one pairing, not a claim that no configuration changed** |
+| **PR-2a** | `Multi_WCS (b).gcode`, ticked by the author 2026-08-13: `spoilboardFixedZRef = Machine Z` with `spoilboardBaseReserve = None` — **the machine-Z route posts with no reserved base** — and **one `G53 G0 Z-10 F300` per traverse**, :880, :1267, :1654, each two lines above its `G55`/`G56`/`G57`, plus :485 for the job-start establish. **Two deltas from the row as written**, neither material: four distinct offsets rather than two, and `Inter Part Travel Z = -10` rather than `-12`. **Trap: `probeOnStart` and `probeOnChange` are both `Skip`**, so the file proves the frame and the traverse and says nothing about origin-mode dispatch — that is `M1`–`M4`. This artifact is also `PR-2e`'s baseline |
+| **PR-2e** | `Multi_WCS (pr-2e).gcode` against `Multi_WCS (b).gcode`: **three lines differ, two of them the assertion** — `spoilboardFixedZRef = Machine Z` → `None`, and `Fixed Z reference = Machine Z` gaining `-- from the homed machine declaration, not set in the dialog`. The third is the generated-on timestamp. All four `G53 G0 Z-10 F300` and all four offsets `G54`–`G57` intact; **no g-code moved**. **Trap: Fusion prints `Warning: Multiple work offsets used in program.` on any multi-WCS post** — Autodesk's, not the post's; the string is nowhere in the `.cps` |
+| **PR-2f** | `Multi_WCS (pr-2f).gcode` against `(pr-2e)`: `machineHomeAtStart = Home` → `Off`, `$H` replaced by `( writeMachineHoming: Home at Job Start off -- current position accepted as zero, no motion)`, and **nothing else**. It **posted**, where the build before `c0ceb86` refused it, and the four `G53` are untouched — the author's ruling entire, in one file |
+| **PR-14a** | The chain's **first** stop, from the PR-2e job with `Axes Homed and Trusted` = `None`. Guard B's replacement text emitted verbatim — one sentence naming the homed machine, `"Axes Homed and Trusted"` to `XYZ`, `group 4 - Machine Frame`, and `Inter Part Travel Z` in group 5 — and **no `.gcode` was written**, only a 51-byte `Multi_WCS (pr-14).gcode.failed`. **Trap: `HR-28`'s stored-offset warning fires in the same dialog** and is correct there — `None` is exactly its trigger — but the refusal means no file exists, so this run is **not** evidence for `HR-28 (A)`, which wants the in-file channel |
+| **PR-14b** | The **second** stop, from the same job with `Axes Homed and Trusted` back to `XYZ` and `Inter Part Travel Z` cleared. `Multi_WCS (pr-14b).log`: `:1682` verbatim — `"Inter Part Travel Z" (group 5 - Fixed Z Reference)`, `ABSOLUTE machine coordinate`, and the jog-and-read-the-DRO instruction — aborted in `onOpen()`, with only a 51-byte `.failed` on disk. **The discriminator is what is missing:** `Total number of warnings: 1` (Fusion's own) and no stored-offset warning, so X/Y *was* declared — the job reached the machine-Z guard through the **derived** frame with `Fixed Z Reference` at `None`, which is `PR-2e`'s derivation proved a second time, on the refusal path |
+| **PR-2g** | `PR-2g.gcode` at factory defaults: one offset (`G54`), `grep -c G53` = **0**, `Fixed Z reference = None` with no derived clause. **Trap: it does not isolate the gate** — at defaults `machineHomedAxes = None`, so three of the derivation's four conditions are false together and the file cannot say which one held. **PR-2h** is the row that does |
+| **PR-2h** | `PR-2h.gcode`, the gate isolated: `machineHomedAxes = XYZ`, `machineHomeAtStart = Home`, `machineParkAtEnd = Work`, `spoilboardFixedZRef = None` — three of the four conditions true, **only the offset count false**. One offset (`G54`), `grep -c G53` = **0**, `(   Fixed Z reference = None)` with no derived clause, and `$H` present. The derivation is gated on the offset count and nothing else, so an ordinary one-part job on a fully homed machine is untouched. **Trap: it posted at `Comment Level` `Info`, not the `Debug` the row asked for, and that is sufficient** — the property dump and the Resolved Values block both emit at `Info`, so every criterion is still read from the file. **Trap: it carries the `Home at Job Start` / first-part warning**, which predates the change (`1eb8141`) and is `probeOnStart = Current XY & Probe Z` meeting `$H`, not the frame |
 
 ### Checked and found correct — do not re-run
 
@@ -593,8 +582,6 @@ Delete a row when its test is re-posted, and delete this section when it empties
 | every saved GRBL `.gcode` predating 2026-07-31 | the manual-spindle stop now prompts on GRBL | A default job ends `M0 (MSG Turn OFF spindle)` where it once ended `M5`. **No row's assertions are affected** — do not read a tail diff as a regression |
 | the two header-dump rows above | the `groupDefinitions` move, the key rename, then the machine-frame work | The assertions stand — one block per group, in dialog order — but the counts and titles moved. Delete when **D5** re-posts |
 | the "base establish `None`" and third "unknown Z" readings | `PR-3` removed the `None` option | Both halves **retire rather than re-baseline** — there is no longer a way to reserve a base and not probe it. Delete when **PR-3** runs |
-| the Guard B reading | `PR-2` relaxed Guard B to *a fixed Z reference of either kind* | Needs a sibling proving `Machine Z` also posts with **no** base. Delete when **PR-2a** runs |
-| every saved multi-WCS `.gcode` | the machine-Z frame is now **derived** from `Axes Homed and Trusted` | The Resolved Values block gains a clause wherever `Fixed Z Reference` is `None` and the frame is taken from the declaration, and Guard B's and the travel-height refusal's texts changed. **No motion changed** — the emitted `G53` blocks are identical. Delete when **PR-2e** runs |
 
 ---
 
