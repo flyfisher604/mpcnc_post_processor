@@ -13,9 +13,18 @@ ranges, not one. `master` is 6 commits ahead of `origin/master`; `Assessment` is
 multi-WCS job posts, and on a machine declared homed it posts with every group-5 field left
 at its default. `PR-14` closed with 1.2. The post is otherwise untouched by this plan.
 
-**What is next: Step 1.3** — the six multi-part jobs in `findings.md` §4.1, the largest
-unverified area in the post. Its first move is not a post: `PA1` and `PB2` cite
-`Retract Across Parts`, which `CR-13` deleted, and re-scoping them is itself a finding.
+**What is next: Step 1.3, nearly closed** — the multi-part jobs in `findings.md` §4.1. **Eight
+rows passed 2026-08-14** — `PB1`, `PB2`, `PBV1`, `PBV2`, `PBV3` and, off those artifacts, three
+of the four boundary dispatches `M1`, `M2`, `M4`. **What is left is `PA1`/`PA1b`, `P2`/`P3` and
+`M3`**, and `PA1` is the only one needing a job that does not exist yet. All take the derived
+machine frame; seven spoilboard rows are retired unrun rather than posted against code Step 2
+deletes. **Two findings were filed off these runs** — `PR-17`, an `Inter Part Travel Z` at or above
+machine zero on a default GRBL build, unwarned; and `PR-18`, two warnings offering a jog mode in the
+same dialog that refuses it on GRBL. **`PB1` was reposted 2026-08-14 with that height moved `1` → `0`
+and its row passes again**, which *sharpened* `PR-17` rather than closing it: machine Z `0` is the
+homing switch's own trigger point, not the ceiling, so the repair tests `>= 0` and the highest safe
+value is the pull-off `-$27`. The repost also **destroyed the first `PB1` artifact and moved two
+other variables with the height** — §4's reused-filename warning, earned.
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
@@ -53,34 +62,52 @@ post source rather than observed. **Step 5 is independent** and can run in paral
 - **Goal** — the largest untested area in the post stops being unverified.
 - **Where** — `findings.md` §4.1. The expected output is **already written** for PB1, PB2,
   PBV1, PBV2, PBV3 and PA1, so this is checking, not designing.
-- **The change** — none to the post unless a row fails.
-- **Done when** — six posted files exist; every §4.1 row ticked or carrying a finding.
-- **First** — `PA1` and `PB2` reference `Retract Across Parts`, deleted by `CR-13`. Re-scope
-  those rows before running them; that is itself a finding.
+- **The frame is fixed for every row** — `Axes Homed and Trusted` = `XYZ`, `Inter Part Travel
+  Z` an absolute machine Z, `Fixed Z Reference` left at `None`. **Post nothing with a
+  `Reserved WCS`:** Step 2 deletes that code, and `findings.md` §4 retires its seven rows.
+- **What is actually being proved is origin-mode dispatch.** `PR-2a` already proved the frame
+  and the traverse on this job with both probe modes at `Skip`; §4.1 is what happens at each
+  boundary when they are not.
+- **The change** — none to the post unless a row fails. **None has** — `PR-17` and `PR-18` are
+  findings the runs exposed, not row failures.
+- **Done when** — six posted files exist; every §4.1 row ticked or carrying a finding. **Five
+  exist**; `PA1` is the sixth and is the only job still to be built.
 
 ## Step 2 — Retire the spoilboard base
 
 - **Goal** — group 5 ceases to exist; one property survives, in group 4.
-- **Why** — **the subsystem's premise defeats itself.** It exists to give a **non-homing**
-  machine a common Z frame for multi-part traverses, but multi-part traverses require homing
-  by the post's own guard at :1669. **No machine both needs it and can use it.** It also
-  consumes one of GRBL's six registers, and four open findings live in it.
+- **Why** — **multi-part and multi-WCS work belongs to the full-licence user, and that machine
+  homes.** The spoilboard answer exists to give a **non-homing** machine a Z frame, and it buys
+  that with one of GRBL's six registers, a probe cycle whose Z0 is whatever happens to be under
+  the tool, a second meaning for `Inter Part Travel Z`, and five properties that are only
+  correct together. **The setup burden is real and the failure is silent** — `PR-16`. A homed
+  machine already has the frame, for nothing.
 - **Where** — `writeBaseEstablish()` :2998 (~79); reserved-base agreement guards :1622-1643
   (~22); slot check, Guard B′, Guard A :1708-1729 (~22); `baseOriginWriteReason()` :1406-1431
   (~26); `getReservedBaseWcs()` :2042 (~12); `fixedZEstablished*()` :2071-2099 (~28); four of
-  five group 5 properties (~90).
-- **The change** — delete the above. **Keep `spoilboardTravelZ`**, rename `machineTravelZ`,
-  move to `groupDefinitions.machine`. `getFixedZReference()` :2005 reduces to one branch.
+  five group 5 properties (~90). **Locate by call site, not by that list** — search every
+  reader of `getFixedZReference`, `usesMachineZDatum`, `getReservedBaseWcs`,
+  `fixedZEstablishedInFile` and `fixedZEstablishedAtStart`.
+- **The change** — delete the above, **including `spoilboardFixedZRef` entire**: no enum, no
+  boolean replacing it. **Keep `spoilboardTravelZ`**, rename `machineTravelZ`, retitle
+  `Machine Travel Z`, move to `groupDefinitions.machine`. `getFixedZReference()` :2005 becomes
+  *declares Z homed **and** the height parses*, **ungated by offset count** — the field is the
+  opt-in, and it ships empty. The target is `design.md` → *▶ Target — the fixed Z reference*;
+  build against that section, not against this bullet.
+- **Two behaviours change, both intended, and neither is a pure deletion.** A multi-part job on
+  a machine declared **not** homed posts today by reserving a base — Guard B sits inside the
+  `base == 0` arm and never runs when one is — and afterwards Guard B refuses it. And a
+  **single-WCS** job gains the frame when the height is filled, where the offset-count gate
+  denied it: a real `G53` arrival, and a retract before the machine park crosses the bed.
+- **`PR-2e`'s artifact goes stale**, not wrong: the header echo loses the *derived from the
+  declaration* clause, there being no dialog answer left to distinguish it from. Re-baseline it
+  with the two re-posts below.
 - **Done when** — ~250–300 lines gone; 10 groups → 9; the Step 1.3 files still post.
   **Re-post at least two of the six** — a deletion under a verified baseline is the only kind
   that can be checked.
-- **Findings** — `CR-11`, `CR-12`, `CR-14` and `PR-8` close **by deletion**. Each row must say
-  the code was removed rather than repaired.
-- **Refute it first.** Find any configuration where the spoilboard base is the only workable
-  answer — including single-WCS jobs, jet/laser tools, and any path where `Fixed Z Reference
-  = Spoilboard` changes output without a WCS change. Search every reader of
-  `getFixedZReference`, `usesMachineZDatum`, `getReservedBaseWcs`, `fixedZEstablishedInFile`
-  and `fixedZEstablishedAtStart`.
+- **Findings** — `PR-16` and `HR-26` close **by deletion**; each row must say the code was
+  removed rather than repaired. `CR-11`, `CR-12`, `CR-14` and `PR-8` are **already closed by
+  repair** — their code goes with the subsystem and their §3 rows do not change.
 
 ## Step 3 — Marlin multi-WCS: delete Guard C, add a version floor
 
@@ -98,6 +125,20 @@ post source rather than observed. **Step 5 is independent** and can run in paral
   selection is all a multi-WCS job needs); **state a minimum firmware version**; and record
   that **on Marlin, homing silently detaches the program from its own work origin** —
   `set_axis_is_at_home()` zeroes `position_shift` and re-sending `G54` does not restore it.
+- **Guard C is not the only refusal, and deleting it alone changes nothing.** A multi-part job
+  needs a fixed Z frame, and on Marlin the job falls through Guard C into **Guard B′ today and
+  Guard B after Step 2**, refused either way. **The frame question is a design question, not a
+  firmware limit** — Marlin homes Z, and until the job's first `G92` its one frame *is* the
+  machine frame; it is the post's own origin write that ends the correspondence. `design.md` →
+  *▶ Target — the fixed Z reference* states it exactly. Two candidate routes, neither settled:
+  a flow that never writes `G92 Z`, or cancelling the shift — **and whether Marlin implements
+  `G92.1` is not in this record; settle it from source before either is designed.** The
+  homing route is poisoned independently: `G28 Z` re-establishes the frame but
+  `set_axis_is_at_home()` zeroes `position_shift`, detaching the job from the origins it is
+  traversing between.
+- **Settle what Marlin multi-WCS is *for* before writing code** — a real frame, or a refusal
+  whose message is finally true. Guard C's text is a false statement either way, so it is worth
+  fixing even if the answer is that the refusal stands.
 - **Blocked on the version floor.** `CNC_COORDINATE_SYSTEMS` is a build option, and Marlin
   issue **#14743** reported `G92` inside `G54` corrupting the `G53` origin. **Establishing
   which release fixed it is a prerequisite, not a documentation afterthought** — and it is the
@@ -122,7 +163,8 @@ post source rather than observed. **Step 5 is independent** and can run in paral
   both Jog modes**. **Delete `probeOnChange`**, replaced by at most one boolean — *re-probe Z
   at each WCS change*, default off. Retitle the group to say what the operator is deciding.
   Shorten `probeOnStart`'s ~1,900-character description; three modes is what makes that
-  possible.
+  possible. **`PR-18` closes here** — two `validateJob()` warnings recommend a Jog mode, and the
+  clauses go with the modes; search the warning texts for `"Jog to ..."`, not just the enums.
 - **Keep untouched** — `probePause`, `probeOffsetX/Y`, `probeG382orG28`, `probeG38Target`,
   `probeG38Speed`, `probeSafeZ`, `probeThickness`. **The best-evidenced block in the post** —
   every one confirmed by emitted output.
@@ -174,7 +216,7 @@ and it proves logic only, never output.
   diffed against a file that is neither factory-default nor pre-machine-frame.
 - Then `PR-5a` (the enum flip — the one hazard consolidation created, and the row `PR-5`
   lives or dies on), `PR-2c`, `PR-5b`, `HR-28 (A)`; then `PR-6d`, `PR-6a–c`,
-  `PR-7a–b`, `PR-8a/b`, `PR-9`, `PR-11`; then `FCR-3`, `FCR-4`, `FCR-5`, `FCR-13`.
+  `PR-7a–b`, `PR-8b`, `PR-9`, `PR-11`; then `FCR-3`, `FCR-4`, `FCR-5`, `FCR-13`.
 - **Dialog-only:** `D1` and `D3`. The properties literal is now declared in display order, so
   if the dialog *still* shows groups out of numeric order, Fusion is not sorting and the
   zero-padding convention is wrong.
@@ -217,8 +259,8 @@ The guides are off-limits during code changes. Do it all here — per-step means
 - **`writeMachineHoming()`**, the `workOffset 0` → WCS 1 alias, the `>>> WARNING:` channel,
   the seventeen dialog-simplification commits, group 8 entire.
 - **Group 6's touch-off mechanics.**
-- `CR-11`, `CR-12`, `CR-14` and `PR-8` are **superseded by Step 2's deletion**, not preserved
-  — not lost work, work that stops being needed. `CR-13` and `556a378` survive.
+- `CR-11`, `CR-12`, `CR-14` and `PR-8` are landed fixes whose **code** Step 2 deletes — not
+  lost work, work that stops being needed. `CR-13` and `556a378` survive.
 
 ## Delete list — ~450–500 lines
 
@@ -239,7 +281,7 @@ The guides are off-limits during code changes. Do it all here — per-step means
 | Step 3's version floor | the Marlin changelog for #14743 |
 | Step 5's verification | a full-licence posted two-tool file |
 | Step 5's Flow 2 | which token the sender keys on — `findings.md` §6 |
-| `findings.md` §4.1 rows `PA1`, `PB2` | re-scoping against `CR-13` |
+| Step 3's goal, not just its floor | an answer for Marlin's cross-part Z — see Step 3 |
 | Group 10 reduction | a coolant persona |
 | Group 9 audit | laser detail — power scaling, dynamic power, enable sequencing, air assist |
 | A status line in `guide-pro.md` | **deferred by the author 2026-08-13** |
@@ -252,8 +294,10 @@ The guides are off-limits during code changes. Do it all here — per-step means
 > feature — and under-verified everywhere else, by a deliberate deferral nothing in the
 > repository states.**
 
-The over-built place is the spoilboard base: it serves a real user by a route that user
-cannot take. Steps 1, 1.3 and 2 are the remedy. The two design questions the assessment
+The over-built place is the spoilboard base: it serves the non-homing machine at a cost —
+five interlocking properties, a register, and a probe defended only by where the operator
+parked — that the multi-part user does not have to pay, because that user's machine homes.
+Steps 1, 1.3 and 2 are the remedy. The two design questions the assessment
 settled on the way — whether the post reaches into F360's job, and whether computing a safe
 height is the post's job — are in `design.md`.
 

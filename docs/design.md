@@ -1,8 +1,15 @@
-# Design — why the shipped behaviour is what it is
+# Design — the target, and why the shipped behaviour is what it is
 
 The **why** behind `MPCNC_v4.0_Beta2.cps`, for the parts of it the code cannot state: the frame model the
 rest of the record reads against, the external firmware facts each decision rests on, and the arguments
 behind orderings that look arbitrary in the source.
+
+**A section headed ▶ *Target* states the design the code is being changed to, and names the `plan.md` step
+that lands it.** Everything else describes what the post emits today. A target section is written as the
+finished design, in the present tense, because **it is what the diff is checked against** — so read it
+*with* its step, never as a description of the current file. When the step lands, the ▶ comes off and
+nothing else about the section changes; if something else has to change, the design was wrong and the code
+is not the place to discover it.
 
 This file **grows with the post** — a change to what the post emits may earn a paragraph here. Two tests
 gate the entry: the fact must be one **the code cannot state**, and it must be either **the model** — the
@@ -95,58 +102,70 @@ unlike the axis declaration, **this merge deleted a state rather than renaming o
 whenever homing was off, so two booleans offered four settings of which only three did anything. **`$H` uses `writeln()`, not
 `writeBlock()`** — GRBL recognises `$` only as the line's first character (CR-1).
 
-### The fixed Z reference — one concept, two implementations
+### ▶ Target — the fixed Z reference is the machine's own homed Z
+
+*Lands with `plan.md` Step 2. Until it does the post also offers a probed spoilboard base; that
+implementation is being deleted, and nothing new is written against it.*
 
 A frame whose Z0 does not move with stock thickness — the only frame in which one clearance height is
 meaningful across parts of differing thickness, which is why the cross-part safe-Z feature requires one
-(Guard B). A machine can have one two ways:
+(Guard B). **There is exactly one: the machine's own homed Z, addressed with `G53`.** The height is
+`Machine Travel Z`, an absolute machine coordinate, signed, read off the DRO; the machine is declared homed
+in group 4, beside it.
 
-| Answer | The frame | `Inter Part Travel Z` is then… | Costs |
-|---|---|---|---|
-| **Spoilboard** | a probed surface in a reserved WCS | a height **above that surface** — positive | one WCS register — GRBL has six — plus a probe cycle |
-| **Machine Z** | the machine's own homed Z | an **absolute machine coordinate** — signed | a per-machine number read off a DRO |
+**The field is the opt-in — there is no enum and no boolean.** The frame exists when the machine declares Z
+homed **and** `Machine Travel Z` parses, and it does not otherwise. The field **ships empty**, so an
+untouched dialog has no frame and a factory-default job emits exactly what it emits today; filling it is
+the whole act of choosing one, **at any offset count**. Group 5 ceases to exist and the field moves to
+group 4, because a height in the machine frame is meaningless beside a declaration that the machine has
+one. **Two controls that must agree is the failure mode being retired here**, so this design does not add
+another; the header echo names the frame and its height, which is all a second control would have said.
 
-**The machine-Z answer is derived, not asked.** `getFixedZReference()` returns `Machine Z` when the dialog
-says `None`, the job uses more than one work offset, and group 4 declares X/Y **and** Z homed — so a
-multi-part job on a homed machine gets the frame without the operator ever finding this control. **`None`
-therefore means *nothing chosen here*, not *no frame***, and the only route to a multi-part job with no
-frame at all is a machine declared as not homing, which is Guard B's one remaining reason to refuse.
-Single-offset jobs are excluded by construction, which is what leaves an ordinary one-part file unchanged.
-The dialog answer survives for the two things derivation cannot do: **choose the spoilboard**, and **apply
-the machine frame to a single-part job**. Because the property dump then reads `spoilboardFixedZRef = None`
-beside a resolved `Machine Z`, the header echo says in words that the frame came from the declaration.
+**Multi-part is where the frame stops being optional.** A job using more than one work offset must have it
+or be refused (Guard B): the tool has to clear the fixtures on its way between parts, and no single
+clearance height is meaningful across origins that are only known after probing at runtime. A **single-part
+job is never refused for want of one** — it simply gains what the frame is for, when the field is filled: a
+real absolute Z at the first section's arrival instead of a warning, and a retract before the end-of-job
+park crosses the bed.
 
-**One clearance field, not two.** The two answers are never both live, they are read at the same two
-moments (the establish in the preamble, and each cross-WCS traverse), and on a correct setup they name the
-*same physical plane* — so they are one control, `Inter Part Travel Z`, and this enum says which frame it
-is measured in. What that costs is a hazard the two separate fields made impossible: **the enum flip**. A
-height valid in the other frame is still a valid-looking height, and only one direction is detectable —
-a spoilboard clearance is measured *up* from the probed surface, so `<= 0` cannot be one and is guarded,
-while a spoilboard `40` left in a machine-Z job is indistinguishable from a real height on a bed-zeroed
-machine. Three things carry that risk: the field **ships empty and is guarded under both answers**, so an
-untouched dialog cannot post; the header echo **names the frame** beside the number; and both tooltips say
-the frame is decided elsewhere.
+**Marlin can have a homed Z. What it loses is the ability to keep addressing it.** Homing per axis is a
+*machine* capability, and Marlin has it outright — `G28 Z` is genuinely independent there (firmware table
+below). Immediately after homing, Marlin's single frame **is** the machine frame, and a plain `G0 Z<n>` is
+an absolute machine-frame move needing neither `G53` nor a build option. **The post is what breaks the
+correspondence**, and it is the firmware table's own finding: on Marlin an origin is not a register write
+but a *frame shift* — `writeWcsOrigin()` emits `G92 X Y Z` at the current position — so from the first Z
+origin a job establishes, `position_shift` carries an offset the post never knew and cannot read back, and
+`G0 Z<n>` has become a work-frame move. Every mode that establishes a Z0 does this, and a multi-part job on
+Marlin has no alternative to it, there being no per-WCS register to select instead.
 
-**Why it is a parsed string and not a number.** Under the spoilboard answer a number would do — `0` is
-meaningless there, so it could have served as *unset*, which is what the old whole-mm integer relied on.
-The machine-Z answer has no such spare value: every signed number is a real reachable height, `0` very
-much included (on a stock GRBL build the machine zeroes into negative space, so `Z0` is the *top of
-travel*). Fusion's schema gives a numeric property no unset state, so *empty* is only expressible on a
-string — and once the field is shared, the stricter of the two requirements wins.
+So the constraint is narrower and sharper than *Marlin has no frame*: **the machine frame survives on
+Marlin exactly until the job sets its first Z origin**, and `G53` — the only way to address it afterwards —
+is behind `CNC_COORDINATE_SYSTEMS`, off by default. **Guard B therefore still refuses a Marlin multi-part
+job**, but for a reason Step 3 can attack rather than a firmware dead end: whether a flow exists that keeps
+the correspondence — one that never writes `G92 Z`, or that cancels the shift — is an open design question.
+**Whether Marlin implements `G92.1` at all is not in this record and must be settled from source**, and no
+design may assume it either way until it is.
 
-> **Rejected: exposing only the spoilboard** — the shipped design, which *rejected* multi-WCS jobs on
-> machines whose homed Z would have served, Guard B refusing for want of a base while the operator had
-> already declared the machine homes Z and the post had discarded the fact.
-> **Rejected: giving the base an XY origin.** The base stays a Z-only reference.
+> **Retired: the spoilboard base** — a surface probed into a reserved WCS, with the clearance read as a
+> positive height above it. It was the **non-homing** machine's route to a frame, and it goes because
+> multi-part work is the operator running stored fixture offsets, whose machine homes. It cost one of
+> GRBL's six registers, a probe cycle at job start, five properties that were only correct together, and
+> its defence was not code at all: **the base was probed wherever the tool already sat** — no XY move, and
+> none possible, since the establish runs before any origin exists — so parking over the stock recorded the
+> stock top as "the spoilboard" and every clearance from it was short by the stock thickness, silently
+> (`findings.md` `PR-16`). **Do not re-propose it without an answer to that.**
+> **Retired with it: the enum flip.** Two frames sharing one clearance field made a height valid in the
+> other frame a valid-*looking* height, and only one direction was detectable. One frame, one meaning, no
+> flip — and the guard that caught the detectable direction goes too, having nothing left to catch.
+> **Rejected: giving the base an XY origin.** It stayed a Z-only reference to the end.
 
-**Spoilboard — the base probe emits no XY move, so the park position is an operator precondition**, and
-that is why the probe XY offset never applies to it: the establish runs before any origin exists, so no XY
-target could be trusted. The consequence is real and silent — **whatever is under the tool becomes the
-base's Z0**, so parking over the stock records the stock top as "the spoilboard" and every clearance from
-it is short by the stock thickness. **Mitigation is documentation, not code**; the durable fix is unbuilt,
-in `findings.md` §6. Ignored on Marlin (warned), which has no registers to reserve.
+**Why it is a parsed string and not a number** — and it matters more here than it did, because **empty is
+what says *no frame*.** There is no spare value to mean *unset*: every signed number is a real reachable
+height, `0` very much included, since on a stock GRBL build the machine zeroes into negative space and `Z0`
+is the *top of travel*. Fusion's schema gives a numeric property no unset state, so *empty* is expressible
+only on a string — and the property carrying the opt-in is precisely the one that must be able to be unset.
 
-**Machine Z — one absolute height, collected, never derived.** A height read off the DRO *after* homing is
+**The height is collected, never computed.** A height read off the DRO *after* homing is
 already in the controller's own frame, which is what makes it immune to everything below. Units are not: a
 `G53` move is read in the active `G20`/`G21` and GRBL's `$13` can report position in inches — hence the mm
 contract and the header echo. And **transplant, not typing, is its hazard with no precedent here**: every
@@ -296,35 +315,35 @@ Carried from the register the old design filled, because each is a defect the re
 
 **Group 3's "Safe Z to Rapid"** answers a narrower question — "within *this* operation, is Z high enough to
 re-emit a cut G1 as a G0?" It is operation-scoped and only populated when the hobby group is on, so it is
-the wrong source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance
-measured in the job's fixed Z reference** ("Inter Part Travel Z").
+the wrong source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance in
+the machine frame** (`Machine Travel Z`).
 
-**The Inter Part Travel Z cannot be an F360 expression (asked and answered).** `Clearance:40` would parse
-today and is still the wrong source: every F360 height parameter is **per-operation and expressed in that
-operation's own WCS**, while this must be expressed in the
-**base's** frame — feeding a part-frame number into a base-frame `G0 Z` under-clears by the stock
-thickness, silently. F360 has no job-level "above the machine table" height at all; the base frame is a
-post-invented concept. So it stays a plain whole-mm `integer`. The only sound use of an expression here
-would be as a **floor** (`max(constant, resolved)`), never a substitute.
+**It cannot be an F360 expression (asked and answered).** `Clearance:40` would parse today and is still the
+wrong source: every F360 height parameter is **per-operation and expressed in that operation's own WCS**,
+while this one is an absolute machine coordinate — feeding a part-frame number into a `G53 G0 Z` measures
+it from the wrong zero entirely, and how wrong is unknowable to the post. F360 has no job-level "above the
+machine table" height at all. The only sound use of an expression here would be as a **floor**
+(`max(constant, resolved)`), never a substitute.
 
-### Base WCS is transited, not parked (R1/R2)
+### ▶ Target — the cross-part retract enters no WCS at all
 
-The base-relative retract must *select* the base to move in its frame (the numeric relation between two
-WCS is only known after runtime probing). Two rules:
+*Lands with `plan.md` Step 2.*
 
-- **R1 — always restore the operating WCS.** After a base transit, advance to the next operation's WCS
-  before any cutting; never cut with the base left active.
-- **R2 — never round-trip the base empty.** Enter the base only when a real move is emitted there.
+Every traverse between work offsets retracts with a single `G53 G0 Z<Machine Travel Z>` **before** the
+destination WCS is selected, so no height is ever computed in a frame whose Z origin the job has not
+established. `G53` is not modal and is an error without `G0`/`G1` active, so it is **its own block, with a
+Z word and nothing else** — a future X/Y park is a second block, never a three-axis diagonal. Nothing is
+selected, so nothing has to be restored, and the active WCS after a retract is whatever the next section
+asks for.
 
-A transit selects the base with a low-level `writeBlock`, **not** `writeWCS()` — going through `writeWCS()`
-would re-probe and rewrite the origin, which is the opposite of passing through a frame. The same rules
-govern the **base establish**: it transit-selects the base *before* probing so that both the `G38.2`
-target and the post-probe retract are measured against the base, then restores the operating WCS.
-
-> **Superseded, kept because it is the plausible wrong answer.** An earlier note argued the base establish
-> needed no `G59` select, since `G10 L20` does not change the active WCS — correct as far as it goes, but
-> it missed that the base's own probe and its post-probe retract would then execute in the *part's* frame,
-> whose Z may be stale. **The missing select was the defect.**
+> **Retired with the base: R1/R2, the transit rules.** A probed base had to be *selected* to move in its
+> frame — the numeric relation between two WCS is knowable only after runtime probing — which bought two
+> standing rules (*always restore the operating WCS*; *never round-trip the base empty*), a transit that had
+> to bypass `writeWCS()` to avoid re-probing on the way through, and one defect on the way: an earlier note
+> argued the establish needed no `G59` select, since `G10 L20` does not change the active WCS — true, and it
+> missed that the base's own probe and post-probe retract would then execute in the *part's* frame, whose Z
+> may be stale. **`G53` needs none of it.** It addresses the machine frame without selecting anything, which
+> is the whole reason one absolute frame beats one probed register.
 
 ### Why the first section's arrival is asymmetric
 
@@ -332,9 +351,9 @@ In `writeWCS()`, `isTraverse = (previousWorkOffset != undefined)` is false on th
 first section skips **both** the safe-Z retract and the origin/probe dispatch that every later WCS change
 gets. Un-suppressing it where it sits does **not** work:
 
-- **Ordering.** `writeWCS()` is step 3 of `writeFirstSection()`; `writeBaseEstablish()` is step 5. At step
-  3 *neither* the part WCS's Z nor the base's Z has been established, so both retract paths would emit an
-  absolute `G0 Z` into a stale frame — the same defect relocated.
+- **Ordering.** `writeWCS()` is step 3 of `writeFirstSection()`; the fixed-Z establish is step 5. At step 3
+  the part WCS's Z has not been established and the job has emitted nothing in the machine frame either, so
+  a retract there would be an absolute `G0 Z` into a stale frame — the same defect relocated.
 - **Direction.** An absolute Z against a stale zero can move the tool *down*.
 - **Blast radius.** With `isTraverse` true on the first section, the fallback fires on *every* job.
 
@@ -348,12 +367,11 @@ substitute a relative `G91` lift: it would be the only motion emitted in no fram
 unknowable on a machine whose Z travel the post cannot see, and it would leave the `G38.2` target — an
 absolute Z in the same stale frame — exactly as unbounded as it found it.
 
-**The machine-Z answer lifts the limit rather than working around it.** A declared, homed machine Z *is* an
-established frame at job start, so on such a machine the arrival emits a real `G53 G0 Z<Inter Part Travel Z>`
-and the warning is suppressed exactly as an established base suppresses it. The limit stands only where it
-is still true: a job that establishes no fixed reference at all — and *declaring* one is not establishing it
-on Marlin, where neither implementation runs, so the suppression asks `fixedZEstablishedInFile()` and not the
-dialog's own answer.
+**The machine frame lifts the limit rather than working around it.** A declared, homed machine Z *is* an
+established frame at job start, so on such a machine the arrival emits a real `G53 G0 Z<Machine Travel Z>`
+and the warning is suppressed. The limit stands only where it is still true: a job with no frame at all —
+and on Marlin *declaring* one is not establishing it, the one implementation being refused there, so the
+suppression asks whether the frame is established **in this file** and not what the dialog was set to.
 
 ### Computing a safe height is not the post's job
 

@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **58 findings — 32 fixed · 2 part-fixed ·
-2 closed by design · 1 withdrawn · 21 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **61 findings — 33 fixed · 2 part-fixed ·
+2 closed by design · 1 withdrawn · 23 open.** Test registers in §4 and §5.
 
 > Four ids — `HR-19`, `HR-22`, `HR-24`, `HR-27` — had **no row in any register** when this
 > file was built. They were carried in checkpoint prose and in `conventions.md`, and are
@@ -20,7 +20,7 @@ because commit messages cite them and must still resolve.
 | Prefix | Pass | Range |
 |---|---|---|
 | `HB-` | Hobbyist dialog walk, 2026-08-08 — one part, one WCS, one tool, GRBL/Marlin/RepRap | `HB-1` … `HB-20` |
-| `PR-` | Professional / machine-frame review | `PR-1` … `PR-14` |
+| `PR-` | Professional / machine-frame review | `PR-1` … `PR-16` |
 | `HR-` | Found by the hobbyist pass, reclassified as professional — Manual NC, tapping | two ids |
 | `CR-` | Pre-Beta coverage review, 2026-08-09 | `CR-01` … `CR-24` |
 | `FCR-` | 2026-08-01 whole-file review. **All findings closed**; three unrun test rows survive, renamed here | `FCR-4` … `FCR-13` |
@@ -51,7 +51,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**20 open (one of them deferred) · 2 part-fixed — 22 entries.**
+**23 open (one of them deferred) · 2 part-fixed — 25 entries.**
 
 ### PR-15 — the tool-change code does not comply with the tool-change design — High
 
@@ -73,6 +73,57 @@ deleted rows contained.
 **Test.** **None, deliberately.** No row can be written against code that is being replaced;
 the rows belong to the rebuild and are written as it lands.
 
+### PR-16 — homing destroys the park the spoilboard base probe depends on — High
+
+**Problem.** The base is probed **wherever the tool already sits** — no XY move, no probe
+offset — so the operator must park over bare spoilboard, and that precondition is the whole
+defence. `writeMachineHoming()` is step 2 of `writeFirstSection()` and `writeFixedZReference()`
+step 5, so `Home at Job Start` moves the tool to the homing corner before the probe runs and
+the park is gone. Nothing warns. The corner is the extreme of travel: either the probe
+searches its 100 mm (`BASE_PROBE_REACH_MM`) and touches nothing, alarming the controller at
+job start, or it touches whatever is at the corner and records that as the base Z0 — after
+which every inter-part traverse holds an absolute height above a surface that is not the
+spoilboard.
+
+**Reproduce.** Not needed. **The operator precondition this hazard turns on is why the
+subsystem is retired**, and the hazard is unreachable once it is.
+
+**Fix.** **Closes by deletion** — `plan.md` Step 2 removes the base establish entire. No
+repair is to be written and no test row is owed; the row is retired in §4.
+
+### PR-17 — an `Inter Part Travel Z` at or above machine zero on GRBL is unreachable or on the switch, unwarned — Med-High
+
+**Problem.** The height is an absolute machine coordinate and the post cannot validate it — that is
+settled design (`design.md`, *transplant, not typing*). **But on GRBL the post holds one bit of
+evidence it does not use.** At Grbl's default `HOMING_FORCE_SET_ORIGIN` (off) the machine zeroes into
+negative space after `$H`, so every reachable Z is negative and a **positive** value is above the top
+of travel: with soft limits on it alarms at the first traverse, with them off it drives Z into its
+hard stop. A machine deliberately zeroed at the bed makes a positive value correct, and that is
+compile-time and unreadable — so this is a **warning, not a guard**. Nothing is emitted today:
+`Multi_WCS (PB1).gcode` posted clean with `1`.
+
+**Zero is not the ceiling — it is the switch.** Machine Z `0` is not the highest reachable height,
+it is the point at which the Z endstop *tripped*. With `HOMING_FORCE_SET_ORIGIN` off and the
+default `$23=0`, `limits_go_home()` (`grbl/limits.c`, Grbl 1.1f) ends the cycle by assigning
+`-homing_pulloff` — machine Z `-$27`, default `-1.000` — to the position one pull-off *below* the
+trigger, which fixes the trigger itself at machine Z `0` by construction. So `G53 G0 Z0` drives the
+axis back onto the switch it just released. Soft limits pass it: `system_check_travel_limits()`
+(`grbl/system.c`, 1.1f) rejects `target[idx] > 0`, and `0` is not `> 0`. With `$21=1` the switch is
+a live interrupt, so the traverse arrives exactly on the trip threshold and whether it ends in
+`ALARM:1` turns on switch repeatability — **worse than a reliable failure, not better**, because it
+survives the first parts and stops the job somewhere in the middle of the rest. **This is `CR-10`'s
+fact on the Z axis**, where `CR-10` has it on X/Y. The highest safe value is `-$27`, not `0`.
+
+**Reproduce.** GRBL, `Axes Homed and Trusted` = `XYZ`, two work offsets, `Inter Part Travel Z`
+positive — then `0`. `Multi_WCS (PB1).gcode`, 2026-08-14, posted clean at both values.
+
+**Fix.** A post-time `warning()` in both channels on GRBL/FluidNC where the height is **`>= 0`**,
+naming `HOMING_FORCE_SET_ORIGIN` as the one configuration that makes a positive value right, and
+the homing pull-off as what makes `0` wrong on every configuration that does not. **Not an error**
+— the sign cannot be pinned, and `design.md` rejects the enum that tried. **`$27` cannot be read
+either**, so the text names the pull-off and never a number. **Take it with Step 2's rename**: the
+same field changes name and group, and one baseline covers both.
+
 ### PR-13 — group 11's Duet mode strings are RRF 2.x g-code — Low-Med
 
 **Problem.** `duetMillingMode` = `M453 P2 I0 R30000 F200` and `duetLaserMode` =
@@ -89,6 +140,27 @@ is written on every Duet post. Never yet posted.
 **The fields stay editable** — the post cannot know a board's pins or its RRF major version.
 Take the relocation of both properties beside the firmware selector *with* the default
 rewrite: both re-head the property dump, so together they cost one baseline instead of two.
+
+### PR-18 — two warnings recommend a "Jog to ..." mode in the same dialog that refuses it — Low
+
+**Problem.** :1482 (`Home at Job Start` meeting a `... to Current Pos` first-part mode) closes with
+*"a \"Jog to ...\" mode also works"*, and :1526 (the fixed-Z establish moving the tool before the
+origin is recorded) offers *"Use \"Use Active WCS X0 Y0, Probe Z0\" or a \"Jog to ...\" mode"*.
+Neither clause is gated on firmware. :1511 **is** — on GRBL it states that a jog mode stalls the job
+at an `M0` the operator cannot jog out of. All three fire together on a GRBL job, so **the dialog
+tells the operator both to choose a jog mode and that jog modes do not work.** The correct remedy is
+already in both messages beside the wrong one.
+
+**Reproduce.** `Multi_WCS (PBV1).gcode`, 2026-08-14 — GRBL, `Axes Homed and Trusted` = `XYZ`,
+`Home at Job Start` = `Home`, two work offsets, First = `Set X0 Y0 Z0 to Current Pos`, Subsequent =
+`Jog to X0 Y0, Probe Z0`.
+
+**Fix.** **Take it with `plan.md` Step 4**, which deletes both Jog modes from `probeOnStart` and
+`probeOnChange` entire — the clauses go with the modes they name and no separate repair is written.
+If Step 4 changes shape or is deferred, gate both clauses on `fw != eFirmware.GRBL` instead: the
+false statement ships until one or the other lands.
+
+**Test.** `PR-18` in §4 — both branches, GRBL and RepRap.
 
 ### HR-13 — `onCommand` silently discards every command it does not name — Low-Med · ◑ part-fixed
 
@@ -115,7 +187,9 @@ unestablished frame. Guard-B-shaped hole rather than a jet feature gap.
 
 **Reproduce.** Jet tool + multi-WCS + reserved base.
 
-**Fix.** Not started. Three candidate fixes; belongs with §6's jet workstream.
+**Fix.** **Closes by deletion** — `plan.md` Step 2 removes the base and the clearance retract
+that transits it. The surviving machine-frame traverse emits `G53 G0 Z<n>`, which establishes
+nothing, probes nothing and needs no tool, so the hole closes with the code. Not a jet item.
 
 ### HR-27 — a geometry guard leaves a truncated `.gcode` — Medium
 
@@ -231,9 +305,9 @@ the `G38.2` that follows never reaches the stock. `validateJob()` warns — but 
 **default** value, for every job that sets a fixed Z reference at all.
 
 **Reproduce.** `First WCS / Part` left at its default `Set X0 Y0 to Current Pos, Probe Z0`,
-with either `Fixed Z Reference` = Spoilboard or Machine Z, **or — since the frame became
-derived — any multi-part job on a machine declared `XYZ` homed, at every other default.**
-That second route is the wider one and did not exist while Guard B refused such jobs.
+on **any multi-part job on a machine declared `XYZ` homed, at every other default** — the
+frame is derived, so no dialog visit is needed to reach this. That route survives Step 2 and
+is the wide one; it did not exist while Guard B refused such jobs.
 
 **Fix.** A defaults problem rather than a logic one — fix it in the defaults, or in group
 5's description. `PR-10` is the warning half of the same ground.
@@ -370,10 +444,15 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**⬜ 59 UNRUN · ❌ 0 FAIL · ➖ 1 n/a — 60 rows.** **No §4.1 row has run** — the origin-mode
-dispatch across parts and fixtures is entirely unverified, and it is the largest such area.
-**No row exercises a tool change** — the nine that did were deleted with the design they
-tested, and their replacements are written as `plan.md` Step 5 lands.
+**⬜ 47 UNRUN · ❌ 0 FAIL · ➖ 8 n/a — 55 rows.** **§4.1 is nearly closed** — `PB1`, `PB2`, `PBV1`,
+`PBV2`, `PBV3`, `M1`, `M2` and `M4` passed 2026-08-14 and are in §5. **Three of the four boundary
+dispatches are proved**; what is left is `PA1`/`PA1b`, the offset variants `P2`/`P3`, and `M3`.
+**No row exercises a tool change** — the nine that did were deleted with the design they tested,
+and their replacements are written as `plan.md` Step 5 lands.
+
+**Seven rows are ➖ *retired unrun*.** They exercise the spoilboard base, which `plan.md`
+Step 2 deletes — **do not post them.** They are kept as rows, not removed, because each names
+a behaviour that must be *absent* after the deletion. Delete them when Step 2 lands.
 
 **Standing configuration.** GRBL, mm, `Comment Level` `Info`, probe target `Z-10`, probe
 speed `F30`, probe thickness `Z0.8`. **A row names only what it changes from that line.**
@@ -385,63 +464,58 @@ posted file can show it.
 
 | Test | Proves | Setup (delta) | Method | Expansion | State |
 |---|---|---|---|---|---|
-| **PB1** | Re-probe per copy | Replicate 2-copy, base `G59`, Subsequent = `Use Active WCS X0 Y0, Probe Z0` | posted | §4.1 | ⬜ |
-| **PB2** | Trust the stored Z | as PB1, Subsequent = `Use Active WCS X0 Y0 Z0` | posted | §4.1 | ⬜ |
-| **PBV1** | Setup run — record each fixture origin | 2-fixture, First = `Set X0 Y0 Z0 to Current Pos`, Subsequent = `Jog to X0 Y0, Probe Z0` | posted | §4.1 | ⬜ |
-| **PBV2** | Production run — reuse fixtures, re-probe Z | First = `Use Active WCS X0 Y0 Z0`, Subsequent = `Use Active WCS X0 Y0, Probe Z0` | posted | §4.1 | ⬜ |
-| **PBV3** | Production run — trust the stored Z too | as PBV2, Subsequent = `Use Active WCS X0 Y0 Z0` | posted | §4.1 | ⬜ |
 | **PA1** | New WCS from a machined face, operator jogs the new datum | two Setups on one clamped part, Subsequent = `Jog to X0 Y0 Z0` | posted | §4.1 | ⬜ |
 | **PA1b** | Variant — WCS 2's XY already known, only Z re-references | same job, Subsequent = `Use Active WCS X0 Y0, Probe Z0` | posted | §4.1 | ⬜ |
-| **P2** | Nonzero offset, Replicate + reserved base | 2-part job, base `G59`, offsets `10`/`5` | posted | §4.1 | ⬜ |
+| **P2** | Nonzero offset, Replicate | 2-part job, probe offsets `10`/`5` | posted | §4.1 | ⬜ |
 | **P3** | Zero-offset added-part regression | same 2-part job, offsets `0` | posted | §4.1 | ⬜ |
-| **M1** | Boundary dispatch — `Use Active WCS X0 Y0 Z0` | multi-WCS + base | posted | §4.1 | ⬜ |
-| **M2** | Boundary dispatch — `Use Active WCS X0 Y0, Probe Z0` | multi-WCS + base | posted | §4.1 | ⬜ |
-| **M3** | Boundary dispatch — `Jog to X0 Y0 Z0` | multi-WCS + base | posted | §4.1 | ⬜ |
-| **M4** | Boundary dispatch — `Jog to X0 Y0, Probe Z0` | multi-WCS + base | posted | §4.1 | ⬜ |
+| **M3** | Boundary dispatch — `Jog to X0 Y0 Z0` | multi-WCS, derived machine frame | posted | §4.1 | ⬜ |
 | **M5** | Single-WCS regression — byte-for-byte unchanged | single WCS | posted | §4.1 | ⬜ |
-| **M6** | First-part `Use Active WCS X0 Y0 Z0` actually reaches `X0 Y0` | milling tool, first section | posted | §4.1 | ⬜ |
+| **M6** | First-part `Use Active WCS X0 Y0 Z0` on a **jet / tool-0** first part — the `X0 Y0` move with **no** Z retract. *The milling half is proved — `PBV2`/`PBV3` §5* | jet tool, then tool 0, first section | posted | §4.1 | ⬜ |
 | **H7e** | First-part `Use Active WCS X0 Y0, Probe Z0` on Marlin and RRF | firmware Marlin, then RepRap | posted | — | ⬜ |
 | **D1** | Labels, groups and field types | the dialog | dialog | — | ⬜ |
 | **D2** | The property dump is suppressed at Comment Level `Important` and `Off` | Comment Level `Important`, then `Off` | posted | — | ⬜ |
 | **D3** | The key rename resets every saved preset **once**, and the new keys then hold | a preset saved before the rename | dialog | — | ⬜ |
 | **D4** | The groups are still identifiable in the **legacy** Post Process dialog | the legacy dialog | dialog | — | ⬜ |
 | **D5** | The header property dump after the `groupDefinitions` move **and** the key rename | defaults, diffed against the pre-change commit | posted | — | ⬜ |
-| **P5** | `Probe to Set Base = Probe Z` — the no-prompt base variant | group 5 B = `Probe Z` | posted | — | ⬜ |
+| **P5** | `Probe to Set Base = Probe Z` — the no-prompt base variant | — retired unrun: the property goes with **Step 2** | — | — | ➖ |
 | **P6** | `writeWCS()` debug/info logging | Comment Level `Debug`, then `Info` | posted | — | ⬜ |
 | **P7** | `wcsDefinitions` offset-0 decision | work offset `0` | dialog | — | ⬜ |
-| **P9** | Spoilboard surfacing on the base | multi-WCS job with a section cutting *on* the base | posted | — | ⬜ |
+| **P9** | Spoilboard surfacing on the base | — retired unrun: there is no base after **Step 2** | — | — | ➖ |
 | **PR-1a** | The capability/action split emits what the old enum did, and nothing when the action is off | group 4 declarations × `Home at Job Start`, GRBL then Marlin | posted | — | ⬜ |
 | **PR-1b** | The stored-offset warning fires on the trusting modes and **never** on the `Jog …` modes | 2-WCS job, each origin mode in turn | posted | — | ⬜ |
 | **PR-2b** | The first section's arrival emits a real absolute Z instead of the `Unknown Z` comment | multi-WCS, `Fixed Z Reference = Machine Z`, `Inter Part Travel Z = -12`, First = `Use Active WCS X0 Y0, Probe Z0` | posted | — | ⬜ |
 | **PR-2c** | Every new guard refuses, and leaves **no file** | each of the nine new `error()` conditions | posted | — | ⬜ |
 | **PR-2d** | `Inter Part Travel Z` converts mm → inch in both the block and the header echo | multi-WCS, `Fixed Z Reference = Machine Z`, `Inter Part Travel Z = -12`, output units **inch** | posted | — | ⬜ |
-| **PR-3** | `Probe to Set Base` no longer offers `None`, and the base always probes | base reserved, dialog + a post | dialog | — | ⬜ |
+| **PR-16** | Homing runs before the base probe, moves the tool off the parked spot, and nothing says so | — retired unrun: the finding closes by deletion at **Step 2** | — | — | ➖ |
+| **PR-17** | The GRBL machine-Z warning fires at `1` **and at `0`**, and is **silent** at `-10`. **`0` is the row's discriminator** — a `> 0` repair passes it and is wrong | GRBL, 2 WCS, `Inter Part Travel Z` `1`, then `0`, then `-10` | posted | — | ⬜ |
+| **PR-18** | Neither warning offers a "Jog to ..." mode on GRBL, and the jog refusal is the only mention of one; on RepRap the offer survives | GRBL then RepRap, `XYZ` + `Home`, 2 WCS, First = `Set X0 Y0 Z0 to Current Pos` | posted | — | ⬜ |
+| **PR-3** | `Probe to Set Base` no longer offers `None`, and the base always probes | — retired unrun: the property goes with **Step 2** | — | — | ➖ |
 | **PR-5a** | The enum flip — the one hazard consolidation created | `Fixed Z Reference` flipped with a live `Inter Part Travel Z` | posted | — | ⬜ |
 | **PR-5b** | The frame-naming header echo | as PR-5a | posted | — | ⬜ |
 | **PR-6a** | The machine park emits `G53 G0 X0 Y0` as its own block, X/Y only | GRBL, `XY Only` + `Home`, park `Machine X0 Y0` | posted | — | ⬜ |
 | **PR-6b** | The **Marlin** route is `G28 X` / `G28 Y`, and needs no prior homing | Marlin, `XY Only`, `Home at Job Start` = **`Off`**, park `Machine` | posted | — | ⬜ |
-| **PR-6c** | The machine park retracts first where a fixed Z reference exists, and restores the WCS | PR-6a + `Spoilboard`, then `Machine Z` | posted | — | ⬜ |
+| **PR-6c** | The machine park retracts first where a fixed Z reference exists | PR-6a + `Machine Z` | posted | — | ⬜ |
 | **PR-6d** | `Work` (default) is byte-identical to the old boolean-on behaviour | defaults, diffed against the pre-change build | posted | — | ⬜ |
 | **PR-7a** | `Pause, then Home` emits one pause then the homing, and `Home` emits homing with none | GRBL and Marlin, `XYZ`, both non-`Off` answers | posted | — | ⬜ |
 | **PR-7b** | Group 4 reads declaration / action / park, and group 1 no longer carries the park | the dialog | dialog | — | ⬜ |
-| **PR-8a** | A Marlin park with a reserved base emits **no** base transit | Marlin, `Spoilboard` (`G55`, then `G59.1`), park `Machine` | posted | — | ⬜ |
+| **PR-8a** | A Marlin park with a reserved base emits **no** base transit | — retired unrun: no base to reserve after **Step 2**, and `PR-8b` keeps the surviving branch | — | — | ➖ |
 | **PR-8b** | A park with **no** fixed Z reference says in the file that it cannot retract | PR-6a with `Fixed Z Reference = None` | posted | — | ⬜ |
 | **PR-9** | The `G53` park block carries the XY travel feedrate | PR-6a, `Travel Speed XY` off its default | posted | — | ⬜ |
-| **PR-10** | The fixed-Z establish warns off the two `… to Current Pos` first-part modes | `Machine Z`, then `Spoilboard`, First = each `Current` mode then each `Jog` mode | posted | — | ⬜ |
+| **PR-10** | The fixed-Z establish warns off the two `… to Current Pos` first-part modes | `Machine Z`, First = each `Current` mode then each `Jog` mode | posted | — | ⬜ |
 | **PR-11** | The GRBL jog warning is silent on a single-WCS job whose *subsequent* mode is a `Jog` mode | one WCS, Subsequent = `Jog to X0 Y0, Probe Z0` | posted | — | ⬜ |
 | **PR-13** | The Duet mode string is written once per section-type change, verbatim | `CNC Firmware` = RepRap, a milling job, then milling + laser | posted | — | ⬜ |
 | **HR-13** | `onCommand` no longer discards silently, and says so at Comment Level `Off` | Manual NC *Orientate spindle*, then again at Comment Level `Off` | posted | — | ⬜ |
 | **HR-20** | Tapping beyond a warning on the manual path | a drill + tap job, automatic spindle | posted | — | ⬜ |
-| **HR-26** | The base-clearance retract has no tool-0 / jet guard though the base *establish* does | jet tool + multi-WCS + base | posted | — | ⬜ |
+| **HR-26** | The base-clearance retract has no tool-0 / jet guard though the base *establish* does | — retired unrun: the finding closes by deletion at **Step 2** | — | — | ➖ |
 | **HR-28 (A)** | The stored-offset warning on a multi-WCS job | 2 WCS, `Axes Homed and Trusted` = `None` | posted | — | ⬜ |
 | **FCR-4** | Coolant `Use custom` loads a file rather than writing its name | Channel A Mode = the tool's coolant, On/Off = `Use custom`, a real `air_on.g`/`air_off.g` in the nc folder; then again with the field empty | posted | — | ⬜ |
 | **FCR-5** | A jet / tool-0 first part warns that Z0 was never set | a jet tool, then tool 0, on the default first-part mode | posted | — | ⬜ |
 | **FCR-13** | `resetPostState()` — byte-for-byte identical output on a re-post | any verified reference job, re-posted; ideally two setups to separate files in one invocation | posted | — | ⬜ |
 | **J1** | First-part origin modes — all six, with a jet tool and with tool 0 | jet tool / tool 0 | posted | §6 | ⬜ |
 | **J2** | Subsequent WCS / Part with a jet tool — the `canProbe` false branches | jet tool, multi-WCS | posted | §6 | ⬜ |
-| **J3** | Spoilboard base with a jet tool — the base is never established | jet tool, base reserved | posted | §6 | ⬜ |
+| **J3** | Spoilboard base with a jet tool — the base is never established | — retired unrun: there is no base after **Step 2**; the surviving jet question is `J5` | — | — | ➖ |
 | **J4** | The laser property group (`9 - Laser`, 7 properties) — **never posted at all** | group 09 on, a laser operation | posted | §6 | ⬜ |
-| **J5** | Laser/jet × the multi-WCS base features | jet + base + cross-part clearance | posted | §6 | ⬜ |
+| **J5** | Laser/jet × the multi-WCS frame features | jet + cross-part clearance in the machine frame | posted | §6 | ⬜ |
 | **REG-MF** | A factory-default job is unchanged **apart from the property dump** | all defaults, diffed against the pre-change build | posted | — | ⬜ |
 | **REG-S0** | Step 0.3 / 0.4 / 0.6 move no byte of an ordinary job | defaults, no Manual NC, no probing operation | posted | — | ⬜ |
 | **P4** | Group 04's branches | — superseded by **PR-1a**: the enum it tested no longer exists | — | — | ➖ |
@@ -451,48 +525,75 @@ posted file can show it.
 Every row here needs a 2-copy Replicate job or a two-Setup job; none can be reached from
 the single-section jobs on disk. **The largest untested area in the post.**
 
-> **Guard B settings note.** `CR-13` deleted `Retract Across Parts` and made Guard B
-> unconditional, so *every* job with two distinct work offsets needs a fixed Z frame. **Group 4
-> is now the whole requirement:** `Axes Homed and Trusted` = `XYZ` and a measured
-> `Inter Part Travel Z`, and the machine's own homed Z is taken as the frame with no
-> `Fixed Z Reference` visit and no `Home at Job Start`. Rows wanting the *spoilboard* frame
-> instead must still set `Fixed Z Reference` = `Spoilboard` **and** a `Reserved WCS`. **PA1 and
-> PB2 cannot be posted as written** until their settings are re-scoped against `CR-13`.
+> **Frame settings note — one frame, and no row varies it.** `CR-13` made Guard B
+> unconditional and `plan.md` Step 2 retires the spoilboard base, so **every row below takes
+> the derived machine frame**: group 4's `Axes Homed and Trusted` = `XYZ`, `Inter Part Travel
+> Z` as an **absolute machine Z** that clears every fixture, and `Fixed Z Reference` left at
+> its factory `None` — the frame comes from the declaration, not from the dialog (`PR-2e`).
+> **No row sets a `Reserved WCS`**, and no row is to be posted with `Fixed Z Reference` =
+> `Spoilboard`: that is the code being deleted. `Home at Job Start` is free — the declaration
+> is the trust assertion (`PR-2f`). Marlin is refused this frame outright, so §4.1 is
+> GRBL/RepRap only.
 
-**PB1** — job start: `( Establish spoilboard base G59)` → `G59` → `G38.2` →
-`G10 L20 P6 Z0.8` → `G0 Z40` → restore `G54`. At the `P1→P2` boundary:
+**PB1 is the reference file — it has run** (§5, `Multi_WCS (PB1).gcode`, 2026-08-14), and the
+blocks below are transcribed from it rather than predicted. **Every remaining row here diffs
+against that artifact**, which is why they are cheap: the frame, the establish and the boundary
+retract are identical in all of them, and only the dispatch after the `G55` differs.
+
+**PB1's job.** The one that posted `Multi_WCS.gcode` (2026-08-13 11:59): document
+`2.5D Milling - Mounting Plate`, `Setup1`, one `Face1` operation replicated across work
+offsets 1–4, tool 171, stock 63.5 mm thick. It already runs `Subsequent WCS / Part` =
+`Use Active WCS X0 Y0, Probe Z0` at `Comment Level` `Debug`, so its boundary blocks are PB1's
+without the base. **Four copies satisfy a row asking for two** — three boundaries of the one
+shape. Five fields change:
+
+| Property (group) | in `Multi_WCS.gcode` | for PB1 |
+|---|---|---|
+| `Fixed Z Reference` (5) | `Machine Z - homed` | **`None`** — the frame derives from the group-4 declaration, and the header echo says so (`PR-2e`) |
+| `Inter Part Travel Z` (5) | `0` | **an absolute machine Z clearing every fixture** — `-10` on the machine `PR-2a` ran |
+| `First WCS / Part` (6) | `Set X0 Y0 to Current Pos, Probe Z0` | **`Use Active WCS X0 Y0, Probe Z0`** — the shipped default records the first origin at bed clearance here (`CR-15`) |
+
+`Axes Homed and Trusted` is already `XYZ` in that job and is what makes the frame derivable;
+`Home at Job Start` may be left at `Home`. **No dialog warning is expected** — the stock-
+thickness warning was spoilboard-only, and under the machine frame the post cannot compute it
+(the distance from an absolute travel height down to the stock top is not a number it has).
+**That hazard is unchanged, only unwarned:** `G38 Target` must still reach the stock from the
+travel height, and it is now the operator's to size.
+
+**Job start**, after `G54` and the `START` preamble — no probe, no prompt, no WCS change:
 
 ```
-... transit through base: G59 -> G0 Z40 ...
+( Establish fixed Z reference -- homed machine Z)
+(   Move to the travel height in the machine frame -- machine Z -10)
+G53 G0 Z-10 F300           (F is "Travel Speed Z"; G53 is its own block, Z only)
+```
+
+At the `P1→P2` boundary:
+
+```
+(   Retract to the travel height in the machine frame before traverse -- machine Z -10)
+G53 G0 Z-10 F300
 G55
 (   Move to part origin X0 Y0, then probe Z)
-G0 X0 Y0 F<travelXY>
+G0 X0 Y0 F2500
+G10 L20 P2 Z0              (provisional)
+M0 (MSG Attach ZProbe)
 G38.2 F30 Z-10
 G10 L20 P2 Z0.8
 ```
 
-**Pass:** the base probes once at start with no XY reposition; each copy re-probes Z at its
-stored XY; the traverse retracts base-relative *before* switching WCS.
+**Pass:** one `G53 G0 Z` at job start and exactly one per boundary — four in a 4-copy job;
+every one is a **bare Z block**, no X/Y word appended; each `G53` precedes its `G55`/`G56`/`G57`
+rather than following it; each copy re-probes Z at its stored XY. **Trap: `PR-2a` already
+proves the frame and the traverse** on this same job — what PB1 adds, and all it adds, is the
+origin-mode dispatch, because `PR-2a` ran with both probe modes at `Skip`.
 
-**PB2** — at `P1→P2`: `G59` → `G0 Z40` → `G55` → `G0 X0 Y0` → straight into the cut.
-**Pass:** no `G38.2` on the added copy, and the tool still arrives safely at `X0 Y0`.
-
-**PBV1** — first part `G10 L20 P1 X0 Y0 Z0`, no prompt, no probe. At `P1→P2`: retract →
-`G55` → `M0 (MSG Jog to X0 Y0 above Z0, probe)` → `G10 L20 P2 X0 Y0` → `G38.2` →
-`G10 L20 P2 Z0.8`. **Pass:** every fixture's origin is written to its own register from an
-operator jog. Then confirm at the controller that `G54`/`G55` report the set origins.
-
-**PBV2** — first part `G0 Z<probeSafeZ>` → `G0 X0 Y0`, no origin write. At `P1→P2`:
-retract → `G55` → `G0 X0 Y0` → `G38.2` → `G10 L20 P2 Z0.8`. **Pass:** no prompts anywhere;
-XY from the stored fixtures; Z re-probed per copy.
-**PBV3** — as PBV2 with Subsequent = `Use Active WCS X0 Y0 Z0`. **Pass:** no probe anywhere
-on added copies. Only sound when every copy's stock is the setup run's thickness.
-
-**PA1** — at the `G54→G55` boundary: `G0 Z<probeSafeZ>` **in the outgoing G54 frame** →
-`G55` → `M0` jog prompt → `G10 L20 P2 X0 Y0` → `G38.2 F30 Z-10` → `G10 L20 P2 Z0.8`.
-**Pass:** the traverse retracts in the *outgoing* frame before selecting `G55`; the re-probe
-writes Z into `P2`, not `P1`.
-**PA1b** — retract → `G55` → `G0 X0 Y0` → `G38.2` → `G10 L20 P2 Z0.8`, **no jog prompt**.
+**PA1** — two Setups is two work offsets, so this job takes the frame like every other row
+here. At the `G54→G55` boundary: `G53 G0 Z<travel>` → `G55` → `M0` jog prompt →
+`G10 L20 P2 X0 Y0` → `G38.2 F30 Z-10` → `G10 L20 P2 Z0.8`. **Pass:** the retract is the
+machine-frame block and it precedes the `G55`; the re-probe writes Z into `P2`, not `P1`.
+**PA1b** — `G53 G0 Z<travel>` → `G55` → `G0 X0 Y0` → `G38.2` → `G10 L20 P2 Z0.8`, **no jog
+prompt**.
 
 **P2** — the **added part** shows `(   Move to probe point = origin + offset X10 Y5, then
 probe Z)` → `G0 X10 Y5` → `G38.2` → `G10 L20 P2 Z<thk>`. The offset is **never** applied to
@@ -500,28 +601,31 @@ the base probe.
 **P3** — each added part emits the bare-origin form (`part origin X0 Y0`), and the first
 part still shows no reposition at all.
 
-**M1–M6 — the four subsequent modes.** 2-part Replicate, base `G59`, tool ≠ 0. On each added
-part every mode must **retract to a safe Z first, then act**. Marlin is out of scope
-(Guard C). **M1** `G59`→`Z<SafeZ>`→`G55`→`G0 X0 Y0`→cutting, no probe. **M2** retract→`G55`→
-rapid to `X0 Y0` (+offset)→`G38.2`→`G10 L20 P2 Z`. **M3** retract→`G55`→jog prompt→
-`G10 L20 P2 X0 Y0 Z0`→cutting. **M4** retract→`G55`→jog prompt→`G10 L20 P2 X0 Y0`→`G38.2`→
-`G10 L20 P2 Z`. **M5** a single-WCS job is byte-for-byte unchanged. **M6** the first section
-emits `G0 Z<probeSafeZ>` then `G0 X0 Y0`; a jet/tool-0 first part emits the `X0 Y0` move but
-**no** Z retract.
+**M1–M6 — the four subsequent modes.** 2-part Replicate, derived machine frame, tool ≠ 0. On
+each added part every mode must **retract to the travel height first, then act** — the retract
+is `G53 G0 Z<travel>` in every case, and it is the *same* block in all four, which is what
+makes the four rows a dispatch test rather than four frame tests. Marlin is out of scope
+(refused this frame, and Guard C). **M1** retract→`G55`→`G0 X0 Y0`→cutting, no probe.
+**M2** retract→`G55`→rapid to `X0 Y0` (+offset)→`G38.2`→`G10 L20 P2 Z`. **M3** retract→`G55`→
+jog prompt→`G10 L20 P2 X0 Y0 Z0`→cutting. **M4** retract→`G55`→jog prompt→
+`G10 L20 P2 X0 Y0`→`G38.2`→`G10 L20 P2 Z`. **M5** a single-WCS job is byte-for-byte unchanged
+— **and it is the row that proves the derivation stays off a one-part job** (`PR-2h`).
+**M6** a jet/tool-0 first part emits the `X0 Y0` move but **no** Z retract — the milling half is
+`PBV2`/`PBV3`'s artifact.
 
-> **Open decision to settle on this run:** whether the added-part jog mode should get a
-> provisional `Z0` for symmetry with the first-part jog mode. The tool arrives from a
-> retracted clearance, so its Z is less predictable than on the first part.
+> **The added-part jog mode writes a provisional `Z0`** — `PBV1` settled it: `G10 L20 P<n> X0 Y0 Z0`
+> in one block, not a separate write. **`M4` above is written `X0 Y0` and should read `X0 Y0 Z0`.**
+> `M3`'s `Z0` is a different thing — `Jog XYZ` writes all three as the real origin.
 
 ---
 
 ## 5. Passed tests
 
-**✅ 30 PASS · ❌ 0 FAIL · ➖ 3 n/a — 33 tests in 26 rows** (an `(A)`/`(B)` pair shares a
+**✅ 38 PASS · ❌ 0 FAIL · ➖ 3 n/a — 41 tests in 34 rows** (an `(A)`/`(B)` pair shares a
 row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
-`PR-2g`, `PR-2h`, `PR-14a` and `PR-14b` were posted 2026-08-14 from `c0ceb86`. Every one
-passed on first read; none was ever marked ❌.
+`PR-2g`, `PR-2h`, `PR-14a`, `PR-14b`, `PB1`, `PB2`, `M2`, `PBV1`, `PBV2`, `PBV3`, `M1` and `M4`
+were posted 2026-08-14 from `c0ceb86`. Every one passed on first read; none was ever marked ❌.
 
 | Test | Result |
 |---|---|
@@ -551,6 +655,14 @@ passed on first read; none was ever marked ❌.
 | **PR-14b** | The **second** stop, from the same job with `Axes Homed and Trusted` back to `XYZ` and `Inter Part Travel Z` cleared. `Multi_WCS (pr-14b).log`: `:1682` verbatim — `"Inter Part Travel Z" (group 5 - Fixed Z Reference)`, `ABSOLUTE machine coordinate`, and the jog-and-read-the-DRO instruction — aborted in `onOpen()`, with only a 51-byte `.failed` on disk. **The discriminator is what is missing:** `Total number of warnings: 1` (Fusion's own) and no stored-offset warning, so X/Y *was* declared — the job reached the machine-Z guard through the **derived** frame with `Fixed Z Reference` at `None`, which is `PR-2e`'s derivation proved a second time, on the refusal path |
 | **PR-2g** | `PR-2g.gcode` at factory defaults: one offset (`G54`), `grep -c G53` = **0**, `Fixed Z reference = None` with no derived clause. **Trap: it does not isolate the gate** — at defaults `machineHomedAxes = None`, so three of the derivation's four conditions are false together and the file cannot say which one held. **PR-2h** is the row that does |
 | **PR-2h** | `PR-2h.gcode`, the gate isolated: `machineHomedAxes = XYZ`, `machineHomeAtStart = Home`, `machineParkAtEnd = Work`, `spoilboardFixedZRef = None` — three of the four conditions true, **only the offset count false**. One offset (`G54`), `grep -c G53` = **0**, `(   Fixed Z reference = None)` with no derived clause, and `$H` present. The derivation is gated on the offset count and nothing else, so an ordinary one-part job on a fully homed machine is untouched. **Trap: it posted at `Comment Level` `Info`, not the `Debug` the row asked for, and that is sufficient** — the property dump and the Resolved Values block both emit at `Info`, so every criterion is still read from the file. **Trap: it carries the `Home at Job Start` / first-part warning**, which predates the change (`1eb8141`) and is `probeOnStart = Current XY & Probe Z` meeting `$H`, not the frame |
+| **PB1** | `Multi_WCS (PB1).gcode` — **the origin-mode dispatch, which is all this row adds**: `PR-2a` proved the frame and the traverse with both probe modes at `Skip`, and here both are `Probe Z`. **Two `G53 G0 Z0 F300` and no others** — :126 the job-start establish, :206 the one boundary — each a **bare Z block**, and :206 sits two lines *above* its `G55` at :208. Each part probes at its own stored XY: `G0 X0 Y0 F2500` → provisional `G10 L20 P<n> Z0` → `G38.2 F30 Z-10` → `G10 L20 P<n> Z0.8`, into `P1` at :129-141 and `P2` at :210-222. `spoilboardFixedZRef = None` :44 beside a resolved `Machine Z -- from the homed machine declaration, not set in the dialog` :108 — **the derivation, a third time** (`PR-2e`, `PR-14b`). **Trap: two work offsets, not the four its source job had** — one boundary carries the assertion and every added copy repeats the same one. **Trap: the file's two `>>> WARNING:` lines are coolant** — `Flood` requested against two `Off` channels — not the frame. **Reposted 2026-08-14, and the line numbers above are the repost's**: the first post's are gone with the artifact, the filename having been reused against §4's own warning. **Trap: the repost moved three things, not the one it was aimed at** — `Inter Part Travel Z` `1` → `0`, `Comment Level` `Debug` → `Info`, and a shorter operation list (280 lines against the batch's ~959), so **no diff against the first post is possible and none should be claimed**; what it establishes is that the assertion re-passes at a second height, not that the height is the only thing that moved. **The `Info` level is sufficient** — the property dump and the Resolved Values block both emit at `Info`, so every criterion above is still read from the file (`PR-2h` carries the same trap). **That the height reaches nothing but its own block is checked across files instead**: this boundary against `PBV2`'s :879-898, same `probeOnChange`, differs in the `G53` Z word and its one comment and in nothing else but `PBV2`'s `Debug` lines. **Trap: `0` is wrong too** — `PR-17` puts the ceiling at the pull-off `-$27`, not at zero, so this row still stands on a value no machine should run |
+| **PB2** | `Multi_WCS (PB2).gcode` — the added copy trusts the stored Z: :896 `G53 G0 Z1 F300` → :898 `G55` → :899-900 `(   Move to this part's stored origin X0 Y0)` → `G0 X0 Y0 F2500` → cutting. **The file holds exactly one `G38.2`, at :501, and it is the *first* part's** — `probeOnStart = Probe Z`, `probeOnChange = Skip` — so the absence the row asks for is the added copy's alone, and the first-part probe beside it is what makes that reading meaningful. Arrival at `X0 Y0` is from the machine-frame retract, not from wherever the cut ended |
+| **PBV1** | `Multi_WCS (PBV1).gcode` — **the two dispatches `PB1` does not reach**. First part `Current XYZ`: :489 `G10 L20 P1 X0 Y0 Z0`, with no prompt and no probe before it. Added part `Jog XY & Probe Z`: :880 `G53 G0 Z1 F300` (bare Z, two lines above its `G55` at :882) → :884 `M0 (MSG Jog to X0 Y0 above Z0, probe)` → :888 `G10 L20 P2 X0 Y0 Z0` → :897 `G38.2 F30 Z-10` → :899 `G10 L20 P2 Z0.8`. **It settles §4.1's open decision by evidence** — the added-part jog mode *does* get a provisional `Z0`, folded into the XY write rather than emitted as its own block, :886 saying why; the row's expected `G10 L20 P2 X0 Y0` was the stale half. **Trap: the file's `>>> WARNING:` at :883 is the GRBL jog refusal and is correctly placed**, one line above the `M0` it describes — it is the post-time set beside it that is `PR-18`. **Trap: the row's closing clause is unmeetable** — confirming `G54`/`G55` at the controller needs a controller; the emitted origin writes are the whole of what is proved |
+| **PBV2** | `Multi_WCS (PBV2).gcode` — **the first-part `Skip` dispatch is all this adds**: its boundary :879-898 is `PB1`'s (now :205-224 after that row's repost) block for block, `probeOnChange` being `Probe Z` in both — differing only in the travel height and in `PBV2`'s `Debug` comments. :487-489 `(   Use stored work origin; move Z to Safe Z, then to X0 Y0)` → `G0 Z5.08 F300` → `X0 Y0 F2500`, and **no origin write anywhere on the first part**. **Trap: `Skip` is the id of "Use Active WCS X0 Y0 Z0"** (:407, :422), not a do-nothing — the mode moves the tool. **Trap: the `X0 Y0` line carries no `G0` word**, modal from the block above, which is safe on GRBL only — see *Checked and found correct*. **Trap: the row's "no prompts anywhere" is not what the file shows** — `M0 (MSG Attach ZProbe)`/`Detach` at :895/:900 are `probePause = Before & After`, standing configuration, and stand in `PB1`'s expected block too; the criterion means no *jog* prompt, and there is none |
+| **PBV3** | `Multi_WCS (PBV3).gcode` — the assertion is an absence: `grep -c G38` = **0** across the whole file. Boundary :880-884 `G53 G0 Z1 F300` → `G55` → `(   Move to this part's stored origin X0 Y0)` → `G0 X0 Y0 F2500` → straight into the cut at :892. First part identical to `PBV2`'s. **Trap: it is sound only where every copy's stock is the setup run's thickness** — the file cannot show that and no warning states it |
+| **M1** | Proved by `PBV3`'s artifact: :880-884 **is** M1's block — retract → `G55` → `G0 X0 Y0` → cutting, no probe. **The substitution is `M2`'s** — *Multiple WCS Offsets* rather than *Replicate*, two distinct work offsets being what the dispatch turns on |
+| **M4** | Proved by `PBV1`'s artifact: :880-899 **is** M4's block — retract → `G55` → jog prompt → `G10 L20 P2 X0 Y0 Z0` → `G38.2` → `G10 L20 P2 Z0.8`, tool 171. **Trap: the row was written `G10 L20 P2 X0 Y0`** and the emitted block carries the provisional `Z0`; §4.1 is corrected. `M3` is now the one boundary dispatch of the four still unposted |
+| **M2** | Proved by `PB1`'s artifact — :896-914 of the first post, :206-222 of the repost that replaced it, the block being the same either way **is** M2's block — retract → `G55` → `G0 X0 Y0` → `G38.2` → `G10 L20 P2 Z0.8`, tool 171, no origin write of X/Y. **Trap: the job is *Multiple WCS Offsets*, not *Replicate*,** which the row was written around; two distinct work offsets is what the dispatch turns on, so the substitution holds. **The `+offset` half is `P2`'s** — `Probe XY offset` is `X0 Y0` here |
 
 ### Checked and found correct — do not re-run
 
@@ -566,8 +678,10 @@ asserts it or its artifact is superseded.
   are the discriminator: a 45° XZ arc at the `F1000` XYZ limit would drive Z at ~636 mm/min.
 - **Base establish probes and retracts in the base's own frame**, with no XY reposition —
   `H7c.gcode`. **Guard A** aborts in `onOpen()` with no `.gcode` written at all — `H7d.log`.
+  **Both retire with `plan.md` Step 2** — delete this bullet when the base is gone.
 - **Added-part re-probe repositions to the new part's `X0 Y0`** before probing — `Test2.gcode`.
-  **Single retract per boundary**; **same-WCS boundary** emits no `G59` round-trip.
+  **Single retract per boundary**; **a same-WCS boundary emits no retract round-trip at all** —
+  the reading survives the base, whose `G59` transit was the form it was read in.
 
 > ⚠ **Stale files, assertions intact.** `Setup1 Multi.gcode`, `Test2.gcode`, `Face1.gcode`,
 > `Setup1-Face1.gcode` and the Test A–D files predate the provisional `Z0`, the property dump
@@ -581,7 +695,7 @@ Delete a row when its test is re-posted, and delete this section when it empties
 |---|---|---|
 | every saved GRBL `.gcode` predating 2026-07-31 | the manual-spindle stop now prompts on GRBL | A default job ends `M0 (MSG Turn OFF spindle)` where it once ended `M5`. **No row's assertions are affected** — do not read a tail diff as a regression |
 | the two header-dump rows above | the `groupDefinitions` move, the key rename, then the machine-frame work | The assertions stand — one block per group, in dialog order — but the counts and titles moved. Delete when **D5** re-posts |
-| the "base establish `None`" and third "unknown Z" readings | `PR-3` removed the `None` option | Both halves **retire rather than re-baseline** — there is no longer a way to reserve a base and not probe it. Delete when **PR-3** runs |
+| the "base establish `None`" and third "unknown Z" readings | `PR-3` removed the `None` option | Both halves **retire rather than re-baseline** — there is no longer a way to reserve a base and not probe it. **`PR-3` is retired unrun**; delete this row with Step 2, which removes the base entirely |
 
 ---
 
@@ -632,30 +746,6 @@ and manual per-part via the two `Jog …` modes. One part from **multiple datums
 fixture** is supported (`PA1`); a **flip or re-clamp** is out of scope for a single run —
 those are separate jobs, and remain future work.
 
-### A machine-coordinate base probe point (`G53`) — not started
-
-The base probes wherever the tool is parked, defended only by an operator precondition. The
-durable fix is an explicit probe point in machine coordinates — `G53 G0 X<n> Y<n>` before the
-`G38.2` — so the touch-off lands on the same bare-spoilboard spot every run.
-
-**Rejected: `G53 G0 X0 Y0`** (machine zero itself). It is the homing corner — the extreme of
-travel, routinely off the spoilboard — machine-config dependent, and Z is unsolved. Today the
-base establish emits *no motion at all*, so the unknown Z is inert; adding a traverse makes it
-a full-bed diagonal at an unknown height.
-
-**Sketch, if built.** A group-5 property pair (base probe point X/Y, machine coordinates,
-whole mm), emitted immediately before the base `G38.2`, plus: **requires a declaration
-including X/Y**; **an answer for Z** — `Inter Part Travel Z` is exactly the height such a
-traverse needs, and where none is declared, an `M0` *"jog clear in Z, then continue"*;
-**default off**, empty = today's probe-where-parked behaviour.
-
-### Open question — first-part `Use Active WCS X0 Y0 Z0` with a base reserved
-
-It retracts to the group-6 probe Safe Z *in the part's frame*, so with a base reserved the
-tool arrives at spoilboard + `Inter Part Travel Z` and then **descends** to a part-relative
-hop that may not clear a taller clamp elsewhere on the bed. **Should it instead hold the base
-clearance?** Undecided. It is a verified path, so any change is deliberate.
-
 ### Unscheduled ideas
 
 None is a defect; none is scheduled.
@@ -688,9 +778,10 @@ None is a defect; none is scheduled.
    source walks and never posted against, plus `HR-19`, `HR-22`, `HR-24` and `HR-27`, which
    never had rows at all. Every one owes a row in §4 before it can be closed — the largest
    single gap in this register, and the one place the *every finding resolves to a test row*
-   rule is currently unmet. **`PR-15` is the one deliberate exception**, and it states why in
-   its own row.
-2. **Every one of the 61 unrun rows.** §4.1 is the largest untested area in the post and
+   rule is currently unmet. **Three deliberate exceptions**, each stating why in its own row:
+   `PR-15`, whose code is being replaced, and `PR-16` and `HR-26`, which close by deletion at
+   `plan.md` Step 2 and owe no row at all.
+2. **Every one of the 52 unrun rows.** §4.1 is the largest untested area in the post and
    needed a job nobody had built. **That blocker is down** — a multi-WCS job was built on
    2026-08-13 from **Multiple WCS Offsets** (one Setup, a checkbox and an instance count) and
    posted three times. Whether it substitutes for rows written around *Replicate*
