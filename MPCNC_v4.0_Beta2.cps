@@ -99,7 +99,7 @@ groupDefinitions.job        = {title: "1 - Job", order: 100};
 groupDefinitions.feeds      = {title: "2 - Feeds and Speeds", order: 110};
 groupDefinitions.mapRapids  = {title: "3 - Map G1s to Rapids - disable when using full license", order: 120};
 groupDefinitions.machine    = {title: "4 - Machine Frame - homing, travel Z and end park", order: 130};
-groupDefinitions.probe      = {title: "5 - On WCS / Part / Fixture Changes", order: 150};
+groupDefinitions.probe      = {title: "5 - Part Origins - how each part's X0 Y0 Z0 is established", order: 150};
 groupDefinitions.toolChange = {title: "6 - Tool Changes", order: 160};
 groupDefinitions.include    = {title: "7 - External Include Files", order: 170};
 groupDefinitions.laser      = {title: "8 - Laser", order: 180};
@@ -343,7 +343,7 @@ properties = {
 
   probeOnStart: {
     title      : "First WCS / Part",
-    description: "Establishes the origin for the first (or only) part -- the WCS the first section resolves to (WCS 1 / G54 by default, or whatever that Setup specifies). TWO THINGS TO CHECK BEFORE PICKING A MODE. (1) The default assumes a WIRED, WORKING Z TOUCH PLATE; if you have none, choose Set X0 Y0 Z0 to Current Pos and touch Z off by hand before posting. (2) THE TWO JOG MODES DO NOT WORK ON GRBL, the default firmware -- only RepRap has a genuine jog-at-pause, and the post warns and says so in the file when a Jog mode is chosen on GRBL. Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 at the current position, then probe the stock-top Z -- pre-jog the tool to the part's X0 Y0 before starting, no prompt. Set X0 Y0 Z0 to Current Pos: record the tool's CURRENT position as X0 Y0 Z0, no probe and no prompt -- a manual touch-off, or a jet/laser where Z is set by hand. Use Active WCS X0 Y0, Probe Z0: use the X0 Y0 already stored in the active WCS (a pre-set fixture offset) -- rapid there and probe the stock-top Z; XY is not re-zeroed. Use Active WCS X0 Y0 Z0: use the full stored origin -- no re-zero and no probe; the tool MOVES to the Safe Z set below, then rapids to the stored X0 Y0. That is a move, not a retract: Safe Z is absolute in the stored frame, so a tool parked above it starts the job by descending. Jog to X0 Y0, Probe Z0: pause (M0) so you jog to the origin during the run, record X0 Y0, then probe Z. Jog to X0 Y0 Z0: pause to jog, then record X0 Y0 Z0 there, no probe. \"ACTIVE WCS\" MEANS the register this Setup designates (its Work Offset: WCS 1 / G54 unless you changed it), which the post SELECTS at job start -- NOT whatever your sender had active, which the post overwrites. Its contents are left over from a prior job or a manual touch-off and cannot be read back, so both Use Active WCS modes TRUST them. On the two pre-jog modes, note that homing and the Machine Travel Z move run last, so \"current position\" means that point. For more parts or copies see Subsequent WCS / Part; for one part from multiple datums or a flip, run separate jobs.",
+    description: "Establishes the origin for the first (or only) part. EVERY MODE DEPENDS ON ONE THING, NAMED WITH IT. Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 wherever the tool stands, then probe the stock-top Z -- needs a WIRED, WORKING Z TOUCH PLATE, and needs you to have jogged the tool to the part's X0 Y0 before starting; there is no prompt. Set X0 Y0 Z0 to Current Pos: record the CURRENT position as X0 Y0 Z0, no probe and no prompt -- the hand touch-off, and the jet/laser answer where Z is set by hand. Use Active WCS X0 Y0, Probe Z0: rapid to the X0 Y0 already stored in the active WCS and probe the stock-top Z, leaving XY as stored -- needs that register to already hold the right XY, which the post cannot read back to check. Use Active WCS X0 Y0 Z0: the full stored origin, no re-zero and no probe -- same trust, and the tool MOVES to the Safe Z set below, absolute in the stored frame, so one parked above it starts the job by descending. Jog to X0 Y0, Probe Z0 and Jog to X0 Y0 Z0: pause so you jog to the origin during the run and record it there, with a probed Z or with Z where you left it. BOTH JOG MODES DEPEND ON WHAT HOLDS THE PAUSE. On GRBL that is the sender: gSender comments the M0 out and pauses its own stream, so the controller stays Idle and accepts jog commands, while a sender that passes M0 through leaves the controller in a hold that refuses them. On Marlin the pause queues serial commands without executing them, so the jog must come from the machine's own panel or from a sender that holds the file. RepRap jogs at the pause natively and needs neither. \"ACTIVE WCS\" is the register this Setup designates -- its Work Offset, WCS 1 / G54 unless you changed it -- which the post SELECTS at job start, not whatever your sender had active. On the two \"... to Current Pos\" modes, homing and the Machine Travel Z move run BEFORE the origin is recorded, so \"current position\" means wherever they left the tool. For more parts or copies see Subsequent WCS / Part.",
     group      : "probe",
     order      : 10,
     type       : "enum",
@@ -360,7 +360,7 @@ properties = {
   },
   probeOnChange: {
     title      : "Subsequent WCS / Part",
-    description: "MULTI-PART JOBS ONLY -- milling several parts or copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). A single-part job never reaches this control. ON MARLIN THIS NEEDS A FIRMWARE BUILD OPTION -- CNC_COORDINATE_SYSTEMS, off in a stock configuration, which is what gives Marlin its nine work offsets and G53 alike; the post assumes you compiled it in and says so in the file, because it cannot read your build. THE TWO JOG MODES DO NOT WORK ON GRBL, the default firmware (see First WCS / Part); the post warns and says so in the file. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS; XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X, Y and Z already in its own WCS, from a prior job or set manually). JOG (you jog to each part during the run) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0, no probe. \"Active WCS\" means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. The attach/detach prompts around any probe follow Probe Pause; the safe-Z retract on the traverse is separate and automatic, and is an absolute move to Machine Travel Z in the machine's own frame. Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
+    description: "MULTI-PART JOBS ONLY -- several parts or copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). A single-part job never reaches this control. Every mode first retracts to Machine Travel Z in the machine's own frame, then acts. TWO WORKFLOWS, AND THE MODES COME IN PAIRS. PRE-SET FIXTURE OFFSETS -- every part's register was set before the job started, which is the Replicate case: Use Active WCS X0 Y0, Probe Z0 (default): rapid to that part's stored X0 Y0 and probe its stock-top Z, writing Z into its own register; XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: touch nothing -- after the retract the tool rapids to the part's stored X0 Y0 and cuts. Both TRUST registers the post cannot read back to check. MID-JOB INDEXING -- you jog to each part as the job reaches it, and nothing has to be set in advance: Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog there, then record that position as X0 Y0 Z0, no probe. This is the supported way to run a blank you clamp during the job -- one WCS per part, captured as you reach it. BOTH JOG MODES DEPEND ON WHAT HOLDS THE PAUSE. On GRBL that is the sender: gSender comments the M0 out and pauses its own stream, so the controller stays Idle and accepts jog commands, while a sender that passes M0 through leaves the controller in a hold that refuses them. On Marlin the pause queues serial commands without executing them, so the jog must come from the machine's own panel or from a sender that holds the file. RepRap jogs at the pause natively and needs neither. ON MARLIN EVERY MODE HERE NEEDS A FIRMWARE BUILD OPTION -- CNC_COORDINATE_SYSTEMS, off in a stock configuration, which is what gives Marlin its nine work offsets and G53 alike; the post assumes you compiled it in and says so in the file, because it cannot read your build. \"Active WCS\" means the register that part's Fusion Setup designates, which the post selects on the traverse. The attach/detach prompts around any probe follow Probe Pause. Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
     group      : "probe",
     order      : 20,
     type       : "enum",
@@ -1421,22 +1421,84 @@ function validateJob() {
     }
   }
 
-  // The post-time half of warnJogAtPauseOnGrbl(); see that function for the source read. Only the
-  // subsequent-part half carries multiWcs, that control being unread on a single-offset job.
-  if (fw == eFirmware.GRBL &&
+  // The post-time half of warnJogAtPauseNeedsSender(), sharing its ONE statement of the condition so
+  // the dialog and the file cannot come to differ. The firmware test is that statement being non-empty
+  // -- RepRap alone has none. Only the subsequent-part half carries multiWcs, that control being unread
+  // on a single-offset job.
+  if (jogAtPauseCondition() != "" &&
       (startMode == "Jog XY & Probe Z" || startMode == "Jog XYZ" ||
        (multiWcs && (changeMode == "Jog XY & Probe Z" || changeMode == "Jog XYZ")))) {
-    warning(localize("A \"Jog to ...\" origin mode is selected, but GRBL cannot jog at the pause "
-      + "it produces: the post emits M0, and GRBL 1.1 accepts a jog command only in its Idle or Jog "
-      + "states. The job will stop and wait, and the operator will be unable to move the machine "
-      + "without resetting the program. These modes are supported on RepRap. On GRBL, position the "
-      + "tool before starting and use a \"Set ... to Current Pos\" or \"Use Active WCS ...\" mode."));
+    warning(localize("A \"Jog to ...\" origin mode is selected, and " + jogAtPauseCondition() + ". "
+      + "Check that before running this file -- without it the job stops at the prompt and cannot be "
+      + "moved until it is resumed. Otherwise position the tool before starting and use a "
+      + "\"Set ... to Current Pos\" or \"Use Active WCS ...\" mode."));
+  }
+
+  // PR-20, AND IT IS THE SENDER'S THRESHOLD, NOT THE POST'S. gSender rewrites an M0 to "(M0)" in its
+  // sender dataFilter unconditionally, but pauses its own stream only past its tenth sent line --
+  // "if (sent > 10)", labelled a workaround for Carbide files that open with a meaningless M0
+  // (src/server/controllers/Grbl/GrblController.js, master, read 2026-08-14). Below the threshold BOTH
+  // halves fail together: the controller never sees the M0 because it was commented out, and the sender
+  // does not hold. The stop is deleted in silence. Sender.js's load() filters blank lines only, so the
+  // threshold counts EMITTED LINES, comments included -- which makes "Comment Level" the one setting
+  // that decides it, and it is in a different group from every prompt it can silence.
+  //
+  // THIS IS NOT A JOG-MODE PROBLEM. Every operator stop this post writes into its PREAMBLE is exposed,
+  // and the two that ship on by default are the worst of them. At Off:
+  //
+  //   Pause, then Home     M0 (MSG Prepare machine for homing) is LINE 1 of the file -- writeInformation
+  //                        emits nothing at this level -- so it is dropped in every configuration and
+  //                        the machine homes while the operator is still clearing the bed.
+  //   Current XY & Probe Z M0 (MSG Attach ZProbe) at line 7 of the leanest file: G54, four Start()
+  //     (the DEFAULT)      blocks, the provisional G10, the prompt. Dropped, and the G38.2 below it then
+  //                        drives a bare tool "G38 Target" deep looking for a plate nobody attached.
+  //   Jog to ...           the jog prompt at 10 at the most, so dropped, and the origin write below it
+  //                        records wherever the tool was parked as the part origin.
+  //
+  // THE COUNT CANNOT BE COMPUTED HERE, WHICH IS WHY THE TEXT HEDGES. Nothing the post emits of its own
+  // clears ten at Off -- the fullest preamble it can build is $H, the select, four Start() blocks, the
+  // travel-Z warning, the G53 block, a retract, a traverse and the prompt, and the two paths that reach
+  // eleven are still one short. But "Start File" REPLACES Start() with a file of the operator's own, of
+  // any length, and validateJob() runs before a byte of it is read. So the threshold is clearable and
+  // the post cannot say when. Important straddles it; Info never reaches it, the property dump alone
+  // being ~70 lines. Only the FIRST part is ever exposed: a boundary prompt is thousands of lines in.
+  //
+  // A WARNING AND NOT A GUARD, and no attempt to pad the preamble: filler emitted to satisfy an
+  // undocumented constant in one sender would be invisible here and silently wrong the day it changes.
+  // The remedy is one field away in the same dialog, so the text names it. The probe arm does not test
+  // the tool -- a jet/tool-0 first part warns needlessly here, which costs one line in a dialog that is
+  // already telling that job its Z0 was never established.
+  if (fw == eFirmware.GRBL &&
+      commentLevels.indexOf(getProperty(properties.jobCommentLevel)) < commentLevels.indexOf(eComment.Info)) {
+    var earlyPrompts = [];
+    // (homedXY || homedZ) because writeMachineHoming() returns before the prompt when nothing is
+    // declared homeable -- that job emits no stop to lose, and is already warned about above.
+    if (promptsBeforeHome() && (homedXY || homedZ)) {
+      earlyPrompts.push("the \"Pause, then Home\" stop, which is the FIRST LINE of the file");
+    }
+    if (startMode == "Jog XY & Probe Z" || startMode == "Jog XYZ") {
+      earlyPrompts.push("the \"First WCS / Part\" jog prompt");
+    }
+    if (getProperty(properties.probePause) != "No" &&
+        (startMode == "Current XY & Probe Z" || startMode == "Probe Z" || startMode == "Jog XY & Probe Z")) {
+      earlyPrompts.push("the \"Attach ZProbe\" prompt before the first part's probe");
+    }
+    if (earlyPrompts.length > 0) {
+      warning(localize("\"Comment Level\" is \"" + getProperty(properties.jobCommentLevel) + "\", which "
+        + "leaves this job's preamble only a few lines long -- and gSender ignores an M0 in the first "
+        + "ten lines it sends, a workaround for CAM that opens its files with a meaningless one. It "
+        + "comments the M0 out either way, so a prompt that early is not postponed, it is DELETED: the "
+        + "job runs straight past it. At risk here: " + earlyPrompts.join("; ") + ". Post at "
+        + "\"Comment Level\" \"Info\" and the property dump puts ~70 lines ahead of every one of them. "
+        + "Senders that do not special-case an early M0 are unaffected, and nothing after the first "
+        + "part is affected on any sender."));
+    }
   }
 
   // Establishing the fixed Z reference MOVES THE TOOL, before the first part's origin is recorded, so
-  // "current position" is bed clearance. The "Jog" modes are excluded -- they position after it.
-  // The "Jog to ..." recommendation below is false on GRBL, which the jog warning above says outright.
-  // PR-18 -- it closes with Step 4, which deletes the modes the clause names.
+  // "current position" is bed clearance. The "Jog" modes are excluded -- they position after it, which
+  // is why the remedy below names them: the warning above states the sender condition they carry on
+  // GRBL and no longer contradicts this one. PR-18/PR-19.
   if (fixedZEstablishedInFile() &&
       (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
     warning(localize("The fixed Z reference is established at job start by moving the tool to "
@@ -1847,14 +1909,14 @@ function writeWCS(section) {
     }
   } else if (onChangeMode == "Jog XYZ") {
     // Jog: the operator jogs to this part's origin; record that position as X0 Y0 Z0, no probe.
-    warnJogAtPauseOnGrbl();
+    warnJogAtPauseNeedsSender();
     askUser("Jog to X0 Y0 Z0, then continue", "Set origin", true);
     writeComment(eComment.Info, "   Set current position to 0,0,0");
     writeWcsOrigin(currentWorkOffset, 0, 0, 0);
   } else if (onChangeMode == "Jog XY & Probe Z") {
     // Jog: the operator jogs to this part's X0 Y0 (staying clear in Z); record X0 Y0 here,
     // then probe Z. partProbe(true) -- the tool is at the origin after the jog.
-    warnJogAtPauseOnGrbl();
+    warnJogAtPauseNeedsSender();
     askUser("Jog to X0 Y0 above Z0, probe", "Set origin", true);
     writeComment(eComment.Info, "   Set current X,Y position to 0,0");
     if (canProbe) {
@@ -3011,7 +3073,7 @@ function writeWcsOnStart() {
     var jogMsg = (mode == "Jog XYZ")
       ? "Jog to X0 Y0 Z0, then continue"
       : "Jog to X0 Y0 above Z0, probe";
-    warnJogAtPauseOnGrbl();
+    warnJogAtPauseNeedsSender();
     askUser(jogMsg, "Set origin", true);
   }
 
@@ -3429,19 +3491,51 @@ function circular(clockwise, cx, cy, cz, x, y, z, feed) {
   }
 }
 
-// The four "Jog to ..." origin modes cannot work on GRBL, this post's default firmware. askUser()'s
-// allowJog flag is consumed in the RepRap branch ONLY, where it appends "X1 Y1 Z1" to M291; the GRBL
-// branch emits a bare M0 and discards it -- and "a jog command will only be accepted when Grbl is in
-// either the 'Idle' or 'Jog' states" (Grbl v1.1 Jogging, gnea/grbl wiki). A warning rather than a
-// deletion, since the modes are correct on RepRap. Called at the jog dispatch sites rather than inside
-// askUser(), which also serves prompts that are not jog modes.
-function warnJogAtPauseOnGrbl() {
-  if (fw != eFirmware.GRBL) {
+// WHETHER A "Jog to ..." MODE WORKS IS A CONDITION ON WHAT HOLDS THE PAUSE, NOT A FIRMWARE CAPABILITY,
+// and what stood here said GRBL could not do it at all. ONE STATEMENT OF THAT CONDITION, returned from
+// here and written by both channels -- the in-file warning below and validateJob()'s post-time twin --
+// so the two cannot come to differ, which is the same discipline the park and probe warnings follow.
+// Empty string means "no condition", which is RepRap and only RepRap.
+//
+//   RepRap -- a genuine firmware jog-at-pause. askUser()'s allowJog flag appends "X1 Y1 Z1" to M291,
+//   and nothing outside the controller has to cooperate.
+//
+//   GRBL -- the SENDER decides. "A jog command will only be accepted when Grbl is in either the 'Idle'
+//   or 'Jog' states" (Grbl v1.1 Jogging, gnea/grbl wiki) describes a controller that RECEIVED the M0,
+//   and a streaming sender decides whether it ever does. gSender does not send it:
+//   src/server/controllers/Grbl/GrblController.js (master, read 2026-08-14) rewrites the line in its
+//   sender dataFilter -- line = line.replace(/M0+(?!\d)/i, "(M0)") -- above a this.workflow.pause(...)
+//   that holds its own stream, so the controller stays Idle and jogs normally.
+//
+//   Marlin -- neither. M0 calls wait_for_user_response(), which is "while (wait_for_user) idle();", and
+//   idle() reaches queue.get_available_commands() but never queue.advance() (MarlinCore.cpp, 2.1.2.5).
+//   Serial commands are ACCEPTED AND QUEUED at the pause and execute only after it, so a jog sent down
+//   the wire runs late -- into the part, on a machine the operator believes is stopped. The panel's own
+//   move-axis UI is not gcode and is unaffected, which is why this is a condition and not a refusal.
+//
+// Called at the jog dispatch sites rather than inside askUser(), which also serves non-jog prompts.
+function jogAtPauseCondition() {
+  if (fw == eFirmware.REPRAP) {
+    return "";
+  }
+  if (fw == eFirmware.GRBL) {
+    return "jogging at this pause depends on your sender, not on GRBL -- gSender comments the M0 out"
+      + " and pauses its own stream, so the controller stays Idle and accepts jog commands, while a"
+      + " sender that passes M0 through leaves the controller in a hold that refuses them";
+  }
+  return "jogging at this pause needs the machine's own panel, or a sender that holds the file and does"
+    + " not send the M0 -- Marlin's M0 blocks inside wait_for_user_response, whose idle loop queues"
+    + " serial commands without executing them, so a jog sent down the wire does not move the machine"
+    + " until the pause is released and then runs late. MarlinCore.cpp, 2.1.2.5";
+}
+
+function warnJogAtPauseNeedsSender() {
+  var condition = jogAtPauseCondition();
+  if (condition == "") {
     return;
   }
-  writeWarning("jogging at this pause is not supported on GRBL --"
-    + " M0 holds the controller in a state that refuses jog commands. Position the tool before"
-    + " starting the job, or choose a \"Use Active WCS ...\" mode.");
+  writeWarning(condition + ". Check this before running the file: without it the job stops here and"
+    + " cannot be moved until it is resumed.");
 }
 
 function askUser(text, title, allowJog) {

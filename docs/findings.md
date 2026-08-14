@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **61 findings — 36 fixed · 2 part-fixed ·
-2 closed by design · 1 withdrawn · 20 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **63 findings — 39 fixed · 2 part-fixed ·
+2 closed by design · 1 withdrawn · 19 open.** Test registers in §4 and §5.
 
 > Four ids — `HR-19`, `HR-22`, `HR-24`, `HR-27` — had **no row in any register** when this
 > file was built. They were carried in checkpoint prose and in `conventions.md`, and are
@@ -51,7 +51,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**20 open (one of them deferred) · 2 part-fixed — 22 entries.**
+**19 open (one of them deferred) · 2 part-fixed — 21 entries.**
 
 ### PR-15 — the tool-change code does not comply with the tool-change design — High
 
@@ -89,27 +89,6 @@ is written on every Duet post. Never yet posted.
 **The fields stay editable** — the post cannot know a board's pins or its RRF major version.
 Take the relocation of both properties beside the firmware selector *with* the default
 rewrite: both re-head the property dump, so together they cost one baseline instead of two.
-
-### PR-18 — two warnings recommend a "Jog to ..." mode in the same dialog that refuses it — Low
-
-**Problem.** :1482 (`Home at Job Start` meeting a `... to Current Pos` first-part mode) closes with
-*"a \"Jog to ...\" mode also works"*, and :1526 (the fixed-Z establish moving the tool before the
-origin is recorded) offers *"Use \"Use Active WCS X0 Y0, Probe Z0\" or a \"Jog to ...\" mode"*.
-Neither clause is gated on firmware. :1511 **is** — on GRBL it states that a jog mode stalls the job
-at an `M0` the operator cannot jog out of. All three fire together on a GRBL job, so **the dialog
-tells the operator both to choose a jog mode and that jog modes do not work.** The correct remedy is
-already in both messages beside the wrong one.
-
-**Reproduce.** `Multi_WCS (PBV1).gcode`, 2026-08-14 — GRBL, `Axes Homed and Trusted` = `XYZ`,
-`Home at Job Start` = `Home`, two work offsets, First = `Set X0 Y0 Z0 to Current Pos`, Subsequent =
-`Jog to X0 Y0, Probe Z0`.
-
-**Fix.** **Take it with `plan.md` Step 4**, which deletes both Jog modes from `probeOnStart` and
-`probeOnChange` entire — the clauses go with the modes they name and no separate repair is written.
-If Step 4 changes shape or is deferred, gate both clauses on `fw != eFirmware.GRBL` instead: the
-false statement ships until one or the other lands.
-
-**Test.** `PR-18` in §4 — both branches, GRBL and RepRap.
 
 ### HR-13 — `onCommand` silently discards every command it does not name — Low-Med · ◑ part-fixed
 
@@ -335,7 +314,7 @@ and fine.
 
 ## 3. Closed findings
 
-**36 fixed · 2 closed by design · 1 withdrawn — 39 rows.** Permanent: commit messages and
+**39 fixed · 2 closed by design · 1 withdrawn — 42 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -380,12 +359,15 @@ diagnosis, the diff and the argument.
 | **PR-16** | `Home at Job Start` moves the tool off the parked spot the spoilboard base probe depends on, unwarned | High | **Closed by deletion** — the base establish, its probe and its operator precondition were removed rather than repaired. No repair exists and none is owed | ✅ |
 | **PR-17** | A `Machine Travel Z` at or above machine zero on GRBL is unreachable, or lands on the homing switch, unwarned | Med-High | A `>= 0` warning in both channels. **`>= 0` and not `> 0`**: homing ends one pull-off *below* the trigger, which fixes the trigger at machine Z `0`, and `system_check_travel_limits()` rejects only `> 0`. Names `HOMING_FORCE_SET_ORIGIN` and the pull-off, never a number — `$27` cannot be read | ✅ |
 | **HR-26** | The base-clearance retract had no tool-0 / jet guard though the base establish did | Med | **Closed by deletion** — the transit went with the base. The machine-frame retract that replaced it emits `G53 G0 Z`, which establishes nothing and needs no tool, so the hole closed with the code | ✅ |
+| **PR-18** | Two warnings recommend a "Jog to ..." mode in the same dialog that refuses it | Low | Closed with `PR-19` — the refusal became a condition, so the recommendations no longer contradict it. **Nothing was deleted**: the clauses that name a jog mode are the correct remedy and stand as written | ✅ |
+| **PR-20** | Under gSender, the **first operator stop in the file is deleted rather than obeyed** whenever `Comment Level` is below `Info` | High | Post-time `warning()` naming the stops this job puts at risk. **Not a code fix and cannot be one** — `GrblController.js` (master, 2026-08-14) comments an `M0` out unconditionally but holds the stream only past `if (sent > 10)`, a Carbide workaround, and `Sender.js`'s `load()` filters blank lines only, so the threshold is a line count of the emitted file. **It is not a jog-mode defect, which is how it was first filed:** at `Off` the default job loses `Attach ZProbe` at line 7 and probes with no plate attached, and `Pause, then Home` loses its stop at **line 1** and homes into an uncleared bed. **Padding the preamble was rejected** — filler to satisfy another program's constant. `PR-10` is the precedent for closing on a warning | ✅ |
+| **PR-19** | The post claimed GRBL cannot jog at an `M0` pause, and said nothing at all about Marlin | Med | The claim was false and shipped in five places. Jogging at the pause is a condition on **what holds the pause**, stated once in `jogAtPauseCondition()` and written by both channels. GRBL: the sender decides — gSender rewrites the line to `(M0)` and holds its own stream (`src/server/controllers/Grbl/GrblController.js`, master, 2026-08-14). Marlin: **a real gap the walk found** — `M0` blocks in `wait_for_user_response()`, whose `idle()` reaches `queue.get_available_commands()` but never `queue.advance()` (`MarlinCore.cpp`, 2.1.2.5), so a serial jog queues and runs **after** the pause. RepRap alone needs no condition | ✅ |
 
 ---
 
 ## 4. Open tests
 
-**⬜ 31 UNRUN · ❌ 0 FAIL · ➖ 1 n/a — 32 rows.** **§4.1 is closed and gone**, and the `S2`/`S3`
+**⬜ 34 UNRUN · ❌ 0 FAIL · ➖ 2 n/a — 36 rows.** **§4.1 is closed and gone**, and the `S2`/`S3`
 debt with it: `PB1`, `PB2`, `PBV1`, `PBV2`, `PBV3`, `M1`, `M2` and `M4` passed on posted files
 2026-08-14, and the twenty-six rows that turn on Steps 1.3, 2 and 3 closed **by code walk**
 2026-08-14 — §5 holds each one's argument. **No row exercises a tool change** — the nine that did
@@ -403,12 +385,15 @@ speed `F30`, probe thickness `Z0.8`. **A row names only what it changes from tha
 Output goes to `Documents\Fusion 360\NC Programs\`, is not in the repo, and a reused
 filename destroys evidence.
 
-**Three methods.** `posted` — the job is run from Fusion and the g-code read. `dialog` — settled by
+**Four methods.** `posted` — the job is run from Fusion and the g-code read. `dialog` — settled by
 opening the Fusion dialog, and no posted file can show it. `walk` — settled by reading the code that
 would emit it. **A walk is admissible only where the emission is fully determined by the post**: it
 proves what the post writes given a configuration, and never what Fusion feeds it, what the dialog
 renders, or what a controller does with the result. Where a row's every emitted line is separately
-witnessed in an existing artifact, say which one.
+witnessed in an existing artifact, say which one. `sender` — **new with `PR-20`, and one row uses
+it**: the file is correct and identical either way, so the assertion is about what a sender does with
+it. It needs gSender and a machine that need not cut; it does not need a controller this project
+lacks.
 
 | Test | Proves | Setup (delta) | Method | Expansion | State |
 |---|---|---|---|---|---|
@@ -422,7 +407,11 @@ witnessed in an existing artifact, say which one.
 | **PR-1b** | The stored-offset warning fires on the trusting modes and **never** on the `Jog …` modes | 2-WCS job, each origin mode in turn | posted | — | ⬜ |
 | **PR-2c** | Every guard refuses, and leaves **no file** | each `error()` condition in `validateJob()` | posted | — | ⬜ |
 | **PR-2d** | `Machine Travel Z` converts mm → inch in both the block and the header echo | multi-WCS, `Machine Travel Z = -12`, output units **inch** | posted | — | ⬜ |
-| **PR-18** | Neither warning offers a "Jog to ..." mode on GRBL, and the jog refusal is the only mention of one; on RepRap the offer survives | GRBL then RepRap, `XYZ` + `Home`, 2 WCS, First = `Set X0 Y0 Z0 to Current Pos` | posted | — | ⬜ |
+| **PR-19a** | The in-file jog condition, all three firmwares: **GRBL names the sender, Marlin names the panel and the queued-not-executed pause, RepRap emits nothing at all** — the absence is that branch's whole assertion, and the `M291` beside it must carry `X1 Y1 Z1` | one part, First = `Jog to X0 Y0 Z0`, posted on each firmware in turn | posted | — | ⬜ |
+| **PR-19b** | The post-time half fires on the same answers, in the same words, and **no warning in the dialog says a jog mode does not work** — the two clauses that recommend one now stand beside it uncontradicted | GRBL, `XYZ` + `Home`, `Machine Travel Z` filled, 2 WCS, First = `Set X0 Y0 to Current Pos, Probe Z0`, Subsequent = `Jog to X0 Y0, Probe Z0`; then Marlin, then RepRap | posted | — | ⬜ |
+| **PR-18** | — proved by **PR-19b**: the contradiction is gone when all three warnings read together name no impossibility | — | — | — | ➖ |
+| **PR-20a** | The warning names **exactly the stops this job puts inside the ten lines** and is silent when there are none — `Pause, then Home` with nothing declared homeable, `Probe Pause` `No`, and both `Use Active WCS X0 Y0 Z0` / `Set X0 Y0 Z0 to Current Pos` are the silent cases, and Marlin and RepRap are silent at every setting | GRBL at `Comment Level` `Off`: defaults; then `Pause, then Home` + `XYZ`; then each first-part mode in turn; then `Probe Pause` = `No`; then the same at `Info` | posted | — | ⬜ |
+| **PR-20b** | gSender itself: **the same file, posted once, stops at the prompt when streamed after ten lines and runs past it when not** | one file at `Comment Level` `Off` and one at `Info`, defaults otherwise, each streamed from gSender with the spindle off and the tool clear | sender | — | ⬜ |
 | **PR-6a** | The machine park emits `G53 G0 X0 Y0` as its own block, X/Y only | GRBL, `XY Only` + `Home`, park `Machine X0 Y0` | posted | — | ⬜ |
 | **PR-6b** | The **Marlin** route is `G28 X` / `G28 Y`, and needs no prior homing | Marlin, `XY Only`, `Home at Job Start` = **`Off`**, park `Machine` | posted | — | ⬜ |
 | **PR-6d** | `Work` (default) is byte-identical to the old boolean-on behaviour | defaults, diffed against the pre-change build | posted | — | ⬜ |
@@ -551,6 +540,7 @@ Delete a row when its test is re-posted, and delete this section when it empties
 |---|---|---|
 | every saved GRBL `.gcode` predating 2026-07-31 | the manual-spindle stop now prompts on GRBL | A default job ends `M0 (MSG Turn OFF spindle)` where it once ended `M5`. **No row's assertions are affected** — do not read a tail diff as a regression |
 | the two header-dump rows above | the `groupDefinitions` move, the key rename, then the machine-frame work | The assertions stand — one block per group, in dialog order — but the counts and titles moved. **`D5` closed by walk, so no post refreshes these**; delete when **`REG-MF`** runs |
+| every saved `.gcode` posted at `Comment Level` `Info` or `Debug`, and `S2a`/`D5`'s enumerated dump delta | group 5's dialog title, which `writeAllProperties()` prints as its heading | **One line moves in every such file** — ` Properties -- 5 - On WCS / Part / Fixture Changes:` becomes ` Properties -- 5 - Part Origins - how each part's X0 Y0 Z0 is established:`. No g-code, no key, no value. **`S2a`'s claim survives as written and its enumeration does not** — the whole delta is still the property dump; the dump now has one more changed line than `D5` lists. **Byte-identity is not available as a criterion for any re-post at `Info` or `Debug`**; the criterion is *this heading and nothing else* |
 | `PR-2e`'s artifact | the fixed Z reference stopped being derived — the field itself is now the opt-in | **Stale, not wrong.** The header echo loses its *from the homed machine declaration, not set in the dialog* clause, there being no dialog answer left to distinguish it from. **`PR-5b` closed by walk and no row now schedules this job**; the artifact stands as evidence for `PR-2e`'s own assertion and for nothing about the current echo |
 
 ---
@@ -637,7 +627,7 @@ None is a defect; none is scheduled.
    rule is currently unmet. **Three deliberate exceptions**, each stating why in its own row:
    `PR-15`, whose code is being replaced, and `PR-16` and `HR-26`, which **closed by deletion**
    and owe no row at all.
-2. **Every one of the 31 unrun rows**, and **a posted file behind the twenty-six walked ones.**
+2. **Every one of the 34 unrun rows**, and **a posted file behind the twenty-six walked ones.**
    A walk settles what the post writes; it cannot settle what Fusion feeds it or what a
    controller does with the result, and every walked row above names its own residue. **Two
    posts would retire most of that residue at once** — a factory-default job against `S2a`'s
