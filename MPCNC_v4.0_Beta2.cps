@@ -41,8 +41,8 @@ allowedCircularPlanes = undefined;
 wcsDefinitions = {
   useZeroOffset: false,
   wcs          : [
-    {name:"GRBL/RepRap", format:"G", range:[54, 59]},   // G54-G59 (raw offset 1-6)
-    {name:"RepRap only", format:"G59.", range:[1, 3]}    // G59.1-G59.3 (raw offset 7-9)
+    {name:"All firmware", format:"G", range:[54, 59]},        // G54-G59 (raw offset 1-6)
+    {name:"Marlin/RepRap", format:"G59.", range:[1, 3]}       // G59.1-G59.3 (raw offset 7-9)
   ]
 };
 
@@ -360,7 +360,7 @@ properties = {
   },
   probeOnChange: {
     title      : "Subsequent WCS / Part",
-    description: "MULTI-PART JOBS ONLY -- milling several parts or copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). A single-part job never reaches this control. Not supported on Marlin at all, which has one global origin -- use separate jobs. THE TWO JOG MODES DO NOT WORK ON GRBL, the default firmware (see First WCS / Part); the post warns and says so in the file. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS; XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X, Y and Z already in its own WCS, from a prior job or set manually). JOG (you jog to each part during the run) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0, no probe. \"Active WCS\" means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. The attach/detach prompts around any probe follow Probe Pause; the safe-Z retract on the traverse is separate and automatic, and is an absolute move to Machine Travel Z in the machine's own frame. Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
+    description: "MULTI-PART JOBS ONLY -- milling several parts or copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). A single-part job never reaches this control. ON MARLIN THIS NEEDS A FIRMWARE BUILD OPTION -- CNC_COORDINATE_SYSTEMS, off in a stock configuration, which is what gives Marlin its nine work offsets and G53 alike; the post assumes you compiled it in and says so in the file, because it cannot read your build. THE TWO JOG MODES DO NOT WORK ON GRBL, the default firmware (see First WCS / Part); the post warns and says so in the file. Every mode first retracts to a safe Z, then acts. USE ACTIVE WCS (pre-set fixture offsets / Replicate) -- Use Active WCS X0 Y0, Probe Z0 (default): rapid to the part's stored X0 Y0 and probe its stock-top Z, writing Z into that WCS; XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: do nothing to the origin; after the retract the tool rapids to the part's stored X0 Y0 (X, Y and Z already in its own WCS, from a prior job or set manually). JOG (you jog to each part during the run) -- Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog to this part's origin, then record that position as X0 Y0 Z0, no probe. \"Active WCS\" means the register that part's Fusion Setup designates, which the post selects on the traverse; its stored contents come from a prior job or a manual touch-off and are trusted, not verified. The attach/detach prompts around any probe follow Probe Pause; the safe-Z retract on the traverse is separate and automatic, and is an absolute move to Machine Travel Z in the machine's own frame. Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
     group      : "probe",
     order      : 20,
     type       : "enum",
@@ -1509,8 +1509,9 @@ function validateJob() {
   }
 
   // --- Guards -----------------------------------------------------------------------------------
-  // Order is load-bearing: Guard C's Marlin branch returns, so anything below it is unreachable on
-  // exactly the firmware it excludes.
+  // Every guard below applies on every firmware. Guard C used to return early on Marlin, which made
+  // everything after it unreachable on exactly the firmware it excluded; with that gone, order here is
+  // about which complaint is the more basic, not about which firmware still gets checked.
 
   // A named include file that does not exist only reaches error() inside loadFile(), by which point
   // the header and preamble are in the stream. The tool-change files are checked only with group 6 on.
@@ -1554,8 +1555,8 @@ function validateJob() {
     }
   }
 
-  // Above Guard C's Marlin branch, and here that matters more because this guard APPLIES on Marlin --
-  // whose route (G28 X Y) re-establishes the frame, which is why the homing half is GRBL/RepRap-only.
+  // The homing half is GRBL/RepRap-only because Marlin's park route (G28 X Y) RE-ESTABLISHES the frame
+  // rather than addressing it, so it needs no prior homing -- unlike the Z retract above, which does.
   if (getProperty(properties.machineParkAtEnd) == "Machine") {
     if (!machineHomesXY()) {
       error("\"At End Park At\" = machine X0 Y0 requires \"Axes Homed and Trusted\" to include X/Y -- a machine's X0 Y0 is its homing corner, which means nothing on a machine that does not home.");
@@ -1567,14 +1568,13 @@ function validateJob() {
     }
   }
 
-  // Guard C -- Marlin is single-frame: a job using more than one distinct work offset is silently
-  // wrong on it.
-  if (fw == eFirmware.MARLIN) {
-    if (collectDistinctOffsets().length > 1) {
-      error("Marlin has a single coordinate frame -- this multi-WCS job cannot be posted; use one work offset.");
-    }
-    return;
-  }
+  // GUARD C IS GONE, and its message was the reason: "Marlin has a single coordinate frame" was a
+  // FALSE STATEMENT EMITTED TO THE USER. Marlin/src/gcode/gcode.cpp (2.1.2.5) puts G54-G59 in the same
+  // #if ENABLED(CNC_COORDINATE_SYSTEMS) as G53, with G59 taking the .1/.2/.3 subcodes -- nine
+  // workspaces, individually selectable, persisted with EEPROM. Selection has full parity with GRBL and
+  // RRF, and selection is what a multi-WCS job needs; the write dialect is writeWcsOrigin()'s business.
+  // A Marlin multi-part job is now refused by exactly one thing, Guard B below, and on the same terms
+  // as every other firmware. The build option is assumed and warned about, once, above.
 
   // Guard B -- a multi-part job MUST have the fixed Z frame: the tool has to clear the fixtures on its
   // way between parts, and no single clearance height is meaningful across WCS whose origins are only
@@ -1737,23 +1737,30 @@ function writeWCS(section) {
     writeComment(eComment.Info, " writeWCS: workOffset defaulted to: " + workOffset);
   }
 
-  if (fw == eFirmware.MARLIN) {
-    if (workOffset > 1 && workOffset != currentWorkOffset) {
-      writeWarning("Marlin uses a G92 origin; work offset " + workOffset + "/G" + (53 + workOffset) + " is not supported and is ignored");
-    }
-    currentWorkOffset = workOffset;
+  // ALL THREE FIRMWARES take this path. Marlin used to return here with a warning that its work
+  // offsets "are not supported and are ignored" -- read from source (gcode.cpp 2.1.2.5), that was
+  // false: G54-G59 sit in the same #if ENABLED(CNC_COORDINATE_SYSTEMS) as G53, and SELECTION has full
+  // parity there. What differs is only how an origin is WRITTEN, which writeWcsOrigin() handles.
+  if (workOffset == currentWorkOffset) {
+    writeComment(eComment.Info, " WCS unchanged: " + workOffset + ", not re-selecting");
     return;
   }
 
-  // GRBL / RepRap: select the work coordinate system (only when it changes).
-  if (workOffset == currentWorkOffset) {
-    writeComment(eComment.Info, " WCS unchanged: " + workOffset + ", not re-selecting");
+  // THE ORDINARY MARLIN JOB MUST NOT MOVE. A job that never leaves work offset 1 already sits in
+  // Marlin's default workspace, so selecting it explicitly buys nothing -- and on a stock build, where
+  // CNC_COORDINATE_SYSTEMS is off, "G54" is an unknown command the firmware would report on every
+  // single-part hobby file. Suppressed only for that exact case: any job with a second offset, or one
+  // assigned to a register other than the first, needs the select and gets it, because G92 writes
+  // whichever workspace is ACTIVE and would otherwise land in the wrong one.
+  if (fw == eFirmware.MARLIN && workOffset == 1 && collectDistinctOffsets().length == 1) {
+    writeComment(eComment.Debug, " writeWCS: Marlin single-offset job on WCS 1 -- default workspace, no select emitted");
+    currentWorkOffset = workOffset;
     return;
   }
   var previousWorkOffset = currentWorkOffset;
   var offsetCode = wcsGcode(workOffset);
   if (offsetCode == undefined) {
-    error("Work offset " + workOffset + " is out of range for " + fw + " (GRBL supports G54-G59, RepRap G54-G59.3).");
+    error("Work offset " + workOffset + " is out of range for " + fw + " (GRBL supports G54-G59; Marlin and RepRap add G59.1-G59.3).");
     return;
   }
   // How to establish this added part's origin/Z (probeOnChange). The first part's is set by
@@ -1843,18 +1850,34 @@ function writeWCS(section) {
 }
 
 // Persists the current position as WCS wcsNumber's own origin; any of x/y/z may be undefined to leave
-// that axis alone. GRBL/RepRap write into that WCS's own offset register (G10 L20 P<n>), so it cannot
-// leak into another. Marlin has no addressable per-WCS register, so it falls back to G92.
+// that axis alone. TWO DIALECTS, and the difference is addressing, not capability:
+//
+//   GRBL / RepRap -- "G10 L20 P<n>" names its target, so it can write any register without selecting
+//   it and cannot leak into another.
+//
+//   Marlin -- "G92", which under CNC_COORDINATE_SYSTEMS is a real per-WCS write and NOT the global
+//   frame shift this post long recorded it as: G92.cpp (2.0.9.7 and 2.1.2.5) runs
+//   "coordinate_system[active_coordinate_system] = position_shift" behind a WITHIN() bounds check. But
+//   it can only ever write the ACTIVE workspace, and only positionally.
+//
+// That makes "the target is the active WCS" a precondition on Marlin rather than a coincidence. Every
+// caller already satisfies it -- writeWCS() selects before it dispatches, and probeTool() lost the
+// target parameter that was the one way to violate it -- so this is an assertion, not a branch.
 function writeWcsOrigin(wcsNumber, x, y, z) {
   writeComment(eComment.Debug, " writeWcsOrigin: wcs: " + wcsNumber
     + " x: " + (x == undefined ? "-" : x) + " y: " + (y == undefined ? "-" : y) + " z: " + (z == undefined ? "-" : z)
-    + " method: " + (fw == eFirmware.MARLIN ? "G92 (global -- Marlin has no per-WCS register)" : ("G10 L20 (scoped to WCS " + wcsNumber + ")")));
+    + " method: " + (fw == eFirmware.MARLIN ? "G92 (writes the ACTIVE workspace)" : ("G10 L20 (scoped to WCS " + wcsNumber + ")")));
 
   var xWord = x == undefined ? undefined : xFormat.format(x);
   var yWord = y == undefined ? undefined : yFormat.format(y);
   var zWord = z == undefined ? undefined : zFormat.format(z);
 
   if (fw == eFirmware.MARLIN) {
+    if (wcsNumber != currentWorkOffset) {
+      error("Internal: an origin write targeted work offset " + wcsNumber + " while " + currentWorkOffset
+        + " is active. On Marlin G92 writes the ACTIVE workspace, so this would land in the wrong register.");
+      return;
+    }
     writeBlock(gFormat.format(92), xWord, yWord, zWord);
   } else {
     writeBlock(gFormat.format(10), "L20", "P" + wcsNumber, xWord, yWord, zWord);
@@ -1931,7 +1954,9 @@ function machineTravelZ() {
 // for the firmware (the G59.x slots are RepRap-only); callers report the error.
 function wcsGcode(workOffset) {
   if (workOffset <= 6) return 53 + workOffset;
-  if (fw == eFirmware.REPRAP && workOffset <= 9) return 59 + (workOffset - 6) / 10;
+  // Not GRBL, which stops at G59: Marlin's G59() takes the .1/.2/.3 subcodes under the same build
+  // option as the rest (gcode.cpp 2.1.2.5), giving it nine workspaces exactly as RRF has.
+  if (fw != eFirmware.GRBL && workOffset <= 9) return 59 + (workOffset - 6) / 10;
   return undefined;
 }
 

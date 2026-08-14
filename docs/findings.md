@@ -418,14 +418,14 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**⬜ 55 UNRUN · ❌ 0 FAIL · ➖ 1 n/a — 56 rows.** **§4.1 is nearly closed** — `PB1`, `PB2`, `PBV1`,
+**⬜ 57 UNRUN · ❌ 0 FAIL · ➖ 1 n/a — 58 rows.** **§4.1 is nearly closed** — `PB1`, `PB2`, `PBV1`,
 `PBV2`, `PBV3`, `M1`, `M2` and `M4` passed 2026-08-14 and are in §5. **Three of the four boundary
 dispatches are proved**; what is left is `PA1`/`PA1b`, the offset variants `P2`/`P3`, and `M3`.
 **No row exercises a tool change** — the nine that did were deleted with the design they tested,
 and their replacements are written as `plan.md` Step 5 lands.
 
-**The `S2` and `S3` rows are this step's debt** — five for the base's retirement, four for
-Marlin gaining the frame. `S2a` is the one that protects every hobbyist job: with the field
+**The `S2` and `S3` rows are this step's debt** — five for the base's retirement, six for
+Marlin gaining the frame and its registers. `S2a` is the one that protects every hobbyist job: with the field
 empty nothing changed, and only a posted file can say so.
 
 **Eight rows went with the spoilboard base**, deleted rather than run: `P5`, `P9`, `PR-3`,
@@ -474,6 +474,8 @@ posted file can show it.
 | **S3b** | **Every `G53` on Marlin is followed by a `G5x` re-select**, and it is `currentWorkOffset`'s own — the discriminator is that it is **not** hard-coded `G54` on a job whose active offset is `G55` | as S3a plus a Setup on work offset 2, then the end park with `At End Park At` = `Machine X0 Y0` | posted | — | ⬜ |
 | **S3c** | **GRBL emits no re-select** — the same job on GRBL has a bare `G53` block and nothing after it, so the restore is Marlin-only | S3a's job, firmware GRBL | posted | — | ⬜ |
 | **S3d** | The unhomed-frame warning now fires on **Marlin as well as RepRap**, and stays **silent on GRBL** | `Machine Travel Z` filled, `Home at Job Start` = `Off`, each firmware in turn | posted | — | ⬜ |
+| **S3e** | **A Marlin two-WCS job posts** — `G55` selected at the boundary, a `G53 G0 Z<n>` retract *above* it, and the added part's origin written with `G92` **after** the select, into the register the select made active. **Never posted on Marlin in any form** | Marlin, 2 WCS, `Axes Homed and Trusted` = `XYZ`, `Machine Travel Z` = `-10` | posted | §4.1 | ⬜ |
+| **S3f** | **The ordinary Marlin job did not move** — a single-WCS Marlin file emits **no** `G54` at all, so the 24 `HB-Tests/` files re-post byte-identically. The discriminator is the *absence*: a naive select would have added an unknown command to every stock-Marlin hobby file | Marlin, defaults, diffed against the pre-Step-3 build | posted | — | ⬜ |
 | **PR-6a** | The machine park emits `G53 G0 X0 Y0` as its own block, X/Y only | GRBL, `XY Only` + `Home`, park `Machine X0 Y0` | posted | — | ⬜ |
 | **PR-6b** | The **Marlin** route is `G28 X` / `G28 Y`, and needs no prior homing | Marlin, `XY Only`, `Home at Job Start` = **`Off`**, park `Machine` | posted | — | ⬜ |
 | **PR-6c** | The machine park retracts first where a fixed Z reference exists | PR-6a + `Machine Travel Z` filled | posted | — | ⬜ |
@@ -509,7 +511,8 @@ the single-section jobs on disk. **The largest untested area in the post.**
 > that clears every fixture. Guard B is unconditional (`CR-13`), so **no row here can be posted
 > without both** — a multi-part job with the field empty is refused, and that refusal is `S2c`'s
 > assertion rather than a row's setup mistake. `Home at Job Start` is free: the declaration is
-> the trust assertion (`PR-2f`).
+> the trust assertion (`PR-2f`). **Marlin is no longer excluded** — Guard C is gone, and `S3e` is
+> the Marlin row; every other row here stays GRBL unless it says otherwise.
 
 **PB1 is the reference file — it has run** (§5, `Multi_WCS (PB1).gcode`, 2026-08-14), and the
 blocks below are transcribed from it rather than predicted. **Every remaining row here diffs
@@ -577,8 +580,8 @@ part still shows no reposition at all.
 **M1–M6 — the four subsequent modes.** 2-part Replicate, derived machine frame, tool ≠ 0. On
 each added part every mode must **retract to the travel height first, then act** — the retract
 is `G53 G0 Z<travel>` in every case, and it is the *same* block in all four, which is what
-makes the four rows a dispatch test rather than four frame tests. Marlin is out of scope
-(refused this frame, and Guard C). **M1** retract→`G55`→`G0 X0 Y0`→cutting, no probe.
+makes the four rows a dispatch test rather than four frame tests. **Marlin is in scope now** —
+Guard C is gone — but is `S3e`'s row rather than a fifth variant here. **M1** retract→`G55`→`G0 X0 Y0`→cutting, no probe.
 **M2** retract→`G55`→rapid to `X0 Y0` (+offset)→`G38.2`→`G10 L20 P2 Z`. **M3** retract→`G55`→
 jog prompt→`G10 L20 P2 X0 Y0 Z0`→cutting. **M4** retract→`G55`→jog prompt→
 `G10 L20 P2 X0 Y0`→`G38.2`→`G10 L20 P2 Z`. **M5** a single-WCS job is byte-for-byte unchanged
@@ -750,7 +753,7 @@ None is a defect; none is scheduled.
    rule is currently unmet. **Three deliberate exceptions**, each stating why in its own row:
    `PR-15`, whose code is being replaced, and `PR-16` and `HR-26`, which **closed by deletion**
    and owe no row at all.
-2. **Every one of the 55 unrun rows.** §4.1 is the largest untested area in the post and
+2. **Every one of the 57 unrun rows.** §4.1 is the largest untested area in the post and
    needed a job nobody had built. **That blocker is down** — a multi-WCS job was built on
    2026-08-13 from **Multiple WCS Offsets** (one Setup, a checkbox and an instance count) and
    posted three times. Whether it substitutes for rows written around *Replicate*

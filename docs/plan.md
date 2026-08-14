@@ -9,13 +9,15 @@ behaves as it does is `design.md`.
 contributes 18 of them and is **itself unmerged**, so a merge to `master` carries two
 ranges, not one. `master` is 6 commits ahead of `origin/master`; `Assessment` is unpushed.
 
-**What is true now.** Phase C, Step 0, **Steps 1.1, 1.2 and 2 are done and closed.** A multi-WCS
-job posts on a machine declared homed; the spoilboard base and group 5 no longer exist. `PR-14`
-closed with 1.2; `PR-16` and `HR-26` closed by deletion with 2.
+**What is true now.** Phase C, Step 0, **Steps 1.1, 1.2, 2 and 3 are done and closed.** A multi-WCS
+job posts on any of the three firmwares given a machine declared homed; the spoilboard base and
+group 5 no longer exist. `PR-14` closed with 1.2; `PR-16` and `HR-26` closed by deletion with 2.
 
-**What is next: Step 3.** **Step 2 has landed** — the spoilboard base is gone and one fixed Z
-reference survives, opted into by filling `Machine Travel Z` in group 4. It is **unverified**:
-nothing has been posted against it, and `findings.md` §4's `S2a`–`S2e` are the debt.
+**What is next: post what has landed.** **Steps 2 and 3 are done** — one fixed Z reference, opted
+into by filling `Machine Travel Z` in group 4, and Marlin has both it and its nine work offsets.
+**None of it has been posted.** `findings.md` §4's `S2a`–`S2e` and `S3a`–`S3e` are the debt, and
+`S2a` is first: with the field empty a factory-default job must be unchanged, and only a posted
+file can say so.
 
 **Step 1.3 is parked, not closed.** Eight rows passed 2026-08-14 — `PB1`, `PB2`, `PBV1`, `PBV2`,
 `PBV3` and, off those artifacts, three of the four boundary dispatches `M1`, `M2`, `M4`. **What is
@@ -45,15 +47,14 @@ quoted comment text, never by line number.
 | | Item | Blocked on |
 |---|---|---|
 | **1.3** | Post the six multi-part jobs — `findings.md` §4.1 | — |
-| **3** | Marlin multi-WCS: delete Guard C, add a version floor | a Marlin changelog reading |
-| **4** | Group 5: keep the touch-off, delete the orchestration | 3 |
+| **4** | Group 5: keep the touch-off, delete the orchestration | — |
 | **5** | Group 6: rebuild the tool change as two flows | — (parallel with 1–4) |
 | **V** | Post-verify what has landed unposted | — |
 | **6** | Clarity | 1–5 |
 | **7** | Documents, once | 1–6 |
 
 **Step 1 is first among the code steps because it is the only one that can invalidate the
-others.** Steps 3 and 4 assume F360 emits a multi-WCS job a particular way, read from Autodesk's
+others.** Step 4 assumes F360 emits a multi-WCS job a particular way, read from Autodesk's
 post source rather than observed. **Step 5 is independent** and can run in parallel.
 
 ---
@@ -72,44 +73,6 @@ post source rather than observed. **Step 5 is independent** and can run in paral
   findings the runs exposed, not row failures.
 - **Done when** — six posted files exist; every §4.1 row ticked or carrying a finding. **Five
   exist**; `PA1` is the sixth and is the only job still to be built.
-
-## Step 3 — Marlin multi-WCS: delete Guard C, add a version floor
-
-- **Goal** — Marlin users can run multi-WCS jobs, above a stated firmware version.
-- **Why** — Marlin with `CNC_COORDINATE_SYSTEMS` has **nine** WCS registers, individually
-  selectable, persistent with EEPROM. Guard C's message — *"Marlin has a single coordinate
-  frame"* — is **a false statement emitted to the user**, and `design.md` is its source. The
-  post already cited the same build flag correctly for `G53` forty lines above.
-- **Where** — Guard C :1689-1694; RepRap-only slot gate :1709-1712; write dialect in
-  `writeWCS()` :1860; `probeOnChange`'s description :416, which **asserts the false claim to
-  the operator**.
-- **The change** — delete Guard C; slot gate becomes "not GRBL"; **keep the write dialect**
-  (`G10 L20 P<n>` on GRBL/RepRap, `G5x` then `G92` on Marlin — Marlin can only write the
-  *active* register, and only positionally, but for *selection* there is full parity and
-  selection is all a multi-WCS job needs); **state a minimum firmware version**; and record
-  that **on Marlin, homing silently detaches the program from its own work origin** —
-  `set_axis_is_at_home()` zeroes `position_shift` and re-sending `G54` does not restore it.
-- **Guard C is not the only refusal, and deleting it alone changes nothing.** A multi-part job
-  needs a fixed Z frame, and on Marlin the job falls through Guard C into **Guard B**, refused
-  either way. **The frame question is a design question, not a
-  firmware limit** — Marlin homes Z, and until the job's first `G92` its one frame *is* the
-  machine frame; it is the post's own origin write that ends the correspondence. `design.md` →
-  *The fixed Z reference is the machine's own homed Z* states it exactly. Two candidate routes, neither settled:
-  a flow that never writes `G92 Z`, or cancelling the shift — **and whether Marlin implements
-  `G92.1` is not in this record; settle it from source before either is designed.** The
-  homing route is poisoned independently: `G28 Z` re-establishes the frame but
-  `set_axis_is_at_home()` zeroes `position_shift`, detaching the job from the origins it is
-  traversing between.
-- **Settle what Marlin multi-WCS is *for* before writing code** — a real frame, or a refusal
-  whose message is finally true. Guard C's text is a false statement either way, so it is worth
-  fixing even if the answer is that the refusal stands.
-- **Blocked on the version floor.** `CNC_COORDINATE_SYSTEMS` is a build option, and Marlin
-  issue **#14743** reported `G92` inside `G54` corrupting the `G53` origin. **Establishing
-  which release fixed it is a prerequisite, not a documentation afterthought** — and it is the
-  one question the assessment could not close.
-- **Done when** — a two-WCS Marlin job posts; `design.md`'s Marlin row **rewritten, not
-  annotated**; the version floor is in the property description; the homing hazard is in
-  `design.md`'s firmware table.
 
 ## Step 4 — Group 5: keep the touch-off, delete the orchestration
 
@@ -190,7 +153,7 @@ and it proves logic only, never output.
 
 Only after 1–5, because they delete much of what would otherwise be tidied.
 
-- `validateJob()` was **288 lines**; Step 2 removed ~90 and Step 3 removes ~6. **Re-measure
+- `validateJob()` was **288 lines**; Steps 2 and 3 removed ~100 of it. **Re-measure
   before restructuring** — it may not need it.
 - The property block is **795 lines, 21% of the file.** Steps 2 and 4 remove ~150 of
   description alone. Re-measure.
@@ -232,7 +195,6 @@ The guides are off-limits during code changes. Do it all here — per-step means
 |---|---|---|
 | `probeOnChange` + 4 Jog modes (Step 4) | ~100 | Low |
 | `toolChangeDisableZStepper` + `M84 Z` | ~12 | None — it is a hazard |
-| Guard C (Step 3) | ~6 | Low — it blocks supported behaviour |
 | Group 10 (Duet) folded | ~20 | Very low |
 | Group 9 coolant surplus | ~50 | Low — pending a coolant persona |
 
@@ -240,11 +202,8 @@ The guides are off-limits during code changes. Do it all here — per-step means
 
 | Blocked | Waiting on |
 |---|---|
-| Step 4 | Step 3 |
-| Step 3's version floor | the Marlin changelog for #14743 |
 | Step 5's verification | a full-licence posted two-tool file |
 | Step 5's Flow 2 | which token the sender keys on — `findings.md` §6 |
-| Step 3's goal, not just its floor | an answer for Marlin's cross-part Z — see Step 3 |
 | Group 9 reduction | a coolant persona |
 | Group 8 audit | laser detail — power scaling, dynamic power, enable sequencing, air assist |
 | A status line in `guide-pro.md` | **deferred by the author 2026-08-13** |
@@ -289,6 +248,14 @@ at all. Filed as **`PR-14`** — error *text*, not logic. The author's verdict, 
 failed post was operator error, and the route to the setting is the separate issue. **It did
 what the critical path promised — it invalidated part of Steps 1–4's premise before any of it
 was built.**
+
+**Step 3 — Marlin multi-WCS ✅ closed 2026-08-14.** Guard C is gone: its message, *"Marlin has a
+single coordinate frame"*, was a false statement emitted to the user. `gcode.cpp` 2.1.2.5 puts
+`G54`–`G59` in the same `#if ENABLED(CNC_COORDINATE_SYSTEMS)` as `G53`, and `G92` under it writes
+the **active** workspace's own register — so selection has full parity and the write dialect is all
+that differs. **The version floor is 2.0.9.7**, the oldest release at which both files were read;
+`#14743` cannot reproduce against that code. A Marlin multi-part job is now refused by exactly one
+thing, Guard B, on the same terms as every other firmware.
 
 **Step 2 — retire the spoilboard base ✅ closed 2026-08-14.** One fixed Z reference survives:
 the machine's own homed Z, addressed with `G53`, opted into by filling `Machine Travel Z` in

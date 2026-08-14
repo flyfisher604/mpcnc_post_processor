@@ -27,9 +27,15 @@ is no tool-length system at all** — no TLO, no tool setter — so a work-Z re-
 the substitute, and **X/Y is never probed**.
 
 - **Persistence:** WCS origins are written with `G10 L20 P<n>` on GRBL/RepRap — scoped to that WCS's own
-  register. `P` maps 1:1 to Fusion's `workOffset` (P1–P6 = G54–G59; P7–P9 = G59.1–G59.3, RepRap only).
-- **Marlin is single-frame:** no per-WCS registers, so one global `G92` origin. A Marlin job using more
-  than one distinct work offset is a hard error (Guard C).
+  register, so the write names its target and cannot leak. `P` maps 1:1 to Fusion's `workOffset`
+  (P1–P6 = G54–G59; P7–P9 = G59.1–G59.3, not on GRBL).
+- **Marlin has nine registers too, behind one build option.** `CNC_COORDINATE_SYSTEMS` gates `G53`
+  *and* `G54`–`G59` in a single `#if`, so the machine frame and the work offsets arrive together. What
+  differs is **addressing, not capability**: `G92` writes the **active** workspace and only
+  positionally, where `G10 L20 P<n>` names its target. That makes *the origin write targets the active
+  WCS* a precondition on Marlin, enforced as an internal error rather than left to hold by luck.
+  **Guard C is gone** — its message, *"Marlin has a single coordinate frame"*, was false. Verified at
+  **2.0.9.7 and 2.1.2.5**; nothing read below that, so that is the floor.
 - **`workOffset 0`** is Fusion's "default / unset", **not** a request for `G53`; it aliases to WCS 1 /
   `G54`, and must alias identically everywhere, or two paths disagree about which frame a section is in.
 - Undefendable by any post: an operator typing `G55` into the console *mid-run*. Out of scope.
