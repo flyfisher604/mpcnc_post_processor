@@ -418,15 +418,15 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**⬜ 51 UNRUN · ❌ 0 FAIL · ➖ 1 n/a — 52 rows.** **§4.1 is nearly closed** — `PB1`, `PB2`, `PBV1`,
+**⬜ 55 UNRUN · ❌ 0 FAIL · ➖ 1 n/a — 56 rows.** **§4.1 is nearly closed** — `PB1`, `PB2`, `PBV1`,
 `PBV2`, `PBV3`, `M1`, `M2` and `M4` passed 2026-08-14 and are in §5. **Three of the four boundary
 dispatches are proved**; what is left is `PA1`/`PA1b`, the offset variants `P2`/`P3`, and `M3`.
 **No row exercises a tool change** — the nine that did were deleted with the design they tested,
 and their replacements are written as `plan.md` Step 5 lands.
 
-**The five `S2` rows are the debt the base's retirement created**, and `S2a` is the one that
-protects every hobbyist job: with the field empty nothing changed, and only a posted file can
-say so.
+**The `S2` and `S3` rows are this step's debt** — five for the base's retirement, four for
+Marlin gaining the frame. `S2a` is the one that protects every hobbyist job: with the field
+empty nothing changed, and only a posted file can say so.
 
 **Eight rows went with the spoilboard base**, deleted rather than run: `P5`, `P9`, `PR-3`,
 `PR-8a`, `PR-16`, `HR-26`, `J3` and `PR-5a` — the last being the enum flip, and there is no
@@ -470,6 +470,10 @@ posted file can show it.
 | **S2c** | **Guard B refuses a multi-part job on a machine declared not homed**, where reserving a base used to post it — aborts in `onOpen()` with **no file**, naming `Machine Travel Z` and group 4 | 2 WCS, `Axes Homed and Trusted` = `None` | posted | — | ⬜ |
 | **S2d** | **Guard B's X/Y half is its own refusal** — a `Z Only` machine with the height filled is refused for the *stored offsets*, not for the frame, and the two messages are distinguishable | 2 WCS, `Axes Homed and Trusted` = `Z Only`, `Machine Travel Z` = `-10` | posted | — | ⬜ |
 | **S2e** | **The frame is Z-only** — a **single-part** job on a `Z Only` machine posts *with* the frame, which `S2d` refuses only because it is multi-part | one WCS, `Axes Homed and Trusted` = `Z Only`, `Machine Travel Z` = `-10` | posted | — | ⬜ |
+| **S3a** | **Marlin gets the frame, warned in both channels** — a `G53 G0 Z<n>` establish, the `CNC_COORDINATE_SYSTEMS` warning in the Fusion dialog **and** as a `>>> WARNING:` in the file, and the job posts rather than being refused | Marlin, one WCS, `Axes Homed and Trusted` = `XYZ`, `Machine Travel Z` = `-10` | posted | — | ⬜ |
+| **S3b** | **Every `G53` on Marlin is followed by a `G5x` re-select**, and it is `currentWorkOffset`'s own — the discriminator is that it is **not** hard-coded `G54` on a job whose active offset is `G55` | as S3a plus a Setup on work offset 2, then the end park with `At End Park At` = `Machine X0 Y0` | posted | — | ⬜ |
+| **S3c** | **GRBL emits no re-select** — the same job on GRBL has a bare `G53` block and nothing after it, so the restore is Marlin-only | S3a's job, firmware GRBL | posted | — | ⬜ |
+| **S3d** | The unhomed-frame warning now fires on **Marlin as well as RepRap**, and stays **silent on GRBL** | `Machine Travel Z` filled, `Home at Job Start` = `Off`, each firmware in turn | posted | — | ⬜ |
 | **PR-6a** | The machine park emits `G53 G0 X0 Y0` as its own block, X/Y only | GRBL, `XY Only` + `Home`, park `Machine X0 Y0` | posted | — | ⬜ |
 | **PR-6b** | The **Marlin** route is `G28 X` / `G28 Y`, and needs no prior homing | Marlin, `XY Only`, `Home at Job Start` = **`Off`**, park `Machine` | posted | — | ⬜ |
 | **PR-6c** | The machine park retracts first where a fixed Z reference exists | PR-6a + `Machine Travel Z` filled | posted | — | ⬜ |
@@ -746,7 +750,7 @@ None is a defect; none is scheduled.
    rule is currently unmet. **Three deliberate exceptions**, each stating why in its own row:
    `PR-15`, whose code is being replaced, and `PR-16` and `HR-26`, which **closed by deletion**
    and owe no row at all.
-2. **Every one of the 51 unrun rows.** §4.1 is the largest untested area in the post and
+2. **Every one of the 55 unrun rows.** §4.1 is the largest untested area in the post and
    needed a job nobody had built. **That blocker is down** — a multi-WCS job was built on
    2026-08-13 from **Multiple WCS Offsets** (one Setup, a checkbox and an instance count) and
    posted three times. Whether it substitutes for rows written around *Replicate*

@@ -304,7 +304,7 @@ properties = {
   // very much included.
   machineTravelZ: {
     title      : "Machine Travel Z",
-    description: "The height the tool holds while it travels -- an ABSOLUTE MACHINE COORDINATE, in mm, signed. FILLING THIS FIELD IS WHAT GIVES THE JOB A FIXED Z REFERENCE: a frame whose Z0 does NOT move with stock thickness, and therefore the only frame in which one clearance height is meaningful across parts of differing thickness. Leave it EMPTY (the default) and the job has no such frame -- the right answer for an ordinary single-part job, and what leaves a factory-default file unchanged. Requires Axes Homed and Trusted above to include Z. A MULTI-PART JOB CANNOT POST WITHOUT IT: the tool must clear the fixtures on its way between parts, and no single clearance height is meaningful across WCS whose origins are only known after probing at runtime. A single-part job is never refused for want of it, and gains two things when it is filled -- a real absolute Z on the way to the first part instead of a warning, and a retract before an At End Park At = Machine X0 Y0 crossing. GET IT ONCE PER MACHINE: home, jog to a height that visibly clears every fixture, clamp and part on the bed, and read Z off your sender's DRO -- no touch-off and no arithmetic. It is often negative, which is normal and needs no adjusting: on a stock GRBL build the machine zeroes into negative space after homing, so Z0 is the TOP of travel. The value is echoed in the file's Resolved Values block, so check it there before the machine moves. THIS NUMBER BELONGS TO THE MACHINE, NOT TO THE JOB -- unlike every other height in this dialog it does NOT stay correct when a Setup is copied or a design is shared, so re-read it on any machine that is not the one it was measured on. A wrong value sends the tool to a wrong height at travel speed.",
+    description: "The height the tool holds while it travels -- an ABSOLUTE MACHINE COORDINATE, in mm, signed. FILLING THIS FIELD IS WHAT GIVES THE JOB A FIXED Z REFERENCE: a frame whose Z0 does NOT move with stock thickness, and therefore the only frame in which one clearance height is meaningful across parts of differing thickness. Leave it EMPTY (the default) and the job has no such frame -- the right answer for an ordinary single-part job, and what leaves a factory-default file unchanged. Requires Axes Homed and Trusted above to include Z. A MULTI-PART JOB CANNOT POST WITHOUT IT: the tool must clear the fixtures on its way between parts, and no single clearance height is meaningful across WCS whose origins are only known after probing at runtime. A single-part job is never refused for want of it, and gains two things when it is filled -- a real absolute Z on the way to the first part instead of a warning, and a retract before an At End Park At = Machine X0 Y0 crossing. GET IT ONCE PER MACHINE: home, jog to a height that visibly clears every fixture, clamp and part on the bed, and read Z off your sender's DRO -- no touch-off and no arithmetic. It is often negative, which is normal and needs no adjusting: on a stock GRBL build the machine zeroes into negative space after homing, so Z0 is the TOP of travel. ON MARLIN THIS NEEDS A FIRMWARE BUILD OPTION -- G53 sits behind CNC_COORDINATE_SYSTEMS, which is off in a stock configuration; the post assumes you compiled it in and says so in the file, because it cannot read your build. The value is echoed in the file's Resolved Values block, so check it there before the machine moves. THIS NUMBER BELONGS TO THE MACHINE, NOT TO THE JOB -- unlike every other height in this dialog it does NOT stay correct when a Setup is copied or a design is shared, so re-read it on any machine that is not the one it was measured on. A wrong value sends the tool to a wrong height at travel speed.",
     group      : "machine",
     order      : 20,
     type       : "string",
@@ -1459,11 +1459,7 @@ function validateJob() {
       + "at whatever height the tool is left at -- position it clear of the stock, clamps and "
       + "fixtures before starting the program. The probe that follows searches \"G38 Target\" DOWN FROM "
       + "that height, so set the target deep enough to reach the stock from where you leave the tool."
-      // The closing recommendation is actionable only where the operator can make
-      // fixedZEstablishedInFile() true, and on Marlin they cannot.
-      + (fw == eFirmware.MARLIN
-        ? " Marlin has no fixed Z reference this post can establish, so that start height is yours to set."
-        : " \"Machine Travel Z\" removes both, by establishing a Z the post can move in itself.")));
+      + " \"Machine Travel Z\" removes both, by establishing a Z the post can move in itself."));
   }
 
   // The machine park crosses the bed, and writeMachineParkXY() can retract first only in a frame THIS
@@ -1478,15 +1474,17 @@ function validateJob() {
 
   // The machine-Z frame is addressed with an absolute G53 rapid, and "Home at Job Start" is NOT required
   // for it -- the group-4 declaration is the trust assertion. The firmware decides whether that is
-  // enough: with homing enabled Grbl 1.1 comes up in Alarm and refuses all motion until homed, so a
-  // stale declared frame cannot execute there. RepRap/RRF has no equivalent lock, which makes it the one
-  // target where the assertion can be false and the machine still moves. Marlin never reaches here.
-  if (fw == eFirmware.REPRAP && fixedZEstablishedInFile() && !homesAtJobStart()) {
+  // enough, and GRBL is the only one that decides in the operator's favour: with homing enabled Grbl 1.1
+  // comes up in Alarm and refuses all motion until homed, so a stale declared frame cannot execute
+  // there at all. RepRap/RRF has no equivalent lock, and Marlin's is NO_MOTION_BEFORE_HOMING, a build
+  // option this post cannot read -- so both are targets where the assertion can be false and the
+  // machine still moves.
+  if (fw != eFirmware.GRBL && fixedZEstablishedInFile() && !homesAtJobStart()) {
     warning(localize("This job moves in the machine's own Z frame (G53), but \"Home at Job Start\" is "
       + "Off, so those moves are measured against whatever machine zero the board currently holds "
-      + "rather than one this job established. RepRap runs them either way -- it has no unhomed lock. "
-      + "Home the machine at the controller before starting this file, or set \"Home at Job Start\" "
-      + "to Home."));
+      + "rather than one this job established. " + fw + " may well run them anyway -- unlike GRBL it "
+      + "has no unconditional lock on motion before homing. Home the machine at the controller before "
+      + "starting this file, or set \"Home at Job Start\" to Home."));
   }
 
   // Post-time half of toolChange()'s suppression warning, so it reaches Fusion's dialog and not
@@ -1539,11 +1537,16 @@ function validateJob() {
   // refuses all motion until homed, so a stale frame cannot execute on the default firmware at all.
   // RepRap has no such lock and is warned above.
   if (parseMachineTravelZ() != undefined) {
-    // Marlin/src/gcode/gcode.cpp (2.1.x) gates "case 53: G53();" inside CNC_COORDINATE_SYSTEMS, so a
-    // single-WCS Marlin job would pass every other guard and still be unable to execute the move.
+    // ASSUMED, NOT REFUSED. Marlin/src/gcode/gcode.cpp (2.1.2.5) gates "case 53:" through "case 59:"
+    // inside one #if ENABLED(CNC_COORDINATE_SYSTEMS), off by default -- so a Marlin build either has
+    // the machine frame AND the WCS registers, or neither. The post cannot read the build, and
+    // refusing would deny the frame to every correctly configured CNC Marlin, so it warns.
     if (fw == eFirmware.MARLIN) {
-      error("\"Machine Travel Z\" is addressed with G53, which is a build option on Marlin (CNC_COORDINATE_SYSTEMS) and off by default -- clear the field, or post this job for GRBL or RepRap.");
-      return;
+      warning(localize("This job moves in the machine's own Z frame with G53, which on Marlin is the "
+        + "build option CNC_COORDINATE_SYSTEMS and is OFF in a stock configuration. The post assumes "
+        + "your firmware was compiled with it; if it was not, Marlin reports G53 as an unknown command "
+        + "and every travel-height move is silently skipped, leaving the tool wherever the last "
+        + "operation ended. Check the build before running this file, or clear \"Machine Travel Z\"."));
     }
     if (!machineHomesZ()) {
       error("\"Machine Travel Z\" is a height in the machine's own homed Z frame, so it requires \"Axes Homed and Trusted\" to include Z -- declare that this machine homes Z, or clear the field.");
@@ -1872,11 +1875,16 @@ function writeWcsOrigin(wcsNumber, x, y, z) {
 // requirement belongs to the MULTI-PART WORKFLOW -- traverses between stored work offsets -- and is
 // enforced once, on Guard B in validateJob(). "Home at Job Start" is NOT required either: the group-4
 // declaration is the trust assertion, and the firmware carries the rest (see the unhomed warning in
-// validateJob()). Marlin is excluded: G53 is a build option there (CNC_COORDINATE_SYSTEMS), off by
-// default. Named "InFile" because every consumer reasoning about WHERE THE TOOL IS asks whether this
-// file established the frame, not what the dialog was set to.
+// validateJob()). Named "InFile" because every consumer reasoning about WHERE THE TOOL IS asks whether
+// this file established the frame, not what the dialog was set to.
+//
+// ALL THREE FIRMWARES, Marlin included. On Marlin G53 is behind CNC_COORDINATE_SYSTEMS, off by
+// default, so the post ASSUMES the operator compiled it in and warns rather than refusing -- see the
+// warning in validateJob(). That is one build option and it carries the whole Marlin story: gcode.cpp
+// (2.1.2.5) puts "case 53:" through "case 59:" inside a single #if, so the machine frame and the WCS
+// registers arrive together or not at all.
 function fixedZEstablishedInFile() {
-  return fw != eFirmware.MARLIN && machineHomesZ() && parseMachineTravelZ() != undefined;
+  return machineHomesZ() && parseMachineTravelZ() != undefined;
 }
 
 // The group-4 declaration, split back into the two axis questions every consumer actually asks: the
@@ -1927,31 +1935,65 @@ function wcsGcode(workOffset) {
   return undefined;
 }
 
-// The ONE machine-frame move this post emits: a rapid to the declared "Machine Travel Z", addressed
-// absolutely with G53. Two conditions come from G53's own definition: it "is not modal and must be
-// programmed on each line", so nothing may be appended to this block and a future X/Y park must be a
-// SECOND block rather than a three-axis diagonal; and "it is an error if G53 is used without G0 or G1
-// being active", so the G0 goes through gFormat and NOT gMotionModal, which would suppress the word
-// exactly when G0 is already active. The resets bracket it because a machine-frame move invalidates
-// the tracked work-frame coordinates and motion mode.
+// EVERY machine-frame move in this post goes through here, so the two call sites -- the travel-Z
+// retract and the X/Y park -- cannot come to differ about how G53 is emitted. Pass the axis words
+// already formatted; this adds G53 G0 and the feedrate.
+//
+// ONE BLOCK, ALWAYS, and now for two independent firmware reasons:
+//
+//   GRBL / LinuxCNC / RRF -- G53 "is not modal and must be programmed on each line", and "it is an
+//   error if G53 is used without G0 or G1 being active". So nothing may be appended to this block, a
+//   Z move and an X/Y park must be two blocks rather than one three-axis diagonal, and the G0 goes
+//   through gFormat and NOT gMotionModal, which would suppress the word exactly when G0 is already
+//   active.
+//
+//   Marlin -- G53() (Marlin/src/gcode/geometry/G53-G59.cpp, identical at 2.0.9.7 and 2.1.2.5) saves
+//   active_coordinate_system, calls select_coordinate_system(-1), and restores it INSIDE
+//   "if (parser.chain())". A G53 chained with its motion on one line therefore restores itself; a
+//   BARE G53 on its own line leaves native space active for the rest of the job.
+//
+// The Marlin restore below is belt-and-braces on top of that, and it is not idle: the two reports of
+// G53 misbehaving there -- issues 13843 and 14743, one of them from an operator on an MPCNC Marlin
+// fork -- were both closed WITHOUT a fix commit, 13843 by a stale-bot for inactivity. So the post
+// re-selects the active work offset itself rather than trusting a restore no commit ever landed. It
+// re-selects currentWorkOffset's OWN G5x and never a fixed G54, which would be the wrong register on
+// any job whose active offset is not the first.
+//
+// The resets bracket it because a machine-frame move invalidates the tracked work-frame coordinates
+// and motion mode.
+function writeMachineFrameBlock(axisWords, feedMmPerMin) {
+  resetAll();
+  writeBlock(gFormat.format(53), gFormat.format(0), axisWords[0], axisWords[1],
+    fFormat.format(propertyMmToUnit(feedMmPerMin)));
+  if (fw == eFirmware.MARLIN && currentWorkOffset != undefined) {
+    var restore = wcsGcode(currentWorkOffset);
+    if (restore != undefined) {
+      writeComment(eComment.Debug, " writeMachineFrameBlock: re-selecting " + gFormat.format(restore)
+        + " -- Marlin restores a CHAINED G53 itself, but no fix commit exists for the reports that it does not");
+      writeBlock(gFormat.format(restore));
+    }
+  }
+  resetAll();
+  gMotionModal.reset();
+}
+
+// A rapid to the declared "Machine Travel Z", addressed absolutely with G53.
 function writeMachineTravelZ(reason) {
   var z = machineTravelZ();
   writeComment(eComment.Info, "   " + reason + " -- machine Z " + xyzFormat.format(z));
-  resetAll();
-  writeBlock(gFormat.format(53), gFormat.format(0), zFormat.format(z),
-    fFormat.format(propertyMmToUnit(getProperty(properties.feedsTravelSpeedZ))));
-  resetAll();
-  gMotionModal.reset();
+  writeMachineFrameBlock([zFormat.format(z), undefined],
+    getProperty(properties.feedsTravelSpeedZ));
   flushMotions();
 }
 
 // Park at the machine's own X0 Y0 -- the homing corner -- as the last motion of the job. Two firmware
-// routes, and not the same KIND of operation, which is why this feature's guard is firmware-dependent
-// where the machine-Z datum's is a flat exclusion. GRBL/RepRap emit "G53 G0 X0 Y0", an absolute rapid
-// ADDRESSING a frame the job must already have established, X/Y only. Marlin emits "G28 X / G28 Y",
-// which RE-ESTABLISHES the frame instead -- self-establishing, but a homing cycle rather than a rapid.
-// Arithmetic is not a third route: the G92 work frame differs from the machine frame by an offset the
-// post never knew and cannot read back.
+// routes, and not the same KIND of operation, which is why this feature's guard is firmware-dependent.
+// GRBL/RepRap emit "G53 G0 X0 Y0", an absolute rapid ADDRESSING a frame the job must already have
+// established, X/Y only. Marlin emits "G28 X / G28 Y", which RE-ESTABLISHES the frame instead --
+// self-establishing, so it needs neither prior homing nor a build option, at the cost of being a homing
+// cycle rather than a rapid. THAT TRADE IS STILL WORTH IT even now that the Z retract above may emit
+// G53 on Marlin: the retract has no alternative, this does. Arithmetic is not a third route -- the G92
+// work frame differs from the machine frame by an offset the post never knew and cannot read back.
 function writeMachineParkXY() {
   // Retract before crossing the bed -- potentially a full diagonal. Only a job that ESTABLISHED a
   // fixed Z reference can retract at all, which is what fixedZEstablishedInFile() answers.
@@ -1971,13 +2013,10 @@ function writeMachineParkXY() {
   }
 
   writeComment(eComment.Info, "   Park at machine X0 Y0");
-  resetAll();
   // The F word is not optional even on a G0: where the modal feedrate is honoured for G0, an F-less
-  // rapid crosses the bed at the last CUT's feed. resetAll() just cleared it, hence fFormat.
-  writeBlock(gFormat.format(53), gFormat.format(0), xFormat.format(0), yFormat.format(0),
-    fFormat.format(propertyMmToUnit(getProperty(properties.feedsTravelSpeedXY))));
-  resetAll();
-  gMotionModal.reset();
+  // rapid crosses the bed at the last CUT's feed. writeMachineFrameBlock() clears it first, hence fFormat.
+  writeMachineFrameBlock([xFormat.format(0), yFormat.format(0)],
+    getProperty(properties.feedsTravelSpeedXY));
 }
 
 // A 3-axis section can still be ORIENTED off machine +Z -- a Setup built on a model face rather than
@@ -2792,6 +2831,13 @@ function writeFixedZReference() {
   writeComment(eComment.Debug, " writeFixedZReference: " + (established ? "machine Z" : "none"));
   if (!established) {
     return;
+  }
+  // The in-file half of validateJob()'s Marlin warning, so a file read on its own carries the
+  // assumption its motion depends on. Once, at the establish, rather than at every G53.
+  if (fw == eFirmware.MARLIN) {
+    writeWarning("every G53 below assumes this Marlin was compiled with CNC_COORDINATE_SYSTEMS,"
+      + " which is off in a stock configuration -- without it G53 is an unknown command and every"
+      + " travel-height move in this file is skipped, leaving the tool where the last operation ended");
   }
   writeComment(eComment.Important, " Establish fixed Z reference -- homed machine Z");
   writeMachineTravelZ("Move to the travel height in the machine frame");

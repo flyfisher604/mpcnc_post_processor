@@ -130,23 +130,37 @@ Z trustworthy and nothing else, so a single-part job on a `Z Only` machine may u
 X/Y zero is *traversing between stored work offsets*, which is multi-part work — so that requirement sits
 on Guard B as a **second, separately worded refusal**, and the frame predicate carries no trace of it.
 
-**Marlin can have a homed Z. What it loses is the ability to keep addressing it.** Homing per axis is a
-*machine* capability, and Marlin has it outright — `G28 Z` is genuinely independent there (firmware table
-below). Immediately after homing, Marlin's single frame **is** the machine frame, and a plain `G0 Z<n>` is
-an absolute machine-frame move needing neither `G53` nor a build option. **The post is what breaks the
-correspondence**, and it is the firmware table's own finding: on Marlin an origin is not a register write
-but a *frame shift* — `writeWcsOrigin()` emits `G92 X Y Z` at the current position — so from the first Z
-origin a job establishes, `position_shift` carries an offset the post never knew and cannot read back, and
-`G0 Z<n>` has become a work-frame move. Every mode that establishes a Z0 does this, and a multi-part job on
-Marlin has no alternative to it, there being no per-WCS register to select instead.
+**Marlin has the frame too, and it costs one build option.** `Marlin/src/gcode/gcode.cpp` (2.1.2.5) puts
+`case 53:` through `case 59:` inside a **single** `#if ENABLED(CNC_COORDINATE_SYSTEMS)`, so a Marlin build
+has the machine frame **and** the nine WCS registers together, or neither. That is one question, not two,
+and **the post assumes the answer is yes and warns rather than refusing** — in the dialog and again in the
+file. Refusing would deny the frame to every correctly configured CNC Marlin, and the post cannot read a
+build; a warning beside a working file is the honest trade. Without the option, `G53` is an unknown command
+and the travel moves are skipped — which is what the warning says, in those words.
 
-So the constraint is narrower and sharper than *Marlin has no frame*: **the machine frame survives on
-Marlin exactly until the job sets its first Z origin**, and `G53` — the only way to address it afterwards —
-is behind `CNC_COORDINATE_SYSTEMS`, off by default. **Guard B therefore still refuses a Marlin multi-part
-job**, but for a reason Step 3 can attack rather than a firmware dead end: whether a flow exists that keeps
-the correspondence — one that never writes `G92 Z`, or that cancels the shift — is an open design question.
-**Whether Marlin implements `G92.1` at all is not in this record and must be settled from source**, and no
-design may assume it either way until it is.
+> **This corrects the record twice.** An origin write on Marlin is **not** merely a global frame shift:
+> under the same option `G92` runs `coordinate_system[active_coordinate_system] = position_shift` behind a
+> `WITHIN()` bounds check (`src/gcode/geometry/G92.cpp`, in **2.0.9.7 and 2.1.2.5** alike), so `G5x` then
+> `G92` is a real per-WCS register write into the *active* slot. And `G53` reaches native space
+> **regardless of any `G92`**, because it selects `-1` for its own line. So the old claim that *the machine
+> frame survives only until the job sets its first Z origin* was wrong, and with it the conclusion that
+> Marlin multi-part work was a dead end. **`G92.1` also exists** there, under
+> `ENABLED(CNC_COORDINATE_SYSTEMS) && !IS_SCARA` — the open question this record carried is closed.
+
+**One `G53`, one block, and on Marlin a `G5x` after it.** `G53()` saves `active_coordinate_system`, calls
+`select_coordinate_system(-1)`, and restores it **inside `if (parser.chain())`** — byte-identical at
+2.0.9.7 and 2.1.2.5. So a `G53` chained with its motion on one line restores itself, and **a bare `G53` on
+its own line leaves native space active for the rest of the job**. The post never emits the bare form, for
+this reason and for GRBL's separate one (`G53` is not modal, and is an error without `G0`/`G1` active) —
+**one rule, two firmware justifications, and neither may be dropped without the other being checked**.
+
+The re-select the post adds on top is **belt-and-braces against reports that were never closed**. Marlin
+issues **13843** and **14743** both describe `G53` failing to reach native space, and both were closed
+**without a fix commit** — 13843 by a stale-bot for inactivity, its reporter running *an MPCNC Marlin
+fork*, which is this post's own audience. The current source is correct by inspection, but "correct by
+inspection with two unclosed reports against it" is not the same as fixed. So the post re-selects
+`currentWorkOffset`'s **own** `G5x` — never a fixed `G54`, which would be the wrong register on any job
+whose active offset is not the first.
 
 > **Retired: the spoilboard base** — a surface probed into a reserved WCS, with the clearance read as a
 > positive height above it. It was the **non-homing** machine's route to a frame, and it goes because
@@ -212,9 +226,12 @@ each is a place a one-dialect assumption would have shipped a wrong motion:
 
 | Question | Answer |
 |---|---|
-| `G53` per firmware | GRBL 1.1 supports it (above). **Marlin gates `case 53:` behind `CNC_COORDINATE_SYSTEMS`, off by default** (`gcode.cpp` 2.1.x) — so a *single-WCS* Marlin job passes Guard C and still cannot execute the move: that exclusion is separate, not inherited. It is also **not modal — program it on every line**, and an error without `G0`/`G1` active (LinuxCNC; RRF the same), so a split Z-then-XY move carries `G53` twice |
+| `G53` per firmware | GRBL 1.1 supports it (above). **Marlin gates `case 53:` behind `CNC_COORDINATE_SYSTEMS`, off by default** (`gcode.cpp` 2.1.2.5) — but so are `case 54:` … `case 59:`, in the **same** `#if`, so the frame and the registers are one decision and the post assumes and warns rather than refusing. It is also **not modal — program it on every line**, and an error without `G0`/`G1` active (LinuxCNC; RRF the same), so a split Z-then-XY move carries `G53` twice |
 | Reaching machine X0 Y0 **without** `G53` | **`G28 X` / `G28 Y` does it on Marlin** — it does not *address* the machine frame, it **re-establishes** it, so it needs no build option and no prior homing. The costs are that it is a homing cycle rather than a rapid, and that the same trick is **unsafe on GRBL**: one `$H` homes whatever that build was compiled to home (per-axis `$HX`/`$HY` sit behind `HOMING_SINGLE_AXIS_COMMANDS`, off by default), so it can drive **Z**. Hence `G53` on GRBL/RRF and `G28 X Y` on Marlin |
-| Is Marlin's one frame the machine frame? | **Only until the post writes an origin.** `writeWcsOrigin()` uses `G92` on Marlin, issued *at the current position*, so from the first section on, work X0 Y0 and machine X0 Y0 differ by an offset the post never knew — and cannot read back. Undoing it arithmetically is therefore not a route to the machine frame there |
+| Is Marlin's one frame the machine frame? | **Wrong question, and the earlier answer here was wrong.** With `CNC_COORDINATE_SYSTEMS` Marlin has nine workspaces and `G53` reaches native space on any line, whatever `G92` did — `G53()` selects `-1` for the duration of its own chained command. Work X0 Y0 and machine X0 Y0 still differ by an offset the post cannot read back, so *arithmetic* is still not a route; `G53` is, and it is the one the post takes. Read 2026-08-14, `src/gcode/geometry/G53-G59.cpp` + `gcode.cpp`, 2.1.2.5 |
+| Does Marlin's `G53` restore the workspace after its line? | **Only when chained.** `G53()` saves `active_coordinate_system`, calls `select_coordinate_system(-1)`, and restores **inside `if (parser.chain())`** — so `G53 G0 Z-10` restores itself and a **bare `G53` never does**, leaving native space active for the rest of the job. Byte-identical at **2.0.9.7 and 2.1.2.5**. Issues **13843** and **14743** report it failing even chained; both were closed **with no fix commit** (13843 by a stale-bot, its reporter on an MPCNC Marlin fork), so the post re-selects the active `G5x` itself. `src/gcode/geometry/G53-G59.cpp` |
+| Can Marlin write a *per-WCS* origin? | **Yes, under the same option.** `G92` runs `coordinate_system[active_coordinate_system] = position_shift` behind a `WITHIN()` bounds check, so `G5x` then `G92` writes the selected register, positionally, and persistently. **Corrects the standing "Marlin has one global origin" claim.** `G92.1` exists too, under `ENABLED(CNC_COORDINATE_SYSTEMS) && !IS_SCARA`. `src/gcode/geometry/G92.cpp`, **2.0.9.7 and 2.1.2.5** |
+| Does homing detach a Marlin job from its work origin? | **Not irrecoverably, on a CNC build.** `set_axis_is_at_home()` zeroes `position_shift[axis]` under `HAS_POSITION_SHIFT` but **never touches `coordinate_system[]`**, so re-sending `G5x` re-applies the stored origin. Without the build option there is no register and the shift is simply lost. **This narrows an earlier flat claim that re-sending `G54` does not restore it.** `src/module/motion.cpp`, 2.1.2.5 |
 | `G30` to store a park height | **Dead on all three.** GRBL/LinuxCNC: bare `G30` moves **X and Y too**, and `G30 Z<n>` rapids first to that Z *in the current WCS, offsets included*. Marlin and RRF: `G30` is a **single Z probe** — a plunge. Same trap `G80`–`G83` sets above |
 | Jogging at an `M0` pause | **Not possible on GRBL** — *"a jog command will only be accepted when Grbl is in either the 'Idle' or 'Jog' states"* (Grbl v1.1 Jogging), and `M0` is neither. Only RRF has a real jog-at-pause (`M291 … X1 Y1 Z1`) |
 | `G17` / `G94` off GRBL | **Neither is a free no-op.** Marlin compiles `G17` only under `CNC_WORKSPACE_PLANES` (shipped commented out in `Configuration_adv.h`) and has **no `G93`/`G94` at all** (`gcode.h` 2.1.x) — both reach `parser.unknown_command_warning()`. RRF has `G17` from 2.03 (`G18`/`G19` from 3.3) but gained `G93`/`G94` only in **3.5.1**, "experimentally", and **3.6.3** fixed inverse time mode not being reset at job start. So both stay GRBL-only, and the plane and feed mode a RepRap job inherits are a Start file's problem — `findings.md` HB-6 |
