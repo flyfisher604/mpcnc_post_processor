@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **61 findings — 35 fixed · 2 part-fixed ·
-2 closed by design · 1 withdrawn · 21 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **61 findings — 36 fixed · 2 part-fixed ·
+2 closed by design · 1 withdrawn · 20 open.** Test registers in §4 and §5.
 
 > Four ids — `HR-19`, `HR-22`, `HR-24`, `HR-27` — had **no row in any register** when this
 > file was built. They were carried in checkpoint prose and in `conventions.md`, and are
@@ -51,7 +51,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**21 open (one of them deferred) · 2 part-fixed — 23 entries.**
+**20 open (one of them deferred) · 2 part-fixed — 22 entries.**
 
 ### PR-15 — the tool-change code does not comply with the tool-change design — High
 
@@ -72,40 +72,6 @@ deleted rows contained.
 
 **Test.** **None, deliberately.** No row can be written against code that is being replaced;
 the rows belong to the rebuild and are written as it lands.
-
-### PR-17 — a `Machine Travel Z` at or above machine zero on GRBL is unreachable or on the switch, unwarned — Med-High
-
-**Problem.** The height is an absolute machine coordinate and the post cannot validate it — that is
-settled design (`design.md`, *transplant, not typing*). **But on GRBL the post holds one bit of
-evidence it does not use.** At Grbl's default `HOMING_FORCE_SET_ORIGIN` (off) the machine zeroes into
-negative space after `$H`, so every reachable Z is negative and a **positive** value is above the top
-of travel: with soft limits on it alarms at the first traverse, with them off it drives Z into its
-hard stop. A machine deliberately zeroed at the bed makes a positive value correct, and that is
-compile-time and unreadable — so this is a **warning, not a guard**. Nothing is emitted today:
-`Multi_WCS (PB1).gcode` posted clean with `1`.
-
-**Zero is not the ceiling — it is the switch.** Machine Z `0` is not the highest reachable height,
-it is the point at which the Z endstop *tripped*. With `HOMING_FORCE_SET_ORIGIN` off and the
-default `$23=0`, `limits_go_home()` (`grbl/limits.c`, Grbl 1.1f) ends the cycle by assigning
-`-homing_pulloff` — machine Z `-$27`, default `-1.000` — to the position one pull-off *below* the
-trigger, which fixes the trigger itself at machine Z `0` by construction. So `G53 G0 Z0` drives the
-axis back onto the switch it just released. Soft limits pass it: `system_check_travel_limits()`
-(`grbl/system.c`, 1.1f) rejects `target[idx] > 0`, and `0` is not `> 0`. With `$21=1` the switch is
-a live interrupt, so the traverse arrives exactly on the trip threshold and whether it ends in
-`ALARM:1` turns on switch repeatability — **worse than a reliable failure, not better**, because it
-survives the first parts and stops the job somewhere in the middle of the rest. **This is `CR-10`'s
-fact on the Z axis**, where `CR-10` has it on X/Y. The highest safe value is `-$27`, not `0`.
-
-**Reproduce.** GRBL, `Axes Homed and Trusted` = `XYZ`, two work offsets, `Machine Travel Z`
-positive — then `0`. `Multi_WCS (PB1).gcode`, 2026-08-14, posted clean at both values, under the
-field's old name.
-
-**Fix.** A post-time `warning()` in both channels on GRBL/FluidNC where the height is **`>= 0`**,
-naming `HOMING_FORCE_SET_ORIGIN` as the one configuration that makes a positive value right, and
-the homing pull-off as what makes `0` wrong on every configuration that does not. **Not an error**
-— the sign cannot be pinned, and `design.md` rejects the enum that tried. **`$27` cannot be read
-either**, so the text names the pull-off and never a number. **The field's rename and move have
-landed**, so this repair and one re-post baseline cover each other.
 
 ### PR-13 — group 11's Duet mode strings are RRF 2.x g-code — Low-Med
 
@@ -369,7 +335,7 @@ and fine.
 
 ## 3. Closed findings
 
-**35 fixed · 2 closed by design · 1 withdrawn — 38 rows.** Permanent: commit messages and
+**36 fixed · 2 closed by design · 1 withdrawn — 39 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -412,6 +378,7 @@ diagnosis, the diff and the argument.
 | **CR-13** | With `Retract Across Parts` off, the inter-part traverse height is resolved in one frame and emitted in another | Machine damage | `fbd1591` — the control is removed and Guard B is unconditional, so the arm is unreachable | ✅ |
 | **CR-14** | The base-establish tool-0 skip leaves the job believing a base was established | Machine damage | `348e35a` — the predicate now answers for the tool that must probe, plus a second guard | ✅ |
 | **PR-16** | `Home at Job Start` moves the tool off the parked spot the spoilboard base probe depends on, unwarned | High | **Closed by deletion** — the base establish, its probe and its operator precondition were removed rather than repaired. No repair exists and none is owed | ✅ |
+| **PR-17** | A `Machine Travel Z` at or above machine zero on GRBL is unreachable, or lands on the homing switch, unwarned | Med-High | A `>= 0` warning in both channels. **`>= 0` and not `> 0`**: homing ends one pull-off *below* the trigger, which fixes the trigger at machine Z `0`, and `system_check_travel_limits()` rejects only `> 0`. Names `HOMING_FORCE_SET_ORIGIN` and the pull-off, never a number — `$27` cannot be read | ✅ |
 | **HR-26** | The base-clearance retract had no tool-0 / jet guard though the base establish did | Med | **Closed by deletion** — the transit went with the base. The machine-frame retract that replaced it emits `G53 G0 Z`, which establishes nothing and needs no tool, so the hole closed with the code | ✅ |
 
 ---

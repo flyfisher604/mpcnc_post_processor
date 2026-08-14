@@ -1553,6 +1553,30 @@ function validateJob() {
       error("\"Machine Travel Z\" is a height in the machine's own homed Z frame, so it requires \"Axes Homed and Trusted\" to include Z -- declare that this machine homes Z, or clear the field.");
       return;
     }
+    // PR-17. The post cannot validate an absolute machine coordinate -- that is settled design -- but on
+    // GRBL it holds one bit of evidence it would otherwise waste. At Grbl's default
+    // HOMING_FORCE_SET_ORIGIN (off) the machine zeroes into NEGATIVE space after $H, so every reachable
+    // Z is negative. A machine deliberately zeroed at the bed makes a positive value right, and that is
+    // compile-time and unreadable -- hence a warning and not a guard.
+    //
+    // ZERO IS NOT THE CEILING, IT IS THE SWITCH, which is why the test is ">= 0" and not "> 0".
+    // limits_go_home() (grbl/limits.c, 1.1f) ends the cycle by assigning -homing_pulloff to the position
+    // one pull-off BELOW the trigger, which fixes the trigger itself at machine Z 0 by construction. So
+    // "G53 G0 Z0" drives the axis back onto the switch it just released, and soft limits pass it:
+    // system_check_travel_limits() (grbl/system.c, 1.1f) rejects target > 0, and 0 is not > 0. The
+    // highest safe value is -$27, which the post cannot read -- so the text names the pull-off and never
+    // a number. This is CR-10's fact on the Z axis, where CR-10 has it on X/Y.
+    if (fw == eFirmware.GRBL && parseMachineTravelZ() >= 0) {
+      warning(localize("\"Machine Travel Z\" is " + parseMachineTravelZ() + ", which is at or above "
+        + "machine zero. On a stock Grbl build (HOMING_FORCE_SET_ORIGIN off) homing leaves every "
+        + "reachable Z negative, so a positive value is above the top of travel -- it alarms at the "
+        + "first traverse with soft limits on, and drives Z into its hard stop with them off. ZERO IS "
+        + "NOT THE CEILING EITHER: it is the point at which the Z endstop tripped, because homing ends "
+        + "one pull-off below it, so a move to zero returns the axis onto the switch and soft limits do "
+        + "not reject it. Set a height below machine zero by at least the homing pull-off ($27). If "
+        + "this machine was built with HOMING_FORCE_SET_ORIGIN on, its zero is at the bed and a "
+        + "positive value is correct -- the post cannot read that and will warn every time."));
+    }
   }
 
   // The homing half is GRBL/RepRap-only because Marlin's park route (G28 X Y) RE-ESTABLISHES the frame
@@ -2857,6 +2881,16 @@ function writeFixedZReference() {
   if (!established) {
     return;
   }
+  // The in-file half of PR-17's post-time warning. Once, at the establish, rather than at every G53 --
+  // the height is the same on all of them, and the reason is in validateJob() beside the source read.
+  if (fw == eFirmware.GRBL && parseMachineTravelZ() >= 0) {
+    writeWarning("machine Z " + xyzFormat.format(machineTravelZ()) + " is at or above machine zero --"
+      + " on a stock Grbl build homing leaves every reachable Z negative, and zero itself is where the"
+      + " Z endstop tripped, one pull-off above where homing left the axis; a move there returns it onto"
+      + " the switch and soft limits do not reject it. Correct only on a machine built with"
+      + " HOMING_FORCE_SET_ORIGIN, which zeroes at the bed");
+  }
+
   // The in-file half of validateJob()'s Marlin warning, so a file read on its own carries the
   // assumption its motion depends on. Once, at the establish, rather than at every G53.
   if (fw == eFirmware.MARLIN) {

@@ -23,8 +23,8 @@ file can say so.
 `PBV3` and, off those artifacts, three of the four boundary dispatches `M1`, `M2`, `M4`. **What is
 left is `PA1`/`PA1b`, `P2`/`P3` and `M3`**, none of which the deletion touched: every one exercises
 the origin-mode dispatch, not the frame. `PA1` is the only one needing a job that does not exist yet. **Two findings were filed off these runs** — `PR-17`, a `Machine Travel Z` at or above
-machine zero on a default GRBL build, unwarned; and `PR-18`, two warnings offering a jog mode in the
-same dialog that refuses it on GRBL. **`PB1` was reposted 2026-08-14 with that height moved `1` → `0`
+machine zero on a default GRBL build, unwarned — **since closed** — and `PR-18`, two warnings offering
+a jog mode in the same dialog that refuses it on GRBL, which closes with Step 4. **`PB1` was reposted 2026-08-14 with that height moved `1` → `0`
 and its row passes again**, which *sharpened* `PR-17` rather than closing it: machine Z `0` is the
 homing switch's own trigger point, not the ceiling, so the repair tests `>= 0` and the highest safe
 value is the pull-off `-$27`. The repost also **destroyed the first `PB1` artifact and moved two
@@ -248,6 +248,10 @@ at all. Filed as **`PR-14`** — error *text*, not logic. The author's verdict, 
 failed post was operator error, and the route to the setting is the separate issue. **It did
 what the critical path promised — it invalidated part of Steps 1–4's premise before any of it
 was built.**
+
+**`PR-17` ✅ closed 2026-08-14.** A `>= 0` warning on GRBL in both channels, taken with the field's
+rename because one baseline covers both. `>= 0` and not `> 0` is the whole point: homing ends one
+pull-off below the trigger, so machine Z `0` *is* the switch, and soft limits reject only `> 0`.
 
 **Step 3 — Marlin multi-WCS ✅ closed 2026-08-14.** Guard C is gone: its message, *"Marlin has a
 single coordinate frame"*, was a false statement emitted to the user. `gcode.cpp` 2.1.2.5 puts
