@@ -5,30 +5,23 @@ behaves as it does is `design.md`.
 
 ## Checkpoint — read this first
 
-**Baseline.** Branch **`Assessment`**, 31 commits ahead of `master`. `CoverageFixes`
+**Baseline.** Branch **`Assessment`**, 44 commits ahead of `master`. `CoverageFixes`
 contributes 18 of them and is **itself unmerged**, so a merge to `master` carries two
 ranges, not one. `master` is 6 commits ahead of `origin/master`; `Assessment` is unpushed.
 
-**What is true now.** Phase C, Step 0, **Steps 1.1, 1.2, 2 and 3 are done and closed.** A multi-WCS
-job posts on any of the three firmwares given a machine declared homed; the spoilboard base and
-group 5 no longer exist. `PR-14` closed with 1.2; `PR-16` and `HR-26` closed by deletion with 2.
+**What is true now.** Phase C, Step 0, **Steps 1.1, 1.2, 1.3, 2 and 3 are done and closed.** A
+multi-WCS job posts on any of the three firmwares given a machine declared homed; the spoilboard
+base and group 5 no longer exist; the multi-part register is settled. `PR-14` closed with 1.2;
+`PR-16` and `HR-26` closed by deletion with 2; `PR-17` closed with 2.
 
-**What is next: post what has landed.** **Steps 2 and 3 are done** — one fixed Z reference, opted
-into by filling `Machine Travel Z` in group 4, and Marlin has both it and its nine work offsets.
-**None of it has been posted.** `findings.md` §4's `S2a`–`S2e` and `S3a`–`S3e` are the debt, and
-`S2a` is first: with the field empty a factory-default job must be unchanged, and only a posted
-file can say so.
+**What is next: Step 4, then Step 5.** Both delete code the register has no pass criterion for —
+group 5's orchestration, and the whole tool change. Step 5 is independent and can run in parallel.
 
-**Step 1.3 is parked, not closed.** Eight rows passed 2026-08-14 — `PB1`, `PB2`, `PBV1`, `PBV2`,
-`PBV3` and, off those artifacts, three of the four boundary dispatches `M1`, `M2`, `M4`. **What is
-left is `PA1`/`PA1b`, `P2`/`P3` and `M3`**, none of which the deletion touched: every one exercises
-the origin-mode dispatch, not the frame. `PA1` is the only one needing a job that does not exist yet. **Two findings were filed off these runs** — `PR-17`, a `Machine Travel Z` at or above
-machine zero on a default GRBL build, unwarned — **since closed** — and `PR-18`, two warnings offering
-a jog mode in the same dialog that refuses it on GRBL, which closes with Step 4. **`PB1` was reposted 2026-08-14 with that height moved `1` → `0`
-and its row passes again**, which *sharpened* `PR-17` rather than closing it: machine Z `0` is the
-homing switch's own trigger point, not the ceiling, so the repair tests `>= 0` and the highest safe
-value is the pull-off `-$27`. The repost also **destroyed the first `PB1` artifact and moved two
-other variables with the height** — §4's reused-filename warning, earned.
+**Step V shrank but did not go away.** `findings.md` §4 holds **31 unrun rows, from 57**, twenty-six
+having closed by code walk 2026-08-14. A walk settles what the post writes and nothing beyond it, so
+what is left there is what needs Fusion or a controller. **One of those rows matters to Step 4**: the
+walk found `S3f`'s byte-identity claim false, so the Marlin files in `HB-Tests/` no longer match
+their saved artifacts. §4 states the method and its bound; §5 carries each row's argument.
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
@@ -46,33 +39,17 @@ quoted comment text, never by line number.
 
 | | Item | Blocked on |
 |---|---|---|
-| **1.3** | Post the six multi-part jobs — `findings.md` §4.1 | — |
 | **4** | Group 5: keep the touch-off, delete the orchestration | — |
-| **5** | Group 6: rebuild the tool change as two flows | — (parallel with 1–4) |
+| **5** | Group 6: rebuild the tool change as two flows | — (parallel with 4) |
 | **V** | Post-verify what has landed unposted | — |
-| **6** | Clarity | 1–5 |
-| **7** | Documents, once | 1–6 |
+| **6** | Clarity | 4–5 |
+| **7** | Documents, once | 4–6, V |
 
-**Step 1 is first among the code steps because it is the only one that can invalidate the
-others.** Step 4 assumes F360 emits a multi-WCS job a particular way, read from Autodesk's
-post source rather than observed. **Step 5 is independent** and can run in parallel.
+**4 and 5 are independent of each other and can run in either order or together.** Step 4 assumes
+F360 emits a multi-WCS job a particular way, read from Autodesk's post source rather than observed;
+**Step 1.3's artifacts are what that assumption is now checked against**, which is why it came first.
 
 ---
-
-## Step 1.3 — Post the remaining multi-part jobs
-
-- **Goal** — the largest untested area in the post stops being unverified.
-- **Where** — `findings.md` §4.1. The expected output is **already written** for PB1, PB2,
-  PBV1, PBV2, PBV3 and PA1, so this is checking, not designing.
-- **The frame is fixed for every row** — `Axes Homed and Trusted` = `XYZ` and `Machine Travel
-  Z` an absolute machine Z, both in group 4. Guard B refuses the job without them.
-- **What is actually being proved is origin-mode dispatch.** `PR-2a` already proved the frame
-  and the traverse on this job with both probe modes at `Skip`; §4.1 is what happens at each
-  boundary when they are not.
-- **The change** — none to the post unless a row fails. **None has** — `PR-17` and `PR-18` are
-  findings the runs exposed, not row failures.
-- **Done when** — six posted files exist; every §4.1 row ticked or carrying a finding. **Five
-  exist**; `PA1` is the sixth and is the only job still to be built.
 
 ## Step 4 — Group 5: keep the touch-off, delete the orchestration
 
@@ -96,11 +73,14 @@ post source rather than observed. **Step 5 is independent** and can run in paral
   `probeG38Speed`, `probeSafeZ`, `probeThickness`. **The best-evidenced block in the post** —
   every one confirmed by emitted output.
 - **Done when** — no offered option is non-functional on any supported firmware, and the 24
-  hobby files in `HB-Tests/` re-post **byte-identically** for the surviving modes.
+  hobby files in `HB-Tests/` re-post **byte-identically** for the surviving modes. **The Marlin
+  files among them already carry one known delta** — `findings.md` `S3f`, a `WCS unchanged`
+  comment per section after the first — so diff against a build of `e11d0c9`, not against the
+  saved artifacts.
 
 ## Step 5 — Group 6: rebuild the tool change as two flows
 
-Independent of 1–4. **The shipped design is being replaced, not repaired** — the design is
+Independent of Step 4. **The shipped design is being replaced, not repaired** — the design is
 `design.md` → *Tool changes*, and `PR-15` is the one finding that the code does not comply
 with it. Eight properties, ~65 lines, **zero posted files exercising a tool change**, and
 after the register deletion **zero test rows** either.
@@ -133,25 +113,29 @@ plunge. That is a bug, not a design question, and it does not wait for the contr
 
 ## Step V — Post-verify what has landed unposted
 
-The machine-frame rework, the end park and the `CR-` fixes all changed the emitted file and
-**none has been posted**. A node guard harness stands in — 38 guard cases + 24 unit checks —
-and it proves logic only, never output.
+The end park and the `CR-` fixes changed the emitted file and **have never been posted**. The
+machine-frame rework is settled from the source instead — `findings.md` §5's twenty-six walked
+rows — so what is left here is what a walk cannot reach.
 
 - **`REG-MF` first** — the GRBL/mm factory-default diff. "Factory default" now means `Scale
   Feedrate` **on**, so the expected diff is the property dump, the Resolved-Values block
   **and every `F` word**, and nothing else. It is still owed because the closest run was
-  diffed against a file that is neither factory-default nor pre-machine-frame.
-- Then `PR-5a` (the enum flip — the one hazard consolidation created, and the row `PR-5`
-  lives or dies on), `PR-2c`, `PR-5b`, `HR-28 (A)`; then `PR-6d`, `PR-6a–c`,
-  `PR-7a–b`, `PR-8b`, `PR-9`, `PR-11`; then `FCR-3`, `FCR-4`, `FCR-5`, `FCR-13`.
-- **Dialog-only:** `D1` and `D3`. The properties literal is now declared in display order, so
-  if the dialog *still* shows groups out of numeric order, Fusion is not sorting and the
-  zero-padding convention is wrong.
+  diffed against a file that is neither factory-default nor pre-machine-frame. **`S2a` predicts
+  the dump delta exactly**, so this run either confirms that walk or breaks it.
+- **Then the Marlin multi-operation job** — `S3f`'s corrected count, and the only place a walk
+  contradicted the register.
+- Then `PR-2c`, `HR-28 (A)`; then `PR-6d`, `PR-6a`, `PR-6b`, `PR-7a`, `PR-9`, `PR-11`; then
+  `FCR-4`, `FCR-5`, `FCR-13`.
+- **`PR-2d` on its own** — the post has never emitted an inch file, and no walk can say what
+  `createFormat` resolved its decimals to.
+- **Dialog-only:** `D1`, `D3`, `D4`, `P7`. The properties literal is now declared in display
+  order, so if the dialog *still* shows groups out of numeric order, Fusion is not sorting and
+  the zero-padding convention is wrong.
 - **The tidy-ups:** `HR-19` and `HR-24`, both one-liners, neither changing output.
 
 ## Step 6 — Clarity
 
-Only after 1–5, because they delete much of what would otherwise be tidied.
+Only after 4 and 5, because they delete much of what would otherwise be tidied.
 
 - `validateJob()` was **288 lines**; Steps 2 and 3 removed ~100 of it. **Re-measure
   before restructuring** — it may not need it.
@@ -169,8 +153,8 @@ The guides are off-limits during code changes. Do it all here — per-step means
 
 | Document | What falls due |
 |---|---|
-| `design.md` | **The Marlin single-frame row rewritten** — nine registers, not one. **Add** the minimum firmware version and what Step 1.3 emitted. **Remove** the *Tool changes* section's "the code implements neither" framing once it does |
-| `property-reference.md` | Regenerate. The old groups 5 and 11 are gone and 6–11 renumbered to 5–10; group 5 retitled; group 6 rebuilt as two flows. **Its stated count of 69 is already wrong** |
+| `design.md` | **Remove** the *Tool changes* section's "the code implements neither" framing once it does. The Marlin rewrite and the version floor landed with Step 3 |
+| `property-reference.md` | Regenerate. The old groups 5 and 11 are gone and 6–11 renumbered to 5–10; group 5 retitled; group 6 rebuilt as two flows. **63 grouped properties, not the stated 69** |
 | `guide-pro.md` | State the **operator's** obligations explicitly — every work offset set before the job, one clearance clearing every fixture, machine homed. F360 nowhere states this and the emitted g-code depends on it. And say plainly what is verified and what is not |
 | `guide-hobbyist.md` | Flow 1's end-of-file behaviour; the Marlin do-not-home rule; the minimum Marlin version |
 | `README.md` | Feature list and the hobbyist/professional split |
@@ -219,7 +203,9 @@ The guides are off-limits during code changes. Do it all here — per-step means
 The over-built place was the spoilboard base: it served the non-homing machine at a cost —
 five interlocking properties, a register, and a probe defended only by where the operator
 parked — that the multi-part user did not have to pay, because that user's machine homes.
-Steps 1, 1.3 and 2 were the remedy, and 2 has landed. The two design questions the assessment
+Steps 1, 1.3 and 2 were the remedy, and all of them have landed. **The under-verification is the
+half still standing** — smaller than it was, and now explicit about which of its rows a posted
+file could still overturn. The two design questions the assessment
 settled on the way — whether the post reaches into F360's job, and whether computing a safe
 height is the post's job — are in `design.md`.
 
@@ -265,8 +251,11 @@ thing, Guard B, on the same terms as every other firmware.
 the machine's own homed Z, addressed with `G53`, opted into by filling `Machine Travel Z` in
 group 4 — no enum, no boolean, ungated by offset count. Six frame predicates collapsed to one;
 group 5, Guard A, Guard B′, the reserved-base guards and the enum-flip guard all went with it.
-**−354 lines, 10 groups → 9.** `PR-16` and `HR-26` closed **by deletion**; five `S2` rows in
-`findings.md` §4 are the debt it created.
+**−354 lines, 10 groups → 9.** `PR-16` and `HR-26` closed **by deletion**.
+
+**Step 1.3 — the multi-part register ✅ closed 2026-08-14.** Eight rows on posted files, then
+**twenty-six by code walk against `e11d0c9`** — the remainder plus the whole `S2`/`S3` debt Steps 2
+and 3 created. `findings.md` §4.1 is gone and the walk corrected the register four times.
 
 **Step 1.2 — the homed machine answers Guard B ✅ closed 2026-08-14, `c0ceb86`.**
 `getFixedZReference()` derives `Machine Z` for a multi-part job on a machine declared `XYZ`
