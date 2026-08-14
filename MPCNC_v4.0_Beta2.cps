@@ -294,7 +294,7 @@ properties = {
 
   machineHomedAxes: {
     title      : "Axes Homed and Trusted",
-    description: "DECLARE which axes your machine homes to endstops -- a fact about the machine, set once and never revisited. This is NOT an instruction to home anything; that is Home at Job Start below. None (default): no endstops, or you do not trust them; machine zero is wherever the controller was last reset. XY Only: X and Y home to endstops, so a work offset stored in a G54-G59 register still points at the same physical place after a power cycle; Z has no machine frame. Z Only: Z homes to a real endstop (LowRider switches) or to the Marlin movable-plate trick, so the machine has a Z frame that does not move with stock thickness -- a TRAVEL datum, never the cutting reference. XYZ: both. Only two things read this: Fixed Z Reference = Machine Z requires Z (and X/Y, for the multi-part traverses that clearance serves), and the post warns when a job trusts a STORED work offset without X/Y. Homing buys repeatability and nothing else -- your Z cutting zero always comes from the work-Z touch-off (see First WCS / Part), never from here.",
+    description: "DECLARE which axes your machine homes to endstops -- a fact about the machine, set once and never revisited. This is NOT an instruction to home anything; that is Home at Job Start below. None (default): no endstops, or you do not trust them; machine zero is wherever the controller was last reset. XY Only: X and Y home to endstops, so a work offset stored in a G54-G59 register still points at the same physical place after a power cycle; Z has no machine frame. Z Only: Z homes to a real endstop (LowRider switches) or to the Marlin movable-plate trick, so the machine has a Z frame that does not move with stock thickness -- a TRAVEL datum, never the cutting reference. XYZ: both. Three things read this. XYZ is what lets a MULTI-PART job post at all: the post takes the machine's own homed Z as that job's travel frame automatically, with no group-5 visit -- all you then owe it is Inter Part Travel Z. Fixed Z Reference = Machine Z, set explicitly, requires the same Z (and X/Y, for the multi-part traverses that clearance serves). And the post warns when a job trusts a STORED work offset without X/Y. Homing buys repeatability and nothing else -- your Z cutting zero always comes from the work-Z touch-off (see First WCS / Part), never from here.",
     group      : "machine",
     order      : 10,
     type       : "enum",
@@ -309,7 +309,7 @@ properties = {
   },
   machineHomeAtStart: {
     title      : "Home at Job Start",
-    description: "THE ACTION -- whether this job homes the axes declared above, and whether it pauses first. Off (default): emit no homing and accept the machine's current position, whether that is a machine already homed at the controller or a power-on 0,0,0. Home: home at job start with no pause. Pause, then Home: stop once (M0) before ANY homing motion so you can prepare the machine -- place a movable Z-homing plate, clear the bed -- then home. That is a single stop whatever the firmware and however many axes home, so it never needs revisiting when the machine changes. THIS IS A PROPERTY OF THE JOB, which is why it is separate from the declaration above: a machine whose endstops exist can still be homed once at the controller and left alone for the rest of the session. Must not be Off when Fixed Z Reference = Machine Z: an absolute machine-frame move has to be measured against a frame this job established, not one a previous power cycle left behind.",
+    description: "THE ACTION -- whether this job homes the axes declared above, and whether it pauses first. Off (default): emit no homing and accept the machine's current position, whether that is a machine already homed at the controller or a power-on 0,0,0. Home: home at job start with no pause. Pause, then Home: stop once (M0) before ANY homing motion so you can prepare the machine -- place a movable Z-homing plate, clear the bed -- then home. That is a single stop whatever the firmware and however many axes home, so it never needs revisiting when the machine changes. THIS IS A PROPERTY OF THE JOB, which is why it is separate from the declaration above: a machine whose endstops exist can still be homed once at the controller and left alone for the rest of the session, and Off is the right answer when it has been. Nothing requires this to be on -- the declaration above is what the machine-Z frame trusts. On RepRap only, leaving it Off with that frame in use draws a warning, because RepRap will run an absolute machine move against an unhomed board where GRBL refuses to move at all.",
     group      : "machine",
     order      : 30,
     type       : "enum",
@@ -339,7 +339,7 @@ properties = {
 
   spoilboardFixedZRef: {
     title      : "Fixed Z Reference",
-    description: "MULTI-PART JOBS NEED THIS; A SINGLE-PART JOB DOES NOT -- leave it None and skip the rest of the group. The job's fixed Z reference is a frame whose Z0 does NOT move with stock thickness, and therefore the only frame in which one clearance height is meaningful across parts of differing thickness. This answer also decides WHICH FRAME Inter Part Travel Z below is measured in, so re-read that height whenever you change it. None (default): no fixed reference -- SINGLE-PART JOBS ONLY, because a multi-WCS job then has no frame in which one clearance height is meaningful and the post refuses to post it (Guard B); Inter Part Travel Z is ignored. Spoilboard: reserve a WCS and probe the spoilboard into it; Inter Part Travel Z is then a height above that surface. Reserved WCS and Probe to Set Base below are its sub-questions. Costs one of GRBL's six WCS registers. GRBL/RepRap only -- Marlin has no per-WCS registers. Machine Z: use the machine's own homed Z frame; Inter Part Travel Z is then an absolute machine coordinate. Consumes NO WCS register and needs no probe, but requires Axes Homed and Trusted to include Z AND Home at Job Start not Off, both in group 4 -- the frame an absolute move trusts must be one this job established. Not available on Marlin.",
+    description: "MULTI-PART JOBS NEED THIS; A SINGLE-PART JOB DOES NOT -- leave it None and skip the rest of the group. The job's fixed Z reference is a frame whose Z0 does NOT move with stock thickness, and therefore the only frame in which one clearance height is meaningful across parts of differing thickness. This answer also decides WHICH FRAME Inter Part Travel Z below is measured in, so re-read that height whenever you change it. None (default): nothing chosen HERE, which is not the same as no frame. On a single-part job it means no fixed reference and Inter Part Travel Z is ignored. ON A MULTI-PART JOB, a machine declared homed in X/Y and Z (Axes Homed and Trusted, group 4) supplies the frame automatically -- the machine's own homed Z, exactly as the Machine Z answer below, with Inter Part Travel Z read as an absolute machine coordinate. The file's Resolved Values block says when that has happened, so check it there. A multi-part job on a machine NOT declared homed has no frame at all, and the post refuses to post it (Guard B). Spoilboard: reserve a WCS and probe the spoilboard into it; Inter Part Travel Z is then a height above that surface. Reserved WCS and Probe to Set Base below are its sub-questions. Costs one of GRBL's six WCS registers. GRBL/RepRap only -- Marlin has no per-WCS registers. Machine Z: use the machine's own homed Z frame; Inter Part Travel Z is then an absolute machine coordinate. Consumes NO WCS register and needs no probe, and requires only that Axes Homed and Trusted (group 4) includes Z, plus X/Y for the multi-part traverses it serves. Setting it here rather than leaving None makes the frame explicit and applies it to SINGLE-part jobs too. Not available on Marlin.",
     group      : "spoilboard",
     order      : 10,
     type       : "enum",
@@ -1523,7 +1523,13 @@ function validateJob() {
       + "\"Inter Part Travel Z\", and that runs before \"First WCS / Part\" records the current "
       + "position -- so the origin is recorded at bed clearance rather than at the part, and the "
       + "probe target measured from it will not reach the stock. Use \"Use Active WCS X0 Y0, Probe "
-      + "Z0\" or a \"Jog to ...\" mode, or set \"Fixed Z Reference\" to None."));
+      + "Z0\" or a \"Jog to ...\" mode"
+      // The "set it to None" remedy is real only where the DIALOG chose the frame. On a multi-part job
+      // the frame is derived from the homed machine and None does not remove it -- Guard B demanded it.
+      + (fixedZReferenceIsDerived()
+        ? ". This job's frame comes from the homed machine declaration, not from \"Fixed Z Reference\", "
+          + "so setting that to None does not remove it -- a multi-part job needs it."
+        : ", or set \"Fixed Z Reference\" to None.")));
   }
 
   // The same boundary from the other side: this fires when no fixed Z reference is established and the
@@ -1571,6 +1577,19 @@ function validateJob() {
       + "this job establishes no fixed Z reference to retract in, so the tool makes that crossing "
       + "at whatever Z the last operation left it at. Set \"Fixed Z Reference\", or park at work "
       + "X0 Y0."));
+  }
+
+  // The machine-Z frame is addressed with an absolute G53 rapid, and "Home at Job Start" is NOT required
+  // for it -- the group-4 declaration is the trust assertion. The firmware decides whether that is
+  // enough: with homing enabled Grbl 1.1 comes up in Alarm and refuses all motion until homed, so a
+  // stale declared frame cannot execute there. RepRap/RRF has no equivalent lock, which makes it the one
+  // target where the assertion can be false and the machine still moves. Marlin never reaches here.
+  if (fw == eFirmware.REPRAP && usesMachineZDatum() && !homesAtJobStart()) {
+    warning(localize("This job moves in the machine's own Z frame (G53), but \"Home at Job Start\" is "
+      + "Off, so those moves are measured against whatever machine zero the board currently holds "
+      + "rather than one this job established. RepRap runs them either way -- it has no unhomed lock. "
+      + "Home the machine at the controller before starting this file, or set \"Home at Job Start\" "
+      + "to Home."));
   }
 
   // Post-time half of toolChange()'s suppression warning, so it reaches Fusion's dialog and not
@@ -1654,14 +1673,13 @@ function validateJob() {
       error("\"Fixed Z Reference\" = the machine-Z answer requires \"Axes Homed and Trusted\" to include Z -- declare that this machine homes Z, or choose another fixed Z reference.");
       return;
     }
-    // The declaration alone is not enough HERE: a stale machine frame drives an absolute RAPID, and
-    // only GRBL stops it. So when this is the datum, the job homes the frame it trusts.
-    if (!homesAtJobStart()) {
-      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Home at Job Start\" to be Home or Pause, then Home -- an absolute machine-frame move must be measured against a frame this job established, not one a previous power cycle left behind.");
-      return;
-    }
+    // NO "Home at Job Start" REQUIREMENT: "Axes Homed and Trusted" is the trust assertion, and the state
+    // it exists to express -- homed at the controller, do not home here -- is a legitimate one. The
+    // firmware carries the rest: with homing enabled Grbl 1.1 comes up in Alarm and refuses all motion
+    // until homed, so a stale frame cannot execute on the default firmware at all. RepRap has no such
+    // lock and is warned above; Marlin is refused this frame outright.
     if (parseInterPartTravelZ() == undefined) {
-      error("\"Fixed Z Reference\" = the machine-Z answer requires \"Inter Part Travel Z\" as an ABSOLUTE machine coordinate -- home the machine, jog to a height that clears every fixture and part, and enter the Z the sender's DRO reports, in mm. It is empty whenever this answer has just changed, because a height measured above the spoilboard is not a machine Z.");
+      error("This job's Z frame is the machine's own homed Z, so it needs \"Inter Part Travel Z\" (group 5 - Fixed Z Reference) as an ABSOLUTE machine coordinate -- home the machine, jog to a height that clears every fixture and part, and enter the Z the sender's DRO reports, in mm. It ships empty because a height measured above the spoilboard is not a machine Z, and no default can be right about a number that belongs to your machine.");
       return;
     }
     // Requires declared homed XY -- not for the Z-only move, but because the multi-part workflow it
@@ -1696,12 +1714,16 @@ function validateJob() {
 
   var base = getReservedBaseWcs();
   if (base == 0) {
-    // Guard B -- safe-Z across WCS needs A FIXED Z REFERENCE of either kind: across offsets only
-    // established by probing at runtime, no single clearance height is meaningful. Single-WCS is exempt.
-    // UNCONDITIONAL since CR-13: it was gated on "Retract Across Parts", so turning that off was the one
-    // way to post the job this refuses -- and what it then posted was a traverse in the wrong frame.
+    // Guard B -- safe-Z across WCS needs A FIXED Z REFERENCE: across offsets only established by probing
+    // at runtime, no single clearance height is meaningful. Single-WCS is exempt. UNCONDITIONAL since
+    // CR-13: it was gated on "Retract Across Parts", so turning that off was the one way to post the job
+    // this refuses -- and what it then posted was a traverse in the wrong frame.
+    //
+    // The CONDITION is unchanged; what changed is that getFixedZReference() now derives the machine's own
+    // homed Z for any machine declared homed, so this is reachable only when the operator has told the
+    // post the machine does not home. That is the only remaining reason, and it is the one named.
     if (!usesMachineZDatum() && collectDistinctOffsets().length > 1) {
-      error("A multi-WCS job requires a fixed Z reference: the tool must clear the fixtures on its way between parts, and no single clearance height is meaningful across WCS whose offsets are only known after probing at runtime. Set \"Fixed Z Reference\" to the spoilboard answer (and reserve a WCS) or to the machine-Z answer -- or post one job per part.");
+      error("A multi-part job needs a Z frame that outlives one work offset -- the tool must clear the fixtures on its way between parts, and no single clearance height is meaningful across WCS whose origins are only known after probing at runtime. A homed machine already has that frame: set \"Axes Homed and Trusted\" to XYZ in group 4 - Machine Frame, then enter \"Inter Part Travel Z\" in group 5 -- or post one job per part.");
     }
     return; // no base reserved -> Guard A and the slot check are moot
   }
@@ -2003,8 +2025,31 @@ function writeWcsOrigin(wcsNumber, x, y, z) {
 // The job's FIXED Z REFERENCE -- "None" | "Spoilboard" | "Machine Z". A frame whose Z0 does not move
 // with stock thickness; the two non-None answers are two implementations of that one frame, not two
 // features. Every consumer asks this rather than asking whether a base is reserved.
+//
+// DERIVED, not merely read. Multi-part work needs a frame that outlives one work offset, and a machine
+// DECLARED homed in X/Y and Z already has one at no cost -- no register spent, no probe cycle. So the
+// multi-part job does not have to FIND this control in order to use it, and "None" means "nothing
+// chosen here" rather than "no frame". The group-4 declaration is the trust assertion in full: "Home at
+// Job Start" is a separate decision about this job and is deliberately NOT required -- see the RepRap
+// warning in validateJob(), the one firmware where that distinction can still move a machine. Marlin is
+// excluded for the same reason the explicit answer is refused there: G53 is a build option
+// (CNC_COORDINATE_SYSTEMS) and off by default. Single-offset jobs are untouched by construction, so an
+// ordinary one-part file is unchanged byte for byte.
 function getFixedZReference() {
-  return getProperty(properties.spoilboardFixedZRef);
+  var declared = getProperty(properties.spoilboardFixedZRef);
+  if (declared != "None") return declared;
+  if (fw != eFirmware.MARLIN && machineHomesXY() && machineHomesZ() &&
+      collectDistinctOffsets().length > 1) {
+    return "Machine Z";
+  }
+  return "None";
+}
+
+// True when the frame above came from the group-4 declaration rather than from group 5's own control.
+// Read by the header echo alone, and only so the file can say so: the property dump shows
+// "spoilboardFixedZRef = None" beside a resolved value of "Machine Z", and that must not read as a bug.
+function fixedZReferenceIsDerived() {
+  return getProperty(properties.spoilboardFixedZRef) == "None" && getFixedZReference() != "None";
 }
 
 // True when the fixed Z reference is the machine's own homed Z frame, addressed with G53. Deliberately
@@ -2893,7 +2938,10 @@ function writeResolvedValues() {
   writeComment(eComment.Info, "   Map SafeZ = " + describeSafeZ(safeZMode, safeZHeightDefault));
   writeComment(eComment.Info, "   Probe SafeZ = " + describeSafeZ(probeSafeZMode, probeSafeZHeightDefault));
   var base = getReservedBaseWcs();
+  // NAMED AS DERIVED where it is: the property dump above shows "spoilboardFixedZRef = None" and this
+  // line resolves to "Machine Z", and the operator must be able to see why rather than read it as a bug.
   writeComment(eComment.Info, "   Fixed Z reference = " + getFixedZReference()
+    + (fixedZReferenceIsDerived() ? " -- from the homed machine declaration, not set in the dialog" : "")
     + (base == 0 ? "" : " -- reserved base " + wcsName(base) + " / P" + base));
   writeComment(eComment.Info, "   Probe XY offset in output units = X" + xyzFormat.format(probeOffsetX()) + " Y" + xyzFormat.format(probeOffsetY()));
   // WITH ITS FRAME NAMED: one field means two unrelated numbers, and a G53 move is interpreted in the

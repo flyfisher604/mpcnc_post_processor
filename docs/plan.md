@@ -13,11 +13,12 @@ ranges, not one. `master` is 6 commits ahead of `origin/master`; `Assessment` is
 multi-WCS job posts, in three dialog edits, and the refusal chain is filed as `PR-14`. The
 post is otherwise untouched by this plan since Step 0.
 
-**What is next: Step 1.2.** It is a decision rather than a wait, and it now has a real
-posted file to be measured against. **The single thing that has to happen first:** read
-`Multi_WCS (b)` — already on disk, unread. If its traverse is already `G53`-framed at
-today's settings, Step 1.2 is measured against a known-good file instead of a prediction,
-and `PR-2a`/`PR-2b`/`PR-2d` come off it rather than off a re-post.
+**What is next: Step 1.2's four test rows.** `Multi_WCS (b)` is read: its traverse is already
+`G53 G0 Z-10`-framed at all three WCS changes, so the capability was proven before the code
+changed. **Step 1.2's code is applied and unposted.** What is owed is four posts, in
+`findings.md` §4 — `PR-2e` (the derived frame, a two-line diff against `Multi_WCS (b)`),
+`PR-2f` (`Home at Job Start = Off` now posts), `PR-2g` (single-part unchanged) and `PR-14`
+(both refusals). Nothing else moves until they run.
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
@@ -62,21 +63,15 @@ post source rather than observed. **Step 5 is independent** and can run in paral
   discoverability and defaults, not capability** — the capability landed with `PR-2`.
 - **Where** — Guard B :1698-1705; `usesMachineZDatum()` :2012; `machineHomesXY/Z()`
   :2019-2026; `parseInterPartTravelZ()` :2054; the machine-Z branch :1645-1672.
-- **The change** —
-  1. Multi-WCS ⇒ require homed X/Y/Z, `Home at Job Start`, and a travel height. **All four
-     properties already exist.**
-  2. Traverse emits `G53 G0 Z<travel>` — correct regardless of any WCS's Z0.
-  3. Machine does not home ⇒ refuse in **one** sentence naming the real reason: *multi-part
-     work needs a homed machine; post one job per part.*
-  4. **Do not delete the spoilboard path here.** Step 2 does that, after this is proven.
-- **Done when** — the 1.1 job posts on GRBL with only group 4 properties set, and the
-  traverse is `G53`-framed. **Read the emitted file; do not infer it.** Measured against the
-  2026-08-13 baseline, this step's own measure is **one dialog field removed, not a job newly
-  enabled**.
-- **Findings** — `PR-14` does **not** close here: this removes the first refusal, not the
-  second. Closing it needs the error text to name `Inter Part Travel Z` and the group both
-  cures live in — cheap, and worth doing *inside* this step so the operator meets one
-  complete sentence instead of two halves.
+- **The change — applied, unposted.** `getFixedZReference()` derives `Machine Z` for a
+  multi-part job on a machine declared `XYZ` homed, so `None` means *nothing chosen here*
+  rather than *no frame*. `Home at Job Start` is **not** required — the declaration is the
+  trust assertion, GRBL's alarm lock enforces it, and RepRap takes a warning instead. Guard B
+  now refuses in one sentence naming the homed machine; the travel-height refusal names its
+  field and group. The spoilboard path is untouched — Step 2 deletes it.
+- **Done when** — `PR-2e`, `PR-2f`, `PR-2g` and `PR-14` are ticked in `findings.md` §4.
+  **Read the emitted files; do not infer them.** `PR-2e` is the measure: one dialog field
+  removed, two lines of the file changed, and no g-code.
 
 ## Step 1.3 — Post the six multi-part jobs
 

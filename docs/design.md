@@ -49,11 +49,16 @@ fixed for *that* power cycle, so origins **created** during a run stay mutually 
 multi-part job is sound. Only a **stored** offset goes bad, which is the whole of why that guard is
 mode-sensitive rather than blanket.
 
-**The one place a trust assertion is not enough:** when a declared frame becomes the **datum for an
-absolute move**, the job must *establish* it — so `Fixed Z Reference = Machine Z` requires `Home at Job
-Start`, not merely the declaration. Firmware forces it: with homing enabled **GRBL comes up in Alarm and
-refuses all motion until homed**, so a stale declared frame cannot execute there, while Marlin and RRF have
-no such lock and run the move against a machine zero that has moved.
+**Where a trust assertion carries an absolute move, the firmware decides whether it is enough.** A declared
+machine Z becomes the datum for an absolute `G53` rapid, and the assertion that carries it is
+`Axes Homed and Trusted` alone — **not** `Home at Job Start`, whose entire purpose is to express *homed at
+the controller, do not home here*. Requiring the action as well would cancel the state the split exists to
+express. The firmwares differ, and only one of them is exposed: with homing enabled **GRBL comes up in
+Alarm and refuses all motion until homed**, so a stale declared frame cannot execute there at all; **Marlin
+never reaches the question**, `G53` being behind `CNC_COORDINATE_SYSTEMS` and the machine-Z frame refused on
+it; **RRF has no such lock** and will run the move against a machine zero that has moved. RRF therefore
+takes a post-time warning when this frame is in use with `Home at Job Start = Off`, and it is the only
+target that needs one.
 
 ### The machine frame — capability, then action
 
@@ -94,12 +99,22 @@ whenever homing was off, so two booleans offered four settings of which only thr
 
 A frame whose Z0 does not move with stock thickness — the only frame in which one clearance height is
 meaningful across parts of differing thickness, which is why the cross-part safe-Z feature requires one
-(Guard B). A machine can have one two ways, and they are one dialog question:
+(Guard B). A machine can have one two ways:
 
 | Answer | The frame | `Inter Part Travel Z` is then… | Costs |
 |---|---|---|---|
 | **Spoilboard** | a probed surface in a reserved WCS | a height **above that surface** — positive | one WCS register — GRBL has six — plus a probe cycle |
 | **Machine Z** | the machine's own homed Z | an **absolute machine coordinate** — signed | a per-machine number read off a DRO |
+
+**The machine-Z answer is derived, not asked.** `getFixedZReference()` returns `Machine Z` when the dialog
+says `None`, the job uses more than one work offset, and group 4 declares X/Y **and** Z homed — so a
+multi-part job on a homed machine gets the frame without the operator ever finding this control. **`None`
+therefore means *nothing chosen here*, not *no frame***, and the only route to a multi-part job with no
+frame at all is a machine declared as not homing, which is Guard B's one remaining reason to refuse.
+Single-offset jobs are excluded by construction, which is what leaves an ordinary one-part file unchanged.
+The dialog answer survives for the two things derivation cannot do: **choose the spoilboard**, and **apply
+the machine frame to a single-part job**. Because the property dump then reads `spoilboardFixedZRef = None`
+beside a resolved `Machine Z`, the header echo says in words that the frame came from the declaration.
 
 **One clearance field, not two.** The two answers are never both live, they are read at the same two
 moments (the establish in the preamble, and each cross-WCS traverse), and on a correct setup they name the
