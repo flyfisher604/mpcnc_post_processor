@@ -2930,6 +2930,27 @@ function onCommand(command) {
     case COMMAND_STOP:
       writeBlock(mFormat.format(0));
       return;
+
+    // AN OPTIONAL STOP IS TAKEN, ALWAYS. No supported firmware has a working "stop only if the operator
+    // asked for it", so the choice is between a stop that cannot be skipped and a command that vanishes
+    // -- and HR-13's own registered diff proposed M1 on the premise that "M1 is supported by all three
+    // targets", which is true of the parser and false of the behaviour. All three parse it and it means
+    // three different things. grbl 1.1 grbl/gcode.c: "case 1: break; // Optional stop not supported.
+    // Ignore." -- accepted, no error, and nothing pauses. RepRapFirmware src/GCodes/GCodes2.cpp handles
+    // "case 0: // Stop", "case 1: // Sleep" and "case 2: // Stop" in one block, so mid-file it ENDS THE
+    // JOB. Only Marlin does what Fusion means -- Marlin/src/gcode/lcd/M0_M1.cpp waits for the LCD, under
+    // HB-1's HAS_RESUME_CONTINUE. So the post emits M0, which pauses on all three, and says in the file
+    // that the "optional" half is the part it could not keep.
+    //
+    // WARNED PER OCCURRENCE and outliving Comment Level Off, for the reason the fallback below gives:
+    // Manual NC is invisible to validateJob(), so there is no post-time twin for this to survive in.
+    // PR-20 is NOT extended to cover it either -- that enumeration is of the stops the POST puts in the
+    // first ten lines of its own preamble, and it cannot see a Manual NC command at all.
+    case COMMAND_OPTIONAL_STOP:
+      writeWarning("an Optional Stop was requested here and is emitted as an UNCONDITIONAL M0 -- none"
+        + " of the three supported firmwares has a usable M1, so this pause cannot be skipped");
+      writeBlock(mFormat.format(0));
+      return;
   }
 
   // Anything this switch does not name reaches here. Until HR-13 it returned in silence: the Info
@@ -2940,16 +2961,6 @@ function onCommand(command) {
   // writeWarning(), NOT writeComment(eComment.Important, ...) as HR-13's own diff proposed: HB-9's rule
   // is that a warning outlives the level gate, and this one has no validateJob() twin to survive in --
   // Manual NC is invisible to a post-time pass over the properties.
-  //
-  // COMMAND_OPTIONAL_STOP deliberately gets NO case emitting M1, which is the other half of what HR-13
-  // asked for, on the grounds that "M1 is supported by all three targets". All three parse it and it
-  // means three different things. grbl 1.1 grbl/gcode.c: "case 1: break; // Optional stop not supported.
-  // Ignore." -- accepted, no error, and nothing pauses. RepRapFirmware src/GCodes/GCodes2.cpp handles
-  // "case 0: // Stop", "case 1: // Sleep" and "case 2: // Stop" in one block, so mid-file it ENDS THE
-  // JOB. Only Marlin does what Fusion means: Marlin/src/gcode/lcd/M0_M1.cpp waits for the LCD, and only
-  // under HB-1's HAS_RESUME_CONTINUE. An optional stop this post cannot keep is better refused out loud
-  // than emitted as a no-op on the default firmware and a job abort on another; promoting it to an
-  // unconditional M0 changes what the operator asked for and is a dialog decision, not this fix.
   writeWarning("command " + getCommandStringId(command) + " is not supported by this post and was not "
     + "emitted");
 }

@@ -1,6 +1,6 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **71 findings — 49 fixed · 1 part-fixed ·
+Every logged issue and the tests that confirm it. **71 findings — 50 fixed ·
 4 closed by design · 1 withdrawn · 16 open.** Test registers in §4 and §5.
 
 > **`HR-22` has no row in any register but this one.** It was carried in checkpoint prose and
@@ -50,7 +50,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**16 open (one of them deferred) · 1 part-fixed — 17 entries.**
+**16 open, one of them deferred.**
 
 ### PR-25 — whether RepRapFirmware applies a tool-length offset to a `G53` move is unsettled — Low-Med
 
@@ -107,17 +107,6 @@ is written on every Duet post. Never yet posted.
 **The fields stay editable** — the post cannot know a board's pins or its RRF major version.
 Take the relocation of both properties beside the firmware selector *with* the default
 rewrite: both re-head the property dump, so together they cost one baseline instead of two.
-
-### HR-13 — `onCommand` silently discards every command it does not name — Low-Med · ◑ part-fixed
-
-**Problem.** **The silence is fixed** — `f54beb0`, 2026-08-13. Every unnamed command now
-reaches a `writeWarning()` below the `switch`, so it survives Comment Level `Off`.
-**`COMMAND_OPTIONAL_STOP` is still not honoured**: the registered diff proposed `M1`, whose
-premise *"`M1` is supported by all three targets"* is true of the parser and false of the
-behaviour — GRBL ignores it, RRF ends the job. So *Optional stop* warns instead of
-vanishing, and still does nothing.
-
-**Fix.** A dialog decision, not a defect — see §6.
 
 ### HR-22 — should `gAbsIncModal` / `gUnitModal` / `gFeedModeModal` be reset? — Low
 
@@ -291,7 +280,7 @@ and fine.
 
 ## 3. Closed findings
 
-**49 fixed · 4 closed by design · 1 withdrawn — 54 rows.** Permanent: commit messages and
+**50 fixed · 4 closed by design · 1 withdrawn — 55 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -347,6 +336,7 @@ diagnosis, the diff and the argument.
 | **PR-28** | `rapidMovements()` ordered itself against a Z the tool is not at, after any post-injected move | Low-Med | **The kernel is told, rather than the post keeping a second copy of the truth.** `getCurrentPosition()` reports the **toolpath's** position — the kernel advances it from the movements it feeds `onRapid`/`onLinear` and never saw the nine moves the post injects on its own account: the probe traverses, the safe-Z retracts, the returns to X0 Y0. Four readers were stale after one of them — the X/Y-against-Z ordering, `isSafeToRapid()`'s G1→G0 restore, and the feedrate projection in both `linearMovements()` and the arc handler — so the flag `PR-26` left fixed the ordering of one move and none of the rest. `noteCurrentPosition()` reports each work-frame move through the kernel's own `setCurrentPosition()`, called from inside `rapidMovementsXY()` / `rapidMovementsZ()` so all nine injection sites are covered without one of them being edited, with `undefined` meaning **unchanged** so an X/Y move claims no Z. **What it cannot reach is the machine frame**, and that is the finding's limit: `setCurrentPosition()` takes a *frame* position, and the work-frame value of a `G53` height needs the WCS offset a runtime probe establishes. Autodesk's own posts leave the kernel stale across a machine-frame retract for the same reason, reporting that move only to the machine simulator on a channel tagged `coordinates: MACHINE` (`haas.cps`, `writeRetract()`, `G53` case). So `forceRapidXYBeforeZ` stays, now as the named residue rather than a point fix — feeding a made-up number in its place would order that one move correctly and silently corrupt the other three readers | ✅ |
 | **PR-19** | The post claimed GRBL cannot jog at an `M0` pause, and said nothing at all about Marlin | Med | The claim was false and shipped in five places. Jogging at the pause is a condition on **what holds the pause**, stated once in `jogAtPauseCondition()` and written by both channels. GRBL: the sender decides — gSender rewrites the line to `(M0)` and holds its own stream (`src/server/controllers/Grbl/GrblController.js`, master, 2026-08-14). Marlin: **a real gap the walk found** — `M0` blocks in `wait_for_user_response()`, whose `idle()` reaches `queue.get_available_commands()` but never `queue.advance()` (`MarlinCore.cpp`, 2.1.2.5), so a serial jog queues and runs **after** the pause. RepRap alone needs no condition | ✅ |
 | **CR-01** | GRBL ignores `F` on `G0`, so the group-2 travel speeds do nothing there | Wrong output | **The post cannot set that rate, so it names the parameter that does — in the file, on every GRBL job, as the first line.** GRBL takes a rapid's rate off the axis limits and never out of the block: `block->programmed_rate = block->rapid_rate`, `rapid_rate = limit_value_by_axis_maximum(settings.max_rate, unit_vec)` (`grbl/planner.c`, `plan_buffer_line()`, gnea/grbl 1.1), and FluidNC is the same planner renamed (`FluidNC/src/Planner.cpp`, `block->motion.rapidMotion`, `limit_rate_by_axis_maximum()`, 3.x). Nothing a posted file may contain reaches it: `$110`–`$112` are settings, refused outside `Idle`/`Alarm` (`system_execute_line()` → `STATUS_IDLE_ERROR`; FluidNC's `Setting::check_state()` → `Error::IdleError`), and the rapid override is the real-time bytes `0x95`/`0x96`/`0x97`, not stream content. **The warning names both dialects because the post cannot tell them apart** — one `Grbl` answer covers FluidNC, which kept the g-code and dropped the numbered settings: no `$110` there, the limit being `max_rate_mm_per_min` per axis (`FluidNC/src/Machine/Axis.cpp`). `PR-27`'s `$1` warning is the precedent — a setting the post can never emit, so it says so — and this one is **ungated**, being true of every job on the default firmware. The tooltip half landed with it: both travel-speed descriptions now name the firmwares that read them. **The `F` word stays on the `G0`**: it is still stored (`gc_state.feed_rate = gc_block.values.f; // Always copy this value`, `grbl/gcode.c`), so it sets the modal feed the next cut inherits — which is why `PR-9` put one on the park block. **Mapping travels to `G1` so the `F` would be obeyed was built and rejected** — `travelMotionGcode()`, one switch over both rapid writers and `writeMachineFrameBlock()`, dropped by the author's ruling before it landed: a rapid is a rapid, and the machine's own limit is the operator's setting to make. Expect it to be re-proposed; the answer is here | ✅ |
+| **HR-13** | `onCommand` silently discarded every command it did not name | Low-Med | Two halves, and both are landed. The **silence** went with `f54beb0` — every unnamed command reaches a `writeWarning()` below the `switch`, so it outlives Comment Level `Off`, which matters because Manual NC is invisible to `validateJob()` and there is no post-time twin to carry it. **`COMMAND_OPTIONAL_STOP` now emits `M0`**, by the author's ruling: no supported firmware has a working *stop only if asked*, so the choice was a stop that cannot be skipped or a command that vanishes. **`M1` is refused**, and the registered diff that proposed it was right about the parser and wrong about the behaviour — grbl 1.1 accepts and ignores it (`gcode.c`, *"case 1: break; // Optional stop not supported. Ignore."*), RRF handles `M0`/`M1`/`M2` in one block and so **ends the job** mid-file (`src/GCodes/GCodes2.cpp`), and only Marlin waits (`src/gcode/lcd/M0_M1.cpp`, under `HB-1`'s `HAS_RESUME_CONTINUE`). The file says at each occurrence that the *optional* half is what could not be kept | ✅ |
 | **HR-19** | `M291` carried a doubled space | Low | The RepRap arm of `askUser()` built its parameter string with a leading space, on top of the separator `writeBlock()` already supplies — so `M291  P"…"` at **both** `Include Whitespace` settings, the manual prefix covering the other one. The space is gone; the GRBL and default arms never had it, and `X1 Y1 Z1`'s leading space stays, joining inside one word | ✅ |
 | **HR-24** | `writeWCS()` read the global `tool`, not the section it was handed | Low | `section.getTool()`, held in a local and read by the `canProbe` test. **Emits exactly what it did**: both callers pass `currentSection`, whose tool *is* the global at that moment, so the change makes the agreement structural rather than coincidental. `writeWCS()` is the only function in the post that takes a section and could be called with one that is not current | ✅ |
 | **HR-20** | Tapping is not really implemented | Med | **Closed by design — tapping is not supported**, by the author's ruling, and no code changed. Both registered halves were already answered: the automatic path no longer always emits `M4` — `spindleOn()` writes `M3` or `M4` off the commanded direction, and prompts a manual spindle for a reversal at an unchanged speed — and the manual path prompts. What is left is **rigid** tapping, which no supported firmware can do at all, there being no `G33`/`G84` on any of them, and `writeSpeedFeedSyncWarning()` says so on **every** speed-feed-synchronization command so every affected move is flagged. An ordinary tapping cycle still expands into `G0`/`G1` through `onCyclePoint()`, which wants a floating/tension holder — the warning's own words | ➖ |
@@ -440,7 +430,7 @@ lacks.
 | **PR-13** | The Duet mode string is written once per section-type change, verbatim | `CNC Firmware` = RepRap, a milling job, then milling + laser | posted | — | ⬜ |
 | **HR-19** | Every RepRap prompt reads `M291 P"…" R"…" S3` with **one** space after `M291` at both `Include Whitespace` settings, and a jog prompt still has exactly one before its `X1 Y1 Z1` | RepRap, First = `Jog to X0 Y0 Z0`, posted at `Include Whitespace` on and again off. **Rides with `PR-19a`'s RepRap post** | posted | — | ⬜ |
 | **HR-24** | `writeWCS()`'s probe test reads the section's own tool, and **no byte of the file moves**: a re-post of a verified job is identical to the pre-change build, which is the whole assertion | any verified reference job, diffed against the pre-change build. **Rides with `REG-MF`, one post** | posted | — | ⬜ |
-| **HR-13** | `onCommand` no longer discards silently, and says so at Comment Level `Off` | Manual NC *Orientate spindle*, then again at Comment Level `Off` | posted | — | ⬜ |
+| **HR-13** | Both halves: an unnamed command warns instead of vanishing, and Manual NC *Optional stop* emits `M0` with its own warning beside it — **on all three firmwares, and no `M1` anywhere in the file** | Manual NC *Orientate spindle*, then Manual NC *Optional stop*, each again at Comment Level `Off` | posted | — | ⬜ |
 | **HR-20** | — retired with `HR-20`: closed as unsupported with no code change, so there is nothing to post | — | — | — | ➖ |
 | **HR-27** | — proved by **PR-2c**, which now covers the two `onSection()` geometry guards: a refused job leaves nothing that will run | — | — | — | ➖ |
 | **HR-28 (A)** | The stored-offset warning on a multi-WCS job | 2 WCS, `Axes Homed and Trusted` = `None` | posted | — | ⬜ |
@@ -611,10 +601,6 @@ None is a defect; none is scheduled.
   to `writeBlock()` with no firmware check, so a `Mrln:` code posts into a GRBL file. The
   durable fix is a `validateJob()` warning when dialect and firmware disagree — the dialect is
   already in each option's title. `Use custom` is exempt: the post cannot know the dialect.
-- **Manual NC *Optional stop* — promote it to `M0`, or leave it refused?** `HR-13`'s landed
-  half warns that the command was dropped; this is the decision about honouring it. `M1` is
-  not available — ignored by GRBL, ends the job on RRF. `M0` pauses on all three, but it makes
-  an *optional* stop unconditional. **A dialog question, not a defect.**
 - **`permittedCommentChars` global.** A comparable community GRBL post declares it; research
   whether it adds real kernel-side filtering on top of `sanitizeMessageText()`.
 - **A fourth entry in `Tool Change Handled By`.** UGS is the obvious candidate and is
