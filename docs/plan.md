@@ -15,12 +15,13 @@ base and the old group 5 no longer exist; the multi-part register is settled; ev
 states the condition it depends on; the tool change is both flows, a machine-frame change position on
 the manual one, and nothing else. `PR-14` closed with 1.2; `PR-16` and `HR-26` closed by deletion with
 2; `PR-17` closed with 2; `PR-18` and `PR-19` closed with 4; `PR-15`, `PR-21` and `PR-22` closed with
-5; `PR-24` with F2; `PR-26` and `PR-27` with F3; `PR-28` with F4; `CR-01` with F5.
+5; `PR-24` with F2; `PR-26` and `PR-27` with F3; `PR-28` with F4; `CR-01` with F5; `HR-13`, `HR-19`,
+`HR-24` and `CR-02` with F6, which closed `HR-20` and `HR-27` by design alongside them.
 
 **What is next: Step V**, and its tool-change half is now the biggest single hole in it: twenty-three
 `TC-`/`PR-2xa` rows exist and **none has been run**, twenty of them needing a full licence.
 
-**Step V grew by twenty-four and shrank by none.** `findings.md` §4 holds **58 unrun rows**. A walk
+**Step V grew by twenty-seven and shrank by one.** `findings.md` §4 holds **60 unrun rows**. A walk
 settles what the post writes and nothing beyond it, so what is left there is what needs Fusion, a
 controller or — new with `PR-20` — a sender. §4 states the methods and their bounds; §5 carries each
 row's argument.
@@ -80,7 +81,9 @@ rows — so what is left here is what a walk cannot reach.
   Every other `TC-` row and `PR-22a` need a **full licence**, which no other row in this step does.
   **`TC-16` needs gSender and a machine that need not cut** — `PR-20b`'s method, and the only row
   here that can fail without the post being wrong.
-- **The tidy-ups:** `HR-19` and `HR-24`, both one-liners, neither changing output.
+- **`CR-02` is the other licence-free row** — a defaults GRBL job whose whole delta against the
+  pre-change build is one comma per prompt line. `HR-24` rides with `REG-MF` and asserts the opposite,
+  that no byte moves at all; `HR-19` rides with `PR-19a`'s RepRap post.
 
 ## Step 6 — Clarity
 
@@ -106,7 +109,7 @@ The guides are off-limits during code changes. Do it all here — per-step means
 | Document | What falls due |
 |---|---|
 | `design.md` | Nothing outstanding — the *Tool changes* retitle and the token paragraph landed with `F2`, and the Marlin rewrite and the version floor with Step 3. **Re-read before assuming that** |
-| `property-reference.md` | Regenerate. The old groups 5 and 11 are gone and 6–11 renumbered to 5–10; group 5 is now *5 - Part Origins*, retitled and rewritten but offering exactly what it did; group 6 is five properties where it was eight, two of them new, and group 7 lost `includeProbeFile`. **Recount — the stated 69 was already wrong** |
+| `property-reference.md` | Regenerate. The old groups 5 and 11 are gone and 6–11 renumbered to 5–10; group 5 is now *5 - Part Origins*, retitled and rewritten but offering exactly what it did; group 6 is **ten** properties where it was eight — rebuilt entire, with the change position and the two tool-change include files moved in from group 7 — and group 7 is now only the two files that **replace** the header and footer, having also lost `includeProbeFile`. **Recount — the stated 69 was already wrong** |
 | `guide-pro.md` | State the **operator's** obligations explicitly — every work offset set before the job, one clearance clearing every fixture, machine homed. F360 nowhere states this and the emitted g-code depends on it. And say plainly what is verified and what is not |
 | `guide-hobbyist.md` | Flow 1's end-of-file behaviour; the Marlin do-not-home rule; the minimum Marlin version; **mid-job indexing** — the jog modes as a supported workflow, the sender condition on GRBL, and the panel condition on Marlin |
 | `README.md` | Feature list and the hobbyist/professional split |
@@ -236,6 +239,21 @@ author**: a rapid is a rapid, and the machine's limit is the operator's setting 
 line at the top of every GRBL file, which moves every line number in every GRBL artifact — `findings.md`
 §5 carries it, and `validateJob()`'s *"the FIRST LINE of the file"* clause was reworded with the fix.
 `CR-01a` unrun.
+
+**F6 — six registered findings, cleared on the author's rulings ✅ closed 2026-08-14.** Four took code.
+`HR-13`: a Manual NC *Optional stop* now emits **`M0`**, the ruling being that a stop that cannot be
+skipped beats a command that vanishes — no supported firmware has a working `M1`, GRBL ignoring it,
+RRF ending the job on it and Marlin alone waiting. `CR-02`: every GRBL prompt gains the **comma**,
+which grblHAL requires and without which its operator sees an unexplained pause; it moves every prompt
+line in every GRBL file. `HR-19` and `HR-24` are the one-liners — one space after `M291` instead of
+two, and `writeWCS()` reading the tool of the section it is handed rather than the global that happens
+to match. Two closed on a ruling alone: **`HR-20`, tapping is not supported** — rigid tapping needs a
+`G33`/`G84` none of the three has, and the post already warns on every sync command — and **`HR-27`,
+the geometry guards function as designed**, moving them into `validateJob()` stranding the orientation
+guard's `Debug` trace, which is the only thing separating a guard that read nothing from one that read
+`+Z`. Alongside them the **tool-change include files left group 7 for group 6**, being the only
+tool-change settings outside it and the only two in that group that ADD to a sequence rather than
+replace one. `CR-02`, `HR-19` and `HR-24` are unrun; `PR-2c` now carries `HR-27`'s falsifier.
 
 **Step 5 — the tool change is Flow 1 and nothing else ✅ closed 2026-08-14.** The post changes no
 tool: no `M6`, no `M84 Z`, no `T` word, no beep, and no `Tool Change X/Y/Z` — the hand-over retracts

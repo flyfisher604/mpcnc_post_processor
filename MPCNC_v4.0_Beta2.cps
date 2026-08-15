@@ -487,7 +487,7 @@ properties = {
   },
   toolChangeMacroFile: {
     title      : "Sender Macro File",
-    description: "Names a file in the NC output folder whose contents are emitted in place of a tool-change token. Read only when At a Tool Change is Hand over to the sender/firmware macro AND Tool Change Handled By is Other, and required there -- the post refuses to post rather than hand over to nothing. THIS IS THE HAND-OVER ITSELF, not an addition to it: the retract, the coolant and spindle stops and the resume are still the post's, but everything between them is your file. It is included once per tool-change boundary, identically, so it cannot depend on which tool is coming -- if it must, have it call a macro that reads the machine's own state. Tool Change Start and Tool Change End in group 7 still bracket the whole sequence and are the place for anything that has to run outside the stops. NAMING ANY FILE makes Fusion ask \"This post processor might be unsafe...\" when you post; answer Yes, because answering No aborts the post.",
+    description: "Names a file in the NC output folder whose contents are emitted in place of a tool-change token. Read only when At a Tool Change is Hand over to the sender/firmware macro AND Tool Change Handled By is Other, and required there -- the post refuses to post rather than hand over to nothing. THIS IS THE HAND-OVER ITSELF, not an addition to it: the retract, the coolant and spindle stops and the resume are still the post's, but everything between them is your file. It is included once per tool-change boundary, identically, so it cannot depend on which tool is coming -- if it must, have it call a macro that reads the machine's own state. Tool Change Start and Tool Change End below still bracket the whole sequence and are the place for anything that has to run outside the stops. NAMING ANY FILE makes Fusion ask \"This post processor might be unsafe...\" when you post; answer Yes, because answering No aborts the post.",
     group      : "toolChange",
     order      : 30,
     type       : "string",
@@ -546,6 +546,27 @@ properties = {
     value      : true,
     scope      : "post"
   },
+  // THESE TWO USED TO SIT IN GROUP 7 and were the only tool-change settings outside this group. They
+  // ADD to the hand-over sequence, where group 7's two REPLACE the post's header and footer, so they
+  // never belonged beside them. Keys are unchanged, so nobody's saved setting resets.
+  includeToolFile1: {
+    title      : "Tool Change Start",
+    description: "File of custom g-code in the NC output folder, inserted at the START of each tool change -- before the retract, before the coolant and spindle stops, and before the pause or macro call. It is ADDED to the hand-over sequence and replaces no part of it, unlike Start GCode File and Stop GCode File in group 7, which replace the post's header and footer outright. IT RUNS WHERE THE CUT ENDED: nothing has retracted yet and the section's own work offset is still active, so a move in this file is a work-frame move at cutting height and it is yours to make safe. Ignored unless At a Tool Change above is a hand-over mode -- Pause for a manual change, or Hand over to the sender/firmware macro. NAMING ANY FILE makes Fusion ask \"This post processor might be unsafe...\" when you post; answer Yes, because answering No aborts the post.",
+    group      : "toolChange",
+    order      : 90,
+    type       : "string",
+    value      : "",
+    scope      : "post"
+  },
+  includeToolFile2: {
+    title      : "Tool Change End",
+    description: "File of custom g-code in the NC output folder, inserted at the END of each tool change -- after the pause or macro call, after the post's own resume and after any re-probe, just before cutting resumes. ADDED to the sequence, not a replacement for it. THE MACHINE IS AT Machine Travel Z when it runs, with absolute mode, the units and the active work offset all re-asserted, so this is the safe end of the sequence to move in. Ignored unless At a Tool Change above is a hand-over mode. See the note on Tool Change Start about Fusion's \"might be unsafe\" prompt.",
+    group      : "toolChange",
+    order      : 100,
+    type       : "string",
+    value      : "",
+    scope      : "post"
+  },
 
   includeStartFile: {
     title      : "Start GCode File",
@@ -561,24 +582,6 @@ properties = {
     description: "Names a file in the NC output folder whose contents REPLACE the post's own footer rather than adding to it -- the spindle stop or its prompt, the end park, the stepper release and the program end all go, so your file must do whatever the job needs. Leave empty (the default) for the built-in footer. See the note on Start GCode File about Fusion's \"might be unsafe\" prompt.",
     group      : "include",
     order      : 20,
-    type       : "string",
-    value      : "",
-    scope      : "post"
-  },
-  includeToolFile1: {
-    title      : "Tool Change Start",
-    description: "File of custom g-code inserted at the START of each tool change (in the NC output folder), before the retract, the stops and the pause or macro call. Unlike the Start and Stop files above this one is ADDED to the hand-over sequence, not a replacement for it. Ignored unless group 6's At a Tool Change is a hand-over mode -- Pause for a manual change, or Hand over to the sender/firmware macro.",
-    group      : "include",
-    order      : 30,
-    type       : "string",
-    value      : "",
-    scope      : "post"
-  },
-  includeToolFile2: {
-    title      : "Tool Change End",
-    description: "File of custom g-code inserted at the END of each tool change (in the NC output folder), after the pause or macro call, after the post's own resume and after any re-probe, just before cutting resumes. ADDED to the sequence, not a replacement for it. Ignored unless group 6's At a Tool Change is a hand-over mode -- Pause for a manual change, or Hand over to the sender/firmware macro.",
-    group      : "include",
-    order      : 40,
     type       : "string",
     value      : "",
     scope      : "post"
