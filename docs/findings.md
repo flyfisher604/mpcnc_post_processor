@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **71 findings — 45 fixed · 2 part-fixed ·
-2 closed by design · 1 withdrawn · 21 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **71 findings — 46 fixed · 2 part-fixed ·
+2 closed by design · 1 withdrawn · 20 open.** Test registers in §4 and §5.
 
 > Four ids — `HR-19`, `HR-22`, `HR-24`, `HR-27` — had **no row in any register** when this
 > file was built. They were carried in checkpoint prose and in `conventions.md`, and are
@@ -51,33 +51,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**21 open (one of them deferred) · 2 part-fixed — 23 entries.**
-
-### PR-28 — `rapidMovements()` orders itself against a Z the tool is not at, after any post-injected move — Low-Med
-
-**Problem.** The ordering rule is `if (_z < getCurrentPosition().z)` — cross first when descending,
-retract first when rising. `getCurrentPosition()` is the **toolpath's** position, and every move the
-post injects itself is invisible to it: the `G53` retract, the probe's safe-Z retract, the start
-sequence's moves. So on the first rapid after any of them the comparison is made against a height the
-tool left blocks ago, and the branch it picks may be the wrong one. Concretely, after a re-probe the
-tool stands at the part origin at `probeSafeZ` while `getCurrentPosition()` still reports the previous
-section's end; if that end is *below* the next section's first rapid the "rising" branch fires, the
-tool **descends to the section's clearance height over the origin** and then crosses the bed at it.
-On a flat single-part job that is ordinary and harmless. Over clamps or between fixtures it is the
-crossing `Machine Travel Z` exists to prevent.
-
-**Found by walking `PR-26`**, which needs the same fact and solves only its own case:
-`forceRapidXYBeforeZ` forces cross-then-descend for the one move after a relocated tool change. That
-flag is a point fix for a general gap, and it is deliberately narrow — it is set only where the walk
-proved the ordering wrong.
-
-**Reproduce.** A code walk settles the comparison. What it cannot settle is how often the wrong branch
-is actually picked, which needs a posted multi-section file with the re-probe on: read the first rapid
-after each probe and check whether the `G0 Z` precedes the `G0 X Y`.
-
-**Fix.** Not attempted. The candidate is to track the post's own injected Z the way `xOutput`/`zOutput`
-already track emitted words, and order against that rather than against the toolpath — which is a
-change to every rapid in the post, not to the tool change, and wants its own step.
+**20 open (one of them deferred) · 2 part-fixed — 22 entries.**
 
 ### PR-25 — whether RepRapFirmware applies a tool-length offset to a `G53` move is unsettled — Low-Med
 
@@ -359,7 +333,7 @@ and fine.
 
 ## 3. Closed findings
 
-**45 fixed · 2 closed by design · 1 withdrawn — 48 rows.** Permanent: commit messages and
+**46 fixed · 2 closed by design · 1 withdrawn — 49 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -412,18 +386,20 @@ diagnosis, the diff and the argument.
 | **PR-24** | Flow 2 was unbuilt because the design left the macro token unsettled, and no firmware source can settle a sender's behaviour | High | **The token stopped being one question by becoming a property.** `Tool Change Handled By` names the handler and the post emits what that handler reads: `T<n> M6` for gSender and CNCjs, whose Grbl `dataFilter` removes the `M6` before the controller answers `error:20` (`src/server/controllers/Grbl/GrblController.js` — the same function `PR-19`/`PR-20` cite); `T<n>` alone for RepRapFirmware, where the T word **is** the change and runs `tfree`/`tpre`/`tpost`; and for `Other`, the operator's own file through `loadFile()` and no token at all. `At a Tool Change` gained a third value and the flows **share** the arrive-and-stop half — one retract, one coolant stop, one spindle stop, so no route can be given a hand-over the others do not get. The resume is `toolChangeMacroResume()`: `G90`, the unit code, `G94`/`G17` on GRBL only, an **unconditional** re-select of `currentWorkOffset`'s own `G5x`, and a return to `Machine Travel Z` before anything reads a coordinate. **Marlin is refused**, having no tool-length register for a macro to write; so are a handler and a firmware that do not match, and `Other` with no file. **The contract is stated where it can be read** — the dropdown's own description — because it is the operator's to satisfy and the post can verify none of it | ✅ |
 | **PR-26** | A manual change happened directly above the cut, and the `Tool Change X/Y/Z` that once moved it had been deleted as unsound rather than replaced | Med | **The frame was the defect, not the feature.** The old fields were bare `G0` words read in whichever WCS was active, so a change position measured against one part's origin was somewhere else for the next; `Tool Change Position X`/`Y`/`Z` are **absolute machine coordinates** through the same `writeMachineFrameBlock()` as every other `G53` move, and mean the same thing on every part of every job. X/Y crosses **after** the retract to `Machine Travel Z` and in its own block, Z follows in a second — `G53` is not modal and no firmware here guarantees a machine-frame diagonal. **There is no X/Y retrace, and that is the finding's substance**: nothing after a change is measured from where the tool stood before it, and where a change coincides with a change of work offset the two registers' true relationship is not known to the post at all, both being probed at runtime. What *is* owed is the ordering of the next rapid — `rapidMovements()` reads `getCurrentPosition().z`, which after an excursion is not where the tool is, and its rising-Z branch would have crossed the bed at the **section's clearance height** instead of the travel height the tool was already holding. `forceRapidXYBeforeZ` forces cross-then-descend for that one move and is cleared by the first commanded work-frame Z. Refused: a half-specified X/Y, any position without a fixed Z reference, and X/Y without X/Y homed. Flow 2 is untouched — the changer position is the macro's own, in a frame the post cannot see — and the fields draw a warning there rather than being dropped in silence | ✅ |
 | **PR-27** | On GRBL nothing keeps the steppers energised through the tool-change pause | Med | Marlin and RepRap get `Start()`'s `M84 S0` and are covered for the whole job. GRBL's equivalent is `$1`, the step idle delay — a **setting**, not g-code, and accepted only in `Idle`, so the post can never emit it. `st_go_idle()` runs whenever the segment buffer drains, which an `M0` pause causes, and disables the drivers after `$1` ms unless `$1` is `255` (`stepper.c`; the stock default is `25`, `defaults.h`, Grbl 1.1). The position **counter** survives — what does not is the axis holding against a hand on the collet or an unbraked Z on a leadscrew that back-drives. A post-time warning naming `$1=255`, **gated on the tool change** rather than on every `M0`: the same setting protects the spindle and probe prompts, but this is the pause that runs to minutes with a spanner in it, and a warning on every job containing a prompt would be read by nobody | ✅ |
+| **PR-28** | `rapidMovements()` ordered itself against a Z the tool is not at, after any post-injected move | Low-Med | **The kernel is told, rather than the post keeping a second copy of the truth.** `getCurrentPosition()` reports the **toolpath's** position — the kernel advances it from the movements it feeds `onRapid`/`onLinear` and never saw the nine moves the post injects on its own account: the probe traverses, the safe-Z retracts, the returns to X0 Y0. Four readers were stale after one of them — the X/Y-against-Z ordering, `isSafeToRapid()`'s G1→G0 restore, and the feedrate projection in both `linearMovements()` and the arc handler — so the flag `PR-26` left fixed the ordering of one move and none of the rest. `noteCurrentPosition()` reports each work-frame move through the kernel's own `setCurrentPosition()`, called from inside `rapidMovementsXY()` / `rapidMovementsZ()` so all nine injection sites are covered without one of them being edited, with `undefined` meaning **unchanged** so an X/Y move claims no Z. **What it cannot reach is the machine frame**, and that is the finding's limit: `setCurrentPosition()` takes a *frame* position, and the work-frame value of a `G53` height needs the WCS offset a runtime probe establishes. Autodesk's own posts leave the kernel stale across a machine-frame retract for the same reason, reporting that move only to the machine simulator on a channel tagged `coordinates: MACHINE` (`haas.cps`, `writeRetract()`, `G53` case). So `forceRapidXYBeforeZ` stays, now as the named residue rather than a point fix — feeding a made-up number in its place would order that one move correctly and silently corrupt the other three readers | ✅ |
 | **PR-19** | The post claimed GRBL cannot jog at an `M0` pause, and said nothing at all about Marlin | Med | The claim was false and shipped in five places. Jogging at the pause is a condition on **what holds the pause**, stated once in `jogAtPauseCondition()` and written by both channels. GRBL: the sender decides — gSender rewrites the line to `(M0)` and holds its own stream (`src/server/controllers/Grbl/GrblController.js`, master, 2026-08-14). Marlin: **a real gap the walk found** — `M0` blocks in `wait_for_user_response()`, whose `idle()` reaches `queue.get_available_commands()` but never `queue.advance()` (`MarlinCore.cpp`, 2.1.2.5), so a serial jog queues and runs **after** the pause. RepRap alone needs no condition | ✅ |
 
 ---
 
 ## 4. Open tests
 
-**⬜ 56 UNRUN · ❌ 0 FAIL · ➖ 3 n/a — 59 rows.** **§4.1 is closed and gone**, and the `S2`/`S3`
+**⬜ 57 UNRUN · ❌ 0 FAIL · ➖ 3 n/a — 60 rows.** **§4.1 is closed and gone**, and the `S2`/`S3`
 debt with it: `PB1`, `PB2`, `PBV1`, `PBV2`, `PBV3`, `M1`, `M2` and `M4` passed on posted files
 2026-08-14, and the twenty-six rows that turn on Steps 1.3, 2 and 3 closed **by code walk**
 2026-08-14 — §5 holds each one's argument. **The nine tool-change rows deleted with the old design
-are replaced by the eighteen `TC-`/`PR-21a`/`PR-22a` rows below**, ten written as Step 5 landed and
-six more with Flow 2, 2026-08-14. All but `TC-2` and `PR-21a` need a **full licence**: a Personal
+are replaced by the twenty-two `TC-`/`PR-21a`/`PR-22a` rows below**, ten written as Step 5 landed,
+six more with Flow 2 and four with the change position, 2026-08-14. All but `TC-2` and `PR-21a`
+need a **full licence**: a Personal
 licence emits no tool change, so there is no boundary in its files to post against. **`TC-16` is
 the only row in this register that can fail without the post being wrong** — it asserts what
 another program does with a correct file.
@@ -488,6 +464,7 @@ lacks.
 | **TC-20** | The `$1=255` warning fires on GRBL for a multi-tool job in either hand-over mode, and is **absent** on Marlin and RepRap, on `Refuse`, and on a single-tool job | four posts, one per condition | posted | — | ⬜ |
 | **PR-23** | — proved by **TC-4**: that file carries two probes into the same register, the first with the outgoing tool. The row records the cost; nothing about it fails | — | — | — | ➖ |
 | **PR-21a** | Marlin + `At End Park At` = `Machine X0 Y0` warns in both channels that the park homes and zeroes the work origin; GRBL and RepRap are silent | Marlin, `XY` + `Home`, park `Machine X0 Y0`; then the same on GRBL | posted | — | ⬜ |
+| **PR-28a** | The first rapid after a post-injected move is ordered against where the tool **actually** is. Diffed against the pre-fix build the only change in the file is that pair of `G0`s — X/Y before Z wherever the section's clearance sits below `Safe Z` — and **nothing else moves at all**, the note being what the kernel already believed for every toolpath rapid | 1 tool, `Probe on Start` = `Current XY & Probe Z`; then a 2-section job with `Re-probe Z0 After a Change` on | posted | — | ⬜ |
 | **PR-22a** | A change from a milling tool into a **jet** tool still stops the spindle — `M5` or the `Turn OFF spindle` prompt is present before the change `M0` | `TC-3` with a jet second tool, `Manual Spindle On/Off` on then off | posted | — | ⬜ |
 | **PR-6a** | The machine park emits `G53 G0 X0 Y0` as its own block, X/Y only | GRBL, `XY Only` + `Home`, park `Machine X0 Y0` | posted | — | ⬜ |
 | **PR-6b** | The **Marlin** route is `G28 X` / `G28 Y`, and needs no prior homing | Marlin, `XY Only`, `Home at Job Start` = **`Off`**, park `Machine` | posted | — | ⬜ |

@@ -3429,10 +3429,37 @@ function writeComment(level, text) {
 }
 
 // Set by a tool change that RELOCATED THE TOOL IN THE MACHINE FRAME, and read once, in rapidMovements().
-// It is the post's way of saying that getCurrentPosition().z -- the toolpath's idea of where the tool
-// is -- is not where the tool is, so the comparison that normally orders a rapid cannot be trusted for
-// one move.
+// It is what is LEFT OVER once noteCurrentPosition() reports every work-frame move the post injects: a
+// machine-frame move has no work-frame value to report, so this is the one case where the post knows
+// getCurrentPosition().z is not where the tool is and cannot correct it -- only refuse to read it.
 var forceRapidXYBeforeZ = false;
+
+// TELL THE KERNEL WHERE THE TOOL IS. getCurrentPosition() reports the TOOLPATH's position -- the kernel
+// advances it from the movements it feeds to onRapid/onLinear, and it is blind to every move the post
+// emits on its own account: the probe traverses, the safe-Z retracts, the return to X0 Y0. Four places
+// read it and each was reading it stale after one of those -- rapidMovements() to order X/Y against Z,
+// isSafeToRapid() to decide whether a G1 may be restored to a G0, and linearMovements() and the arc
+// handler to project a feedrate onto the axes from the wrong start point.
+//
+// UNDEFINED MEANS UNCHANGED and not zero: an X/Y-only move must not claim a Z it did not command.
+//
+// WORK-FRAME POSITIONS ONLY, which is the whole limit of this. setCurrentPosition() takes a FRAME
+// position -- the space getCurrentPosition() reports and getFramePosition() produces -- so a G53 move
+// has nothing truthful to pass here: its work-frame value needs the WCS offset, and that offset is
+// established at runtime by a G10 L20 from a probe the post cannot read. Autodesk's own posts leave the
+// kernel stale across a machine-frame retract for exactly this reason, reporting that move only to the
+// machine simulator on a channel that accepts MACHINE coordinates (haas.cps, writeRetract(), G53 case).
+// So writeMachineFrameBlock() does not call this, and forceRapidXYBeforeZ still exists for the one move
+// that follows a tool change at a machine-frame position. Passing a made-up number instead would order
+// that move correctly and silently corrupt the three other readers, which is the worse trade.
+function noteCurrentPosition(_x, _y, _z) {
+  var cur = getCurrentPosition();
+  setCurrentPosition(new Vector(
+    (_x == undefined) ? cur.x : _x,
+    (_y == undefined) ? cur.y : _y,
+    (_z == undefined) ? cur.z : _z
+  ));
+}
 
 // Rapid movement in X/Y, emitted as G0 at the configured XY travel feedrate. Called from
 // rapidMovements() for every onRapid, and directly for moves like the final return-to-origin.
@@ -3449,6 +3476,10 @@ function rapidMovementsXY(_x, _y) {
       writeBlock(gMotionModal.format(0), x, y, f);
     }
   }
+
+  // Whether the words were emitted or suppressed, the tool is at _x/_y: a formatter returns "" only
+  // where the axis already holds the value asked for.
+  noteCurrentPosition(_x, _y, undefined);
 }
 
 // Rapid movement in Z, emitted as G0 at the configured Z travel feedrate. Called from
@@ -3465,6 +3496,8 @@ function rapidMovementsZ(_z) {
       writeBlock(gMotionModal.format(0), z, f);
     }
   }
+
+  noteCurrentPosition(undefined, undefined, _z);
 
   // A COMMANDED WORK-FRAME Z IS WHAT ENDS THE DEBT. Whatever set the flag did so because the tool was
   // standing at a machine-frame height the work frame has no number for; the block above has just given

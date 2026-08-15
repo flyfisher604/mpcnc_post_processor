@@ -15,12 +15,12 @@ base and the old group 5 no longer exist; the multi-part register is settled; ev
 states the condition it depends on; the tool change is both flows, a machine-frame change position on
 the manual one, and nothing else. `PR-14` closed with 1.2; `PR-16` and `HR-26` closed by deletion with
 2; `PR-17` closed with 2; `PR-18` and `PR-19` closed with 4; `PR-15`, `PR-21` and `PR-22` closed with
-5; `PR-24` with F2; `PR-26` and `PR-27` with F3.
+5; `PR-24` with F2; `PR-26` and `PR-27` with F3; `PR-28` with F4.
 
-**What is next: Step V**, and its tool-change half is now the biggest single hole in it: twenty-two
+**What is next: Step V**, and its tool-change half is now the biggest single hole in it: twenty-three
 `TC-`/`PR-2xa` rows exist and **none has been run**, twenty of them needing a full licence.
 
-**Step V grew by twenty-two and shrank by none.** `findings.md` §4 holds **56 unrun rows**. A walk
+**Step V grew by twenty-three and shrank by none.** `findings.md` §4 holds **57 unrun rows**. A walk
 settles what the post writes and nothing beyond it, so what is left there is what needs Fusion, a
 controller or — new with `PR-20` — a sender. §4 states the methods and their bounds; §5 carries each
 row's argument.
@@ -68,6 +68,9 @@ rows — so what is left here is what a walk cannot reach.
 - **Dialog-only:** `D1`, `D3`, `D4`, `P7`. The properties literal is now declared in display
   order, so if the dialog *still* shows groups out of numeric order, Fusion is not sorting and
   the zero-padding convention is wrong.
+- **`PR-28a`, which is the cheapest row in this step and needs no licence at all**: a one-tool
+  probe-on-start job, diffed against the pre-fix build, where the whole expected delta is the
+  ordering of one pair of `G0`s. Anything else that moves means the position notes are wrong.
 - **The tool-change rows, twenty-two of them, none run.** `TC-4` first — it is the only one that
   proves the ordering fix, and the register it names is the difference between a correct part and
   a plunge at the tool-length difference. `TC-2` rides on `REG-MF`'s post; `TC-17` next after
@@ -206,9 +209,18 @@ cross before it descends — without it the tool crossed the bed at the section'
 is untouched, the changer position being the macro's own, and the fields warn there rather than being
 dropped in silence. `PR-27` rode along: GRBL's steppers de-energise at the pause and `$1` is a setting
 the post can never emit, so it says so. All three close **on a walk alone** — `TC-17` … `TC-20` are
-unrun. **`PR-28` is what F3 left**: the ordering comparison it had to work around is unsound after
-*any* post-injected move, not only after a change position, and fixing that properly touches every
-rapid in the post.
+unrun. F3 left `PR-28`, which **F4 closed**.
+
+**F4 — the post tells the kernel where the tool is ✅ closed 2026-08-14.** `PR-28`, opened by F3's own
+walk. `getCurrentPosition()` is the **toolpath's** position and was blind to the nine moves the post
+injects itself, so four readers — the rapid ordering, `isSafeToRapid()`, and the feedrate projection in
+`linearMovements()` and the arc handler — were each computing from a point the tool had left blocks
+before. The fix reports every **work-frame** injected move through the kernel's own
+`setCurrentPosition()`, from inside `rapidMovementsXY()` / `rapidMovementsZ()` so no injection site
+needed editing. **The machine frame is where it stops, and that is not a shortfall but the same fact
+the rest of this plan turns on**: a `G53` height has no work-frame value until a probe establishes the
+offset, so `forceRapidXYBeforeZ` remains for the one move after a relocated change — as the named
+residue now, not as a point fix. Autodesk's own posts stop at the same line. `PR-28a` is unrun.
 
 **Step 5 — the tool change is Flow 1 and nothing else ✅ closed 2026-08-14.** The post changes no
 tool: no `M6`, no `M84 Z`, no `T` word, no beep, and no `Tool Change X/Y/Z` — the hand-over retracts

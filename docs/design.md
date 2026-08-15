@@ -358,6 +358,25 @@ Carried from the register the old design filled, because each is a defect the re
 
 ## Design notes behind the shipped behaviour
 
+### The kernel's position is the toolpath's, and only the work frame can correct it
+
+`getCurrentPosition()` is not where the tool is. It is where the **toolpath** is: the kernel advances it
+from the movements it feeds `onRapid` / `onLinear`, and every move the post emits on its own account —
+the probe traverses, the safe-Z retracts, the returns to X0 Y0, the machine-frame retracts — is invisible
+to it. Four things read it, and each is wrong by exactly that gap: the X/Y-against-Z ordering of a rapid,
+the G1→G0 restore, and the feedrate projection for a line and for an arc.
+
+So **the post reports its own moves back**, through `noteCurrentPosition()` and the kernel's
+`setCurrentPosition()`, from inside the two rapid writers rather than at each injection site. The rule
+that follows is the one worth carrying: **only a work-frame move can be reported.** `setCurrentPosition()`
+takes a frame position, and the work-frame value of a `G53` height requires the WCS offset — which on this
+machine is established at runtime by a probe, and is the same unknown that makes an X/Y retrace after a
+tool change unsound and multi-part probing necessary. A machine-frame move therefore leaves the kernel
+knowingly stale, and the one place that matters — the first rapid after a relocated tool change — refuses
+to read the stale value instead of being handed a plausible one. Autodesk's own posts draw the line in the
+same place, reporting a `G53` retract only to the machine simulator, on a channel that accepts machine
+coordinates.
+
 ### Traverse clearance is not the G1→G0 plane
 
 **Group 3's "Safe Z to Rapid"** answers a narrower question — "within *this* operation, is Z high enough to
