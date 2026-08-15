@@ -2102,7 +2102,12 @@ function writeWCS(section) {
   // How to establish this added part's origin/Z (probeOnChange). The first part's is set by
   // probeOnStart in writeFirstSection(), so this covers the added parts only.
   var onChangeMode = getProperty(properties.probeOnChange);
-  var canProbe = (tool.number != 0 && !tool.isJetTool());
+  // THE SECTION'S OWN TOOL, not the global one. Both callers pass currentSection, whose tool IS the
+  // global `tool` at that moment, so this emits exactly what it always did -- HR-24. Reading it off the
+  // parameter is what makes that true by construction rather than by coincidence: this is the one
+  // function in the post that is handed a section and could be called with one that is not current.
+  var sectionTool = section.getTool();
+  var canProbe = (sectionTool.number != 0 && !sectionTool.isJetTool());
   writeComment(eComment.Debug, " writeWCS: probeOnChange: " + onChangeMode
     + " previousWorkOffset: " + (previousWorkOffset == undefined ? "none" : previousWorkOffset)
     + " canProbe: " + canProbe);

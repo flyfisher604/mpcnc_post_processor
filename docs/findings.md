@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **71 findings — 47 fixed · 1 part-fixed ·
-4 closed by design · 1 withdrawn · 18 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **71 findings — 48 fixed · 1 part-fixed ·
+4 closed by design · 1 withdrawn · 17 open.** Test registers in §4 and §5.
 
 > Four ids — `HR-19`, `HR-22`, `HR-24`, `HR-27` — had **no row in any register** when this
 > file was built. They were carried in checkpoint prose and in `conventions.md`, and are
@@ -51,7 +51,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**18 open (one of them deferred) · 1 part-fixed — 19 entries.**
+**17 open (one of them deferred) · 1 part-fixed — 18 entries.**
 
 ### PR-25 — whether RepRapFirmware applies a tool-length offset to a `G53` move is unsettled — Low-Med
 
@@ -131,10 +131,6 @@ Deliberately excluded from `HB-16`'s fix. `CR-21` answers this: the second file 
 context loses its whole preamble.
 
 **Fix.** Settle with `CR-21`.
-
-### HR-24 — `writeWCS()` reads the global `tool`, not `section.getTool()` — Low
-
-A one-liner; changes no output.
 
 ### CR-02 — `(MSG …)` prompts omit the conventional comma — Cosmetic
 
@@ -300,7 +296,7 @@ and fine.
 
 ## 3. Closed findings
 
-**47 fixed · 4 closed by design · 1 withdrawn — 52 rows.** Permanent: commit messages and
+**48 fixed · 4 closed by design · 1 withdrawn — 53 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -356,6 +352,7 @@ diagnosis, the diff and the argument.
 | **PR-28** | `rapidMovements()` ordered itself against a Z the tool is not at, after any post-injected move | Low-Med | **The kernel is told, rather than the post keeping a second copy of the truth.** `getCurrentPosition()` reports the **toolpath's** position — the kernel advances it from the movements it feeds `onRapid`/`onLinear` and never saw the nine moves the post injects on its own account: the probe traverses, the safe-Z retracts, the returns to X0 Y0. Four readers were stale after one of them — the X/Y-against-Z ordering, `isSafeToRapid()`'s G1→G0 restore, and the feedrate projection in both `linearMovements()` and the arc handler — so the flag `PR-26` left fixed the ordering of one move and none of the rest. `noteCurrentPosition()` reports each work-frame move through the kernel's own `setCurrentPosition()`, called from inside `rapidMovementsXY()` / `rapidMovementsZ()` so all nine injection sites are covered without one of them being edited, with `undefined` meaning **unchanged** so an X/Y move claims no Z. **What it cannot reach is the machine frame**, and that is the finding's limit: `setCurrentPosition()` takes a *frame* position, and the work-frame value of a `G53` height needs the WCS offset a runtime probe establishes. Autodesk's own posts leave the kernel stale across a machine-frame retract for the same reason, reporting that move only to the machine simulator on a channel tagged `coordinates: MACHINE` (`haas.cps`, `writeRetract()`, `G53` case). So `forceRapidXYBeforeZ` stays, now as the named residue rather than a point fix — feeding a made-up number in its place would order that one move correctly and silently corrupt the other three readers | ✅ |
 | **PR-19** | The post claimed GRBL cannot jog at an `M0` pause, and said nothing at all about Marlin | Med | The claim was false and shipped in five places. Jogging at the pause is a condition on **what holds the pause**, stated once in `jogAtPauseCondition()` and written by both channels. GRBL: the sender decides — gSender rewrites the line to `(M0)` and holds its own stream (`src/server/controllers/Grbl/GrblController.js`, master, 2026-08-14). Marlin: **a real gap the walk found** — `M0` blocks in `wait_for_user_response()`, whose `idle()` reaches `queue.get_available_commands()` but never `queue.advance()` (`MarlinCore.cpp`, 2.1.2.5), so a serial jog queues and runs **after** the pause. RepRap alone needs no condition | ✅ |
 | **CR-01** | GRBL ignores `F` on `G0`, so the group-2 travel speeds do nothing there | Wrong output | **The post cannot set that rate, so it names the parameter that does — in the file, on every GRBL job, as the first line.** GRBL takes a rapid's rate off the axis limits and never out of the block: `block->programmed_rate = block->rapid_rate`, `rapid_rate = limit_value_by_axis_maximum(settings.max_rate, unit_vec)` (`grbl/planner.c`, `plan_buffer_line()`, gnea/grbl 1.1), and FluidNC is the same planner renamed (`FluidNC/src/Planner.cpp`, `block->motion.rapidMotion`, `limit_rate_by_axis_maximum()`, 3.x). Nothing a posted file may contain reaches it: `$110`–`$112` are settings, refused outside `Idle`/`Alarm` (`system_execute_line()` → `STATUS_IDLE_ERROR`; FluidNC's `Setting::check_state()` → `Error::IdleError`), and the rapid override is the real-time bytes `0x95`/`0x96`/`0x97`, not stream content. **The warning names both dialects because the post cannot tell them apart** — one `Grbl` answer covers FluidNC, which kept the g-code and dropped the numbered settings: no `$110` there, the limit being `max_rate_mm_per_min` per axis (`FluidNC/src/Machine/Axis.cpp`). `PR-27`'s `$1` warning is the precedent — a setting the post can never emit, so it says so — and this one is **ungated**, being true of every job on the default firmware. The tooltip half landed with it: both travel-speed descriptions now name the firmwares that read them. **The `F` word stays on the `G0`**: it is still stored (`gc_state.feed_rate = gc_block.values.f; // Always copy this value`, `grbl/gcode.c`), so it sets the modal feed the next cut inherits — which is why `PR-9` put one on the park block. **Mapping travels to `G1` so the `F` would be obeyed was built and rejected** — `travelMotionGcode()`, one switch over both rapid writers and `writeMachineFrameBlock()`, dropped by the author's ruling before it landed: a rapid is a rapid, and the machine's own limit is the operator's setting to make. Expect it to be re-proposed; the answer is here | ✅ |
+| **HR-24** | `writeWCS()` read the global `tool`, not the section it was handed | Low | `section.getTool()`, held in a local and read by the `canProbe` test. **Emits exactly what it did**: both callers pass `currentSection`, whose tool *is* the global at that moment, so the change makes the agreement structural rather than coincidental. `writeWCS()` is the only function in the post that takes a section and could be called with one that is not current | ✅ |
 | **HR-20** | Tapping is not really implemented | Med | **Closed by design — tapping is not supported**, by the author's ruling, and no code changed. Both registered halves were already answered: the automatic path no longer always emits `M4` — `spindleOn()` writes `M3` or `M4` off the commanded direction, and prompts a manual spindle for a reversal at an unchanged speed — and the manual path prompts. What is left is **rigid** tapping, which no supported firmware can do at all, there being no `G33`/`G84` on any of them, and `writeSpeedFeedSyncWarning()` says so on **every** speed-feed-synchronization command so every affected move is flagged. An ordinary tapping cycle still expands into `G0`/`G1` through `onCyclePoint()`, which wants a floating/tension holder — the warning's own words | ➖ |
 | **HR-27** | A geometry guard leaves a truncated `.gcode` | Med | **Closed by design**, by the author's ruling: `currentSection.isMultiAxis()` and `isSectionOrientationSupported()` stay in `onSection()`. Moving them into `validateJob()`'s section loop would strand the orientation guard's `Debug` trace, which is emitted on **every** path by design and is the only thing that distinguishes a guard that read nothing from one that read `+Z` and allowed it — at post-validation time there is no output stream to write it to. `PR-2c` carries the falsifier: what a refused job leaves must not be a runnable `.gcode` | ➖ |
 
@@ -363,7 +360,7 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**⬜ 57 UNRUN · ❌ 0 FAIL · ➖ 5 n/a — 62 rows.** **§4.1 is closed and gone**, and the `S2`/`S3`
+**⬜ 58 UNRUN · ❌ 0 FAIL · ➖ 5 n/a — 63 rows.** **§4.1 is closed and gone**, and the `S2`/`S3`
 debt with it: `PB1`, `PB2`, `PBV1`, `PBV2`, `PBV3`, `M1`, `M2` and `M4` passed on posted files
 2026-08-14, and the twenty-six rows that turn on Steps 1.3, 2 and 3 closed **by code walk**
 2026-08-14 — §5 holds each one's argument. **The nine tool-change rows deleted with the old design
@@ -445,6 +442,7 @@ lacks.
 | **PR-9** | The `G53` park block carries the XY travel feedrate | PR-6a, `Travel Speed XY` off its default | posted | — | ⬜ |
 | **PR-11** | The GRBL jog warning is silent on a single-WCS job whose *subsequent* mode is a `Jog` mode | one WCS, Subsequent = `Jog to X0 Y0, Probe Z0` | posted | — | ⬜ |
 | **PR-13** | The Duet mode string is written once per section-type change, verbatim | `CNC Firmware` = RepRap, a milling job, then milling + laser | posted | — | ⬜ |
+| **HR-24** | `writeWCS()`'s probe test reads the section's own tool, and **no byte of the file moves**: a re-post of a verified job is identical to the pre-change build, which is the whole assertion | any verified reference job, diffed against the pre-change build. **Rides with `REG-MF`, one post** | posted | — | ⬜ |
 | **HR-13** | `onCommand` no longer discards silently, and says so at Comment Level `Off` | Manual NC *Orientate spindle*, then again at Comment Level `Off` | posted | — | ⬜ |
 | **HR-20** | — retired with `HR-20`: closed as unsupported with no code change, so there is nothing to post | — | — | — | ➖ |
 | **HR-27** | — proved by **PR-2c**, which now covers the two `onSection()` geometry guards: a refused job leaves nothing that will run | — | — | — | ➖ |
@@ -631,8 +629,8 @@ None is a defect; none is scheduled.
 
 ## 7. Owed
 
-1. **Sixteen open findings have no test row** — the thirteen open `CR-` ids, filed from
-   source walks and never posted against, plus `HR-19`, `HR-22` and `HR-24`, which
+1. **Fifteen open findings have no test row** — the thirteen open `CR-` ids, filed from
+   source walks and never posted against, plus `HR-19` and `HR-22`, which
    never had rows at all. Every one owes a row in §4 before it can be closed — the largest
    single gap in this register, and the one place the *every finding resolves to a test row*
    rule is currently unmet. **Two deliberate exceptions**, each stating why in its own row:
