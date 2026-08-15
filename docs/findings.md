@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **71 findings — 50 fixed ·
-4 closed by design · 1 withdrawn · 16 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **71 findings — 51 fixed ·
+4 closed by design · 1 withdrawn · 15 open.** Test registers in §4 and §5.
 
 > **`HR-22` has no row in any register but this one.** It was carried in checkpoint prose and
 > in `conventions.md`, as `HR-19`, `HR-24` and `HR-27` were until they closed.
@@ -50,7 +50,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**16 open, one of them deferred.**
+**15 open, one of them deferred.**
 
 ### PR-25 — whether RepRapFirmware applies a tool-length offset to a `G53` move is unsettled — Low-Med
 
@@ -115,15 +115,6 @@ Deliberately excluded from `HB-16`'s fix. `CR-21` answers this: the second file 
 context loses its whole preamble.
 
 **Fix.** Settle with `CR-21`.
-
-### CR-02 — `(MSG …)` prompts omit the conventional comma — Cosmetic
-
-**Problem.** `askUser()`'s GRBL arm emits `M0 (MSG Attach ZProbe)`. Senders match on
-`(MSG,<text>)` with a comma. GRBL ignores the comment either way, so nothing breaks at the
-controller — but a sender that keys on `(MSG,` will not surface the prompt and the operator
-sees an unexplained pause.
-
-**Reproduce.** `CNC Firmware` = Grbl, any prompt.
 
 ### CR-03 — group 3 is not gated to the licence it exists for, and nothing warns — Machine damage · deferred
 
@@ -280,7 +271,7 @@ and fine.
 
 ## 3. Closed findings
 
-**50 fixed · 4 closed by design · 1 withdrawn — 55 rows.** Permanent: commit messages and
+**51 fixed · 4 closed by design · 1 withdrawn — 56 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -336,6 +327,7 @@ diagnosis, the diff and the argument.
 | **PR-28** | `rapidMovements()` ordered itself against a Z the tool is not at, after any post-injected move | Low-Med | **The kernel is told, rather than the post keeping a second copy of the truth.** `getCurrentPosition()` reports the **toolpath's** position — the kernel advances it from the movements it feeds `onRapid`/`onLinear` and never saw the nine moves the post injects on its own account: the probe traverses, the safe-Z retracts, the returns to X0 Y0. Four readers were stale after one of them — the X/Y-against-Z ordering, `isSafeToRapid()`'s G1→G0 restore, and the feedrate projection in both `linearMovements()` and the arc handler — so the flag `PR-26` left fixed the ordering of one move and none of the rest. `noteCurrentPosition()` reports each work-frame move through the kernel's own `setCurrentPosition()`, called from inside `rapidMovementsXY()` / `rapidMovementsZ()` so all nine injection sites are covered without one of them being edited, with `undefined` meaning **unchanged** so an X/Y move claims no Z. **What it cannot reach is the machine frame**, and that is the finding's limit: `setCurrentPosition()` takes a *frame* position, and the work-frame value of a `G53` height needs the WCS offset a runtime probe establishes. Autodesk's own posts leave the kernel stale across a machine-frame retract for the same reason, reporting that move only to the machine simulator on a channel tagged `coordinates: MACHINE` (`haas.cps`, `writeRetract()`, `G53` case). So `forceRapidXYBeforeZ` stays, now as the named residue rather than a point fix — feeding a made-up number in its place would order that one move correctly and silently corrupt the other three readers | ✅ |
 | **PR-19** | The post claimed GRBL cannot jog at an `M0` pause, and said nothing at all about Marlin | Med | The claim was false and shipped in five places. Jogging at the pause is a condition on **what holds the pause**, stated once in `jogAtPauseCondition()` and written by both channels. GRBL: the sender decides — gSender rewrites the line to `(M0)` and holds its own stream (`src/server/controllers/Grbl/GrblController.js`, master, 2026-08-14). Marlin: **a real gap the walk found** — `M0` blocks in `wait_for_user_response()`, whose `idle()` reaches `queue.get_available_commands()` but never `queue.advance()` (`MarlinCore.cpp`, 2.1.2.5), so a serial jog queues and runs **after** the pause. RepRap alone needs no condition | ✅ |
 | **CR-01** | GRBL ignores `F` on `G0`, so the group-2 travel speeds do nothing there | Wrong output | **The post cannot set that rate, so it names the parameter that does — in the file, on every GRBL job, as the first line.** GRBL takes a rapid's rate off the axis limits and never out of the block: `block->programmed_rate = block->rapid_rate`, `rapid_rate = limit_value_by_axis_maximum(settings.max_rate, unit_vec)` (`grbl/planner.c`, `plan_buffer_line()`, gnea/grbl 1.1), and FluidNC is the same planner renamed (`FluidNC/src/Planner.cpp`, `block->motion.rapidMotion`, `limit_rate_by_axis_maximum()`, 3.x). Nothing a posted file may contain reaches it: `$110`–`$112` are settings, refused outside `Idle`/`Alarm` (`system_execute_line()` → `STATUS_IDLE_ERROR`; FluidNC's `Setting::check_state()` → `Error::IdleError`), and the rapid override is the real-time bytes `0x95`/`0x96`/`0x97`, not stream content. **The warning names both dialects because the post cannot tell them apart** — one `Grbl` answer covers FluidNC, which kept the g-code and dropped the numbered settings: no `$110` there, the limit being `max_rate_mm_per_min` per axis (`FluidNC/src/Machine/Axis.cpp`). `PR-27`'s `$1` warning is the precedent — a setting the post can never emit, so it says so — and this one is **ungated**, being true of every job on the default firmware. The tooltip half landed with it: both travel-speed descriptions now name the firmwares that read them. **The `F` word stays on the `G0`**: it is still stored (`gc_state.feed_rate = gc_block.values.f; // Always copy this value`, `grbl/gcode.c`), so it sets the modal feed the next cut inherits — which is why `PR-9` put one on the park block. **Mapping travels to `G1` so the `F` would be obeyed was built and rejected** — `travelMotionGcode()`, one switch over both rapid writers and `writeMachineFrameBlock()`, dropped by the author's ruling before it landed: a rapid is a rapid, and the machine's own limit is the operator's setting to make. Expect it to be re-proposed; the answer is here | ✅ |
+| **CR-02** | `(MSG …)` prompts omitted the conventional comma | Cosmetic | `askUser()`'s GRBL arm writes `(MSG,<text>)`. **The comma is load-bearing on grblHAL** — `strncasecmp(comment, "MSG,", 4)` in `gc_normalize_block()` (`grblHAL/core`, `gcode.c`, read 2026-08-14), which surfaces nothing without it, so the prompt was an unexplained pause there. The other two dialects pay nothing: FluidNC matches `strstr(comment, "MSG")` and skips a fixed four characters (`gcode_comment_msg()`, `FluidNC/src/GCode.cpp`), and stock grbl 1.1 discards comments entirely. No space after the comma — grblHAL trims one, FluidNC would keep it. **Every `M0 (MSG …)` line in every GRBL file changes**; `validateJob()`'s `PR-20` comment was re-quoted to match, and the two line numbers `CR-01` left stale in the same sentences were corrected with it | ✅ |
 | **HR-13** | `onCommand` silently discarded every command it did not name | Low-Med | Two halves, and both are landed. The **silence** went with `f54beb0` — every unnamed command reaches a `writeWarning()` below the `switch`, so it outlives Comment Level `Off`, which matters because Manual NC is invisible to `validateJob()` and there is no post-time twin to carry it. **`COMMAND_OPTIONAL_STOP` now emits `M0`**, by the author's ruling: no supported firmware has a working *stop only if asked*, so the choice was a stop that cannot be skipped or a command that vanishes. **`M1` is refused**, and the registered diff that proposed it was right about the parser and wrong about the behaviour — grbl 1.1 accepts and ignores it (`gcode.c`, *"case 1: break; // Optional stop not supported. Ignore."*), RRF handles `M0`/`M1`/`M2` in one block and so **ends the job** mid-file (`src/GCodes/GCodes2.cpp`), and only Marlin waits (`src/gcode/lcd/M0_M1.cpp`, under `HB-1`'s `HAS_RESUME_CONTINUE`). The file says at each occurrence that the *optional* half is what could not be kept | ✅ |
 | **HR-19** | `M291` carried a doubled space | Low | The RepRap arm of `askUser()` built its parameter string with a leading space, on top of the separator `writeBlock()` already supplies — so `M291  P"…"` at **both** `Include Whitespace` settings, the manual prefix covering the other one. The space is gone; the GRBL and default arms never had it, and `X1 Y1 Z1`'s leading space stays, joining inside one word | ✅ |
 | **HR-24** | `writeWCS()` read the global `tool`, not the section it was handed | Low | `section.getTool()`, held in a local and read by the `canProbe` test. **Emits exactly what it did**: both callers pass `currentSection`, whose tool *is* the global at that moment, so the change makes the agreement structural rather than coincidental. `writeWCS()` is the only function in the post that takes a section and could be called with one that is not current | ✅ |
@@ -346,7 +338,7 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**⬜ 59 UNRUN · ❌ 0 FAIL · ➖ 5 n/a — 64 rows.** **§4.1 is closed and gone**, and the `S2`/`S3`
+**⬜ 60 UNRUN · ❌ 0 FAIL · ➖ 5 n/a — 65 rows.** **§4.1 is closed and gone**, and the `S2`/`S3`
 debt with it: `PB1`, `PB2`, `PBV1`, `PBV2`, `PBV3`, `M1`, `M2` and `M4` passed on posted files
 2026-08-14, and the twenty-six rows that turn on Steps 1.3, 2 and 3 closed **by code walk**
 2026-08-14 — §5 holds each one's argument. **The nine tool-change rows deleted with the old design
@@ -428,6 +420,7 @@ lacks.
 | **PR-9** | The `G53` park block carries the XY travel feedrate | PR-6a, `Travel Speed XY` off its default | posted | — | ⬜ |
 | **PR-11** | The GRBL jog warning is silent on a single-WCS job whose *subsequent* mode is a `Jog` mode | one WCS, Subsequent = `Jog to X0 Y0, Probe Z0` | posted | — | ⬜ |
 | **PR-13** | The Duet mode string is written once per section-type change, verbatim | `CNC Firmware` = RepRap, a milling job, then milling + laser | posted | — | ⬜ |
+| **CR-02** | Every operator prompt on GRBL reads `M0 (MSG,<text>)` — `grep -c '(MSG '` = **0** and `grep -c '(MSG,'` = the prompt count — and **nothing else in the file moves**: the diff against the pre-change build is one comma per prompt line | defaults, diffed against the pre-change build. **Licence-free** | posted | — | ⬜ |
 | **HR-19** | Every RepRap prompt reads `M291 P"…" R"…" S3` with **one** space after `M291` at both `Include Whitespace` settings, and a jog prompt still has exactly one before its `X1 Y1 Z1` | RepRap, First = `Jog to X0 Y0 Z0`, posted at `Include Whitespace` on and again off. **Rides with `PR-19a`'s RepRap post** | posted | — | ⬜ |
 | **HR-24** | `writeWCS()`'s probe test reads the section's own tool, and **no byte of the file moves**: a re-post of a verified job is identical to the pre-change build, which is the whole assertion | any verified reference job, diffed against the pre-change build. **Rides with `REG-MF`, one post** | posted | — | ⬜ |
 | **HR-13** | Both halves: an unnamed command warns instead of vanishing, and Manual NC *Optional stop* emits `M0` with its own warning beside it — **on all three firmwares, and no `M1` anywhere in the file** | Manual NC *Orientate spindle*, then Manual NC *Optional stop*, each again at Comment Level `Off` | posted | — | ⬜ |
@@ -549,6 +542,7 @@ Delete a row when its test is re-posted, and delete this section when it empties
 
 | Rows | What moved | Effect |
 |---|---|---|
+| every saved GRBL `.gcode` carrying an operator prompt | the `(MSG,` comma | Every `M0 (MSG …)` line gains a comma and nothing else moves. **No row's assertion is affected** — `HB-9`'s criterion anchors on `^(`, and the prompts' text, order and count are unchanged. Delete when **`CR-02`** runs |
 | every saved GRBL `.gcode` predating 2026-07-31 | the manual-spindle stop now prompts on GRBL | A default job ends `M0 (MSG Turn OFF spindle)` where it once ended `M5`. **No row's assertions are affected** — do not read a tail diff as a regression |
 | the two header-dump rows above | the `groupDefinitions` move, the key rename, then the machine-frame work | The assertions stand — one block per group, in dialog order — but the counts and titles moved. **`D5` closed by walk, so no post refreshes these**; delete when **`REG-MF`** runs |
 | every saved `.gcode` posted at `Comment Level` `Info` or `Debug`, and `S2a`/`D5`'s enumerated dump delta | group 5's dialog title, which `writeAllProperties()` prints as its heading | **One line moves in every such file** — ` Properties -- 5 - On WCS / Part / Fixture Changes:` becomes ` Properties -- 5 - Part Origins - how each part's X0 Y0 Z0 is established:`. No g-code, no key, no value. **`S2a`'s claim survives as written and its enumeration does not** — the whole delta is still the property dump; the dump now has one more changed line than `D5` lists. **Byte-identity is not available as a criterion for any re-post at `Info` or `Debug`**; the criterion is *this heading and nothing else* |
@@ -612,7 +606,7 @@ None is a defect; none is scheduled.
 
 ## 7. Owed
 
-1. **Fourteen open findings have no test row** — the thirteen open `CR-` ids, filed from
+1. **Thirteen open findings have no test row** — the twelve open `CR-` ids, filed from
    source walks and never posted against, plus `HR-22`, which never had a row at all.
    Every one owes a row in §4 before it can be closed — the largest
    single gap in this register, and the one place the *every finding resolves to a test row*

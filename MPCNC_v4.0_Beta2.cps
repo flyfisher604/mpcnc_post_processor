@@ -1461,14 +1461,16 @@ function validateJob() {
   // THIS IS NOT A JOG-MODE PROBLEM. Every operator stop this post writes into its PREAMBLE is exposed,
   // and the two that ship on by default are the worst of them. At Off:
   //
-  //   Pause, then Home     M0 (MSG Prepare machine for homing) is LINE 1 of the file -- writeInformation
-  //                        emits nothing at this level -- so it is dropped in every configuration and
-  //                        the machine homes while the operator is still clearing the bed.
-  //   Current XY & Probe Z M0 (MSG Attach ZProbe) at line 7 of the leanest file: G54, four Start()
-  //     (the DEFAULT)      blocks, the provisional G10, the prompt. Dropped, and the G38.2 below it then
-  //                        drives a bare tool "G38 Target" deep looking for a plate nobody attached.
-  //   Jog to ...           the jog prompt at 10 at the most, so dropped, and the origin write below it
-  //                        records wherever the tool was parked as the part origin.
+  //   Pause, then Home     M0 (MSG,Prepare machine for homing) is line 2 of the file, behind CR-01's
+  //                        travel-speed warning -- writeInformation emits nothing at this level -- so it
+  //                        is dropped in every configuration and the machine homes while the operator is
+  //                        still clearing the bed.
+  //   Current XY & Probe Z M0 (MSG,Attach ZProbe) at line 8 of the leanest file: the warning, G54, four
+  //     (the DEFAULT)      Start() blocks, the provisional G10, the prompt. Dropped, and the G38.2 below
+  //                        it drives a bare tool "G38 Target" deep looking for a plate nobody attached.
+  //   Jog to ...           the jog prompt at 11 at the most, so dropped -- eleven is still one short by
+  //                        the count below -- and the origin write beneath it then records wherever the
+  //                        tool was parked as the part origin.
   //
   // THE COUNT CANNOT BE COMPUTED HERE, WHICH IS WHY THE TEXT HEDGES. Nothing the post emits of its own
   // clears ten at Off -- the fullest preamble it can build is $H, the select, four Start() blocks, the
@@ -3944,9 +3946,14 @@ function askUser(text, title, allowJog) {
     writeBlock(mFormat.format(291), (getProperty(properties.jobSeparateWordsWithSpace) ? "" : " ") + v1 + v2);
   }
 
-  // GRBL, include the message in a comment prefixed with MSG
+  // GRBL, include the message in a comment prefixed with MSG. THE COMMA IS LOAD-BEARING and is not
+  // punctuation: grblHAL matches strncasecmp(comment, "MSG,", 4) in gc_normalize_block() and surfaces
+  // nothing at all without it (grblHAL/core gcode.c, read 2026-08-14). FluidNC is indifferent --
+  // strstr(comment, "MSG") then a fixed four-character skip, gcode_comment_msg(), FluidNC/src/GCode.cpp
+  // -- and stock grbl 1.1 discards comments entirely, so the two dialects that already worked pay
+  // nothing for it. No space after the comma: grblHAL trims one, FluidNC would keep it. CR-02.
   else if (fw == eFirmware.GRBL) {
-      writeBlock(mFormat.format(0), (getProperty(properties.jobSeparateWordsWithSpace) ? "" : " ") + "(MSG " + sanitizeMessageText(text, "();") + ")");
+      writeBlock(mFormat.format(0), (getProperty(properties.jobSeparateWordsWithSpace) ? "" : " ") + "(MSG," + sanitizeMessageText(text, "();") + ")");
   }
 
   // Default
