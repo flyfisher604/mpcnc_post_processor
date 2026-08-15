@@ -252,13 +252,13 @@ each is a place a one-dialect assumption would have shipped a wrong motion:
 
 ---
 
-## Tool changes — two flows, and the code implements neither
+## Tool changes — two flows, and the code implements both
 
-**The shipped tool-change code is a bad design and will be replaced rather than repaired.** This section
-is the target, not the behaviour: `findings.md` `PR-15` is the single finding that the code does not comply
-with it, and the per-defect rows filed against the old design were deleted with the design that made them
-defects. Their durable content — the firmware facts and the orderings any implementation must respect —
-is below.
+**The shipped tool-change code was a bad design and was replaced rather than repaired.** Flow 1 landed
+first (`findings.md` `PR-15`) and Flow 2 followed (`PR-24`), both 2026-08-14, so this section now
+describes the code rather than aiming at it. The per-defect rows filed against the old design were
+deleted with the design that made them defects; their durable content — the firmware facts and the
+orderings any implementation must respect — is below.
 
 **The premise both flows follow from.** A measured tool change needs a probe, a **subtraction**, and a
 register to hold the result. **The post can supply none of the three.** It cannot compute an offset it will
@@ -308,9 +308,31 @@ split on who can do the subtraction:
 
 **This is a contract, and the contract is the deliverable.** What the macro may change and what it must
 restore has to be written down, because the post cannot verify any of it. Without that written contract the
-call is a trapdoor. The **token itself is unsettled** — `M6` is the natural candidate and is real on RRF,
-but whether senders intercept it on GRBL is a sender-side fact this project has not yet sourced, and no
-firmware source can settle it. `findings.md` §6 carries the question.
+call is a trapdoor. **It is written in the dialog, not here** — `Tool Change Handled By`'s own description,
+because the party who has to satisfy it is the operator and that is the only document they read.
+
+**The token stopped being one question by becoming a property.** `M6` is real on RRF and is `error:20` on
+GRBL, so whether the route exists at all depends on the *sender* — a sender-side fact no firmware source
+can settle. The post therefore names the handler and emits what that handler reads: `T<n> M6` for gSender
+and CNCjs, whose Grbl `dataFilter` removes the `M6` before the controller sees it; `T<n>` alone for RRF,
+where the T word **is** the change; the operator's own file for anything else. **A handler is listed only
+where its interception is sourced** — which is why `Other` exists and why UGS is not in the list.
+
+**Where the manual change happens is Flow 1's question alone, and the frame is its whole substance.** The
+deleted `Tool Change X/Y/Z` were bare `G0` words the dialog called absolute while the machine read them in
+whichever WCS was active, so a change position measured against one part's origin was somewhere else for
+the next. Replaced in the **machine frame**, through the same `G53` block as every other machine-frame
+move, where a coordinate means the same thing on every part of every job. Flow 2 has no such fields:
+driving the tool to a changer or a length sensor is the macro's own business, in a frame the post cannot
+see, and a post that guessed would be putting the tool where the macro did not ask for it.
+
+**The return is not a retrace, and the reason is the same one that makes multi-part probing necessary.**
+Nothing after a change is measured from where the tool stood before it — the tracked position is discarded,
+the next move is absolute, and the re-probe re-establishes Z0 from the part origin. The point to return to
+is known only in the *work* frame, and where a change coincides with a change of work offset, the true
+relationship between the two registers is not known until both have been probed. So the post owes the
+**height** and the **order of the next rapid**, and nothing else: cross at the height the change left,
+then descend.
 
 ### What any implementation must get right
 

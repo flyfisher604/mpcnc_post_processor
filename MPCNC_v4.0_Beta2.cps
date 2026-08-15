@@ -100,7 +100,7 @@ groupDefinitions.feeds      = {title: "2 - Feeds and Speeds", order: 110};
 groupDefinitions.mapRapids  = {title: "3 - Map G1s to Rapids - disable when using full license", order: 120};
 groupDefinitions.machine    = {title: "4 - Machine Frame - homing, travel Z and end park", order: 130};
 groupDefinitions.probe      = {title: "5 - Part Origins - how each part's X0 Y0 Z0 is established", order: 150};
-groupDefinitions.toolChange = {title: "6 - Tool Changes", order: 160};
+groupDefinitions.toolChange = {title: "6 - Tool Changes - the post hands over, it changes no tool", order: 160};
 groupDefinitions.include    = {title: "7 - External Include Files", order: 170};
 groupDefinitions.laser      = {title: "8 - Laser", order: 180};
 groupDefinitions.coolant    = {title: "9 - Coolant", order: 190};
@@ -375,7 +375,7 @@ properties = {
   },
   probePause: {
     title      : "Probe Pause",
-    description: "Operator pauses around each part probe (the first part and each added part) -- the prompts to attach the Z probe (before) and detach it (after). No: no prompts (a fixed/permanent probe). Before: prompt to attach only. Before & After (default): prompt to attach before probing and to detach after -- the manual touch-off. Applies to the part probes in this group only, not the tool-change re-probe.",
+    description: "Operator pauses around each part probe (the first part and each added part) -- the prompts to attach the Z probe (before) and detach it (after). No: no prompts (a fixed/permanent probe). Before: prompt to attach only. Before & After (default): prompt to attach before probing and to detach after -- the manual touch-off. Applies to EVERY probe the post emits: the first part, each added part, and the re-probe after a manual tool change.",
     group      : "probe",
     order      : 30,
     type       : "enum",
@@ -451,63 +451,86 @@ properties = {
     scope      : "post"
   },
 
-  toolChangeEnabled: {
-    title      : "Tool Changes are Included",
-    description: "Tool changes are included in the NC file.",
+  // THE POST PERFORMS NO TOOL CHANGE, on any firmware, and this group is what it does instead. A
+  // measured change needs a probe, a subtraction and a register to hold the result, and the post can
+  // supply none of the three -- it cannot compute an offset it will not learn until the operator swaps
+  // the tool, hours after posting, and it can never read a register back. So its role is to arrive
+  // correctly, hand over, and resume correctly. design.md -> Tool changes.
+  toolChangeMode: {
+    title      : "At a Tool Change",
+    description: "What this post does when the job's tool number changes. IT NEVER CHANGES THE TOOL ITSELF on any setting: a measured change needs a probe, a subtraction and a tool-length register, and this post has none of the three -- it cannot compute an offset it will not learn until you swap the tool, hours after posting, and it can never read a register back to check one. What it can do is arrive correctly, hand over, and resume correctly, and these are the three ways it can hand over. Refuse to post (default): a job using more than one tool does not post at all, and the dialog says so before any file is written. Post one tool per file -- on a Personal licence Fusion already does that for you, since it emits no tool change at all, and the second file resumes on the origin the first one left behind. Pause for a manual change: at each tool-number boundary the post retracts to Machine Travel Z in the machine's own frame, moves to the Tool Change Position below if you have set one, stops the coolant and the spindle (or prompts you to stop it), and stops the program with M0 so you change the tool by hand; it then re-probes Z0 if Re-probe Z0 After a Change is on, restarts the spindle and resumes. THAT PAUSE DOES NOT OFFER JOGGING and must not be jogged at: the resume depends on the tool still standing where the post left it. Hand over to the sender or firmware macro: the same retract and the same stops, then the post emits the token named by Tool Change Handled By below and lets something that DOES own a tool table do the change -- your sender, or RepRapFirmware's own tool table. THE POST CANNOT VERIFY THAT ANYTHING IS LISTENING: if your sender is not configured to intercept the token, a GRBL controller answers M6 with error:20 and stops the job with the tool in the cut, or the sender drops it silently and the job cuts on with the wrong cutter. Set that up and test it on air before you trust it. NOT AVAILABLE ON MARLIN, which has no tool-length register at all -- there the only correction is re-zeroing by hand, which is Pause for a manual change. BOTH HAND-OVER MODES NEED Machine Travel Z -- with that field empty there is no frame in which an absolute retract means anything, so the hand-over happens at whatever height the last operation ended at and the post says so in the file.",
     group      : "toolChange",
     order      : 10,
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
+    type       : "enum",
+    values: [
+      { title: "Refuse to post",                        id: "Refuse" },
+      { title: "Pause for a manual change",             id: "Pause"  },
+      { title: "Hand over to the sender/firmware macro", id: "Macro" }
+    ],
+    value: "Refuse",
+    scope: "post"
   },
-  toolChangeInsertCode: {
-    title      : "Include Relocation Code",
-    description: "Relocate the tool for manual tool changes.",
+  toolChangeSender: {
+    title      : "Tool Change Handled By",
+    description: "WHO performs the change once the post has handed over, and therefore which token the post emits. Read only when At a Tool Change is Hand over to the sender/firmware macro. gSender and CNCjs: the post emits T<n> M6. Neither GRBL nor grblHAL executes M6 -- the controller answers error:20 -- so this route exists ONLY because the sender takes the M6 out of the stream before the controller sees it and runs its own tool-change routine instead. BOTH SENDERS MUST BE CONFIGURED FOR IT: gSender's own tool-change setting has an Ignore option that drops the M6 and carries straight on, which is a job that finishes cutting with the first tool. CNCjs pauses the stream and does nothing else, so the change and the re-zero are yours to do at the pause. RepRapFirmware tool table: the post emits T<n> alone and no M6, because on RRF the T word IS the change -- it runs tfree, tpre and tpost for you, and tpost is where a tool-length offset is applied. The tool numbers this job uses must be declared with M563 in config.g and the macros must exist, or RRF errors on the T word. Other: the post emits nothing of its own and includes the file named in Sender Macro File instead -- for a sender not listed here, or a macro of your own. WHATEVER RUNS, THE POST RESUMES THE SAME WAY: it re-asserts absolute mode and units, re-selects the active work offset, and returns to Machine Travel Z before cutting resumes, because it cannot know what the macro left behind.",
     group      : "toolChange",
     order      : 20,
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
+    type       : "enum",
+    values: [
+      { title: "gSender (Sienci) -- T + M6",         id: "gSender" },
+      { title: "CNCjs -- T + M6",                    id: "CNCjs"   },
+      { title: "RepRapFirmware tool table -- T",     id: "RepRap"  },
+      { title: "Other -- the macro file below",      id: "Other"   }
+    ],
+    value: "Other",
+    scope: "post"
   },
-  toolChangeX: {
-    title      : "Tool Change X",
-    description: "X location for tool change, in whichever WCS is currently active (plain G0, not machine coordinates).",
+  toolChangeMacroFile: {
+    title      : "Sender Macro File",
+    description: "Names a file in the NC output folder whose contents are emitted in place of a tool-change token. Read only when At a Tool Change is Hand over to the sender/firmware macro AND Tool Change Handled By is Other, and required there -- the post refuses to post rather than hand over to nothing. THIS IS THE HAND-OVER ITSELF, not an addition to it: the retract, the coolant and spindle stops and the resume are still the post's, but everything between them is your file. It is included once per tool-change boundary, identically, so it cannot depend on which tool is coming -- if it must, have it call a macro that reads the machine's own state. Tool Change Start and Tool Change End in group 7 still bracket the whole sequence and are the place for anything that has to run outside the stops. NAMING ANY FILE makes Fusion ask \"This post processor might be unsafe...\" when you post; answer Yes, because answering No aborts the post.",
     group      : "toolChange",
     order      : 30,
-    type       : "integer",
-    value      : 0,
+    type       : "string",
+    value      : "",
     scope      : "post"
   },
-  toolChangeY: {
-    title      : "Tool Change Y",
-    description: "Y location for tool change, in whichever WCS is currently active (plain G0, not machine coordinates).",
+  // WHERE THE MANUAL CHANGE HAPPENS. Three fields and not one because Fusion's dialog has no vector
+  // type, and STRINGS because empty is what says "do not move" -- exactly as Machine Travel Z's empty
+  // says "no frame", and for the same reason: every numeric sentinel is a real reachable coordinate.
+  //
+  // MACHINE COORDINATES, which is the whole difference from the Tool Change X/Y/Z these replace. Those
+  // were plain G0 words the dialog presented as absolute while the machine read them in whichever WCS
+  // happened to be active, so the "fixed" change spot moved with every part origin. These are G53.
+  toolChangePositionX: {
+    title      : "Tool Change Position X",
+    description: "The X the tool moves to for a MANUAL tool change -- an ABSOLUTE MACHINE COORDINATE, in mm, signed, the same frame as Machine Travel Z. Leave it EMPTY (the default) and the tool does not move in X or Y at all: the change happens directly above the point the last operation ended at, which is what this post did before this field existed. Fill it to bring the spindle somewhere you can actually reach -- the front of the bed, out from under the gantry, clear of the dust shoe. X AND Y ARE FILLED TOGETHER OR NOT AT ALL; one without the other does not post. REQUIRES Axes Homed and Trusted to include X and Y, and Machine Travel Z to be set: the move is an absolute G53 rapid, and the tool has to reach a height that clears your fixtures before it crosses the bed. READ ONLY WHEN At a Tool Change is Pause for a manual change -- a macro drives the tool to its own change position in its own frame, and the post does not second-guess it. THE TOOL DOES NOT COME BACK TO THE POINT IT LEFT. It returns to Machine Travel Z, and the next operation's first move then traverses in X/Y at that height before it descends, so nothing is ever cut from the change position. There is nothing else to restore: no depth in the job is measured from where the tool stood before the change.",
     group      : "toolChange",
     order      : 40,
-    type       : "integer",
-    value      : 0,
+    type       : "string",
+    value      : "",
     scope      : "post"
   },
-  toolChangeZ: {
-    title      : "Tool Change Z",
-    description: "Z location for tool change, in whichever WCS is currently active (plain G0, not machine coordinates).",
+  toolChangePositionY: {
+    title      : "Tool Change Position Y",
+    description: "The Y half of the manual tool-change position -- an ABSOLUTE MACHINE COORDINATE, in mm, signed. Everything said about Tool Change Position X applies here, and the two are read as one setting: fill both or neither, or the job does not post. On a bed-slinger-style machine this is usually the field that matters, since bringing Y forward is what puts the spindle over the front edge instead of over the work.",
     group      : "toolChange",
     order      : 50,
-    type       : "integer",
-    value      : 40,
+    type       : "string",
+    value      : "",
     scope      : "post"
   },
-  toolChangeDisableZStepper: {
-    title      : "Disable Z Stepper",
-    description: "Disable Z stepper after reaching tool change location.",
+  toolChangePositionZ: {
+    title      : "Tool Change Position Z",
+    description: "The height the tool holds during a MANUAL tool change -- an ABSOLUTE MACHINE COORDINATE, in mm, signed. Leave it EMPTY (the default) and the change happens at Machine Travel Z, the height the tool has already retracted to; that is the right answer unless you need the spindle lower or higher than the travel height to get a spanner on the collet. Filled, the post moves to it AFTER the X/Y move above, and returns to Machine Travel Z before anything else moves. A VALUE BELOW Machine Travel Z HOLDS THE TOOL LOWER DURING THE CHANGE THAN THE HEIGHT YOU DECLARED CLEARS YOUR FIXTURES -- legitimate at a change position that is clear of them, a collision anywhere else, so the post warns and leaves the judgement to you. May be filled without X and Y, which changes the height and nothing else. Same requirements as X: Axes Homed and Trusted must include Z, Machine Travel Z must be set, and it is read only on Pause for a manual change.",
     group      : "toolChange",
     order      : 60,
-    type       : "boolean",
-    value      : false,
+    type       : "string",
+    value      : "",
     scope      : "post"
   },
-  toolChangeDoFirstChange: {
-    title      : "Do First Change",
-    description: "Do an initial tool change to load first tool.",
+  toolChangeFirstLoad: {
+    title      : "Prompt for the First Tool",
+    description: "Stop (M0) and ask for the first tool before the job's first part origin is established. Off (default): the job assumes the right tool is already in the spindle. On: the prompt runs AFTER homing and the Machine Travel Z move but BEFORE First WCS / Part records or probes anything, and that ordering is the whole point -- a probe run before the load establishes Z0 with the very tool the load exists to replace, and every depth in the job is then out by the difference in tool length. INDEPENDENT OF At a Tool Change above: a single-tool job can use this, a job left at Refuse to post still gets it, and it is an M0 prompt even where the changes themselves are handed to a macro -- the post has nothing to hand over to before the job has started.",
     group      : "toolChange",
     order      : 70,
     type       : "boolean",
@@ -515,12 +538,12 @@ properties = {
     scope      : "post"
   },
   toolChangeProbeAfterChange: {
-    title      : "Probe After Tool Change",
-    description: "Probe Z at the current location after each tool change.",
+    title      : "Re-probe Z0 After a Change",
+    description: "Re-establish the work Z0 after each tool change, on either hand-over mode. On (default): after the pause -- or after the macro returns -- the post moves to the part origin plus Probe X/Y Offset and probes Z into the ACTIVE work offset, using the same probe, the same attach/detach prompts (Probe Pause) and the same provisional Z0 as every part probe in group 5. AFTER A MANUAL PAUSE THIS IS NOT REALLY OPTIONAL: the new tool is a different length, so the Z0 the job established belongs to the old one, and cutting on it puts every depth below out by the difference. AFTER A MACRO IT USUALLY IS: whatever owns the tool table has just applied an offset or re-zeroed, and probing again asks you to fit the touch plate for a measurement that has already been made. Turn it OFF for gSender's re-zeroing tool-change routines and for a RepRapFirmware tpost that applies a tool offset; leave it ON for a sender that only pauses, and for a macro of your own that does not measure. Off: no probe, and the post states in the file whose Z0 the job is now cutting on. THE PROBE SEARCHES DOWN FROM THE RETRACT HEIGHT, which is Machine Travel Z, so G38 Target has to be deep enough to reach the stock top from there -- the same distance the two Use Active WCS X0 Y0, Probe Z0 modes need, and a distance only you can measure. Ignored for tool 0 and for jet/laser tools, which cannot probe.",
     group      : "toolChange",
     order      : 80,
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
 
@@ -544,7 +567,7 @@ properties = {
   },
   includeToolFile1: {
     title      : "Tool Change Start",
-    description: "File of custom g-code inserted at the START of each tool change (in the NC output folder). Unlike the Start and Stop files above this one is ADDED to the tool-change sequence, not a replacement for it. Ignored unless group 6's Tool Changes are Included is on.",
+    description: "File of custom g-code inserted at the START of each tool change (in the NC output folder), before the retract, the stops and the pause or macro call. Unlike the Start and Stop files above this one is ADDED to the hand-over sequence, not a replacement for it. Ignored unless group 6's At a Tool Change is a hand-over mode -- Pause for a manual change, or Hand over to the sender/firmware macro.",
     group      : "include",
     order      : 30,
     type       : "string",
@@ -553,20 +576,9 @@ properties = {
   },
   includeToolFile2: {
     title      : "Tool Change End",
-    description: "File of custom g-code inserted at the END of each tool change (in the NC output folder), after the change and any re-probe. ADDED to the sequence, not a replacement for it. Ignored unless group 6's Tool Changes are Included is on.",
+    description: "File of custom g-code inserted at the END of each tool change (in the NC output folder), after the pause or macro call, after the post's own resume and after any re-probe, just before cutting resumes. ADDED to the sequence, not a replacement for it. Ignored unless group 6's At a Tool Change is a hand-over mode -- Pause for a manual change, or Hand over to the sender/firmware macro.",
     group      : "include",
     order      : 40,
-    type       : "string",
-    value      : "",
-    scope      : "post"
-  },
-  // NOT IMPLEMENTED. Declared but never read -- nothing calls loadFile() with it, so a value entered
-  // here is silently ignored. Kept because the feature is wanted; the title and tooltip say so.
-  includeProbeFile: {
-    title      : "Tool Change Probe",
-    description: "NOT IMPLEMENTED YET. Reserved for a file of custom Gcode to run at the tool-change Z re-probe (in nc folder). Anything entered here is currently ignored -- no file is included and no warning is issued.",
-    group      : "include",
-    order      : 50,
     type       : "string",
     value      : "",
     scope      : "post"
@@ -838,6 +850,9 @@ var oFormat = createFormat({ prefix: "O", decimals: 0 });
 var fFormat = createFormat({ prefix: "F", decimals: (unit == MM ? 0 : 2) });
 
 var toolFormat = createFormat({ decimals: 0 });
+// ONE consumer, and it is not a tool change: toolChangeMacroCall(). The T word is emitted only where
+// something OTHER than this post acts on it -- a sender that intercepts the M6 beside it, or RRF, whose
+// T word IS the change. On every other route the tool is named in a prompt the operator reads.
 var tFormat = createFormat({ prefix: "T", decimals: 0 });
 
 var taperFormat = createFormat({ decimals: 1, scale: DEG });
@@ -1476,6 +1491,13 @@ function validateJob() {
     if (promptsBeforeHome() && (homedXY || homedZ)) {
       earlyPrompts.push("the \"Pause, then Home\" stop, which is the FIRST LINE of the file");
     }
+    // Between the homing stop and the origin prompts because that is where it sits in the file:
+    // writeFirstSection() runs it after the G53 establish and before writeWcsOnStart(). Dropped, the
+    // job probes and cuts with the tool the prompt existed to replace -- which is the whole failure the
+    // property is there to prevent.
+    if (getProperty(properties.toolChangeFirstLoad)) {
+      earlyPrompts.push("the \"Prompt for the First Tool\" stop, which stands before the first part's origin is set");
+    }
     if (startMode == "Jog XY & Probe Z" || startMode == "Jog XYZ") {
       earlyPrompts.push("the \"First WCS / Part\" jog prompt");
     }
@@ -1549,13 +1571,137 @@ function validateJob() {
       + "starting this file, or set \"Home at Job Start\" to Home."));
   }
 
-  // Post-time half of toolChange()'s suppression warning, so it reaches Fusion's dialog and not
-  // only the posted file.
-  if (!getProperty(properties.toolChangeEnabled) && countDistinctTools() > 1) {
-    warning(localize("This job uses more than one tool, but \"Tool Changes are Included\" is off: "
-      + "no tool-change code is emitted and every operation runs with the tool already in the "
-      + "spindle, at the other tools' feeds and speeds. Enable the \"6 - Tool Changes\" group, or "
-      + "post one tool per file."));
+  // The post-time half of toolChange()'s no-frame warning, on the same predicate the file reads, so the
+  // two cannot drift. BOTH HAND-OVER MODES, because the frame is what the hand-over needs and not what
+  // the pause needs: a manual change is the one pause where the operator's hands go to the cutter, and
+  // a macro change costs the RETURN as well -- with no frame the post has no height to lift the tool to
+  // before the macro runs and none to bring it back to afterwards.
+  if (getProperty(properties.toolChangeMode) != "Refuse" && countDistinctTools() > 1
+      && !fixedZEstablishedInFile()) {
+    warning(localize("\"At a Tool Change\" is \"" + (toolChangeIsMacro()
+      ? "Hand over to the sender/firmware macro\", but this job establishes no fixed Z reference, so the "
+        + "post can neither lift the tool before the macro runs nor return it to a known height "
+        + "afterwards -- the next move starts from wherever the macro left it"
+      : "Pause for a manual change\", but this job establishes no fixed Z reference, so the post cannot "
+        + "lift the tool before handing it to you -- the pause happens at whatever height the last "
+        + "operation ended at, and the re-probe after it rapids to the part origin from there")
+      + ". Enter \"Machine Travel Z\" in \"4 - Machine Frame\"."));
+  }
+
+  // FLOW 2's THREE WARNINGS, all of them about the same thing: the post emits a token and cannot see
+  // whether anything acts on it. Nothing here is refusable -- each names a condition the operator can
+  // satisfy and the post cannot check.
+  if (toolChangeIsMacro() && countDistinctTools() > 1) {
+    var senderId = getProperty(properties.toolChangeSender);
+
+    if (senderId == "gSender" || senderId == "CNCjs") {
+      warning(localize("\"Tool Change Handled By\" is \"" + toolChangeSenderTitle() + "\", so this job "
+        + "hands each change over with M6 -- a command GRBL does not execute. It works only because the "
+        + "sender removes the M6 from the stream and runs its own tool-change routine instead, and the "
+        + "post cannot check that yours is set up to do it. If the sender is not configured for tool "
+        + "changes the M6 reaches the controller and answers error:20, stopping the job with the tool "
+        + "in the cut; if it is configured to IGNORE them, the change is dropped silently and the rest "
+        + "of the job is cut with the tool already fitted. Test one change on air before trusting it."));
+    }
+
+    if (senderId == "RepRap") {
+      warning(localize("\"Tool Change Handled By\" is the RepRapFirmware tool table, so this job hands "
+        + "each change over with a bare T word. That word errors unless every tool number it uses is "
+        + "declared with M563 in config.g, and it corrects nothing unless tpost<n>.g applies a "
+        + "tool-length offset. Both are on the machine and neither is visible to the post."));
+
+      // THE ONE CONFIGURATION WHERE THE TOOL OFFSET IS EXPECTED TO BE NON-ZERO, and it is the post's
+      // G53 heights that pay for it. Worded to hold under EITHER reading of what RRF's G53 does with a
+      // tool offset, because the post cannot settle that from a source it has: if offsets are dropped
+      // the advice is merely unnecessary, and if they are applied it is the difference between a
+      // retract and an axis-limit error.
+      if (fixedZEstablishedInFile()) {
+        warning(localize("This job also moves in the machine's own Z frame, and handing changes to the "
+          + "RepRapFirmware tool table is the one setting that makes a tool-length offset active while "
+          + "it does. Set \"Machine Travel Z\" low enough that it is still reachable with the LONGEST "
+          + "tool this job uses fitted and its offset applied -- a value chosen for a bare spindle can "
+          + "put the requested machine position above the axis limit once tpost has run."));
+      }
+    }
+
+    if (getProperty(properties.toolChangeProbeAfterChange)) {
+      warning(localize("\"Re-probe Z0 After a Change\" is On while changes are handed to \""
+        + toolChangeSenderTitle() + "\", so the post probes Z again after the macro returns and "
+        + "overwrites whatever the macro measured. That is right for a handler that only pauses and "
+        + "wrong for one that re-zeroes or applies a tool offset -- there it asks you to fit the touch "
+        + "plate at every change for a measurement already made. Turn it Off if the macro establishes "
+        + "Z0."));
+    }
+  }
+
+  // THE MANUAL CHANGE POSITION, the half of it that posts a valid file which then does something the
+  // operator did not intend. The half that posts a file nothing can run is refused among the guards.
+  if (countDistinctTools() > 1) {
+    var tcz = toolChangePosZ();
+    var tcAnyPos = (toolChangePosX() != undefined) || (toolChangePosY() != undefined)
+                || (tcz != undefined);
+
+    // NOT REFUSED. A change position clear of the fixtures may legitimately sit below the height that
+    // clears them -- that is the point of bringing the spindle down to where a person can work at it --
+    // but the tool holds this Z with hands on it, so the condition is worth stating once.
+    if (tcz != undefined && getProperty(properties.toolChangeMode) == "Pause"
+        && fixedZEstablishedInFile() && tcz < parseMachineTravelZ()) {
+      warning(localize("\"Tool Change Position Z\" is " + tcz + ", below the \"Machine Travel Z\" of "
+        + parseMachineTravelZ() + " -- the tool is held LOWER during the change than the height you "
+        + "declared clears your fixtures. That is right only if the change position itself is clear of "
+        + "everything on the bed at that height; the post crosses the bed at the travel height and "
+        + "descends to this one only once it has arrived."));
+    }
+
+    // SAID, NOT SILENTLY DROPPED. This answers the question the fields raise on the other flow: driving
+    // the tool to a change position belongs to whatever performs the change, in a frame the post cannot
+    // see, and a post that guessed at it would be putting the tool somewhere the macro did not ask for.
+    // Silently ignoring a coordinate the operator typed is how the deleted Tool Change X/Y/Z came to be
+    // trusted for years while it moved with every part origin.
+    if (tcAnyPos && toolChangeIsMacro()) {
+      warning(localize("A tool change position is set, but \"At a Tool Change\" hands changes to \""
+        + toolChangeSenderTitle() + "\", so the post does not use it. Moving the tool to a change "
+        + "position belongs to whatever performs the change -- it knows where its changer, its sensor "
+        + "or its park is, and the post does not. The post still retracts to \"Machine Travel Z\" "
+        + "before the hand-over and returns there afterwards."));
+    }
+  }
+
+  // GRBL HAS NO G-CODE FOR THIS, which is why it is a warning and not a block. Marlin and RepRap get
+  // Start()'s "M84 S0" and are covered for the whole job; GRBL's equivalent is the $1 step idle delay,
+  // a setting, and one the controller accepts only in Idle. stepper.c's st_go_idle() runs whenever the
+  // segment buffer drains -- which an M0 pause causes -- and disables the drivers after $1 ms unless $1
+  // is 255. The stock default is 25 (defaults.h, Grbl 1.1). The position COUNTER survives; what does
+  // not survive is the axis holding against a hand.
+  //
+  // GATED ON THE TOOL CHANGE rather than on every pause. The same setting protects the spindle prompts
+  // and the probe's attach/detach stops, but this is the one that runs to minutes with a spanner on the
+  // collet, and a warning on every job that contains a prompt would be read by nobody.
+  if (fw == eFirmware.GRBL && getProperty(properties.toolChangeMode) != "Refuse"
+      && countDistinctTools() > 1) {
+    warning(localize("This job pauses for a tool change on GRBL, where the steppers de-energise once "
+      + "the machine has been idle for $1 milliseconds -- 25 on a stock build. GRBL keeps counting "
+      + "position, so nothing is lost unless an axis actually moves; a gantry nudged while the collet "
+      + "is loosened, or a Z that back-drives with no holding torque, is enough, and every cut after "
+      + "the change is then offset by an amount nothing reports. Set $1=255 at the controller to keep "
+      + "the steppers locked. The post cannot set it for you: $ settings are not G-code and GRBL "
+      + "accepts them only when it is Idle."));
+  }
+
+  // FLOW 1's END-OF-FILE RULE, stated where the park is set. A two-tool job on a Personal licence is
+  // two posted files, and the second resumes on the origin the first left behind -- so a file must not
+  // end by destroying it. On Marlin this park is a HOMING CYCLE, not a rapid (writeMachineParkXY()),
+  // and set_axis_is_at_home() zeroes position_shift under HAS_POSITION_SHIFT
+  // (Marlin/src/module/motion.cpp, 2.1.2.5). It never touches coordinate_system[], so a stored G5x
+  // register survives -- but an ordinary single-offset Marlin job deliberately never re-selects one
+  // (see writeWCS()), so nothing re-applies it. Warned and not refused: a job with no successor is
+  // entitled to park at the homing corner.
+  if (fw == eFirmware.MARLIN && getProperty(properties.machineParkAtEnd) == "Machine") {
+    warning(localize("\"At End Park At\" = machine X0 Y0 HOMES X and Y on Marlin rather than rapiding "
+      + "there, and homing zeroes position_shift -- the work origin this file established. The stored "
+      + "G54-G59 registers survive it, but an ordinary single-offset job never re-selects one, so a "
+      + "second file run after this one (the two-file answer to a tool change) starts against a zeroed "
+      + "origin. Park at work X0 Y0, or establish the origin again at the start of the next file."));
   }
 
   // Anything parseSafeZExpr() cannot read resolves to a fixed 15 mm on every section, a plausible
@@ -1575,12 +1721,114 @@ function validateJob() {
   // everything after it unreachable on exactly the firmware it excluded; with that gone, order here is
   // about which complaint is the more basic, not about which firmware still gets checked.
 
+  // THE POST PERFORMS NO TOOL CHANGE. Refused rather than warned, and refused HERE rather than at the
+  // boundary, because the alternative is a file that cuts every operation with whichever tool is in the
+  // spindle, at the other tools' feeds and speeds -- a broken cutter at best. The shipped default did
+  // exactly that behind a warning. "Pause for a manual change" is the operator's decision to hand over
+  // in one file; posting one tool per file is the other answer and needs no setting at all.
+  if (countDistinctTools() > 1 && getProperty(properties.toolChangeMode) == "Refuse") {
+    error("This job uses " + countDistinctTools() + " tools and \"At a Tool Change\" is \"Refuse to"
+      + " post\". This post changes no tool itself on any supported firmware -- it emits no M6 on this"
+      + " setting, which a GRBL controller answers with error:20 anyway. Post one tool per file; or set"
+      + " \"At a Tool Change\" to \"Pause for a manual change\" to stop at each boundary and swap the"
+      + " tool by hand; or to \"Hand over to the sender/firmware macro\" if your sender or firmware owns"
+      + " a tool table and you have configured it to do the change.");
+    return;
+  }
+
+  // FLOW 2's GUARDS. Refused rather than warned, because each is a hand-over to something that is not
+  // there: the file would emit a token nothing acts on, and the job would carry on cutting with the
+  // wrong tool -- the exact failure the Refuse default exists to prevent.
+  if (toolChangeIsMacro() && countDistinctTools() > 1) {
+    // MARLIN HAS NO TOOL-LENGTH REGISTER AT ALL, so there is nothing for a macro to write an offset
+    // into and no sender in the list that speaks to it. The operator is the only route, and the post
+    // already has one: the manual pause. design.md -> Tool changes, the who-can-subtract table.
+    if (fw == eFirmware.MARLIN) {
+      error("\"At a Tool Change\" is \"Hand over to the sender/firmware macro\", but the firmware is"
+        + " Marlin, which has no tool-length offset register -- there is nothing for a macro to correct"
+        + " and no supported sender intercepts a tool change for it. M6 reaches Marlin as an unknown"
+        + " command and the job carries on with the wrong cutter. Use \"Pause for a manual change\","
+        + " which re-probes Z0 with the new tool and is the only correction Marlin has.");
+      return;
+    }
+
+    var handler = getProperty(properties.toolChangeSender);
+
+    if (handler == "RepRap" && fw != eFirmware.REPRAP) {
+      error("\"Tool Change Handled By\" is the RepRapFirmware tool table, but this job is posted for "
+        + fw + ". The bare T word that route emits is a tool change on RRF and nothing on any other"
+        + " firmware -- GRBL parses it and takes no action, so every change would be skipped silently."
+        + " Choose the sender that runs this machine, or \"Other\" with a macro file of your own.");
+      return;
+    }
+
+    if ((handler == "gSender" || handler == "CNCjs") && fw != eFirmware.GRBL) {
+      error("\"Tool Change Handled By\" is \"" + toolChangeSenderTitle() + "\", which is a GRBL sender,"
+        + " but this job is posted for " + fw + ". Choose the handler that runs this machine, or"
+        + " \"Other\" with a macro file of your own.");
+      return;
+    }
+
+    if (handler == "Other" && getProperty(properties.toolChangeMacroFile) == "") {
+      error("\"Tool Change Handled By\" is \"Other\", which hands each change over to the file named in"
+        + " \"Sender Macro File\" -- and that field is empty, so there is nothing to hand over to. Name"
+        + " the file, or choose the sender that runs this machine.");
+      return;
+    }
+  }
+
+  // FLOW 1's POSITION GUARDS. Refused rather than warned, because each names a move the post would
+  // have to invent a coordinate for, and every coordinate it could invent is a real machine position
+  // the tool would travel to at rapid.
+  if (countDistinctTools() > 1 && getProperty(properties.toolChangeMode) == "Pause") {
+    var posX = toolChangePosX();
+    var posY = toolChangePosY();
+    var posZ = toolChangePosZ();
+
+    // A HALF-SPECIFIED POINT IS NOT A POINT. Tested against the RAW fields as well, so a value that
+    // does not parse draws the same complaint as one left blank: either way the axis is unset, and
+    // "hold the other axis" and "use 0" are both moves nobody asked for.
+    if ((getProperty(properties.toolChangePositionX) != "" || getProperty(properties.toolChangePositionY) != "")
+        && (posX == undefined || posY == undefined)) {
+      error("\"Tool Change Position X\" and \"Tool Change Position Y\" are read as one point, and this"
+        + " job sets one of them without the other -- or sets one to something that is not a signed"
+        + " decimal number of millimetres. Fill both, or empty both to change the tool where the cut"
+        + " ended.");
+      return;
+    }
+
+    if ((posX != undefined || posZ != undefined) && !fixedZEstablishedInFile()) {
+      // THE SAME PREDICATE THE FILE READS. toolChangeMovesToPosition() answers false without a fixed Z
+      // reference, so without this guard the fields would be accepted and then quietly not happen.
+      error("A tool change position is set, but this job establishes no fixed Z reference -- there is no"
+        + " machine frame to move in, and no height to cross the bed at before the tool gets there."
+        + " Enter \"Machine Travel Z\" and include Z in \"Axes Homed and Trusted\", both in \"4 -"
+        + " Machine Frame\", or clear the tool change position fields.");
+      return;
+    }
+
+    // G53 X/Y NEEDS X/Y HOMED, and the group-4 declaration is the only assertion the post has of it.
+    // This is Guard B's requirement arriving by a second route: a stored machine X/Y means nothing on a
+    // machine that has never established one.
+    if (posX != undefined && !machineHomesXY()) {
+      error("A tool change position in X and Y is an absolute machine move, but \"Axes Homed and"
+        + " Trusted\" does not include X and Y, so the machine has no X/Y frame for it to be measured"
+        + " in. Declare XY (or XYZ) in \"4 - Machine Frame\", or clear the tool change position"
+        + " fields.");
+      return;
+    }
+  }
+
   // A named include file that does not exist only reaches error() inside loadFile(), by which point
-  // the header and preamble are in the stream. The tool-change files are checked only with group 6 on.
+  // the header and preamble are in the stream. The tool-change files are checked only where the mode
+  // that loads them is selected; the macro file is checked only where it is also the hand-over.
   var includeFileProps = [properties.includeStartFile, properties.includeStopFile];
-  if (getProperty(properties.toolChangeEnabled)) {
+  if (getProperty(properties.toolChangeMode) != "Refuse") {
     includeFileProps.push(properties.includeToolFile1);
     includeFileProps.push(properties.includeToolFile2);
+  }
+  if (toolChangeIsMacro() && getProperty(properties.toolChangeSender) == "Other") {
+    includeFileProps.push(properties.toolChangeMacroFile);
   }
   for (var i = 0; i < includeFileProps.length; ++i) {
     var includeName = getProperty(includeFileProps[i]);
@@ -2023,11 +2271,35 @@ function promptsBeforeHome() {
 // Fusion's schema gives a numeric field no way to be unset, and every sentinel would be a real reachable
 // height, 0 very much included. The value's SIGN is not judged here -- see PR-17's warning.
 function parseMachineTravelZ() {
-  var raw = getProperty(properties.machineTravelZ);
+  return parseMachineCoordinate(getProperty(properties.machineTravelZ));
+}
+
+// The one reading of a machine-frame coordinate held as a string, shared by Machine Travel Z and the
+// three tool-change position fields so a value one of them accepts cannot be rejected by another.
+// UNDEFINED IS THE ANSWER "not set", and the empty string is the commonest way to say it.
+function parseMachineCoordinate(raw) {
   if (typeof raw != "string") return undefined;
   var s = raw.replace(/^\s+|\s+$/g, "");
   if (!(/^[-+]?\d+(\.\d+)?$/.test(s))) return undefined;   // also rejects "" -- unset
   return Number(s);
+}
+
+// The manual change position, in MILLIMETRES, each axis independently undefined when its field is
+// empty. Nothing may read the properties directly: the all-or-nothing rule on X/Y and the "Z alone is
+// legal" rule below are enforced once, in validateJob(), against exactly these three answers.
+function toolChangePosX() { return parseMachineCoordinate(getProperty(properties.toolChangePositionX)); }
+function toolChangePosY() { return parseMachineCoordinate(getProperty(properties.toolChangePositionY)); }
+function toolChangePosZ() { return parseMachineCoordinate(getProperty(properties.toolChangePositionZ)); }
+
+// True when this job relocates the tool for a manual change. THE MODE IS PART OF THE QUESTION, not a
+// separate test at each call site: on the macro flow these fields are inert, because driving the tool
+// to a change position is the macro's job and it does it in a frame the post cannot see. A job with no
+// fixed Z reference cannot move in the machine frame at all, so it answers false here too and
+// validateJob() refuses rather than silently dropping the move.
+function toolChangeMovesToPosition() {
+  if (getProperty(properties.toolChangeMode) != "Pause") return false;
+  if (!fixedZEstablishedInFile()) return false;
+  return toolChangePosX() != undefined || toolChangePosZ() != undefined;
 }
 
 // The same height in OUTPUT units, ready to emit. Callers must not wrap it again. Only reached where
@@ -2118,6 +2390,12 @@ function writeMachineParkXY() {
 
   if (fw == eFirmware.MARLIN) {
     writeComment(eComment.Info, "   Park at machine X0 Y0 -- re-homing X/Y; G53 is a Marlin build option");
+    // The in-file half of validateJob()'s Marlin park warning, so a file read on its own carries what
+    // its last two blocks cost. set_axis_is_at_home() zeroes position_shift; coordinate_system[] is
+    // untouched, but nothing in an ordinary single-offset job re-selects it. motion.cpp, 2.1.2.5.
+    writeWarning("the two homing blocks below zero Marlin's position_shift -- the work origin this file"
+      + " established. Any file run after this one must establish its own origin; it cannot resume on"
+      + " this one's");
     writeBlock(gFormat.format(28), "X");
     writeBlock(gFormat.format(28), "Y");
     return;
@@ -2217,19 +2495,20 @@ function onSection() {
   // Determine the Safe Z Height to map G1s to G0s
   safeZforSection(currentSection);
 
-  // Do a tool change if its the first section and we are doing the first tool change
-  // If its not the first section and the tool changed then do a tool change
-  if (isFirstSection()) {
-    if (getProperty(properties.toolChangeDoFirstChange))
-      toolChange();
-  } 
-  else if (tool.number != getPreviousSection().getTool().number)
-      toolChange();
-
   // The later-section half of the deliberate WCS-selection split: section 1 already selected inside
   // writeFirstSection(), which had to run before that section's origin write.
   if (!isFirstSection()) {
     writeWCS(currentSection);
+  }
+
+  // THE TOOL CHANGE RESOLVES AFTER THE WCS, AND THAT ORDER IS LOAD-BEARING. A boundary that is both a
+  // tool change and a WCS change must select the new frame first: the post-change re-probe writes into
+  // whichever work offset is ACTIVE, so changing first put a fresh Z0 into the PREVIOUS section's
+  // register and left this section cutting on a stale one -- a plunge at the wrong depth on the very
+  // next move. The first section's tool LOAD is not here at all: it belongs before that section's
+  // origin work, which writeFirstSection() has already done by this point, so it runs in there.
+  if (!isFirstSection() && tool.number != getPreviousSection().getTool().number) {
+    toolChange();
   }
 
   // Machining type
@@ -2926,6 +3205,12 @@ function writeFirstSection() {
   // both after Start() so absolute positioning/units are set for the probe or the G53 move.
   writeFixedZReference();
 
+  // BEFORE writeWcsOnStart(), and that is the whole reason it lives here rather than in onSection():
+  // the first part's Z0 must be established with the tool that will cut it. Loading afterwards -- which
+  // is where onSection() used to do it -- probes with the very tool the load exists to replace and puts
+  // every depth in the job out by the difference in tool length.
+  toolChangeFirstLoad();
+
   writeWcsOnStart();
 
   writeComment(eComment.Important, " *** START end ***");
@@ -3143,6 +3428,12 @@ function writeComment(level, text) {
   }
 }
 
+// Set by a tool change that RELOCATED THE TOOL IN THE MACHINE FRAME, and read once, in rapidMovements().
+// It is the post's way of saying that getCurrentPosition().z -- the toolpath's idea of where the tool
+// is -- is not where the tool is, so the comparison that normally orders a rapid cannot be trusted for
+// one move.
+var forceRapidXYBeforeZ = false;
+
 // Rapid movement in X/Y, emitted as G0 at the configured XY travel feedrate. Called from
 // rapidMovements() for every onRapid, and directly for moves like the final return-to-origin.
 function rapidMovementsXY(_x, _y) {
@@ -3174,12 +3465,35 @@ function rapidMovementsZ(_z) {
       writeBlock(gMotionModal.format(0), z, f);
     }
   }
+
+  // A COMMANDED WORK-FRAME Z IS WHAT ENDS THE DEBT. Whatever set the flag did so because the tool was
+  // standing at a machine-frame height the work frame has no number for; the block above has just given
+  // it one, so rapidMovements() may go back to reading getCurrentPosition() to order itself. The
+  // re-probe after a relocated tool change is the path that clears it this way: it traverses X/Y with
+  // rapidMovementsXY() and then retracts here, and the section that follows starts from a known Z.
+  forceRapidXYBeforeZ = false;
 }
 
 // Combined X/Y/Z rapid, emitted as separate G0s at each axis's own travel feedrate. Ordered so we
 // never plunge into the part: when Z is descending, position XY first and then bring Z down; when Z is
 // rising or unchanged, retract Z first and then move XY.
 function rapidMovements(_x, _y, _z) {
+  // THE ONE CASE THE COMPARISON BELOW CANNOT DECIDE. After a tool change at a machine-frame position
+  // the tool stands at Machine Travel Z over a point the work frame never named, while
+  // getCurrentPosition() still reports the toolpath position it had before the change. Reading it here
+  // would order this move against a height the tool is not at, and the branch it picks on a RISING or
+  // unchanged Z -- retract first, then cross -- would send the tool across the bed at the section's own
+  // clearance height instead of the travel height it is already holding. So the order is forced: cross
+  // at the height the change left, THEN descend. That is the whole of the "return", and it costs no
+  // motion at all -- there is no point in retracing the excursion when the next move is absolute.
+  if (forceRapidXYBeforeZ) {
+    forceRapidXYBeforeZ = false;
+    writeComment(eComment.Debug, " rapidMovements: X/Y before Z -- first move after a relocated tool change");
+    rapidMovementsXY(_x, _y);
+    rapidMovementsZ(_z);
+    return;
+  }
+
   if (_z < getCurrentPosition().z) {
     rapidMovementsXY(_x, _y);
     rapidMovementsZ(_z);
@@ -3558,67 +3872,363 @@ function askUser(text, title, allowJog) {
   }
 }
 
-function toolChange() {
-  // SAY SO and exit. Returning silently cut every section with whichever tool was in the spindle, at
-  // the other tools' feeds and speeds. Off is the DEFAULT, so this is reached by accident.
-  if (!getProperty(properties.toolChangeEnabled)) {
-    writeWarning("change to T" + tool.number + " " + tool.comment
-      + " suppressed -- \"Tool Changes are Included\" is off; the previous tool stays in the spindle");
+// The first tool is LOADED, not changed: nothing is running, no Z0 exists yet to invalidate, and the
+// tool stands wherever writeFixedZReference() left it. So this is a prompt and nothing else -- no
+// retract to repeat, no spindle to stop, and no re-probe, because writeWcsOnStart() establishes the
+// origin a few blocks below with the tool this prompt just asked for. Called unconditionally so the
+// ordering rule lives in one place; the property is read here.
+function toolChangeFirstLoad() {
+  if (!getProperty(properties.toolChangeFirstLoad)) {
     return;
   }
+  writeComment(eComment.Important, " Load the first tool");
+  writeComment(eComment.Info, "   Before this part's origin is set, so Z0 is established with the tool that cuts it");
+  askUser("Load Tool #" + tool.number + " " + tool.comment, "Tool change", false);
+}
 
+// True when the job is set to hand a change to something outside the post. One definition, because
+// validateJob()'s guards, the include pre-flight and the flow itself must not be able to disagree.
+function toolChangeIsMacro() {
+  return getProperty(properties.toolChangeMode) == "Macro";
+}
+
+// The dialog title of the chosen handler, for messages that name it. Reads the enum's own titles so a
+// warning and the dropdown cannot come to say different things about the same setting.
+function toolChangeSenderTitle() {
+  var id = getProperty(properties.toolChangeSender);
+  var vals = properties.toolChangeSender.values;
+  for (var i = 0; i < vals.length; ++i) {
+    if (vals[i].id == id) {
+      return vals[i].title;
+    }
+  }
+  return id;
+}
+
+// THE POST CHANGES NO TOOL ON EITHER FLOW. A measured change needs a probe, a subtraction and a
+// register to hold the result, and the post has none of the three: it cannot compute an offset it will
+// not learn until the tool is swapped, hours after posting, and it can never read a register back. Its
+// whole role is to arrive correctly, hand over, and resume correctly. design.md -> Tool changes.
+//
+// WHAT IT HANDS OVER TO IS THE ONLY DIFFERENCE between the two flows, and it is one call in the middle
+// of this function. Everything around it -- the retract, the stops, the resume, the Z0 question -- is
+// shared, because it is a property of handing over and not of who takes the tool. That sharing is the
+// point: the shipped code stopped coolant and spindle on one arm only, and the arm it skipped was a
+// hand-over just the same.
+//
+// NOTHING IS EMITTED THAT NOTHING WILL ACT ON:
+//
+//   No M84 Z. Marlin-only, so GRBL halts on it mid-change with the operator holding a tool -- and on
+//   Marlin a stepper release with no brake sinks an unbalanced gantry in Z. A hazard under both
+//   readings, deleted with the design that emitted it.
+//
+//   No M300 beep. spindleOff() already beeps on the two firmwares that have M300, under exactly the
+//   manual-spindle setting that makes a beep worth anything.
+//
+//   No M6 except where something has been NAMED that acts on it -- toolChangeMacroCall(), which the
+//   operator reaches only by choosing a handler. On the manual flow no token is emitted at all: GRBL
+//   answers M6 with error:20 and stops the job with the tool in the cut, and Marlin reports an unknown
+//   command and carries on with the wrong cutter.
+//
+// AND NO POST-INJECTED onRapid(). Every machine-frame move goes through writeMachineTravelZ(): routing
+// it through onRapid() cleared forceSectionToStartWithRapid, defeating "First G1 --> G0" on precisely
+// the sections that follow a change.
+// FLOW 1's OPTIONAL EXCURSION: take the tool somewhere the operator can reach it. Reached only from the
+// manual arm, only after the retract to Machine Travel Z has already happened, and only when
+// toolChangeMovesToPosition() is true -- which is also what validateJob() guards, so the dialog and the
+// file cannot come to disagree about whether this runs.
+//
+// EVERY BLOCK IS G53, through the same writeMachineFrameBlock() as the retract and the end park. That
+// is the correction the deleted Tool Change X/Y/Z earned: those were bare G0 words, read by the machine
+// in whichever WCS was active, so a change position measured against one part's origin was somewhere
+// else entirely for the next part. X/Y AND Z ARE SEPARATE BLOCKS because G53 is not modal and must be
+// programmed on each line, and because a three-axis diagonal in the machine frame is not a move any of
+// these firmwares guarantees to run as a straight line.
+//
+// X/Y BEFORE Z, ALWAYS. The tool is at Machine Travel Z when this starts -- the height declared to
+// clear every fixture -- so the crossing happens up there and only then does the tool move to a change
+// height that may be below it. Doing it the other way round would cross the bed at the change height.
+function writeToolChangePosition() {
+  var x = toolChangePosX();
+  var y = toolChangePosY();
+  var z = toolChangePosZ();
+
+  if (x != undefined && y != undefined) {
+    writeComment(eComment.Info, "   Move to the tool change position in the machine frame -- machine X"
+      + xyzFormat.format(propertyMmToUnit(x)) + " Y" + xyzFormat.format(propertyMmToUnit(y)));
+    writeMachineFrameBlock([xFormat.format(propertyMmToUnit(x)), yFormat.format(propertyMmToUnit(y))],
+      getProperty(properties.feedsTravelSpeedXY));
+  }
+
+  if (z != undefined) {
+    writeComment(eComment.Info, "   Move to the tool change height in the machine frame -- machine Z"
+      + xyzFormat.format(propertyMmToUnit(z)));
+    writeMachineFrameBlock([zFormat.format(propertyMmToUnit(z)), undefined],
+      getProperty(properties.feedsTravelSpeedZ));
+  }
+
+  // THE MACHINE STANDS STILL BEFORE ANYTHING PROMPTS. writeMachineTravelZ() flushed after the retract,
+  // but that was before these blocks; the sync belongs after the LAST motion, which is here.
+  flushMotions();
+}
+
+// FLOW 1's RETURN, and it is deliberately not a retrace. Two things are owed after a relocated change,
+// and neither of them is the X/Y the tool left:
+//
+//   THE HEIGHT, which is owed because the change height may be below the travel height and everything
+//   downstream -- the re-probe's traverse to the part origin, the next section's first rapid -- assumes
+//   the tool is holding a height that clears the fixtures. Emitted only when a change Z was used; with
+//   that field empty the tool never left Machine Travel Z and there is nothing to undo.
+//
+//   THE ORDER OF THE NEXT RAPID, which is owed because the tool now stands over a point the work frame
+//   has no number for. forceRapidXYBeforeZ makes that move cross before it descends. See rapidMovements().
+//
+// NO X/Y RETURN, and that is a decision rather than an omission. Nothing after a tool change is measured
+// from where the tool stood before it: resetAll() has already discarded the tracked position, so the
+// next move carries full absolute coordinates, and the re-probe re-establishes Z0 from the part origin.
+// A retrace would therefore buy one thing only -- the appearance of symmetry -- and it could not be done
+// soundly in any case. The point to return to is known in the WORK frame, and where a change coincides
+// with a change of work offset the two frames' true relationship is not known to the post at all: the
+// stored origins are probed at runtime, so their difference is not the difference the model reports.
+function writeToolChangeReturn() {
+  if (toolChangePosZ() != undefined) {
+    writeMachineTravelZ("Return to the travel height in the machine frame after the tool change");
+  }
+
+  // ONLY AN X/Y EXCURSION OWES THE ORDERING. A Z-only change position put the tool back over the very
+  // point it left, at the height it left it, so the rapid that follows is ordered against exactly the
+  // state it would have been ordered against with no change position set at all.
+  if (toolChangePosX() != undefined) {
+    writeComment(eComment.Info, "   The tool stands at the change position; the next rapid crosses at"
+      + " this height before it descends");
+    forceRapidXYBeforeZ = true;
+  }
+}
+
+function toolChange() {
   writeComment(eComment.Important, " Tool Change Start");
 
-  // If there is a custom GCode file for tool changes then include it
   if (getProperty(properties.includeToolFile1) != "") {
     loadFile(getProperty(properties.includeToolFile1));
   }
 
-  // Are we inserting code to assist with the tool change?
-  // If not, then just insert the tool change GCode (M6 <tool number>).
-  if (getProperty(properties.toolChangeInsertCode)) {
+  // --- 1. Arrive. Leave the machine in the state a hand-over is entitled to assume. ---------------
 
-    // A dedicated tool-change spot only makes sense as a fixed MACHINE location, but toolChangeX/Y/Z
-    // are plain G0 words -- WCS-relative -- so the spot drifts to wherever this job's WCS is zeroed.
-    flushMotions();
-    onRapid(propertyMmToUnit(getProperty(properties.toolChangeX)), propertyMmToUnit(getProperty(properties.toolChangeY)), propertyMmToUnit(getProperty(properties.toolChangeZ)));
-    flushMotions();
-  
-    // turn off spindle and coolant
-    onCommand(COMMAND_COOLANT_OFF);
-    onCommand(COMMAND_STOP_SPINDLE);
-
-    // If Marlin then BEEP
-    if ((fw == eFirmware.MARLIN) && !getProperty(properties.jobManualSpindlePowerControl)) {
-      writeBlock(mFormat.format(300), sFormat.format(400), pFormat.format(2000));
+  // ONE FRAME, AND THE FILE NAMES IT. The hand-over height is the machine frame's own travel height,
+  // the same G53 block every cross-part retract uses, and the optional excursion that may follow it is
+  // G53 too. What this replaces -- Tool Change X/Y/Z -- were plain G0 words the dialog presented as
+  // absolute while the machine read them in whichever WCS happened to be active, so the "fixed" change
+  // spot drifted with every part. THE FRAME WAS THE DEFECT, NOT THE FEATURE: a place to stand where the
+  // operator can reach the collet is a real need, and it is met here in the machine frame, where a
+  // coordinate means the same thing on every part of every job.
+  //
+  // THE EXCURSION IS FLOW 1's ALONE. A macro that wants the tool at a changer position moves it there
+  // itself, in its own frame -- it knows where its changer or its sensor is and the post does not --
+  // and toolChangeMacroResume() brings it back to the travel height afterwards. validateJob() warns
+  // rather than silently ignoring the fields when they are set on that flow.
+  if (fixedZEstablishedInFile()) {
+    writeMachineTravelZ("Retract to the travel height in the machine frame before the tool change");
+    // AFTER THE RETRACT AND NOT INSTEAD OF IT. The excursion crosses the bed, so it may only start from
+    // the height that clears the fixtures -- which is why the position fields require Machine Travel Z
+    // rather than replacing it. Manual flow only; toolChangeMovesToPosition() carries that.
+    if (toolChangeMovesToPosition()) {
+      writeToolChangePosition();
     }
-  
-    // Disable Z stepper
-    if (getProperty(properties.toolChangeDisableZStepper)) {
-      askUser("Z stepper will disable; wait for full stop", "Tool change", false);
-      writeBlock(mFormat.format(84), 'Z'); // Disable steppers timeout
+  } else {
+    writeWarning("no retract before this tool change -- this job establishes no fixed Z reference, so"
+      + " the tool is handed over at whatever height the last operation ended at. Enter \"Machine"
+      + " Travel Z\" in group 4, or retract by hand before touching the tool");
+    // THE MACHINE STANDS STILL BEFORE ANYTHING PROMPTS, on this arm too. The retract above ends with
+    // its own flushMotions(), so flushing here as well emitted M400 twice per change on Marlin and RRF;
+    // only the arm that emits no motion at all still owes the sync.
+    flushMotions();
+  }
+
+  // ON EVERY ROUTE, and that is the correction: the old code stopped them only on the arm that also
+  // relocated the tool, so the other arm handed a spinning cutter to the operator. Stopping is a
+  // property of the hand-over, not of relocating.
+  onCommand(COMMAND_COOLANT_OFF);
+
+  // NOT onCommand(COMMAND_STOP_SPINDLE). That case guards on !tool.isJetTool(), and `tool` is already
+  // the INCOMING tool here -- so a change from a router into a laser read the laser's guard and left
+  // the router turning through the hand-over, with the operator's hands on the collet. spindleEnabled
+  // answers for what is actually running rather than for what is about to be fitted, and spindleOff()
+  // is the same routine that case would have reached. It is also what the macro is entitled to assume:
+  // a tool-change routine that measures does not expect the spindle turning while it does it.
+  if (spindleEnabled) {
+    spindleOff();
+  }
+
+  // --- 2. Hand over. The whole difference between the two flows is these four lines. --------------
+
+  if (toolChangeIsMacro()) {
+    toolChangeMacroCall();
+    toolChangeMacroResume();
+  } else {
+    // NO JOGGING AT THIS PAUSE, which is why allowJog is false and no jog condition is written beside
+    // it. Everything after the pause is absolute in a frame the post is tracking; a jog would move the
+    // machine out from under that without the post ever knowing.
+    askUser("Change to Tool #" + tool.number + " " + tool.comment, "Tool change", false);
+    // The macro arm's resume is toolChangeMacroResume()'s; this is the manual arm's, and it exists only
+    // when the manual arm moved the tool somewhere. With the position fields empty it is not called and
+    // the flow is byte-identical to what it was before they existed.
+    if (toolChangeMovesToPosition()) {
+      writeToolChangeReturn();
     }
-
-    // Ask tool change and wait user to touch lcd button
-    askUser("Insert Tool #" + tool.number + " " + tool.comment, "Tool change", true);
-  }
-  else
-  {
-      writeBlock(mFormat.format(6), tFormat.format(tool.number));
   }
 
-  // If there is a custom GCode file for tool changes then include it
+  // --- 3. Resume. Who owns the work Z0 the next operation cuts against. ---------------------------
+
+  // The new tool is a different length, so the work Z0 this job established belongs to the OLD one --
+  // unless something else has just corrected it. Routed through partProbe(), the same machinery every
+  // part origin uses, so the re-probe honours "Probe X/Y Offset" and "Probe Pause", writes a
+  // provisional Z0 first (CR-12) and lands in the ACTIVE work offset -- which onSection() has now
+  // selected BEFORE calling here. That ordering is the root fix: changing first wrote a fresh Z0 into
+  // the previous section's register.
+  if (getProperty(properties.toolChangeProbeAfterChange)) {
+    if (tool.number != 0 && !tool.isJetTool()) {
+      if (toolChangeIsMacro()) {
+        // Stated, not warned. Probing after a macro is legitimate -- a sender that only pauses leaves
+        // Z0 belonging to the old tool -- but so is turning it off, and the post cannot tell which
+        // handler it is talking to. What it CAN do is say whose measurement the next cut trusts.
+        writeComment(eComment.Important, " Work Z0 re-established by this post, AFTER the macro --"
+          + " whatever the macro measured is overwritten below");
+      }
+      partProbe(false, true);
+    } else {
+      // Suppressing the probe is right; silence is not -- the same rule writeWcsOnStart()'s tool-0 arm
+      // follows. The Z0 in the register was established with the tool just removed, and the jet section
+      // below emits absolute Z words against it.
+      writeComment(eComment.Debug, " toolChange: re-probe skipped -- tool 0 or a jet tool cannot probe");
+      writeWarning("this change fits a jet tool / tool 0, which cannot probe, so work Z0 still measures"
+        + " from the tool just removed -- set Z0 by hand at the pause above before the next operation"
+        + " cuts or fires");
+    }
+  } else if (toolChangeIsMacro()) {
+    // A DIFFERENT STATEMENT FROM THE MANUAL ONE, because a different thing is true. On the manual flow
+    // nothing measured, so nothing can have corrected Z0. Here something may well have, and the post
+    // cannot see it -- so the file states the condition the operator has to have satisfied rather than
+    // asserting a defect that may not exist.
+    writeWarning("this post re-established nothing after the tool change above -- the work Z0 every"
+      + " depth below is measured from is whatever \"" + toolChangeSenderTitle() + "\" left behind."
+      + " That is correct only if it measured the new tool or applied a tool-length offset; if it only"
+      + " paused, re-zero Z by hand before resuming, or turn on \"Re-probe Z0 After a Change\"");
+  } else {
+    writeWarning("work Z0 was NOT re-established after this tool change, so it still measures from the"
+      + " PREVIOUS tool's length and every depth below is out by the difference between the two."
+      + " Re-zero Z by hand at the pause above, or turn on \"Re-probe Z0 After a Change\"");
+  }
+
   if (getProperty(properties.includeToolFile2) != "") {
     loadFile(getProperty(properties.includeToolFile2));
   }
 
-    // Run Z probe gcode. Same WCS caveat as the rapid above: this runs before the new section's WCS
-    // is selected, so probeTool() writes into the PREVIOUS section's WCS.
-  if (getProperty(properties.toolChangeProbeAfterChange) && tool.number != 0) {
-    onCommand(COMMAND_TOOL_MEASURE);
+  // The rest of the resume is onSection()'s own: it restarts the spindle and the coolant after this
+  // returns, and the section's first motion is a rapid.
+  writeComment(eComment.Important, " Tool Change End");
+}
+
+// FLOW 2's hand-over: emit the agreed token, ONCE, and nothing around it that the handler will redo.
+// The post's setup is already done and its resume is toolChangeMacroResume()'s -- this function's only
+// job is the call itself.
+//
+// THE TOKEN IS NOT THE SAME QUESTION ON EVERY TARGET, which is why the handler is a dropdown and not a
+// firmware branch:
+//
+//   gSender / CNCjs -- "T<n> M6". Neither GRBL nor grblHAL executes M6; the controller answers
+//   error:20 and the job stops with the tool in the cut. The route exists only because the SENDER
+//   takes the M6 out of the stream first, in the dataFilter of its Grbl controller
+//   (src/server/controllers/Grbl/GrblController.js -- gSender forked CNCjs's, and PR-20's M0 handling
+//   is the same function). The T word travels with it and is what the sender's routine reads to know
+//   which tool is coming; what reaches the controller is the T alone, which GRBL parses and does not
+//   act on. THE POST CANNOT VERIFY THAT THE SENDER IS CONFIGURED TO DO ANY OF THIS -- validateJob()
+//   warns, and that warning is the whole of the post's assurance.
+//
+//   RepRapFirmware -- "T<n>" and NO M6. On RRF the T word IS the change: it runs tfree<current>.g,
+//   tpre<n>.g and tpost<n>.g, and tpost is where a tool-length offset is applied. An M6 beside it would
+//   be a second token for a change already made.
+//
+//   Other -- no token at all. The operator's file is the hand-over, included through loadFile() like
+//   every other include so it inherits the missing-file error, the trailing-newline fix and the modal
+//   reset that follows a program the post did not write.
+function toolChangeMacroCall() {
+  var sender = getProperty(properties.toolChangeSender);
+
+  if (sender == "Other") {
+    writeComment(eComment.Important, " Hand over to \"" + getProperty(properties.toolChangeMacroFile)
+      + "\" -- the post emits no token of its own");
+    loadFile(getProperty(properties.toolChangeMacroFile));
+    return;
   }
 
-  writeComment(eComment.Important, " Tool Change End");
+  if (sender == "RepRap") {
+    writeComment(eComment.Important, " Hand over to RepRapFirmware -- T" + tool.number
+      + " runs tfree/tpre/tpost");
+    writeComment(eComment.Info, "   " + tool.comment + ", declared with M563 in config.g");
+    writeBlock(tFormat.format(tool.number));
+    return;
+  }
+
+  writeComment(eComment.Important, " Hand over to " + sender + " -- it must intercept the M6 below;"
+    + " GRBL itself answers error:20");
+  writeComment(eComment.Info, "   Tool #" + tool.number + " " + tool.comment);
+  writeBlock(tFormat.format(tool.number), mFormat.format(6));
+}
+
+// FLOW 2's resume: restore the frame and the modal state the handler may have disturbed, and put the
+// tool back at a known height before cutting resumes. NOTHING HERE IS CONDITIONAL ON WHICH HANDLER RAN.
+// The post cannot read a macro it did not write, so it re-asserts what it needs rather than deciding
+// what was probably safe -- the same rule loadFile() follows for an include.
+//
+// A STALE BELIEF IS A MISSING WORD, not a wrong one: the post re-asserts its modals lazily, so a G91 or
+// a G20 left behind by the macro would be inherited silently by the next cut. The resets below force
+// each one to be written again.
+function toolChangeMacroResume() {
+  gPlaneModal.reset();
+  gMotionModal.reset();
+  gAbsIncModal.reset();
+  gUnitModal.reset();
+  gFeedModeModal.reset();
+  resetAll();
+
+  writeComment(eComment.Info, "   Resume: re-assert what the macro may have changed");
+  writeBlock(gAbsIncModal.format(90));
+  writeBlock(gUnitModal.format(unit == IN ? 20 : 21));
+
+  // GRBL ONLY, and for Start()'s reasons rather than this function's: Marlin compiles G17 only under
+  // CNC_WORKSPACE_PLANES and has no G93/G94 at all, and RRF gained G93/G94 only in 3.5.1. Re-asserting
+  // a mode the firmware does not have is an unknown command, not insurance.
+  if (fw == eFirmware.GRBL) {
+    writeBlock(gFeedModeModal.format(94));
+    writeBlock(gPlaneModal.format(17));
+  }
+
+  // RE-SELECTED UNCONDITIONALLY, which is why this does not go through writeWCS(): that function
+  // returns without emitting when the offset is unchanged, and unchanged is exactly the case here --
+  // the post's belief about the active register is what the macro may have invalidated. It re-selects
+  // currentWorkOffset's OWN G5x and never a fixed G54, which would be the wrong register on any job
+  // whose active offset is not the first. Marlin does not reach here at all: validateJob() refuses this
+  // mode there, so writeMachineFrameBlock()'s chained-G53 restore has no counterpart to duplicate.
+  if (currentWorkOffset != undefined) {
+    var reselect = wcsGcode(currentWorkOffset);
+    if (reselect != undefined) {
+      writeComment(eComment.Info, "   Re-select the active work offset -- the macro may have changed it");
+      writeBlock(gFormat.format(reselect));
+    }
+  }
+
+  // BACK TO A KNOWN HEIGHT BEFORE ANYTHING ELSE MOVES. The macro may have left the tool at a changer, a
+  // tool-length sensor or its own park, and the post's tracked position is meaningless either way --
+  // resetAll() above discarded it, so the next move emits full coordinates, but a full coordinate in Z
+  // is only safe from a height the post chose. The re-probe below and the section's first rapid both
+  // depend on this block. A job with no fixed reference gets a warning instead and nothing to move to.
+  if (fixedZEstablishedInFile()) {
+    writeMachineTravelZ("Return to the travel height in the machine frame after the tool change");
+  } else {
+    writeWarning("the tool was NOT returned to a known height after the tool change -- this job"
+      + " establishes no fixed Z reference, so wherever the macro left the tool is where the next move"
+      + " starts from. Enter \"Machine Travel Z\" in group 4");
+  }
 }
 
 // Probe Z and write it as the origin of the ACTIVE work offset. It took a target WCS, a retract height

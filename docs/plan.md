@@ -9,19 +9,21 @@ behaves as it does is `design.md`.
 contributes 18 of them and is **itself unmerged**, so a merge to `master` carries two
 ranges, not one. `master` is 6 commits ahead of `origin/master`; `Assessment` is unpushed.
 
-**What is true now.** Phase C, Step 0, **Steps 1.1, 1.2, 1.3, 2, 3 and 4 are done and closed.** A
+**What is true now.** Phase C, Step 0, **Steps 1.1, 1.2, 1.3, 2, 3, 4, 5 and F2 are done and closed.** A
 multi-WCS job posts on any of the three firmwares given a machine declared homed; the spoilboard
 base and the old group 5 no longer exist; the multi-part register is settled; every origin mode
-states the condition it depends on. `PR-14` closed with 1.2; `PR-16` and `HR-26` closed by deletion
-with 2; `PR-17` closed with 2; `PR-18` and `PR-19` closed with 4.
+states the condition it depends on; the tool change is both flows, a machine-frame change position on
+the manual one, and nothing else. `PR-14` closed with 1.2; `PR-16` and `HR-26` closed by deletion with
+2; `PR-17` closed with 2; `PR-18` and `PR-19` closed with 4; `PR-15`, `PR-21` and `PR-22` closed with
+5; `PR-24` with F2; `PR-26` and `PR-27` with F3.
 
-**What is next: Step 5**, which deletes the whole tool change — the one thing left that the register
-has no pass criterion for.
+**What is next: Step V**, and its tool-change half is now the biggest single hole in it: twenty-two
+`TC-`/`PR-2xa` rows exist and **none has been run**, twenty of them needing a full licence.
 
-**Step V shrank but did not go away.** `findings.md` §4 holds **34 unrun rows**, twenty-six having
-closed by code walk 2026-08-14. A walk settles what the post writes and nothing beyond it, so what
-is left there is what needs Fusion, a controller or — new with `PR-20` — a sender. §4 states the
-methods and their bounds; §5 carries each row's argument.
+**Step V grew by twenty-two and shrank by none.** `findings.md` §4 holds **56 unrun rows**. A walk
+settles what the post writes and nothing beyond it, so what is left there is what needs Fusion, a
+controller or — new with `PR-20` — a sender. §4 states the methods and their bounds; §5 carries each
+row's argument.
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
@@ -39,46 +41,12 @@ quoted comment text, never by line number.
 
 | | Item | Blocked on |
 |---|---|---|
-| **5** | Group 6: rebuild the tool change as two flows | — |
 | **V** | Post-verify what has landed unposted | — |
 | | *`PR-20a` belongs to V and is cheap — one GRBL job posted at two comment levels* | — |
-| **6** | Clarity | 5 |
-| **7** | Documents, once | 5–6, V |
+| **6** | Clarity | — |
+| **7** | Documents, once | 6, V |
 
 ---
-
-## Step 5 — Group 6: rebuild the tool change as two flows
-
-**The shipped design is being replaced, not repaired** — the design is
-`design.md` → *Tool changes*, and `PR-15` is the one finding that the code does not comply
-with it. Eight properties, ~65 lines, **zero posted files exercising a tool change**, and
-after the register deletion **zero test rows** either.
-
-- **Goal** — the post arrives correctly, hands over, and resumes correctly. It performs no
-  tool change itself, in either flow.
-- **Where** — `toolChange()`; `probeTool()`; `onSection()`'s call order around `writeWCS()`;
-  group 6 entire; `includeProbeFile` in group 7.
-
-**5.1 — Flow 1: end this file so a manual tool change costs nothing.** The Personal-licence
-answer, and an **option, not a policy**. The work origin survives untouched — no `G10 L20`, no
-`G92`, and **no homing at end of file**, which on Marlin detaches the next file from the origin
-this one established. **The park gets one frame and says which**: `toolChangeX/Y/Z` emit plain
-`G0` words and are WCS-relative, and the post's own comment at :3657 says *"the spot drifts"*.
-
-**5.2 — Flow 2: call the macro and get out of the way.** Pre-change setup, the call, the
-resume — nothing else. **The deliverable is the contract, not a routine:** what state the
-macro may assume, what it may change, what it must restore. Without it the call is a trapdoor.
-**Blocked on which token the sender keys on** — `findings.md` §6 holds the question, and it is
-the first one in this project that no firmware source can close.
-
-**5.3 — the shared corrections both flows need**, listed at the foot of `design.md`'s section.
-**Take the ordering one first and on its own:** `onSection()` calls `toolChange()` before
-`writeWCS()`, so a re-probe writes into the previous section's register — the post's own
-comment at :3691 says so — and a probe result in the wrong register is a crash on the next
-plunge. That is a bug, not a design question, and it does not wait for the contract.
-
-- **Done when** — a **posted two-tool job** exists, `PR-15` closes, and §4 carries the test
-  rows the deletion left owing. The acceptance test is emitted output, not a code review.
 
 ## Step V — Post-verify what has landed unposted
 
@@ -100,12 +68,20 @@ rows — so what is left here is what a walk cannot reach.
 - **Dialog-only:** `D1`, `D3`, `D4`, `P7`. The properties literal is now declared in display
   order, so if the dialog *still* shows groups out of numeric order, Fusion is not sorting and
   the zero-padding convention is wrong.
+- **The tool-change rows, twenty-two of them, none run.** `TC-4` first — it is the only one that
+  proves the ordering fix, and the register it names is the difference between a correct part and
+  a plunge at the tool-length difference. `TC-2` rides on `REG-MF`'s post; `TC-17` next after
+  `TC-4`, being the row that proves a relocated change does not cross the bed at cutting height.
+  Every other `TC-` row and `PR-22a` need a **full licence**, which no other row in this step does.
+  **`TC-16` needs gSender and a machine that need not cut** — `PR-20b`'s method, and the only row
+  here that can fail without the post being wrong.
 - **The tidy-ups:** `HR-19` and `HR-24`, both one-liners, neither changing output.
 
 ## Step 6 — Clarity
 
-Only after 5, which deletes much of what would otherwise be tidied.
-
+- **`PR-23` belongs here** — split `writeWCS()` into a select and an origin-establish, so a
+  boundary that is both a WCS change and a tool change probes the part once, with the tool that
+  cuts it. Correctness landed with Step 5; this is the waste it left.
 - `validateJob()` was **288 lines**; Steps 2 and 3 removed ~100 of it. **Re-measure
   before restructuring** — it may not need it.
 - The property block is **795 lines, 21% of the file.** Step 2 removed description; **Step 4
@@ -124,8 +100,8 @@ The guides are off-limits during code changes. Do it all here — per-step means
 
 | Document | What falls due |
 |---|---|
-| `design.md` | **Remove** the *Tool changes* section's "the code implements neither" framing once it does. The Marlin rewrite and the version floor landed with Step 3 |
-| `property-reference.md` | Regenerate. The old groups 5 and 11 are gone and 6–11 renumbered to 5–10; group 5 is now *5 - Part Origins*, retitled and rewritten but offering exactly what it did; group 6 rebuilt as two flows. **Recount — the stated 69 was already wrong** |
+| `design.md` | Nothing outstanding — the *Tool changes* retitle and the token paragraph landed with `F2`, and the Marlin rewrite and the version floor with Step 3. **Re-read before assuming that** |
+| `property-reference.md` | Regenerate. The old groups 5 and 11 are gone and 6–11 renumbered to 5–10; group 5 is now *5 - Part Origins*, retitled and rewritten but offering exactly what it did; group 6 is five properties where it was eight, two of them new, and group 7 lost `includeProbeFile`. **Recount — the stated 69 was already wrong** |
 | `guide-pro.md` | State the **operator's** obligations explicitly — every work offset set before the job, one clearance clearing every fixture, machine homed. F360 nowhere states this and the emitted g-code depends on it. And say plainly what is verified and what is not |
 | `guide-hobbyist.md` | Flow 1's end-of-file behaviour; the Marlin do-not-home rule; the minimum Marlin version; **mid-job indexing** — the jog modes as a supported workflow, the sender condition on GRBL, and the panel condition on Marlin |
 | `README.md` | Feature list and the hobbyist/professional split |
@@ -144,11 +120,10 @@ The guides are off-limits during code changes. Do it all here — per-step means
 - `CR-11`, `CR-12`, `CR-14` and `PR-8` are landed fixes whose **code** Step 2 deleted — not
   lost work, work that stopped being needed. `CR-13` and `556a378` survive.
 
-## Delete list — ~390–440 lines
+## Delete list — ~370–420 lines
 
 | What | ~Lines | Risk |
 |---|---|---|
-| `toolChangeDisableZStepper` + `M84 Z` | ~12 | None — it is a hazard |
 | Group 10 (Duet) folded | ~20 | Very low |
 | Group 9 coolant surplus | ~50 | Low — pending a coolant persona |
 
@@ -156,8 +131,8 @@ The guides are off-limits during code changes. Do it all here — per-step means
 
 | Blocked | Waiting on |
 |---|---|
-| Step 5's verification | a full-licence posted two-tool file |
-| Step 5's Flow 2 | which token the sender keys on — `findings.md` §6 |
+| Every `TC-` row but `TC-2` | a **full licence** — a Personal post emits no tool change to test |
+| `TC-16`, `PR-20b` | gSender and a machine that need not cut |
 | Group 9 reduction | a coolant persona |
 | Group 8 audit | laser detail — power scaling, dynamic power, enable sequencing, air assist |
 | A status line in `guide-pro.md` | **deferred by the author 2026-08-13** |
@@ -208,6 +183,45 @@ was built.**
 **`PR-17` ✅ closed 2026-08-14.** A `>= 0` warning on GRBL in both channels, taken with the field's
 rename because one baseline covers both. `>= 0` and not `> 0` is the whole point: homing ends one
 pull-off below the trigger, so machine Z `0` *is* the switch, and soft limits reject only `> 0`.
+
+**F2 — Flow 2, the macro call ✅ closed 2026-08-14.** The token stopped being one unanswerable question
+by becoming a property: `Tool Change Handled By` names gSender, CNCjs, the RepRapFirmware tool table or
+`Other`, and the post emits what that handler reads — `T<n> M6` where a sender strips the `M6`, `T<n>`
+alone where the T word **is** the change, an operator's include file where neither. `At a Tool Change`
+gained a third value and **the two flows share their arrive-and-stop half**, so no route can be given a
+hand-over the others do not get. What F2 added beyond the call is the resume — modal re-assert, an
+unconditional WCS re-select, and a return to `Machine Travel Z` — because a macro the post did not write
+may have left the machine anywhere. **Marlin is refused**, having no register for a macro to write into.
+**`PR-25` is what it left**: Flow 2 on RRF is the first setting that makes a tool offset active while the
+post moves in `G53`, and whether RRF applies one there is a source read this project has not done.
+
+**F3 — where the manual change happens ✅ closed 2026-08-14.** `Tool Change X/Y/Z` was deleted in Step 5
+as unsound and never replaced, which left every manual change happening directly above the cut. The
+replacement is three **machine-frame** fields through the same `writeMachineFrameBlock()` as every other
+`G53` move, so a change position means the same thing on every part of every job — the frame was the
+defect, not the feature. **There is no X/Y retrace**: nothing after a change is measured from where the
+tool stood before it, and across a change of work offset the two probed registers' true relationship is
+not known to the post at all. What *is* owed is the ordering of the next rapid, which `PR-26` forces to
+cross before it descends — without it the tool crossed the bed at the section's clearance height. Flow 2
+is untouched, the changer position being the macro's own, and the fields warn there rather than being
+dropped in silence. `PR-27` rode along: GRBL's steppers de-energise at the pause and `$1` is a setting
+the post can never emit, so it says so. All three close **on a walk alone** — `TC-17` … `TC-20` are
+unrun. **`PR-28` is what F3 left**: the ordering comparison it had to work around is unsound after
+*any* post-injected move, not only after a change position, and fixing that properly touches every
+rapid in the post.
+
+**Step 5 — the tool change is Flow 1 and nothing else ✅ closed 2026-08-14.** The post changes no
+tool: no `M6`, no `M84 Z`, no `T` word, no beep, and no `Tool Change X/Y/Z` — the hand-over retracts
+in the **machine frame**, stops coolant and spindle on the one route there now is, prompts, and
+re-probes through `partProbe()` into the **active** offset, `onSection()` having selected the WCS
+first. Eight properties to three; a first tool load moved into `writeFirstSection()`, ahead of the
+origin work; `includeProbeFile` deleted. `PR-15` closed with it. **Three things the step did not
+foresee:** the multi-tool default became a **refusal** rather than a warning, because the warned
+alternative cut every operation with one tool; the walk found the spindle stop reading the
+**incoming** tool's jet guard, so a change into a laser handed over a turning cutter — `PR-22`; and
+`PR-21`, the Marlin end park being a homing cycle that zeroes the very origin the two-file answer
+depends on. **`PR-23` is what it left**: a boundary that is both a WCS and a tool change probes the
+part twice, register-correct and wasteful, and it belongs to Step 6.
 
 **Step 4 — group 5 keeps every mode and states each one's condition ✅ closed 2026-08-14.** Nothing
 deleted; the group retitled *5 - Part Origins*, both descriptions rewritten around the condition each
