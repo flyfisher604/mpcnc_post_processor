@@ -16,12 +16,13 @@ states the condition it depends on; the tool change is both flows, a machine-fra
 the manual one, and nothing else. `PR-14` closed with 1.2; `PR-16` and `HR-26` closed by deletion with
 2; `PR-17` closed with 2; `PR-18` and `PR-19` closed with 4; `PR-15`, `PR-21` and `PR-22` closed with
 5; `PR-24` with F2; `PR-26` and `PR-27` with F3; `PR-28` with F4; `CR-01` with F5; `HR-13`, `HR-19`,
-`HR-24` and `CR-02` with F6, which closed `HR-20` and `HR-27` by design alongside them.
+`HR-24` and `CR-02` with F6, which closed `HR-20` and `HR-27` by design alongside them; `CR-17` with
+F7.
 
 **What is next: Step V**, and its tool-change half is now the biggest single hole in it: twenty-three
 `TC-`/`PR-2xa` rows exist and **none has been run**, twenty of them needing a full licence.
 
-**Step V grew by twenty-seven and shrank by one.** `findings.md` §4 holds **60 unrun rows**. A walk
+**Step V grew by thirty and shrank by one.** `findings.md` §4 holds **63 unrun rows**. A walk
 settles what the post writes and nothing beyond it, so what is left there is what needs Fusion, a
 controller or — new with `PR-20` — a sender. §4 states the methods and their bounds; §5 carries each
 row's argument.
@@ -81,8 +82,12 @@ rows — so what is left here is what a walk cannot reach.
   Every other `TC-` row and `PR-22a` need a **full licence**, which no other row in this step does.
   **`TC-16` needs gSender and a machine that need not cut** — `PR-20b`'s method, and the only row
   here that can fail without the post being wrong.
-- **`CR-02` is the other licence-free row** — a defaults GRBL job whose whole delta against the
-  pre-change build is one comma per prompt line. `HR-24` rides with `REG-MF` and asserts the opposite,
+- **Three more licence-free rows.** `CR-02` — a defaults GRBL job whose whole delta against the
+  pre-change build is one comma per prompt line. **`CR-17a` and `CR-17c`, which need only a
+  two-offset job whose operations return to the first part**: the whole assertion is an absence at
+  the returning boundary, no `G38.2` on one and no second jog `M0` on the other, and a multi-WCS post
+  needs no licence — `PB1` and `PBV3` proved that. `CR-17b` is the branch that does, being the one
+  that puts a tool change between the two visits. `HR-24` rides with `REG-MF` and asserts the opposite,
   that no byte moves at all; `HR-19` rides with `PR-19a`'s RepRap post.
 
 ## Step 6 — Clarity
@@ -254,6 +259,18 @@ guard's `Debug` trace, which is the only thing separating a guard that read noth
 `+Z`. Alongside them the **tool-change include files left group 7 for group 6**, being the only
 tool-change settings outside it and the only two in that group that ADD to a sequence rather than
 replace one. `CR-02`, `HR-19` and `HR-24` are unrun; `PR-2c` now carries `HR-27`'s falsifier.
+
+**F7 — a part is set up once ✅ closed 2026-08-15.** `CR-17`: a job that returned to a work offset it
+had already used re-ran the whole origin dispatch, driving a second `G38.2` into a pocket floor the
+roughing pass had cut and displacing every finishing cut by that depth. A return now sets nothing up —
+retract, select, rapid to the stored X0 Y0 — under **any** mode, the two jog modes included, X0 Y0
+being what nothing in a job moves. **Only Z re-opens and only a tool change opens it**: with no
+tool-length system the change's re-probe corrects the active offset alone, so it clears the Z half for
+every other part and a return to one of those re-establishes Z by the mode's own answer. **The control
+says so** — `Subsequent WCS / Part` is `Each New WCS / Part`, its default `Use WCS X0 Y0, Probe Z0 Once
+per Part`, and `Active` is gone from all four stored-origin titles; no title reaches a posted file.
+`CR-17a`, `CR-17b` and `CR-17c` are unrun, two of them licence-free. **`PR-23` is untouched** and still
+Step 6's: a boundary that is both a WCS and a tool change probes twice.
 
 **Step 5 — the tool change is Flow 1 and nothing else ✅ closed 2026-08-14.** The post changes no
 tool: no `M6`, no `M84 Z`, no `T` word, no beep, and no `Tool Change X/Y/Z` — the hand-over retracts

@@ -343,15 +343,15 @@ properties = {
 
   probeOnStart: {
     title      : "First WCS / Part",
-    description: "Establishes the origin for the first (or only) part. EVERY MODE DEPENDS ON ONE THING, NAMED WITH IT. Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 wherever the tool stands, then probe the stock-top Z -- needs a WIRED, WORKING Z TOUCH PLATE, and needs you to have jogged the tool to the part's X0 Y0 before starting; there is no prompt. Set X0 Y0 Z0 to Current Pos: record the CURRENT position as X0 Y0 Z0, no probe and no prompt -- the hand touch-off, and the jet/laser answer where Z is set by hand. Use Active WCS X0 Y0, Probe Z0: rapid to the X0 Y0 already stored in the active WCS and probe the stock-top Z, leaving XY as stored -- needs that register to already hold the right XY, which the post cannot read back to check. Use Active WCS X0 Y0 Z0: the full stored origin, no re-zero and no probe -- same trust, and the tool MOVES to the Safe Z set below, absolute in the stored frame, so one parked above it starts the job by descending. Jog to X0 Y0, Probe Z0 and Jog to X0 Y0 Z0: pause so you jog to the origin during the run and record it there, with a probed Z or with Z where you left it. BOTH JOG MODES DEPEND ON WHAT HOLDS THE PAUSE. On GRBL that is the sender: gSender comments the M0 out and pauses its own stream, so the controller stays Idle and accepts jog commands, while a sender that passes M0 through leaves the controller in a hold that refuses them. On Marlin the pause queues serial commands without executing them, so the jog must come from the machine's own panel or from a sender that holds the file. RepRap jogs at the pause natively and needs neither. \"ACTIVE WCS\" is the register this Setup designates -- its Work Offset, WCS 1 / G54 unless you changed it -- which the post SELECTS at job start, not whatever your sender had active. On the two \"... to Current Pos\" modes, homing and the Machine Travel Z move run BEFORE the origin is recorded, so \"current position\" means wherever they left the tool. For more parts or copies see Subsequent WCS / Part.",
+    description: "Establishes the origin for the first (or only) part. EVERY MODE DEPENDS ON ONE THING, NAMED WITH IT. Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 wherever the tool stands, then probe the stock-top Z -- needs a WIRED, WORKING Z TOUCH PLATE, and needs you to have jogged the tool to the part's X0 Y0 before starting; there is no prompt. Set X0 Y0 Z0 to Current Pos: record the CURRENT position as X0 Y0 Z0, no probe and no prompt -- the hand touch-off, and the jet/laser answer where Z is set by hand. Use WCS X0 Y0, Probe Z0: rapid to the X0 Y0 already stored in the active WCS and probe the stock-top Z, leaving XY as stored -- needs that register to already hold the right XY, which the post cannot read back to check. Use WCS X0 Y0 Z0: the full stored origin, no re-zero and no probe -- same trust, and the tool MOVES to the Safe Z set below, absolute in the stored frame, so one parked above it starts the job by descending. Jog to X0 Y0, Probe Z0 and Jog to X0 Y0 Z0: pause so you jog to the origin during the run and record it there, with a probed Z or with Z where you left it. BOTH JOG MODES DEPEND ON WHAT HOLDS THE PAUSE. On GRBL that is the sender: gSender comments the M0 out and pauses its own stream, so the controller stays Idle and accepts jog commands, while a sender that passes M0 through leaves the controller in a hold that refuses them. On Marlin the pause queues serial commands without executing them, so the jog must come from the machine's own panel or from a sender that holds the file. RepRap jogs at the pause natively and needs neither. \"WCS\" here means the register this Setup designates -- its Work Offset, WCS 1 / G54 unless you changed it -- which the post SELECTS at job start, not whatever your sender had active. On the two \"... to Current Pos\" modes, homing and the Machine Travel Z move run BEFORE the origin is recorded, so \"current position\" means wherever they left the tool. For more parts or copies see Each New WCS / Part.",
     group      : "probe",
     order      : 10,
     type       : "enum",
     values: [
       { title: "Set X0 Y0 to Current Pos, Probe Z0", id: "Current XY & Probe Z" },
       { title: "Set X0 Y0 Z0 to Current Pos", id: "Current XYZ" },
-      { title: "Use Active WCS X0 Y0, Probe Z0", id: "Probe Z" },
-      { title: "Use Active WCS X0 Y0 Z0", id: "Skip" },
+      { title: "Use WCS X0 Y0, Probe Z0", id: "Probe Z" },
+      { title: "Use WCS X0 Y0 Z0", id: "Skip" },
       { title: "Jog to X0 Y0, Probe Z0", id: "Jog XY & Probe Z" },
       { title: "Jog to X0 Y0 Z0", id: "Jog XYZ" }
     ],
@@ -359,14 +359,14 @@ properties = {
     scope: "post"
   },
   probeOnChange: {
-    title      : "Subsequent WCS / Part",
-    description: "MULTI-PART JOBS ONLY -- several parts or copies, one WCS per part. What to do when the job advances to the next part's WCS (G55, G56, ...). A single-part job never reaches this control. Every mode first retracts to Machine Travel Z in the machine's own frame, then acts. TWO WORKFLOWS, AND THE MODES COME IN PAIRS. PRE-SET FIXTURE OFFSETS -- every part's register was set before the job started, which is the Replicate case: Use Active WCS X0 Y0, Probe Z0 (default): rapid to that part's stored X0 Y0 and probe its stock-top Z, writing Z into its own register; XY stays the fixture's pre-set offset. Use Active WCS X0 Y0 Z0: touch nothing -- after the retract the tool rapids to the part's stored X0 Y0 and cuts. Both TRUST registers the post cannot read back to check. MID-JOB INDEXING -- you jog to each part as the job reaches it, and nothing has to be set in advance: Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog there, then record that position as X0 Y0 Z0, no probe. This is the supported way to run a blank you clamp during the job -- one WCS per part, captured as you reach it. BOTH JOG MODES DEPEND ON WHAT HOLDS THE PAUSE. On GRBL that is the sender: gSender comments the M0 out and pauses its own stream, so the controller stays Idle and accepts jog commands, while a sender that passes M0 through leaves the controller in a hold that refuses them. On Marlin the pause queues serial commands without executing them, so the jog must come from the machine's own panel or from a sender that holds the file. RepRap jogs at the pause natively and needs neither. ON MARLIN EVERY MODE HERE NEEDS A FIRMWARE BUILD OPTION -- CNC_COORDINATE_SYSTEMS, off in a stock configuration, which is what gives Marlin its nine work offsets and G53 alike; the post assumes you compiled it in and says so in the file, because it cannot read your build. \"Active WCS\" means the register that part's Fusion Setup designates, which the post selects on the traverse. The attach/detach prompts around any probe follow Probe Pause. Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
+    title      : "Each New WCS / Part",
+    description: "MULTI-PART JOBS ONLY -- several parts or copies, one WCS per part. What to do the FIRST TIME the job reaches each part's WCS (G55, G56, ...); a job that comes back to a part it has already set up does none of it again, and RETURNING TO A PART below says what happens instead. A single-part job never reaches this control. Every mode first retracts to Machine Travel Z in the machine's own frame, then acts. TWO WORKFLOWS, AND THE MODES COME IN PAIRS. PRE-SET FIXTURE OFFSETS -- every part's register was set before the job started, which is the Replicate case: Use WCS X0 Y0, Probe Z0 Once per Part (default): rapid to that part's stored X0 Y0 and probe its stock-top Z, writing Z into its own register; XY stays the fixture's pre-set offset. Use WCS X0 Y0 Z0: touch nothing -- after the retract the tool rapids to the part's stored X0 Y0 and cuts. Both TRUST registers the post cannot read back to check. MID-JOB INDEXING -- you jog to each part as the job reaches it, and nothing has to be set in advance: Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog there, then record that position as X0 Y0 Z0, no probe. This is the supported way to run a blank you clamp during the job -- one WCS per part, captured as you reach it. BOTH JOG MODES DEPEND ON WHAT HOLDS THE PAUSE. On GRBL that is the sender: gSender comments the M0 out and pauses its own stream, so the controller stays Idle and accepts jog commands, while a sender that passes M0 through leaves the controller in a hold that refuses them. On Marlin the pause queues serial commands without executing them, so the jog must come from the machine's own panel or from a sender that holds the file. RepRap jogs at the pause natively and needs neither. ON MARLIN EVERY MODE HERE NEEDS A FIRMWARE BUILD OPTION -- CNC_COORDINATE_SYSTEMS, off in a stock configuration, which is what gives Marlin its nine work offsets and G53 alike; the post assumes you compiled it in and says so in the file, because it cannot read your build. \"WCS\" here means the register that part's Fusion Setup designates, which the post selects on the traverse. RETURNING TO A PART SETS UP NOTHING AGAIN, whatever mode is chosen: the job retracts, selects that part's register, rapids to its stored X0 Y0 and cuts. A job that roughs every part and then finishes every part comes back to each one, and by then the touch point may be a machined pocket floor, a cut-away region or air -- so a second probe would overwrite a good Z0 and displace every finishing cut by the roughing depth. X0 Y0 is never re-established on a return under any mode, nothing in a job having moved it, and neither jog mode prompts a second time. ONE THING RE-OPENS Z: a tool change with Re-probe Z0 After a Change on re-measures the ACTIVE part only, and this machine has no tool-length system, so every OTHER part's stored Z0 still measures from the tool just removed. A return to one of those probes once more on the two probing modes, pauses for you to set Z on Jog to X0 Y0 Z0, and warns in the file on Use WCS X0 Y0 Z0, which measures nothing by design. The attach/detach prompts around any probe follow Probe Pause. Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
     group      : "probe",
     order      : 20,
     type       : "enum",
     values: [
-      { title: "Use Active WCS X0 Y0, Probe Z0", id: "Probe Z" },
-      { title: "Use Active WCS X0 Y0 Z0", id: "Skip" },
+      { title: "Use WCS X0 Y0, Probe Z0 Once per Part", id: "Probe Z" },
+      { title: "Use WCS X0 Y0 Z0", id: "Skip" },
       { title: "Jog to X0 Y0, Probe Z0", id: "Jog XY & Probe Z" },
       { title: "Jog to X0 Y0 Z0", id: "Jog XYZ" }
     ],
@@ -389,7 +389,7 @@ properties = {
   },
   probeOffsetX: {
     title      : "Probe X Offset",
-    description: "X distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Subsequent WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin.",
+    description: "X distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Each New WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin.",
     group      : "probe",
     order      : 40,
     type       : "integer",
@@ -398,7 +398,7 @@ properties = {
   },
   probeOffsetY: {
     title      : "Probe Y Offset",
-    description: "Y distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Subsequent WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin.",
+    description: "Y distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Each New WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin.",
     group      : "probe",
     order      : 50,
     type       : "integer",
@@ -416,7 +416,7 @@ properties = {
   },
   probeG38Target: {
     title      : "G38 Target",
-    description: "How far DOWN FROM THE TOOL a probe may search before giving up -- a DISTANCE, not a position. Every probe writes a provisional Z0 at the current height first, so -10 (the default) means \"search 10 mm below wherever the tool is standing when the probe begins\". WHERE IT IS STANDING DEPENDS ON THE MODE. On the Set ... to Current Pos and Jog to ... modes you put it there yourself, a few mm above the stock, and -10 is the right size. On the two Use Active WCS X0 Y0, Probe Z0 modes the POST puts it there, at Machine Travel Z -- the height that clears the tallest clamp in the job -- so the target has to be deeper than the drop from that height to your stock top, which is a distance only you can measure: the post cannot compute it, the stock top being the value this probe exists to find. Deep enough to reach the plate and no deeper: a probe that travels this far without touching is a failed probe, and GRBL raises an alarm and stops the job.",
+    description: "How far DOWN FROM THE TOOL a probe may search before giving up -- a DISTANCE, not a position. Every probe writes a provisional Z0 at the current height first, so -10 (the default) means \"search 10 mm below wherever the tool is standing when the probe begins\". WHERE IT IS STANDING DEPENDS ON THE MODE. On the Set ... to Current Pos and Jog to ... modes you put it there yourself, a few mm above the stock, and -10 is the right size. On the two Use WCS X0 Y0, Probe Z0 modes the POST puts it there, at Machine Travel Z -- the height that clears the tallest clamp in the job -- so the target has to be deeper than the drop from that height to your stock top, which is a distance only you can measure: the post cannot compute it, the stock top being the value this probe exists to find. Deep enough to reach the plate and no deeper: a probe that travels this far without touching is a failed probe, and GRBL raises an alarm and stops the job.",
     group      : "probe",
     order      : 70,
     type       : "integer",
@@ -539,7 +539,7 @@ properties = {
   },
   toolChangeProbeAfterChange: {
     title      : "Re-probe Z0 After a Change",
-    description: "Re-establish the work Z0 after each tool change, on either hand-over mode. On (default): after the pause -- or after the macro returns -- the post moves to the part origin plus Probe X/Y Offset and probes Z into the ACTIVE work offset, using the same probe, the same attach/detach prompts (Probe Pause) and the same provisional Z0 as every part probe in group 5. AFTER A MANUAL PAUSE THIS IS NOT REALLY OPTIONAL: the new tool is a different length, so the Z0 the job established belongs to the old one, and cutting on it puts every depth below out by the difference. AFTER A MACRO IT USUALLY IS: whatever owns the tool table has just applied an offset or re-zeroed, and probing again asks you to fit the touch plate for a measurement that has already been made. Turn it OFF for gSender's re-zeroing tool-change routines and for a RepRapFirmware tpost that applies a tool offset; leave it ON for a sender that only pauses, and for a macro of your own that does not measure. Off: no probe, and the post states in the file whose Z0 the job is now cutting on. THE PROBE SEARCHES DOWN FROM THE RETRACT HEIGHT, which is Machine Travel Z, so G38 Target has to be deep enough to reach the stock top from there -- the same distance the two Use Active WCS X0 Y0, Probe Z0 modes need, and a distance only you can measure. Ignored for tool 0 and for jet/laser tools, which cannot probe.",
+    description: "Re-establish the work Z0 after each tool change, on either hand-over mode. On (default): after the pause -- or after the macro returns -- the post moves to the part origin plus Probe X/Y Offset and probes Z into the ACTIVE work offset, using the same probe, the same attach/detach prompts (Probe Pause) and the same provisional Z0 as every part probe in group 5. AFTER A MANUAL PAUSE THIS IS NOT REALLY OPTIONAL: the new tool is a different length, so the Z0 the job established belongs to the old one, and cutting on it puts every depth below out by the difference. AFTER A MACRO IT USUALLY IS: whatever owns the tool table has just applied an offset or re-zeroed, and probing again asks you to fit the touch plate for a measurement that has already been made. Turn it OFF for gSender's re-zeroing tool-change routines and for a RepRapFirmware tpost that applies a tool offset; leave it ON for a sender that only pauses, and for a macro of your own that does not measure. Off: no probe, and the post states in the file whose Z0 the job is now cutting on. THE PROBE SEARCHES DOWN FROM THE RETRACT HEIGHT, which is Machine Travel Z, so G38 Target has to be deep enough to reach the stock top from there -- the same distance the two Use WCS X0 Y0, Probe Z0 modes need, and a distance only you can measure. Ignored for tool 0 and for jet/laser tools, which cannot probe.",
     group      : "toolChange",
     order      : 80,
     type       : "boolean",
@@ -1391,7 +1391,7 @@ function validateJob() {
   var changeMode = getProperty(properties.probeOnChange);
   var homedXY = machineHomesXY();
   var homedZ = machineHomesZ();
-  // "Subsequent WCS / Part" is consulted only on a genuine WCS change (writeWCS()'s isTraverse),
+  // "Each New WCS / Part" is consulted only on a genuine WCS change (writeWCS()'s isTraverse),
   // which a single-offset job never has -- so every warning about that control is gated on this.
   var multiWcs = collectDistinctOffsets().length > 1;
 
@@ -1414,7 +1414,7 @@ function validateJob() {
       + "\"Axes Homed and Trusted\" declares, and it runs before "
       + "\"First WCS / Part\" records the current position as the part origin, so positioning the "
       + "tool before starting the job has no effect on those axes. On a homed machine the stored "
-      + "offset in the active WCS is repeatable, so \"Use Active WCS X0 Y0, Probe Z0\" is the "
+      + "offset in the active WCS is repeatable, so \"Use WCS X0 Y0, Probe Z0\" is the "
       + "natural first-part mode here; a \"Jog to ...\" mode also works. Otherwise set \"Home at "
       + "Job Start\" to Off."));
   }
@@ -1427,7 +1427,7 @@ function validateJob() {
       storedOffsetControls.push("\"First WCS / Part\"");
     }
     if ((changeMode == "Probe Z" || changeMode == "Skip") && multiWcs) {
-      storedOffsetControls.push("\"Subsequent WCS / Part\"");
+      storedOffsetControls.push("\"Each New WCS / Part\"");
     }
     if (storedOffsetControls.length > 0) {
       warning(localize(storedOffsetControls.join(" and ") + " trust the origin already stored in a "
@@ -1449,7 +1449,7 @@ function validateJob() {
     warning(localize("A \"Jog to ...\" origin mode is selected, and " + jogAtPauseCondition() + ". "
       + "Check that before running this file -- without it the job stops at the prompt and cannot be "
       + "moved until it is resumed. Otherwise position the tool before starting and use a "
-      + "\"Set ... to Current Pos\" or \"Use Active WCS ...\" mode."));
+      + "\"Set ... to Current Pos\" or \"Use WCS ...\" mode."));
   }
 
   // PR-20, AND IT IS THE SENDER'S THRESHOLD, NOT THE POST'S. gSender rewrites an M0 to "(M0)" in its
@@ -1533,7 +1533,7 @@ function validateJob() {
     warning(localize("The fixed Z reference is established at job start by moving the tool to "
       + "\"Machine Travel Z\", and that runs before \"First WCS / Part\" records the current "
       + "position -- so the origin is recorded at bed clearance rather than at the part, and the "
-      + "probe target measured from it will not reach the stock. Use \"Use Active WCS X0 Y0, Probe "
+      + "probe target measured from it will not reach the stock. Use \"Use WCS X0 Y0, Probe "
       + "Z0\" or a \"Jog to ...\" mode"
       // Clearing the field is a real remedy only where the job does not REQUIRE the frame. A multi-part
       // job does -- Guard B refuses it without one -- so on those jobs the mode is the only thing to move.
@@ -1545,7 +1545,7 @@ function validateJob() {
   // The same boundary from the other side: this fires when no fixed Z reference is established and the
   // mode cannot lift. warning(), not error() -- the start height is a promise only the operator can make.
   if (startMode == "Probe Z" && !fixedZEstablishedInFile()) {
-    warning(localize("\"First WCS / Part\" = \"Use Active WCS X0 Y0, Probe Z0\" rapids to the stored "
+    warning(localize("\"First WCS / Part\" = \"Use WCS X0 Y0, Probe Z0\" rapids to the stored "
       + "X0 Y0 before this job has established any Z the post can move in, so that traverse happens "
       + "at whatever height the tool is left at -- position it clear of the stock, clamps and "
       + "fixtures before starting the program. The probe that follows searches \"G38 Target\" DOWN FROM "
@@ -1945,6 +1945,8 @@ function validateJob() {
 // are rebuilt from properties in onOpen() on every branch, so that assignment IS their reset.
 function resetPostState() {
   currentWorkOffset = undefined;          // no work offset emitted yet
+  wcsVisited = {};                        // no part has been set up in this file
+  wcsZ0Trusted = {};
   sequenceNumber = getProperty(properties.jobSequenceNumberStart);
   forceSectionToStartWithRapid = false;
   sectionComment = undefined;
@@ -2064,6 +2066,18 @@ var forceSectionToStartWithRapid = false;
 var sectionComment;
 var currentWorkOffset;   // last work offset (WCS) emitted, to suppress redundant output
 
+// WHAT THIS JOB HAS ALREADY SET UP. currentWorkOffset suppresses a REPEAT of the active offset and
+// nothing else, so a job that RETURNS to an earlier one -- rough every part, then finish every part --
+// ran the full origin dispatch a second time and drove a G38.2 into a surface it had already cut.
+//
+// TWO RECORDS, BECAUSE ONLY Z GOES STALE. Nothing in a job moves a register's X0 Y0 once it is set,
+// so a return never re-jogs and never re-writes XY. Z is the other question: this machine has no
+// tool-length system at all (design.md), a work Z0 measures from the tool that probed it, and a tool
+// change re-probes the ACTIVE offset alone -- which leaves every other one measuring from the tool
+// just removed. So a change clears the Z half and nothing else clears either. CR-17.
+var wcsVisited = {};     // work offset -> this job has entered it and established its origin
+var wcsZ0Trusted = {};   // work offset -> its stored Z0 was established under the tool now loaded
+
 // Emit the work coordinate system (WCS) for a section. GRBL and RepRap/Duet support G54-G59 (RepRap
 // also G59.1-G59.3), so the offset assigned in Fusion is honored. Stock Marlin has none -- the post
 // sets the origin with G92 there and only warns when a non-default WCS was selected.
@@ -2146,6 +2160,12 @@ function writeWCS(section) {
     return;
   }
 
+  // A RETURN TO A PART THIS JOB HAS ALREADY SET UP takes none of the dispatch below. CR-17.
+  if (wcsVisited[workOffset]) {
+    writeWcsOnReturn(workOffset, onChangeMode, canProbe);
+    return;
+  }
+
   // Z is at the safe height from the retract above. The Replicate moves below emit X/Y only, so
   // that height is preserved; the manual modes hand control to the operator (who jogs).
   if (onChangeMode == "Skip") {
@@ -2193,6 +2213,69 @@ function writeWCS(section) {
       writeComment(eComment.Debug, " writeWCS: probe skipped (tool 0 or jet tool)");
     }
   }
+
+  // This part is set up, so a later RETURN moves to its stored origin instead of re-establishing it.
+  // Z0 counts as trusted whatever the mode did -- including "Use WCS X0 Y0 Z0", which writes none by
+  // design, its whole premise being that the stored one is right, and the tool-0 arms, which have
+  // already warned that nothing established it. The claim is "as good as this job can make it", and
+  // the ONE thing that can falsify it afterwards is a tool change. CR-17.
+  wcsVisited[workOffset] = true;
+  wcsZ0Trusted[workOffset] = true;
+}
+
+// A RETURN TO A WORK OFFSET THIS JOB HAS ALREADY SET UP. Called from writeWCS() after the machine-frame
+// retract and the G5x select, so the tool is at the travel height and this part's own register is active.
+//
+// X0 Y0 IS NEVER RE-ESTABLISHED HERE, under any mode. Whatever the first visit settled -- a stored
+// fixture offset, a jog, a recorded position -- is still what the register holds, and re-running the
+// mode would re-prompt the operator to re-zero a part this job has already cut.
+//
+// Z0 IS RE-ESTABLISHED ONLY WHERE A TOOL CHANGE HAS INVALIDATED IT, and then by the mode's own Z
+// answer: a probe where the mode probes, the operator's hand where the mode jogs, a warning where the
+// mode has neither. CR-17.
+function writeWcsOnReturn(workOffset, mode, canProbe) {
+  var zStale = !wcsZ0Trusted[workOffset];
+  writeComment(eComment.Debug, " writeWcsOnReturn: workOffset: " + workOffset + " mode: " + mode
+    + " zStale: " + zStale + " canProbe: " + canProbe);
+
+  // The only path here that emits a G38.2. partProbe() travels to the stored X0 Y0 itself and writes
+  // Z ONLY, which is exactly what a return is allowed to touch -- so the jog mode needs no prompt:
+  // its X0 Y0 answer was given on the first visit and nothing has moved it since.
+  if (zStale && canProbe && (mode == "Probe Z" || mode == "Jog XY & Probe Z")) {
+    writeComment(eComment.Info, "   Return to a part already set up; a tool change since means Z0 is re-probed");
+    partProbe(false, true);
+    wcsZ0Trusted[workOffset] = true;
+    return;
+  }
+
+  // Every other case arrives at the part the same way: X/Y only, at the height the retract left.
+  writeComment(eComment.Info, "   Return to a part already set up -- move to its stored origin X0 Y0");
+  resetAll();
+  rapidMovementsXY(0, 0);
+  flushMotions();
+
+  if (!zStale) {
+    return;
+  }
+
+  // "Jog to X0 Y0 Z0" sets Z by hand, so a return whose Z0 a change invalidated gets the hand again --
+  // Z only, at the origin the move above has just reached.
+  if (mode == "Jog XYZ") {
+    warnJogAtPauseNeedsSender();
+    askUser("Jog to Z0 for the new tool, then continue", "Set origin", true);
+    writeComment(eComment.Info, "   Set the current height to Z0");
+    writeWcsOrigin(workOffset, undefined, undefined, 0);
+    wcsZ0Trusted[workOffset] = true;
+    return;
+  }
+
+  // "Use WCS X0 Y0 Z0" re-establishes nothing by design, and a tool 0 / jet tool has nothing to
+  // re-establish it with. Suppressing the correction is right; silence is not -- the rule
+  // writeWcsOnStart()'s and toolChange()'s tool-0 arms already follow. wcsZ0Trusted stays false, so a
+  // later return to this part says it again.
+  writeWarning("this part's stored Z0 was measured with a tool that has since been changed, and"
+    + " nothing here re-measures it -- every depth below is out by the difference in tool length."
+    + " Set Z0 by hand before this part cuts, or use \"Use WCS X0 Y0, Probe Z0 Once per Part\"");
 }
 
 // Persists the current position as WCS wcsNumber's own origin; any of x/y/z may be undefined to leave
@@ -3266,6 +3349,13 @@ function writeFirstSection() {
 
   writeWcsOnStart();
 
+  // The first part is set up, so a later RETURN to its offset moves to the stored origin rather than
+  // re-establishing it. Trusted whatever the mode did -- seeding this from "did the post probe?" would
+  // send a "Use WCS X0 Y0 Z0" job to probe a surface it had already cut on the first return, which is
+  // CR-17 unfixed.
+  wcsVisited[currentWorkOffset] = true;
+  wcsZ0Trusted[currentWorkOffset] = true;
+
   writeComment(eComment.Important, " *** START end ***");
   writeComment(eComment.Important, " ");
 }
@@ -3322,7 +3412,7 @@ var probePauseAfter = true;
 // A part probe: position to the part's Z-probe touch-point (its WCS origin plus the probe XY offset)
 // and probe Z into the active WCS. `atOrigin` means the tool already sits on the origin, so the
 // reposition is emitted only when the offset is non-zero; added parts pass false, being over the
-// previous part. `zUntrusted` means this WCS's stored Z0 is not believed -- the two "Use Active WCS
+// previous part. `zUntrusted` means this WCS's stored Z0 is not believed -- the two "Use WCS
 // X0 Y0, Probe Z0" modes, which exist for exactly that reason -- so the probe writes its own
 // provisional Z0 below and no absolute Z was emitted in this frame before it. Whether the traverse
 // HEIGHT is also unknown is a SECOND question, asked separately: on the subsequent-part path the tool
@@ -3378,7 +3468,7 @@ function writeWcsOnStart() {
   writeComment(eComment.Debug, " writeWcsOnStart: probeOnStart: " + mode + " wcs: " + currentWorkOffset);
 
   if (mode == "Skip") {
-    // "Use Active WCS X0 Y0 Z0": trust the stored origin, so probeSafeZ() is meaningful in that frame.
+    // "Use WCS X0 Y0 Z0": trust the stored origin, so probeSafeZ() is meaningful in that frame.
     // "move" and not "retract" -- an ABSOLUTE Z means a tool parked above Safe Z descends to it first.
     writeComment(eComment.Info, "   Use stored work origin; move Z to Safe Z, then to X0 Y0");
     resetAll();
@@ -3391,7 +3481,7 @@ function writeWcsOnStart() {
   }
 
   if (mode == "Probe Z") {
-    // "Use Active WCS X0 Y0, Probe Z0": use the stored X0 Y0 and re-probe Z -- do NOT write XY. Unlike
+    // "Use WCS X0 Y0, Probe Z0": use the stored X0 Y0 and re-probe Z -- do NOT write XY. Unlike
     // Skip, Z is stale and about to be probed, so no absolute Z move is emitted in this frame.
     writeComment(eComment.Info, "   Use stored work origin X0 Y0; probe Z");
     if (canProbe) {
@@ -4180,6 +4270,12 @@ function toolChange() {
   // selected BEFORE calling here. That ordering is the root fix: changing first wrote a fresh Z0 into
   // the previous section's register.
   if (getProperty(properties.toolChangeProbeAfterChange)) {
+    // EVERY OTHER PART'S Z0 HAS JUST GONE STALE. The re-probe below writes the ACTIVE offset alone and
+    // there is no tool-length system to correct the rest, so a return to any other part must re-probe
+    // rather than cut on a Z0 the removed tool measured. Cleared HERE and not on the fact of a change:
+    // this property is the post's one statement that a change invalidates Z0, and turned Off it is the
+    // operator asserting the handler applies a tool offset instead. CR-17.
+    wcsZ0Trusted = {};
     if (tool.number != 0 && !tool.isJetTool()) {
       if (toolChangeIsMacro()) {
         // Stated, not warned. Probing after a macro is legitimate -- a sender that only pauses leaves
@@ -4189,6 +4285,7 @@ function toolChange() {
           + " whatever the macro measured is overwritten below");
       }
       partProbe(false, true);
+      wcsZ0Trusted[currentWorkOffset] = true;
     } else {
       // Suppressing the probe is right; silence is not -- the same rule writeWcsOnStart()'s tool-0 arm
       // follows. The Z0 in the register was established with the tool just removed, and the jet section
