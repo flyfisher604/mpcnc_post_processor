@@ -3925,7 +3925,10 @@ function warnJogAtPauseNeedsSender() {
 function askUser(text, title, allowJog) {
   // Firmware is RepRap?
   if (fw == eFirmware.REPRAP) {
-    var v1 = " P\"" + sanitizeMessageText(text, "\"") + "\" R\"" + sanitizeMessageText(title, "\"") + "\" S3";
+    // NO LEADING SPACE HERE. writeBlock()'s word separator supplies one when "Include Whitespace" is on
+    // and the conditional prefix below supplies one when it is off, so a third carried here put TWO
+    // spaces after M291 at every setting -- HR-19. The GRBL and default arms below never had it.
+    var v1 = "P\"" + sanitizeMessageText(text, "\"") + "\" R\"" + sanitizeMessageText(title, "\"") + "\" S3";
     var v2 = allowJog ? " X1 Y1 Z1" : "";
     writeBlock(mFormat.format(291), (getProperty(properties.jobSeparateWordsWithSpace) ? "" : " ") + v1 + v2);
   }
