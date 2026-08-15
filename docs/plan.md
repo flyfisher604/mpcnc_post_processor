@@ -15,12 +15,12 @@ base and the old group 5 no longer exist; the multi-part register is settled; ev
 states the condition it depends on; the tool change is both flows, a machine-frame change position on
 the manual one, and nothing else. `PR-14` closed with 1.2; `PR-16` and `HR-26` closed by deletion with
 2; `PR-17` closed with 2; `PR-18` and `PR-19` closed with 4; `PR-15`, `PR-21` and `PR-22` closed with
-5; `PR-24` with F2; `PR-26` and `PR-27` with F3; `PR-28` with F4.
+5; `PR-24` with F2; `PR-26` and `PR-27` with F3; `PR-28` with F4; `CR-01` with F5.
 
 **What is next: Step V**, and its tool-change half is now the biggest single hole in it: twenty-three
 `TC-`/`PR-2xa` rows exist and **none has been run**, twenty of them needing a full licence.
 
-**Step V grew by twenty-three and shrank by none.** `findings.md` §4 holds **57 unrun rows**. A walk
+**Step V grew by twenty-four and shrank by none.** `findings.md` §4 holds **58 unrun rows**. A walk
 settles what the post writes and nothing beyond it, so what is left there is what needs Fusion, a
 controller or — new with `PR-20` — a sender. §4 states the methods and their bounds; §5 carries each
 row's argument.
@@ -68,6 +68,8 @@ rows — so what is left here is what a walk cannot reach.
 - **Dialog-only:** `D1`, `D3`, `D4`, `P7`. The properties literal is now declared in display
   order, so if the dialog *still* shows groups out of numeric order, Fusion is not sorting and
   the zero-padding convention is wrong.
+- **`CR-01a`, licence-free and one job posted three ways**: the new first line present at `Info` and
+  at `Off`, absent on Marlin, and the rest of the file shifted by exactly one line.
 - **`PR-28a`, which is the cheapest row in this step and needs no licence at all**: a one-tool
   probe-on-start job, diffed against the pre-fix build, where the whole expected delta is the
   ordering of one pair of `G0`s. Anything else that moves means the position notes are wrong.
@@ -221,6 +223,19 @@ needed editing. **The machine frame is where it stops, and that is not a shortfa
 the rest of this plan turns on**: a `G53` height has no work-frame value until a probe establishes the
 offset, so `forceRapidXYBeforeZ` remains for the one move after a relocated change — as the named
 residue now, not as a point fix. Autodesk's own posts stop at the same line. `PR-28a` is unrun.
+
+**F5 — the file says what sets travel speed ✅ closed 2026-08-14.** `CR-01`, open since the code review.
+GRBL and FluidNC take a rapid's rate off the axis limits and never out of the block, so group 2's two
+speeds described an `F` word the default firmware does not read — and **no line a posted file may contain
+reaches that rate**: `$110`–`$112` are settings refused outside `Idle`, and the rapid override is
+real-time bytes. So the post names the parameter instead, as the **first line of every GRBL file** at
+every comment level, in both dialects — FluidNC has no `$110`, its limit being `max_rate_mm_per_min` per
+axis. `PR-27`'s `$1` warning is the precedent and this one is ungated, being true of every job on the
+default firmware. **Mapping travels to `G1` so the `F` would be obeyed was built and rejected by the
+author**: a rapid is a rapid, and the machine's limit is the operator's setting to make. The cost is one
+line at the top of every GRBL file, which moves every line number in every GRBL artifact — `findings.md`
+§5 carries it, and `validateJob()`'s *"the FIRST LINE of the file"* clause was reworded with the fix.
+`CR-01a` unrun.
 
 **Step 5 — the tool change is Flow 1 and nothing else ✅ closed 2026-08-14.** The post changes no
 tool: no `M6`, no `M84 Z`, no `T` word, no beep, and no `Tool Change X/Y/Z` — the hand-over retracts

@@ -196,7 +196,7 @@ properties = {
 
   feedsTravelSpeedXY: {
     title      : "Travel Speed X/Y",
-    description: "High speed for Rapid movements X & Y (mm/min).",
+    description: "Speed for travel movements in X and Y, in mm/min. Honoured on Marlin and RepRapFirmware. GRBL and FluidNC ignore it and travel at the maximum rate configured for the axis -- $110 and $111 on GRBL, max_rate_mm_per_min on FluidNC -- which only the controller can change.",
     group      : "feeds",
     order      : 10,
     type       : "integer",
@@ -205,7 +205,7 @@ properties = {
   },
   feedsTravelSpeedZ: {
     title      : "Travel Speed Z",
-    description: "High speed for Rapid movements Z (mm/min).",
+    description: "Speed for travel movements in Z, in mm/min. Honoured on Marlin and RepRapFirmware. GRBL and FluidNC ignore it and travel at the maximum rate configured for the axis -- $112 on GRBL, max_rate_mm_per_min on FluidNC -- which only the controller can change.",
     group      : "feeds",
     order      : 20,
     type       : "integer",
@@ -1489,7 +1489,9 @@ function validateJob() {
     // (homedXY || homedZ) because writeMachineHoming() returns before the prompt when nothing is
     // declared homeable -- that job emits no stop to lose, and is already warned about above.
     if (promptsBeforeHome() && (homedXY || homedZ)) {
-      earlyPrompts.push("the \"Pause, then Home\" stop, which is the FIRST LINE of the file");
+      // "at the very top" and not "the first line": on GRBL the travel-speed warning stands ahead of
+      // it, and a comment counts toward gSender's ten -- Sender.js's load() filters blank lines only.
+      earlyPrompts.push("the \"Pause, then Home\" stop, which stands at the very top of the file");
     }
     // Between the homing stop and the origin prompts because that is where it sits in the file:
     // writeFirstSection() runs it after the G53 establish and before writeWcsOnStart(). Dropped, the
@@ -3185,6 +3187,36 @@ function writeMachineHoming() {
 // write an origin on top of the active WCS, which is why WCS selection is split between here and
 // onSection().
 function writeFirstSection() {
+  // WHAT ACTUALLY SETS TRAVEL SPEED ON THIS CONTROLLER, said in the file because the file is what
+  // reads as though the F word did it. GRBL and FluidNC take a rapid's rate off the axis limits and
+  // never out of the block -- "if (block->condition & PL_COND_FLAG_RAPID_MOTION) {
+  // block->programmed_rate = block->rapid_rate; }" with rapid_rate =
+  // limit_value_by_axis_maximum(settings.max_rate, unit_vec), grbl/planner.c, plan_buffer_line(),
+  // gnea/grbl 1.1. FluidNC is the same planner renamed -- block->motion.rapidMotion,
+  // limit_rate_by_axis_maximum(), FluidNC/src/Planner.cpp 3.x.
+  //
+  // THE F WORD STAYS ON THE G0 REGARDLESS. It is still stored -- "gc_state.feed_rate =
+  // gc_block.values.f; // Always copy this value", grbl/gcode.c -- so it sets the modal feed the next
+  // cut inherits, which is why fOutput models it and why PR-9 put one on the park block. It simply
+  // does not govern the rapid it rides on.
+  //
+  // FIRST LINE OF THE FILE, and ungated on GRBL. writeWarning() ignores Comment Level by design
+  // (HB-9), so this stands at the top at every level: the operator who never opens the post dialog is
+  // exactly the one who needs it, and it is true of every job on this firmware.
+  //
+  // IT NAMES BOTH DIALECTS because the post cannot tell them apart -- one "Grbl" answer covers
+  // FluidNC, which kept the g-code and dropped the numbered settings ($110 does not exist there; the
+  // limit is max_rate_mm_per_min per axis, FluidNC/src/Machine/Axis.cpp).
+  if (fw == eFirmware.GRBL) {
+    writeWarning("the F values on the G0 moves below do not set how fast this job travels. GRBL and "
+      + "FluidNC ignore F on a rapid and move at the maximum rate configured for each axis, so this "
+      + "post's Travel Speed X/Y and Travel Speed Z have no effect on this firmware. To change how "
+      + "fast the job travels, change that maximum at the controller: $110, $111 and $112 -- X, Y "
+      + "and Z in mm/min -- on GRBL, or max_rate_mm_per_min for each axis in the config file on "
+      + "FluidNC. The post cannot change it for you, because those are controller settings rather "
+      + "than g-code, and GRBL accepts one only while it is Idle.");
+  }
+
   writeInformation();
 
   writeMachineHoming();
