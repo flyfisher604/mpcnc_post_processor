@@ -19,13 +19,12 @@ the manual one, and nothing else. `PR-14` closed with 1.2; `PR-16` and `HR-26` c
 `HR-24` and `CR-02` with F6, which closed `HR-20` and `HR-27` by design alongside them; `CR-17` with
 F7.
 
-**What is next: Step V**, and its tool-change half is now the biggest single hole in it: twenty-three
-`TC-`/`PR-2xa` rows exist and **none has been run**, twenty of them needing a full licence.
-
-**Step V grew by thirty and shrank by one.** `findings.md` §4 holds **63 unrun rows**. A walk
-settles what the post writes and nothing beyond it, so what is left there is what needs Fusion, a
-controller or — new with `PR-20` — a sender. §4 states the methods and their bounds; §5 carries each
-row's argument.
+**What is next: Step V**, and it is **fifteen rows**. The register re-walk of 2026-08-16 closed
+forty-eight from the source — the whole tool-change register but `TC-16`, both `CR-17` branches, and
+every post-time warning predicate — so **nothing in Step V waits on a full licence any more**. A walk
+settles what the post writes and nothing beyond it, so what is left is the dialog, one inch post, two
+sender rows, the jet workstream, and four whole-file or mid-stream questions. §4 states the methods
+and their bounds; §5 carries each row's argument.
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
@@ -44,7 +43,6 @@ quoted comment text, never by line number.
 | | Item | Blocked on |
 |---|---|---|
 | **V** | Post-verify what has landed unposted | — |
-| | *`PR-20a` belongs to V and is cheap — one GRBL job posted at two comment levels* | — |
 | **6** | Clarity | — |
 | **7** | Documents, once | 6, V |
 
@@ -52,43 +50,30 @@ quoted comment text, never by line number.
 
 ## Step V — Post-verify what has landed unposted
 
-The end park and the `CR-` fixes changed the emitted file and **have never been posted**. The
-machine-frame rework is settled from the source instead — `findings.md` §5's twenty-six walked
-rows — so what is left here is what a walk cannot reach.
+The end park and the `CR-` fixes changed the emitted file and **have never been posted**. What the
+source can settle is settled — `findings.md` §5's seventy-four walked rows — so what is left here is
+what a walk cannot reach. The order below is by what one post buys.
 
-- **`REG-MF` first** — the GRBL/mm factory-default diff. "Factory default" now means `Scale
-  Feedrate` **on**, so the expected diff is the property dump, the Resolved-Values block
-  **and every `F` word**, and nothing else. It is still owed because the closest run was
-  diffed against a file that is neither factory-default nor pre-machine-frame. **`S2a` predicts
-  the dump delta exactly**, so this run either confirms that walk or breaks it.
+- **`REG-MF` first**, and it refreshes more artifacts than any other post: the GRBL/mm
+  factory-default diff, `Scale Feedrate` **on**, against a pre-change build. The expected delta is
+  now four landed changes — the property dump, group 5's heading, `CR-01`'s warning line and
+  `CR-02`'s comma per prompt. **`S2a` predicts the g-code half exactly: nothing moves.** `TC-2` and
+  `HR-24` ride on it and assert the same absence.
 - **Then the Marlin multi-operation job** — `S3f`'s corrected count, and the only place a walk
   contradicted the register.
-- Then `PR-2c`, `HR-28 (A)`; then `PR-6d`, `PR-6a`, `PR-6b`, `PR-7a`, `PR-9`, `PR-11`; then
-  `FCR-4`, `FCR-5`, `FCR-13`.
+- **`PR-2c`, and one job settles it for six sites.** Any mid-stream `error()` answers what a refused
+  job leaves on disk; **`HR-6 (B)`'s rotated Setup is one of the six**, so the live risk rides here.
 - **`PR-2d` on its own** — the post has never emitted an inch file, and no walk can say what
   `createFormat` resolved its decimals to.
-- **Dialog-only:** `D1`, `D3`, `D4`, `P7`. The properties literal is now declared in display
+- **`FCR-13`** — two setups to separate files in one invocation. **The walk predicts it FAILS**, and
+  that prediction is `CR-21`.
+- **Dialog-only:** `D1`, `D3`, `D4`, `P7`, `PR-7b`. The properties literal is declared in display
   order, so if the dialog *still* shows groups out of numeric order, Fusion is not sorting and
   the zero-padding convention is wrong.
-- **`CR-01a`, licence-free and one job posted three ways**: the new first line present at `Info` and
-  at `Off`, absent on Marlin, and the rest of the file shifted by exactly one line.
-- **`PR-28a`, which is the cheapest row in this step and needs no licence at all**: a one-tool
-  probe-on-start job, diffed against the pre-fix build, where the whole expected delta is the
-  ordering of one pair of `G0`s. Anything else that moves means the position notes are wrong.
-- **The tool-change rows, twenty-two of them, none run.** `TC-4` first — it is the only one that
-  proves the ordering fix, and the register it names is the difference between a correct part and
-  a plunge at the tool-length difference. `TC-2` rides on `REG-MF`'s post; `TC-17` next after
-  `TC-4`, being the row that proves a relocated change does not cross the bed at cutting height.
-  Every other `TC-` row and `PR-22a` need a **full licence**, which no other row in this step does.
-  **`TC-16` needs gSender and a machine that need not cut** — `PR-20b`'s method, and the only row
-  here that can fail without the post being wrong.
-- **Three more licence-free rows.** `CR-02` — a defaults GRBL job whose whole delta against the
-  pre-change build is one comma per prompt line. **`CR-17a` and `CR-17c`, which need only a
-  two-offset job whose operations return to the first part**: the whole assertion is an absence at
-  the returning boundary, no `G38.2` on one and no second jog `M0` on the other, and a multi-WCS post
-  needs no licence — `PB1` and `PBV3` proved that. `CR-17b` is the branch that does, being the one
-  that puts a tool change between the two visits. `HR-24` rides with `REG-MF` and asserts the opposite,
-  that no byte moves at all; `HR-19` rides with `PR-19a`'s RepRap post.
+- **Two sender rows, the only ones here that can fail without the post being wrong** — `TC-16` and
+  `PR-20b`, both needing gSender and a machine that need not cut.
+- **The jet workstream — `J4` first**, group 8 having never appeared in any posted file; then `J1`,
+  `J2`, `J5`. Deferred by design, and `findings.md` §6 states what blocks it.
 
 ## Step 6 — Clarity
 
@@ -144,7 +129,6 @@ The guides are off-limits during code changes. Do it all here — per-step means
 
 | Blocked | Waiting on |
 |---|---|
-| Every `TC-` row but `TC-2` | a **full licence** — a Personal post emits no tool change to test |
 | `TC-16`, `PR-20b` | gSender and a machine that need not cut |
 | Group 9 reduction | a coolant persona |
 | Group 8 audit | laser detail — power scaling, dynamic power, enable sequencing, air assist |
@@ -170,6 +154,12 @@ height is the post's job — are in `design.md`.
 ---
 
 ## Done
+
+**Register re-walk ✅ 2026-08-16.** The open register executed against the source: **forty-eight of
+sixty-three unrun rows closed**, four of them corrected rather than confirmed, and every full-licence
+blocker gone. It found three defects — `WR-1` a refusal naming a deleted group, `WR-2` a machine
+coordinate read as *unset* when it is a typo, and `CR-21`'s third instance — all fixed. `HR-22` closed
+onto `CR-21`, being the same question twice.
 
 **Phase C — cleanup, 2026-08-13.** `C0` branch `Assessment` cut from `CoverageFixes` ✅ ·
 `C1` `PReview.md` restored to the tree `d010fee` ✅ (superseded — it is now `findings.md`) ·
