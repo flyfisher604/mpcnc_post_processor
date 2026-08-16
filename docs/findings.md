@@ -310,7 +310,7 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**⬜ 15 UNRUN · ❌ 0 FAIL · ➖ 5 n/a — 20 rows.** **Forty-eight rows closed by code walk
+**⬜ 14 UNRUN · ❌ 0 FAIL · ➖ 6 n/a — 20 rows.** **Forty-eight rows closed by code walk
 2026-08-16**, §5 holding each one's argument: the whole `TC-` register but `TC-16`, both `CR-17`
 branches, every post-time warning predicate, and the four rows the walk **corrected** rather than
 confirmed. **No row here waits on a licence any more** — a walk settles what the post writes, and
@@ -318,7 +318,7 @@ what a Personal licence withholds is a boundary in the file rather than a branch
 **`TC-16` is the only row in this register that can fail without the post being wrong** — it
 asserts what another program does with a correct file.
 
-**What is left here cannot be settled from the source.** The three `D` rows, `P7` and `PR-7b` are
+**What is left here cannot be settled from the source.** `D1`, `D4`, `P7` and `PR-7b` are
 the dialog's own behaviour; `PR-2d` is the only inch output the post has ever been asked for;
 `REG-MF` and `FCR-13` are whole-file diffs; `PR-2c` asks the one thing no walk can reach about a
 guard, what Fusion leaves on disk when `error()` fires mid-stream; `PR-20b` and `TC-16` need a
@@ -341,8 +341,8 @@ lacks.
 
 | Test | Proves | Setup (delta) | Method | Expansion | State |
 |---|---|---|---|---|---|
-| **D1** | Labels, groups and field types | the dialog | dialog | — | ⬜ |
-| **D3** | A key rename resets that setting **once**, and the new key then holds — now `spoilboardTravelZ` → `machineTravelZ` | a preset saved before the rename | dialog | — | ⬜ |
+| **D1** | **The dialog orders the groups by `order:` and not by sorting their titles as text**: the ten headings read top to bottom **1, 2, 3, 4, 5, 6, 7, 8, 9, 10**. `10 - Duet` between `1 - Job` and `2 - Feeds and Speeds` means `groupDefinitions[].order` is ignored, and the remedy is zero-padded titles — ten strings, and ten moved lines in every property dump. **Second question, same look**: within each group the properties follow their own `order:`, which `propertyOrder()` records as undocumented and additive, so a dialog that ignores it costs only the dump. **Labels and field types are not here** — group 4's shape is `PR-7b`, the legacy dialog is `D4`, and a string property rendering as `<empty>` rides on `REG-MF` | the dialog | dialog | — | ⬜ |
+| **D3** | — retired by the author's ruling 2026-08-16: **the post is in beta, so there is no installed base to protect** — a key rename resets a setting nobody has stored, and `spoilboardTravelZ` → `machineTravelZ` had no upgrade path to be wrong about. `PR-1`, `PR-3`, `PR-5`, `PR-6` and `PR-7` state the reset as a consequence and none observed it; the rename that follows a stable release is where that first costs something | — | — | — | ➖ |
 | **D4** | The groups are still identifiable in the **legacy** Post Process dialog | the legacy dialog | dialog | — | ⬜ |
 | **P7** | `wcsDefinitions` offset-0 decision | work offset `0` | dialog | — | ⬜ |
 | **PR-2c** | **What Fusion leaves on disk when `error()` is raised after output has begun** — the one thing about a guard no walk can reach. The `validateJob()` guards are settled: they refuse before any output, and `PR-14a`/`PR-14b` witness the 51-byte `.failed`. Six sites raise it mid-stream and leave the identical question, so **one run closes the class**: the two `onSection()` geometry guards (`HR-27`), `onCyclePoint()`'s probing refusal, `onRadiusCompensation()`, the two 5D guards, and an out-of-range work offset in `writeWCS()`. What they leave must not be a runnable `.gcode` | a multi-axis toolpath; or a Setup built on a model face rather than the stock top | posted | — | ⬜ |

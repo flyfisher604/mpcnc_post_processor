@@ -19,7 +19,7 @@ the manual one, and nothing else. `PR-14` closed with 1.2; `PR-16` and `HR-26` c
 `HR-24` and `CR-02` with F6, which closed `HR-20` and `HR-27` by design alongside them; `CR-17` with
 F7.
 
-**What is next: Step V**, and it is **fifteen rows**. The register re-walk of 2026-08-16 closed
+**What is next: Step V**, and it is **fourteen rows**. The register re-walk of 2026-08-16 closed
 forty-eight from the source — the whole tool-change register but `TC-16`, both `CR-17` branches, and
 every post-time warning predicate — so **nothing in Step V waits on a full licence any more**. A walk
 settles what the post writes and nothing beyond it, so what is left is the dialog, one inch post, two
@@ -67,9 +67,9 @@ what a walk cannot reach. The order below is by what one post buys.
   `createFormat` resolved its decimals to.
 - **`FCR-13`** — two setups to separate files in one invocation. **The walk predicts it FAILS**, and
   that prediction is `CR-21`.
-- **Dialog-only:** `D1`, `D3`, `D4`, `P7`, `PR-7b`. The properties literal is declared in display
-  order, so if the dialog *still* shows groups out of numeric order, Fusion is not sorting and
-  the zero-padding convention is wrong.
+- **Dialog-only, and one sitting covers all four:** `D1`, `D4`, `P7`, `PR-7b`. **`D1` is the one
+  with a consequence** — if the groups read 1, 10, 2, 3 … then Fusion sorts the titles rather than
+  reading `order:`, and they need zero-padding.
 - **Two sender rows, the only ones here that can fail without the post being wrong** — `TC-16` and
   `PR-20b`, both needing gSender and a machine that need not cut.
 - **The jet workstream — `J4` first**, group 8 having never appeared in any posted file; then `J1`,
