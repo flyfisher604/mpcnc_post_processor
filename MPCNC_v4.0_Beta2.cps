@@ -273,7 +273,7 @@ properties = {
   // text goes through sanitizeMessageText(_, "()") -- see writeWarning().
   mapRapidsSafeZ: {
     title      : "Safe Z to Rapid",
-    description: "Z at or above this height is treated as safe air, so a G1 there may become a G0. A number in mm, or Feed:/Retract:/Clearance:<fallback> to use the operation's own Fusion level -- Retract:15 means the Fusion retract level, or 15 mm if it has none.",
+    description: "Z at or above this height is treated as safe air, so a G1 there may become a G0. The height is in the part's work coordinates -- measured from the touch-off Z0 at the stock top, never from machine zero. A number in mm, or Feed:/Retract:/Clearance:<fallback> to use the operation's own Fusion level -- Retract:15 means the Fusion retract level, or 15 mm if it has none.",
     group      : "mapRapids",
     order      : 20,
     type       : "string",
@@ -434,7 +434,7 @@ properties = {
   },
   probeSafeZ: {
     title      : "Safe Z",
-    description: "Height the tool retracts to after probing. A number in mm, or Feed:/Retract:/Clearance:<fallback> to use the operation's own Fusion level -- Retract:15 means the Fusion retract level, or 15 mm if it has none.",
+    description: "Height the tool retracts to after probing, in the part's work coordinates -- measured from the Z0 the probe has just set at the stock top, never from machine zero. A number in mm, or Feed:/Retract:/Clearance:<fallback> to use the operation's own Fusion level -- Retract:15 means the Fusion retract level, or 15 mm if it has none.",
     group      : "probe",
     order      : 90,
     type       : "string",
