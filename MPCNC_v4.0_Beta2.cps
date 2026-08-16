@@ -1723,6 +1723,27 @@ function validateJob() {
     }
   }
 
+  // THE SAME CLASS, ON THE FIELDS THAT HOLD A MACHINE COORDINATE. parseMachineCoordinate() answers
+  // undefined for a typo exactly as it does for an empty field, and undefined IS the answer "not set" --
+  // so "-12mm" in "Machine Travel Z" does not fail, it silently means NO FRAME, and a mistyped change
+  // height silently means the tool does not go there. Nothing else says so: the header echo prints
+  // "Fixed Z reference = None" for a job whose operator believes they gave it one.
+  //
+  // NOT COVERED BY THE X/Y REFUSAL BELOW, which tests the raw fields for the same thing but exists only
+  // on the manual flow of a job with more than one tool. Both firing together is right -- this names the
+  // reason and that one names the remedy.
+  var coordProps = [properties.machineTravelZ, properties.toolChangePositionX,
+                    properties.toolChangePositionY, properties.toolChangePositionZ];
+  for (var c = 0; c < coordProps.length; ++c) {
+    var rawCoord = getProperty(coordProps[c]);
+    if (rawCoord != "" && parseMachineCoordinate(rawCoord) == undefined) {
+      warning(localize("\"" + coordProps[c].title + "\" is set to \"" + rawCoord + "\", which is not a "
+        + "signed decimal number of millimetres -- so the post reads the field as EMPTY, which is the "
+        + "answer \"not set\", and the motion it controls is simply not emitted. Give a plain number "
+        + "such as -12 or -12.5, with no unit suffix and no other characters."));
+    }
+  }
+
   // --- Guards -----------------------------------------------------------------------------------
   // Every guard below applies on every firmware. Guard C used to return early on Marlin, which made
   // everything after it unreachable on exactly the firmware it excluded; with that gone, order here is
