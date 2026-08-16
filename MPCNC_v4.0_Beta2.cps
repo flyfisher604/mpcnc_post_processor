@@ -3329,9 +3329,15 @@ function writeFirstSection() {
   // cut inherits, which is why fOutput models it and why PR-9 put one on the park block. It simply
   // does not govern the rapid it rides on.
   //
-  // FIRST LINE OF THE FILE, and ungated on GRBL. writeWarning() ignores Comment Level by design
-  // (HB-9), so this stands at the top at every level: the operator who never opens the post dialog is
+  // ABOVE EVERY G-CODE BLOCK IN THE FILE, and ungated on GRBL. writeWarning() ignores Comment Level by
+  // design (HB-9), so it survives at every level: the operator who never opens the post dialog is
   // exactly the one who needs it, and it is true of every job on this firmware.
+  //
+  // IT IS THE FIRST LINE OF THE FILE ONLY AT "Off". This function runs inside the FIRST onSection(), by
+  // which point onParameter() has already written the generated-by, posts-processor, generated-at,
+  // Document and Setup comments -- at eComment.Important, so they survive at Important and above and
+  // vanish at Off, which is why the count in validateJob()'s PR-20 comment starts here. At Debug the two
+  // parseSafeZProperty() traces from onOpen() stand ahead of it as well.
   //
   // IT NAMES BOTH DIALECTS because the post cannot tell them apart -- one "Grbl" answer covers
   // FluidNC, which kept the g-code and dropped the numbered settings ($110 does not exist there; the
