@@ -126,7 +126,7 @@ properties = {
   },
   jobManualSpindlePowerControl: {
     title      : "Manual Spindle On/Off",
-    description: "On (default): the post PROMPTS you to work the router by hand and emits no M3/M5 at all -- a pause to switch it on at the start, to change speed or direction whenever the job asks for a different one, and to switch it off at each tool change and at the end. Leave it on for a trim router or any spindle with no electronic control, which is most MPCNC builds. Off: the post COMMANDS the spindle with M3/M5 instead, for a controller wired to switch it.",
+    description: "On: the post prompts you to switch the router on and off by hand and emits no M3/M5 -- for a trim router or any spindle without electronic control. Off: the post commands the spindle with M3/M5.",
     group      : "job",
     order      : 20,
     type       : "boolean",
@@ -177,7 +177,7 @@ properties = {
   },
   jobSequenceNumberIncrement: {
     title      : "Line # Increment",
-    description: "Increase line numbers by this increment.",
+    description: "Amount each line number rises.",
     group      : "job",
     order      : 70,
     type       : "integer",
@@ -186,7 +186,7 @@ properties = {
   },
   jobSeparateWordsWithSpace: {
     title      : "Include Whitespace",
-    description: "Includes whitespace separation between text.",
+    description: "Put a space between words: G0 X10 Y10 rather than G0X10Y10.",
     group      : "job",
     order      : 80,
     type       : "boolean",
@@ -196,7 +196,7 @@ properties = {
 
   feedsTravelSpeedXY: {
     title      : "Travel Speed X/Y",
-    description: "Speed for travel movements in X and Y, in mm/min. Honoured on Marlin and RepRapFirmware. GRBL and FluidNC ignore it and travel at the maximum rate configured for the axis -- $110 and $111 on GRBL, max_rate_mm_per_min on FluidNC -- which only the controller can change.",
+    description: "Speed for travel movements in X and Y, in mm/min. Marlin and RepRap obey it. GRBL and FluidNC ignore it and travel at the axis maximum set in the controller, which only the controller can change.",
     group      : "feeds",
     order      : 10,
     type       : "integer",
@@ -205,7 +205,7 @@ properties = {
   },
   feedsTravelSpeedZ: {
     title      : "Travel Speed Z",
-    description: "Speed for travel movements in Z, in mm/min. Honoured on Marlin and RepRapFirmware. GRBL and FluidNC ignore it and travel at the maximum rate configured for the axis -- $112 on GRBL, max_rate_mm_per_min on FluidNC -- which only the controller can change.",
+    description: "Speed for travel movements in Z, in mm/min. Marlin and RepRap obey it. GRBL and FluidNC ignore it and travel at the axis maximum set in the controller, which only the controller can change.",
     group      : "feeds",
     order      : 20,
     type       : "integer",
@@ -214,7 +214,7 @@ properties = {
   },
   feedsEnforceFeedrate: {
     title      : "Enforce Feedrate",
-    description: "Feedrate is included on every g-code movement.",
+    description: "Include a feedrate on every cutting move, not only where it changes.",
     group      : "feeds",
     order      : 30,
     type       : "boolean",
@@ -223,7 +223,7 @@ properties = {
   },
   feedsScaleFeedrate: {
     title      : "Scale Feedrate",
-    description: "On (default): every cut feedrate is scaled down so that no axis is asked to move faster than its limit below, and the resulting toolpath feed is capped at Max Toolpath Speed. Off: Fusion's feedrates are emitted exactly as the CAM produced them, and THE THREE LIMITS BELOW DO NOTHING AT ALL. Set those three to your machine's real capability before relying on this -- the shipped 900/180/1000 are generic MPCNC figures, and limits set below what your machine can actually do will quietly slow every cut in the job.",
+    description: "Slow Fusion's cut feedrates to the three limits below. Off: feedrates are emitted unchanged and those limits do nothing. Set them to your machine's real capability -- the defaults are generic, and a limit set too low slows every cut.",
     group      : "feeds",
     order      : 40,
     type       : "boolean",
@@ -232,7 +232,7 @@ properties = {
   },
   feedsMaxCutSpeedXY: {
     title      : "Max XY Cut Speed",
-    description: "The fastest your machine may cut in X or Y, in mm/min. ONLY APPLIED WHEN SCALE FEEDRATE ABOVE IS ON -- with it off this field does nothing. 900 is a generic MPCNC figure; use your own machine's.",
+    description: "The fastest your machine may cut in X or Y, in mm/min. Read only when Scale Feedrate is on.",
     group      : "feeds",
     order      : 50,
     type       : "integer",
@@ -241,7 +241,7 @@ properties = {
   },
   feedsMaxCutSpeedZ: {
     title      : "Max Z Cut Speed",
-    description: "The fastest your machine may cut in Z, in mm/min -- normally far slower than X/Y on a leadscrew Z. ONLY APPLIED WHEN SCALE FEEDRATE ABOVE IS ON -- with it off this field does nothing. 180 is a generic MPCNC figure; use your own machine's.",
+    description: "The fastest your machine may cut in Z, in mm/min -- usually much slower than X or Y. Read only when Scale Feedrate is on.",
     group      : "feeds",
     order      : 60,
     type       : "integer",
@@ -250,7 +250,7 @@ properties = {
   },
   feedsMaxCutSpeedXYZ: {
     title      : "Max Toolpath Speed",
-    description: "A cap on the speed the tool travels ALONG ITS PATH, in mm/min, applied after the per-axis scaling above -- a diagonal move can stay inside both axis limits and still be faster than you want overall. ONLY APPLIED WHEN SCALE FEEDRATE ABOVE IS ON.",
+    description: "A cap on speed along the toolpath, in mm/min: a diagonal move can stay inside both axis limits and still be too fast. Read only when Scale Feedrate is on.",
     group      : "feeds",
     order      : 70,
     type       : "integer",
@@ -262,7 +262,7 @@ properties = {
   // turning this job's rapids into cuts, and may the post turn them back?
   mapRapidsRestoreRapids: {
     title      : "Map G1s -> G0 Rapids",
-    description: "Enable to convert G1s back to G0 Rapids where it is safe. Covers the three moves the F360 Personal edition emits as cuts: horizontal moves at or above the Safe Z below, vertical retracts and descents that stay above it, and the first move of every operation.",
+    description: "Convert G1s back to G0 rapids where it is safe. Covers the three moves Fusion's Personal edition emits as cuts: horizontal moves at or above the Safe Z below, retracts and descents that stay above it, and each operation's first move.",
     group      : "mapRapids",
     order      : 10,
     type       : "boolean",
@@ -273,7 +273,7 @@ properties = {
   // text goes through sanitizeMessageText(_, "()") -- see writeWarning().
   mapRapidsSafeZ: {
     title      : "Safe Z to Rapid",
-    description: "Z at or above this height is treated as safe air, so a G1 there may be re-emitted as a G0. Same syntax as group 5's Safe Z: a plain number in mm, or Feed:/Retract:/Clearance:<fallback> to use that operation's own Fusion level when it defines one, else the fallback -- Retract:15 (the default) means the Fusion retract level, or 15 mm if the operation has none.",
+    description: "Z at or above this height is treated as safe air, so a G1 there may become a G0. A number in mm, or Feed:/Retract:/Clearance:<fallback> to use the operation's own Fusion level -- Retract:15 means the Fusion retract level, or 15 mm if it has none.",
     group      : "mapRapids",
     order      : 20,
     type       : "string",
@@ -283,7 +283,7 @@ properties = {
 
   machineHomedAxes: {
     title      : "Axes Homed and Trusted",
-    description: "DECLARE which axes your machine homes to endstops -- a fact about the machine, set once and never revisited. This is NOT an instruction to home anything; that is Home at Job Start below. None (default): no endstops, or you do not trust them; machine zero is wherever the controller was last reset. XY Only: X and Y home to endstops, so a work offset stored in a G54-G59 register still points at the same physical place after a power cycle; Z has no machine frame. Z Only: Z homes to a real endstop (LowRider switches) or to the Marlin movable-plate trick, so the machine has a Z frame that does not move with stock thickness -- a TRAVEL datum, never the cutting reference. XYZ: both. Three things read this. Z is what Machine Travel Z below needs: declare Z homed, fill that height, and the job has a fixed Z frame the post can move in. X/Y is required on top of it by a MULTI-PART job, whose traverses move between stored work offsets, and by At End Park At = Machine X0 Y0. And the post warns when a job trusts a STORED work offset without X/Y. Homing buys repeatability and nothing else -- your Z cutting zero always comes from the work-Z touch-off (see First WCS / Part), never from here.",
+    description: "Which axes your machine homes to endstops. It homes nothing itself -- that is Home at Job Start below. Z is required by Machine Travel Z; X and Y by a multi-part job and by At End Park At = Machine X0 Y0. Your cutting Z0 always comes from the touch-off, never from here.",
     group      : "machine",
     order      : 10,
     type       : "enum",
@@ -304,7 +304,7 @@ properties = {
   // very much included.
   machineTravelZ: {
     title      : "Machine Travel Z",
-    description: "The height the tool holds while it travels -- an ABSOLUTE MACHINE COORDINATE, in mm, signed. FILLING THIS FIELD IS WHAT GIVES THE JOB A FIXED Z REFERENCE: a frame whose Z0 does NOT move with stock thickness, and therefore the only frame in which one clearance height is meaningful across parts of differing thickness. Leave it EMPTY (the default) and the job has no such frame -- the right answer for an ordinary single-part job, and what leaves a factory-default file unchanged. Requires Axes Homed and Trusted above to include Z. A MULTI-PART JOB CANNOT POST WITHOUT IT: the tool must clear the fixtures on its way between parts, and no single clearance height is meaningful across WCS whose origins are only known after probing at runtime. A single-part job is never refused for want of it, and gains two things when it is filled -- a real absolute Z on the way to the first part instead of a warning, and a retract before an At End Park At = Machine X0 Y0 crossing. GET IT ONCE PER MACHINE: home, jog to a height that visibly clears every fixture, clamp and part on the bed, and read Z off your sender's DRO -- no touch-off and no arithmetic. It is often negative, which is normal and needs no adjusting: on a stock GRBL build the machine zeroes into negative space after homing, so Z0 is the TOP of travel. ON MARLIN THIS NEEDS A FIRMWARE BUILD OPTION -- G53 sits behind CNC_COORDINATE_SYSTEMS, which is off in a stock configuration; the post assumes you compiled it in and says so in the file, because it cannot read your build. The value is echoed in the file's Resolved Values block, so check it there before the machine moves. THIS NUMBER BELONGS TO THE MACHINE, NOT TO THE JOB -- unlike every other height in this dialog it does NOT stay correct when a Setup is copied or a design is shared, so re-read it on any machine that is not the one it was measured on. A wrong value sends the tool to a wrong height at travel speed.",
+    description: "The height the tool holds while travelling -- an absolute machine coordinate in mm, often negative. Empty (default): the job has no fixed Z reference. Filled: a Z reference that does not move with stock thickness, which a multi-part job cannot post without. Needs Z declared homed above. Measure it once: home, jog clear of every clamp, and read Z off your sender. It belongs to the machine, not the job, and a wrong value sends the tool to a wrong height at travel speed.",
     group      : "machine",
     order      : 20,
     type       : "string",
@@ -313,7 +313,7 @@ properties = {
   },
   machineHomeAtStart: {
     title      : "Home at Job Start",
-    description: "THE ACTION -- whether this job homes the axes declared above, and whether it pauses first. Off (default): emit no homing and accept the machine's current position, whether that is a machine already homed at the controller or a power-on 0,0,0. Home: home at job start with no pause. Pause, then Home: stop once (M0) before ANY homing motion so you can prepare the machine -- place a movable Z-homing plate, clear the bed -- then home. That is a single stop whatever the firmware and however many axes home, so it never needs revisiting when the machine changes. THIS IS A PROPERTY OF THE JOB, which is why it is separate from the declaration above: a machine whose endstops exist can still be homed once at the controller and left alone for the rest of the session, and Off is the right answer when it has been. Nothing requires this to be on -- the declaration above is what the machine-Z frame trusts. On RepRap only, leaving it Off with that frame in use draws a warning, because RepRap will run an absolute machine move against an unhomed board where GRBL refuses to move at all.",
+    description: "Whether this job homes the axes declared above. Off: no homing -- use the machine's current position, which is right if you homed at the controller. Home: home at job start. Pause, then Home: stop (M0) first so you can prepare the machine, then home.",
     group      : "machine",
     order      : 30,
     type       : "enum",
@@ -328,7 +328,7 @@ properties = {
 
   machineParkAtEnd: {
     title      : "At End Park At",
-    description: "Where the tool parks when the job ends. Off: leave it where the last operation finished. Work X0 Y0 (default, and what this control has always done): rapid to X0 Y0 in the WCS the LAST operation used -- unambiguous on a single-part job, but on a multi-part job that is the last fixture's corner, and which fixture that is follows Fusion's operation order rather than anything you chose. Machine X0 Y0: the machine's own homing corner -- one park point for every job whatever its structure. It requires Axes Homed and Trusted to include X/Y, and on GRBL and RepRap it also requires Home at Job Start to be Home or Pause, then Home, because there it is a rapid that ADDRESSES a machine frame this job must already have established. On Marlin it homes X and Y instead, which RE-ESTABLISHES the frame rather than addressing it: no prior homing is needed, but it is a homing cycle and not a rapid -- slower, onto the endstops, and a larger motion. Marlin is therefore the one case where this works with Home at Job Start left Off. Note that on Marlin work X0 Y0 and machine X0 Y0 are NOT the same place once a job starts, and the post cannot read the difference back. Under either machine route, a job with Machine Travel Z filled retracts to it before traversing; a job with that field left empty has no frame in which an absolute retract is meaningful and travels at whatever Z the last operation left it at.",
+    description: "Where the tool goes when the job ends. Off: leave it where the last cut finished. Work X0 Y0: the last operation's work origin -- on a multi-part job, whichever fixture Fusion cut last. Machine X0 Y0: the machine's homing corner, the same point for every job; needs X and Y declared homed, and on GRBL and RepRap also needs Home at Job Start on.",
     group      : "machine",
     order      : 50,
     type       : "enum",
@@ -343,7 +343,7 @@ properties = {
 
   probeOnStart: {
     title      : "First WCS / Part",
-    description: "Establishes the origin for the first (or only) part. EVERY MODE DEPENDS ON ONE THING, NAMED WITH IT. Set X0 Y0 to Current Pos, Probe Z0 (default): record X0 Y0 wherever the tool stands, then probe the stock-top Z -- needs a WIRED, WORKING Z TOUCH PLATE, and needs you to have jogged the tool to the part's X0 Y0 before starting; there is no prompt. Set X0 Y0 Z0 to Current Pos: record the CURRENT position as X0 Y0 Z0, no probe and no prompt -- the hand touch-off, and the jet/laser answer where Z is set by hand. Use WCS X0 Y0, Probe Z0: rapid to the X0 Y0 already stored in the active WCS and probe the stock-top Z, leaving XY as stored -- needs that register to already hold the right XY, which the post cannot read back to check. Use WCS X0 Y0 Z0: the full stored origin, no re-zero and no probe -- same trust, and the tool MOVES to the Safe Z set below, absolute in the stored frame, so one parked above it starts the job by descending. Jog to X0 Y0, Probe Z0 and Jog to X0 Y0 Z0: pause so you jog to the origin during the run and record it there, with a probed Z or with Z where you left it. BOTH JOG MODES DEPEND ON WHAT HOLDS THE PAUSE. On GRBL that is the sender: gSender comments the M0 out and pauses its own stream, so the controller stays Idle and accepts jog commands, while a sender that passes M0 through leaves the controller in a hold that refuses them. On Marlin the pause queues serial commands without executing them, so the jog must come from the machine's own panel or from a sender that holds the file. RepRap jogs at the pause natively and needs neither. \"WCS\" here means the register this Setup designates -- its Work Offset, WCS 1 / G54 unless you changed it -- which the post SELECTS at job start, not whatever your sender had active. On the two \"... to Current Pos\" modes, homing and the Machine Travel Z move run BEFORE the origin is recorded, so \"current position\" means wherever they left the tool. For more parts or copies see Each New WCS / Part.",
+    description: "How the first (or only) part's origin is set. Set X0 Y0 to Current Pos, Probe Z0: X and Y from where the tool stands, Z0 probed on the stock top -- jog there first, there is no prompt. Set X0 Y0 Z0 to Current Pos: all three from where the tool stands. Use WCS X0 Y0, Probe Z0: keep the stored X0 Y0, probe Z0. Use WCS X0 Y0 Z0: use the stored origin, measure nothing. Jog to X0 Y0, Probe Z0: pause to jog there, record X and Y, probe Z0. Jog to X0 Y0 Z0: pause to jog there, record all three. WCS means the work offset this Setup names, which the post selects at job start -- not whatever your sender has active. For more parts see Each New WCS / Part.",
     group      : "probe",
     order      : 10,
     type       : "enum",
@@ -360,7 +360,7 @@ properties = {
   },
   probeOnChange: {
     title      : "Each New WCS / Part",
-    description: "MULTI-PART JOBS ONLY -- several parts or copies, one WCS per part. What to do the FIRST TIME the job reaches each part's WCS (G55, G56, ...); a job that comes back to a part it has already set up does none of it again, and RETURNING TO A PART below says what happens instead. A single-part job never reaches this control. Every mode first retracts to Machine Travel Z in the machine's own frame, then acts. TWO WORKFLOWS, AND THE MODES COME IN PAIRS. PRE-SET FIXTURE OFFSETS -- every part's register was set before the job started, which is the Replicate case: Use WCS X0 Y0, Probe Z0 Once per Part (default): rapid to that part's stored X0 Y0 and probe its stock-top Z, writing Z into its own register; XY stays the fixture's pre-set offset. Use WCS X0 Y0 Z0: touch nothing -- after the retract the tool rapids to the part's stored X0 Y0 and cuts. Both TRUST registers the post cannot read back to check. MID-JOB INDEXING -- you jog to each part as the job reaches it, and nothing has to be set in advance: Jog to X0 Y0, Probe Z0: pause (M0) to jog to this part's origin, record X0 Y0 there, then probe Z. Jog to X0 Y0 Z0: pause (M0) to jog there, then record that position as X0 Y0 Z0, no probe. This is the supported way to run a blank you clamp during the job -- one WCS per part, captured as you reach it. BOTH JOG MODES DEPEND ON WHAT HOLDS THE PAUSE. On GRBL that is the sender: gSender comments the M0 out and pauses its own stream, so the controller stays Idle and accepts jog commands, while a sender that passes M0 through leaves the controller in a hold that refuses them. On Marlin the pause queues serial commands without executing them, so the jog must come from the machine's own panel or from a sender that holds the file. RepRap jogs at the pause natively and needs neither. ON MARLIN EVERY MODE HERE NEEDS A FIRMWARE BUILD OPTION -- CNC_COORDINATE_SYSTEMS, off in a stock configuration, which is what gives Marlin its nine work offsets and G53 alike; the post assumes you compiled it in and says so in the file, because it cannot read your build. \"WCS\" here means the register that part's Fusion Setup designates, which the post selects on the traverse. RETURNING TO A PART SETS UP NOTHING AGAIN, whatever mode is chosen: the job retracts, selects that part's register, rapids to its stored X0 Y0 and cuts. A job that roughs every part and then finishes every part comes back to each one, and by then the touch point may be a machined pocket floor, a cut-away region or air -- so a second probe would overwrite a good Z0 and displace every finishing cut by the roughing depth. X0 Y0 is never re-established on a return under any mode, nothing in a job having moved it, and neither jog mode prompts a second time. ONE THING RE-OPENS Z: a tool change with Re-probe Z0 After a Change on re-measures the ACTIVE part only, and this machine has no tool-length system, so every OTHER part's stored Z0 still measures from the tool just removed. A return to one of those probes once more on the two probing modes, pauses for you to set Z on Jog to X0 Y0 Z0, and warns in the file on Use WCS X0 Y0 Z0, which measures nothing by design. The attach/detach prompts around any probe follow Probe Pause. Does NOT support milling one part from multiple datums or a flip -- run those as separate jobs.",
+    description: "Multi-part jobs only: how each part's origin is set the first time the job reaches it. Every mode retracts to Machine Travel Z first. Use WCS X0 Y0, Probe Z0 Once per Part: move to the part's stored X0 Y0 and probe its stock top. Use WCS X0 Y0 Z0: use the stored origin, measure nothing. Jog to X0 Y0, Probe Z0: pause to jog to the part, record X and Y, probe Z0. Jog to X0 Y0 Z0: pause to jog there, record all three. Returning to a part already set up sets nothing again -- the tool moves to its stored origin and cuts, the probe point by then being a machined surface or air. Only a tool change re-opens that part's Z0. One part from several datums, or a flip, is not supported -- run those as separate jobs.",
     group      : "probe",
     order      : 20,
     type       : "enum",
@@ -375,7 +375,7 @@ properties = {
   },
   probePause: {
     title      : "Probe Pause",
-    description: "Operator pauses around each part probe (the first part and each added part) -- the prompts to attach the Z probe (before) and detach it (after). No: no prompts (a fixed/permanent probe). Before: prompt to attach only. Before & After (default): prompt to attach before probing and to detach after -- the manual touch-off. Applies to EVERY probe the post emits: the first part, each added part, and the re-probe after a manual tool change.",
+    description: "Prompts to attach and remove the Z probe. No: none, for a fixed probe. Before: attach only. Before & After: both. Applies to every probe in the job.",
     group      : "probe",
     order      : 30,
     type       : "enum",
@@ -389,7 +389,7 @@ properties = {
   },
   probeOffsetX: {
     title      : "Probe X Offset",
-    description: "X distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Each New WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin.",
+    description: "X distance from the part origin to the probe's touch-point, in whole mm -- for an origin at a corner or off the material. The same for every part. 0 probes at the origin.",
     group      : "probe",
     order      : 40,
     type       : "integer",
@@ -398,7 +398,7 @@ properties = {
   },
   probeOffsetY: {
     title      : "Probe Y Offset",
-    description: "Y distance from the part origin to the Z-probe touch-point, in whole mm (all dialog dimensions are in mm regardless of the job's output units). Applied at every PART probe -- the first/only part (First WCS / Part) and each added part (Each New WCS / Part) -- so the work origin can sit at a corner or off the material while Z is probed on the stock top. Job-wide, not per-fixture. Default 0 probes at the origin.",
+    description: "Y distance from the part origin to the probe's touch-point, in whole mm -- for an origin at a corner or off the material. The same for every part. 0 probes at the origin.",
     group      : "probe",
     order      : 50,
     type       : "integer",
@@ -407,7 +407,7 @@ properties = {
   },
   probeG382orG28: {
     title      : "Probe with G38.2",
-    description: "Probe using G38.2 (On) or G28 (Off). This setting is read on Marlin and RepRap only -- GRBL always uses G38.2 whatever it says, and G38.2 is what a GRBL job always gets. On Marlin, Off (G28) is for a build with G38_PROBE_TARGET not compiled in, which uses the Z homing switch as a substitute reference. On RepRap the answer is version-bound: leave it On for RRF later than 3.1.1, but note that up to and including RRF 3.1.1 the G38.2 target is interpreted as MACHINE coordinates while this post emits a work-frame target, so On probes to the wrong physical Z there and Off is the safer answer.",
+    description: "Probe using G38.2 (On) or G28 (Off). Read on Marlin and RepRap only -- GRBL always uses G38.2. Turn it off for a Marlin build without probe support, and for RepRapFirmware 3.1.1 and earlier, where G38.2 probes to the wrong height.",
     group      : "probe",
     order      : 60,
     type       : "boolean",
@@ -416,7 +416,7 @@ properties = {
   },
   probeG38Target: {
     title      : "G38 Target",
-    description: "How far DOWN FROM THE TOOL a probe may search before giving up -- a DISTANCE, not a position. Every probe writes a provisional Z0 at the current height first, so -10 (the default) means \"search 10 mm below wherever the tool is standing when the probe begins\". WHERE IT IS STANDING DEPENDS ON THE MODE. On the Set ... to Current Pos and Jog to ... modes you put it there yourself, a few mm above the stock, and -10 is the right size. On the two Use WCS X0 Y0, Probe Z0 modes the POST puts it there, at Machine Travel Z -- the height that clears the tallest clamp in the job -- so the target has to be deeper than the drop from that height to your stock top, which is a distance only you can measure: the post cannot compute it, the stock top being the value this probe exists to find. Deep enough to reach the plate and no deeper: a probe that travels this far without touching is a failed probe, and GRBL raises an alarm and stops the job.",
+    description: "How far down from the tool a probe may search before giving up -- a distance, not a height. -10 searches 10 mm below wherever the tool starts. The Use WCS modes start the probe at Machine Travel Z, so it must reach from there to your stock top. A probe that never touches stops the job with an alarm.",
     group      : "probe",
     order      : 70,
     type       : "integer",
@@ -425,7 +425,7 @@ properties = {
   },
   probeG38Speed: {
     title      : "G38 Speed",
-    description: "G38 probing's speed (mm/min).",
+    description: "G38 probing's speed (mm/min). Slow is accurate.",
     group      : "probe",
     order      : 80,
     type       : "integer",
@@ -434,7 +434,7 @@ properties = {
   },
   probeSafeZ: {
     title      : "Safe Z",
-    description: "Safe Z the tool retracts to after probing. Same syntax as group 3's \"Safe Z to Rapid\": a fixed number, or Feed:/Retract:/Clearance:<fallback> to use the operation's F360 level when defined, else the fallback -- e.g. \"Retract:15\" uses the F360 retract level or 15. Kept independent of the Map G1s Safe Z.",
+    description: "Height the tool retracts to after probing. A number in mm, or Feed:/Retract:/Clearance:<fallback> to use the operation's own Fusion level -- Retract:15 means the Fusion retract level, or 15 mm if it has none.",
     group      : "probe",
     order      : 90,
     type       : "string",
@@ -443,7 +443,7 @@ properties = {
   },
   probeThickness: {
     title      : "Plate Thickness",
-    description: "Thickness of your Z touch plate, in mm regardless of the job's output units. The post subtracts it after the probe touches, so Z0 lands on the stock top rather than the plate top. Measure your own plate -- 0.8 is only a common value, and an error here shifts every cut depth in the job by the same amount.",
+    description: "Thickness of your Z touch plate, in mm, subtracted after the probe touches so Z0 lands on the stock top. Measure your own -- an error here shifts every cut depth in the job.",
     group      : "probe",
     order      : 100,
     type       : "number",
@@ -458,7 +458,7 @@ properties = {
   // correctly, hand over, and resume correctly. design.md -> Tool changes.
   toolChangeMode: {
     title      : "At a Tool Change",
-    description: "What this post does when the job's tool number changes. IT NEVER CHANGES THE TOOL ITSELF on any setting: a measured change needs a probe, a subtraction and a tool-length register, and this post has none of the three -- it cannot compute an offset it will not learn until you swap the tool, hours after posting, and it can never read a register back to check one. What it can do is arrive correctly, hand over, and resume correctly, and these are the three ways it can hand over. Refuse to post (default): a job using more than one tool does not post at all, and the dialog says so before any file is written. Post one tool per file -- on a Personal licence Fusion already does that for you, since it emits no tool change at all, and the second file resumes on the origin the first one left behind. Pause for a manual change: at each tool-number boundary the post retracts to Machine Travel Z in the machine's own frame, moves to the Tool Change Position below if you have set one, stops the coolant and the spindle (or prompts you to stop it), and stops the program with M0 so you change the tool by hand; it then re-probes Z0 if Re-probe Z0 After a Change is on, restarts the spindle and resumes. THAT PAUSE DOES NOT OFFER JOGGING and must not be jogged at: the resume depends on the tool still standing where the post left it. Hand over to the sender or firmware macro: the same retract and the same stops, then the post emits the token named by Tool Change Handled By below and lets something that DOES own a tool table do the change -- your sender, or RepRapFirmware's own tool table. THE POST CANNOT VERIFY THAT ANYTHING IS LISTENING: if your sender is not configured to intercept the token, a GRBL controller answers M6 with error:20 and stops the job with the tool in the cut, or the sender drops it silently and the job cuts on with the wrong cutter. Set that up and test it on air before you trust it. NOT AVAILABLE ON MARLIN, which has no tool-length register at all -- there the only correction is re-zeroing by hand, which is Pause for a manual change. BOTH HAND-OVER MODES NEED Machine Travel Z -- with that field empty there is no frame in which an absolute retract means anything, so the hand-over happens at whatever height the last operation ended at and the post says so in the file.",
+    description: "What the job does when the tool number changes. The post never changes the tool itself. Refuse to post: a job with more than one tool does not post -- split it into one file per tool. Pause for a manual change: the tool retracts, moves to the Tool Change Position if set, the spindle and coolant stop, and the program stops (M0) for you to change the tool. Do not jog at that pause. Hand over to the sender/firmware macro: the same retract and stops, then the token named by Tool Change Handled By below. Test that on air -- the post cannot check anything is listening, and an ignored token cuts on with the wrong tool. Hand-over needs Machine Travel Z, and is not available on Marlin.",
     group      : "toolChange",
     order      : 10,
     type       : "enum",
@@ -472,7 +472,7 @@ properties = {
   },
   toolChangeSender: {
     title      : "Tool Change Handled By",
-    description: "WHO performs the change once the post has handed over, and therefore which token the post emits. Read only when At a Tool Change is Hand over to the sender/firmware macro. gSender and CNCjs: the post emits T<n> M6. Neither GRBL nor grblHAL executes M6 -- the controller answers error:20 -- so this route exists ONLY because the sender takes the M6 out of the stream before the controller sees it and runs its own tool-change routine instead. BOTH SENDERS MUST BE CONFIGURED FOR IT: gSender's own tool-change setting has an Ignore option that drops the M6 and carries straight on, which is a job that finishes cutting with the first tool. CNCjs pauses the stream and does nothing else, so the change and the re-zero are yours to do at the pause. RepRapFirmware tool table: the post emits T<n> alone and no M6, because on RRF the T word IS the change -- it runs tfree, tpre and tpost for you, and tpost is where a tool-length offset is applied. The tool numbers this job uses must be declared with M563 in config.g and the macros must exist, or RRF errors on the T word. Other: the post emits nothing of its own and includes the file named in Sender Macro File instead -- for a sender not listed here, or a macro of your own. WHATEVER RUNS, THE POST RESUMES THE SAME WAY: it re-asserts absolute mode and units, re-selects the active work offset, and returns to Machine Travel Z before cutting resumes, because it cannot know what the macro left behind.",
+    description: "Who does the change after the hand-over, and so which token is emitted. Read only on Hand over to the sender/firmware macro. gSender: T and M6, which the sender must be set to intercept -- GRBL itself rejects M6. CNCjs: T and M6, but it only pauses, so the change and the re-zero are yours. RepRapFirmware tool table: T alone; your tools must be declared in config.g. Other: no token -- the file named in Sender Macro File is included instead. The post then re-asserts absolute mode, units and the work offset, and returns to Machine Travel Z.",
     group      : "toolChange",
     order      : 20,
     type       : "enum",
@@ -487,7 +487,7 @@ properties = {
   },
   toolChangeMacroFile: {
     title      : "Sender Macro File",
-    description: "Names a file in the NC output folder whose contents are emitted in place of a tool-change token. Read only when At a Tool Change is Hand over to the sender/firmware macro AND Tool Change Handled By is Other, and required there -- the post refuses to post rather than hand over to nothing. THIS IS THE HAND-OVER ITSELF, not an addition to it: the retract, the coolant and spindle stops and the resume are still the post's, but everything between them is your file. It is included once per tool-change boundary, identically, so it cannot depend on which tool is coming -- if it must, have it call a macro that reads the machine's own state. Tool Change Start and Tool Change End below still bracket the whole sequence and are the place for anything that has to run outside the stops. NAMING ANY FILE makes Fusion ask \"This post processor might be unsafe...\" when you post; answer Yes, because answering No aborts the post.",
+    description: "A file in the NC output folder emitted in place of a tool-change token. Required when Tool Change Handled By is Other. The retract, stops and resume stay the post's; everything between them is your file, included identically at every change. Naming any file makes Fusion ask whether this post is safe -- answer Yes, or the post aborts.",
     group      : "toolChange",
     order      : 30,
     type       : "string",
@@ -503,7 +503,7 @@ properties = {
   // happened to be active, so the "fixed" change spot moved with every part origin. These are G53.
   toolChangePositionX: {
     title      : "Tool Change Position X",
-    description: "The X the tool moves to for a MANUAL tool change -- an ABSOLUTE MACHINE COORDINATE, in mm, signed, the same frame as Machine Travel Z. Leave it EMPTY (the default) and the tool does not move in X or Y at all: the change happens directly above the point the last operation ended at, which is what this post did before this field existed. Fill it to bring the spindle somewhere you can actually reach -- the front of the bed, out from under the gantry, clear of the dust shoe. X AND Y ARE FILLED TOGETHER OR NOT AT ALL; one without the other does not post. REQUIRES Axes Homed and Trusted to include X and Y, and Machine Travel Z to be set: the move is an absolute G53 rapid, and the tool has to reach a height that clears your fixtures before it crosses the bed. READ ONLY WHEN At a Tool Change is Pause for a manual change -- a macro drives the tool to its own change position in its own frame, and the post does not second-guess it. THE TOOL DOES NOT COME BACK TO THE POINT IT LEFT. It returns to Machine Travel Z, and the next operation's first move then traverses in X/Y at that height before it descends, so nothing is ever cut from the change position. There is nothing else to restore: no depth in the job is measured from where the tool stood before the change.",
+    description: "Where the tool goes in X for a manual tool change -- an absolute machine coordinate in mm. Empty: it does not move in X or Y, and the change happens above the last cut. Fill both X and Y or neither. Needs X and Y declared homed and Machine Travel Z set, and is read only on Pause for a manual change. The tool does not return to the point it left; it returns to Machine Travel Z.",
     group      : "toolChange",
     order      : 40,
     type       : "string",
@@ -512,7 +512,7 @@ properties = {
   },
   toolChangePositionY: {
     title      : "Tool Change Position Y",
-    description: "The Y half of the manual tool-change position -- an ABSOLUTE MACHINE COORDINATE, in mm, signed. Everything said about Tool Change Position X applies here, and the two are read as one setting: fill both or neither, or the job does not post. On a bed-slinger-style machine this is usually the field that matters, since bringing Y forward is what puts the spindle over the front edge instead of over the work.",
+    description: "Where the tool goes in Y for a manual tool change -- an absolute machine coordinate in mm. Fill it with X or not at all. Bringing Y forward is usually what puts the spindle where you can reach it.",
     group      : "toolChange",
     order      : 50,
     type       : "string",
@@ -521,7 +521,7 @@ properties = {
   },
   toolChangePositionZ: {
     title      : "Tool Change Position Z",
-    description: "The height the tool holds during a MANUAL tool change -- an ABSOLUTE MACHINE COORDINATE, in mm, signed. Leave it EMPTY (the default) and the change happens at Machine Travel Z, the height the tool has already retracted to; that is the right answer unless you need the spindle lower or higher than the travel height to get a spanner on the collet. Filled, the post moves to it AFTER the X/Y move above, and returns to Machine Travel Z before anything else moves. A VALUE BELOW Machine Travel Z HOLDS THE TOOL LOWER DURING THE CHANGE THAN THE HEIGHT YOU DECLARED CLEARS YOUR FIXTURES -- legitimate at a change position that is clear of them, a collision anywhere else, so the post warns and leaves the judgement to you. May be filled without X and Y, which changes the height and nothing else. Same requirements as X: Axes Homed and Trusted must include Z, Machine Travel Z must be set, and it is read only on Pause for a manual change.",
+    description: "The height the tool holds during a manual tool change -- an absolute machine coordinate in mm. Empty: the change happens at Machine Travel Z. Fill it only to get a spanner on the collet; the post moves there after the X/Y move and returns to Machine Travel Z afterwards. Below Machine Travel Z the tool sits lower than the height you declared clears your fixtures, so the post warns. May be filled without X and Y.",
     group      : "toolChange",
     order      : 60,
     type       : "string",
@@ -530,7 +530,7 @@ properties = {
   },
   toolChangeFirstLoad: {
     title      : "Prompt for the First Tool",
-    description: "Stop (M0) and ask for the first tool before the job's first part origin is established. Off (default): the job assumes the right tool is already in the spindle. On: the prompt runs AFTER homing and the Machine Travel Z move but BEFORE First WCS / Part records or probes anything, and that ordering is the whole point -- a probe run before the load establishes Z0 with the very tool the load exists to replace, and every depth in the job is then out by the difference in tool length. INDEPENDENT OF At a Tool Change above: a single-tool job can use this, a job left at Refuse to post still gets it, and it is an M0 prompt even where the changes themselves are handed to a macro -- the post has nothing to hand over to before the job has started.",
+    description: "Stop (M0) for you to fit the first tool, after homing but before any origin is recorded or probed -- so Z0 is measured with the tool that will cut. Off: the job assumes the right tool is already in the spindle.",
     group      : "toolChange",
     order      : 70,
     type       : "boolean",
@@ -539,7 +539,7 @@ properties = {
   },
   toolChangeProbeAfterChange: {
     title      : "Re-probe Z0 After a Change",
-    description: "Re-establish the work Z0 after each tool change, on either hand-over mode. On (default): after the pause -- or after the macro returns -- the post moves to the part origin plus Probe X/Y Offset and probes Z into the ACTIVE work offset, using the same probe, the same attach/detach prompts (Probe Pause) and the same provisional Z0 as every part probe in group 5. AFTER A MANUAL PAUSE THIS IS NOT REALLY OPTIONAL: the new tool is a different length, so the Z0 the job established belongs to the old one, and cutting on it puts every depth below out by the difference. AFTER A MACRO IT USUALLY IS: whatever owns the tool table has just applied an offset or re-zeroed, and probing again asks you to fit the touch plate for a measurement that has already been made. Turn it OFF for gSender's re-zeroing tool-change routines and for a RepRapFirmware tpost that applies a tool offset; leave it ON for a sender that only pauses, and for a macro of your own that does not measure. Off: no probe, and the post states in the file whose Z0 the job is now cutting on. THE PROBE SEARCHES DOWN FROM THE RETRACT HEIGHT, which is Machine Travel Z, so G38 Target has to be deep enough to reach the stock top from there -- the same distance the two Use WCS X0 Y0, Probe Z0 modes need, and a distance only you can measure. Ignored for tool 0 and for jet/laser tools, which cannot probe.",
+    description: "Re-probe the work Z0 after each tool change, the new tool being a different length from the one that set it. Off: no probe -- for a sender or macro that already re-zeroes or applies a tool offset. The probe searches down from Machine Travel Z, so G38 Target must reach the stock from there. Ignored for tool 0 and laser tools.",
     group      : "toolChange",
     order      : 80,
     type       : "boolean",
@@ -551,7 +551,7 @@ properties = {
   // never belonged beside them. Keys are unchanged, so nobody's saved setting resets.
   includeToolFile1: {
     title      : "Tool Change Start",
-    description: "File of custom g-code in the NC output folder, inserted at the START of each tool change -- before the retract, before the coolant and spindle stops, and before the pause or macro call. It is ADDED to the hand-over sequence and replaces no part of it, unlike Start GCode File and Stop GCode File in group 7, which replace the post's header and footer outright. IT RUNS WHERE THE CUT ENDED: nothing has retracted yet and the section's own work offset is still active, so a move in this file is a work-frame move at cutting height and it is yours to make safe. Ignored unless At a Tool Change above is a hand-over mode -- Pause for a manual change, or Hand over to the sender/firmware macro. NAMING ANY FILE makes Fusion ask \"This post processor might be unsafe...\" when you post; answer Yes, because answering No aborts the post.",
+    description: "A file of your g-code inserted at the start of each tool change, before the retract and the stops. It runs where the cut ended, at cutting height, so any move in it is yours to make safe. Ignored unless At a Tool Change hands over. Naming any file makes Fusion ask whether this post is safe -- answer Yes, or the post aborts.",
     group      : "toolChange",
     order      : 90,
     type       : "string",
@@ -560,7 +560,7 @@ properties = {
   },
   includeToolFile2: {
     title      : "Tool Change End",
-    description: "File of custom g-code in the NC output folder, inserted at the END of each tool change -- after the pause or macro call, after the post's own resume and after any re-probe, just before cutting resumes. ADDED to the sequence, not a replacement for it. THE MACHINE IS AT Machine Travel Z when it runs, with absolute mode, the units and the active work offset all re-asserted, so this is the safe end of the sequence to move in. Ignored unless At a Tool Change above is a hand-over mode. See the note on Tool Change Start about Fusion's \"might be unsafe\" prompt.",
+    description: "A file of your g-code inserted at the end of each tool change, after the resume and any re-probe. The tool is at Machine Travel Z with absolute mode, units and the work offset re-asserted, so this is the safe end to move in. Ignored unless At a Tool Change hands over.",
     group      : "toolChange",
     order      : 100,
     type       : "string",
@@ -570,7 +570,7 @@ properties = {
 
   includeStartFile: {
     title      : "Start GCode File",
-    description: "Names a file in the NC output folder whose contents REPLACE the post's own header rather than adding to it. That includes the modal preamble -- G90, G21/G20, G94, G17 -- so your file must set whatever the job needs, or it inherits whatever mode the controller was left in. Leave empty (the default) for the built-in header. NAMING ANY FILE IN THIS GROUP makes Fusion ask \"This post processor might be unsafe...\" when you post; answer Yes, because answering No aborts the post.",
+    description: "A file in the NC output folder that replaces the post's header, including the G90/G21/G94/G17 setup -- so your file must set whatever the job needs. Empty uses the built-in header. Naming any file makes Fusion ask whether this post is safe -- answer Yes, or the post aborts.",
     group      : "include",
     order      : 10,
     type       : "string",
@@ -579,7 +579,7 @@ properties = {
   },
   includeStopFile: {
     title      : "Stop GCode File",
-    description: "Names a file in the NC output folder whose contents REPLACE the post's own footer rather than adding to it -- the spindle stop or its prompt, the end park, the stepper release and the program end all go, so your file must do whatever the job needs. Leave empty (the default) for the built-in footer. See the note on Start GCode File about Fusion's \"might be unsafe\" prompt.",
+    description: "A file in the NC output folder that replaces the post's footer -- the spindle stop, park, stepper release and program end all go. Empty uses the built-in footer.",
     group      : "include",
     order      : 20,
     type       : "string",
@@ -630,7 +630,7 @@ properties = {
   },
   laserMarlinPin: {
     title      : "Laser: Marlin M42 Pin",
-    description: "Marlin custom pin number for the laser/plasma cutter.",
+    description: "Marlin custom pin number for the laser/plasma cutter. Read only in Pin mode.",
     group      : "laser",
     order      : 50,
     type       : "integer",
@@ -639,7 +639,7 @@ properties = {
   },
   laserGrblMode: {
     title      : "Laser: GRBL Mode",
-    description: "GRBL mode of the laser/plasma cutter.",
+    description: "GRBL mode of the laser/plasma cutter. M4 scales power with speed so corners are not over-burned; M3 holds it steady.",
     group      : "laser",
     order      : 60,
     type       : "enum",
@@ -652,7 +652,7 @@ properties = {
   },
   laserCoolant: {
     title      : "Laser: Coolant",
-    description: "Force a coolant to be used with the laser.",
+    description: "Force a coolant to be used with the laser -- an air assist, usually.",
     group      : "laser",
     order      : 70,
     type       : "enum",
@@ -673,7 +673,7 @@ properties = {
 
   coolantChannelAMode: {
     title      : "Channel A Mode",
-    description: "Enable channel A when tool is set this coolant.",
+    description: "Enable channel A when a tool asks for this coolant.",
     group      : "coolant",
     order      : 10,
     type       : "enum",
@@ -693,7 +693,7 @@ properties = {
   },
   coolantChannelBMode: {
     title      : "Channel B Mode",
-    description: "Enable channel B when tool is set this coolant.",
+    description: "Enable channel B when a tool asks for this coolant.",
     group      : "coolant",
     order      : 20,
     type       : "enum",
@@ -713,7 +713,7 @@ properties = {
   },
   coolantChannelAOn: {
     title      : "Turn Channel A On",
-    description: "The g-code emitted to switch channel A on. MATCH IT TO YOUR CNC FIRMWARE -- the Grbl: options (M7 mist, M8 flood) and the Mrln: options (M42 pin writes) are not interchangeable, and the post emits whichever you pick verbatim without checking, so a Marlin code sent to GRBL is rejected mid-job. The default is the Grbl code, matching the default CNC Firmware. Use custom names a file of your own g-code instead, set further down this group.",
+    description: "The g-code that switches channel A on. Match it to your CNC Firmware -- the post emits it unchanged, so a Marlin code sent to GRBL is rejected mid-job. Use custom takes it from a file set further down this group.",
     group      : "coolant",
     order      : 30,
     type       : "enum",
@@ -729,7 +729,7 @@ properties = {
   },
   coolantChannelAOff: {
     title      : "Turn Channel A Off",
-    description: "The g-code emitted to switch channel A off. Must be the same dialect as Turn Channel A On above -- see its note. On GRBL there is only one off code, M9, and it stops every coolant output at once. The default is the Grbl code, matching the default CNC Firmware.",
+    description: "The g-code that switches channel A off. Same dialect as Turn Channel A On. On GRBL, M9 is the only off code and stops every coolant output at once.",
     group      : "coolant",
     order      : 40,
     type       : "enum",
@@ -744,7 +744,7 @@ properties = {
   },
   coolantChannelBOn: {
     title      : "Turn Channel B On",
-    description: "The g-code emitted to switch channel B on -- the second, independent coolant output. Must be the same dialect as your CNC Firmware; see Turn Channel A On above. The default is the Grbl code.",
+    description: "The g-code that switches channel B on -- the second, independent output. Same dialect as your CNC Firmware.",
     group      : "coolant",
     order      : 50,
     type       : "enum",
@@ -760,7 +760,7 @@ properties = {
   },
   coolantChannelBOff: {
     title      : "Turn Channel B Off",
-    description: "The g-code emitted to switch channel B off. Must be the same dialect as Turn Channel B On above. On GRBL this is M9, the same single off code channel A uses. The default is the Grbl code.",
+    description: "The g-code that switches channel B off. Same dialect as Turn Channel B On.",
     group      : "coolant",
     order      : 60,
     type       : "enum",
@@ -775,7 +775,7 @@ properties = {
   },
   coolantChannelAOnCustom: {
     title      : "Channel A On Custom",
-    description: "File with custom GCode to turn ON coolant channel A (in nc folder).",
+    description: "File with custom GCode to turn ON coolant channel A (in nc folder). Read only when Turn Channel A On is Use custom.",
     group      : "coolant",
     order      : 70,
     type       : "string",
@@ -784,7 +784,7 @@ properties = {
   },
   coolantChannelAOffCustom: {
     title      : "Channel A Off Custom",
-    description: "File with custom GCode to turn OFF coolant channel A (in nc folder).",
+    description: "File with custom GCode to turn OFF coolant channel A (in nc folder). Read only when Turn Channel A Off is Use custom.",
     group      : "coolant",
     order      : 80,
     type       : "string",
@@ -793,7 +793,7 @@ properties = {
   },
   coolantChannelBOnCustom: {
     title      : "Channel B On Custom",
-    description: "File with custom GCode to turn ON coolant channel B (in nc folder).",
+    description: "File with custom GCode to turn ON coolant channel B (in nc folder). Read only when Turn Channel B On is Use custom.",
     group      : "coolant",
     order      : 90,
     type       : "string",
@@ -802,7 +802,7 @@ properties = {
   },
   coolantChannelBOffCustom: {
     title      : "Channel B Off Custom",
-    description: "File with custom GCode to turn OFF coolant channel B (in nc folder).",
+    description: "File with custom GCode to turn OFF coolant channel B (in nc folder). Read only when Turn Channel B Off is Use custom.",
     group      : "coolant",
     order      : 100,
     type       : "string",
