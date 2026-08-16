@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **73 findings — 58 fixed ·
-7 closed by design · 1 withdrawn · 7 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **73 findings — 62 fixed ·
+7 closed by design · 1 withdrawn · 3 open.** Test registers in §4 and §5.
 
 > **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
 > with the design that made them defects. `design.md` → *Tool changes* is the replacement
@@ -48,7 +48,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**6 open.**
+**3 open.**
 
 ### PR-25 — whether RepRapFirmware applies a tool-length offset to a `G53` move is unsettled — Low-Med
 
@@ -68,56 +68,6 @@ handling — and the GCode dictionary entry for `G53`. **A source read, not a co
 hold under **either** answer: it tells the operator to leave headroom for the longest tool. Settle
 the source question first; only if offsets are applied does the post owe anything more, and the
 candidate is subtracting nothing and saying so rather than computing a length it cannot know.
-
-### PR-23 — a boundary that is both a WCS change and a tool change probes the part twice — Low-Med
-
-**Problem.** `onSection()` now calls `writeWCS()` before `toolChange()`, which is what puts the
-post-change probe in the right register. But `writeWCS()` does two things in one call: it
-selects the new offset **and** runs `probeOnChange`'s origin work. So on the default
-`Use WCS X0 Y0, Probe Z0 Once per Part` the new part is probed with the **outgoing** tool, and the
-tool-change re-probe immediately overwrites that Z0 with the incoming one. The register ends
-correct and the second result is the one that cuts — this is waste and operator friction, not
-a wrong part: two probe cycles, and four attach/detach prompts where two would do.
-
-**Reproduce.** Two parts and two tools, arranged so one section boundary changes both — GRBL,
-`Machine Travel Z` filled, `At a Tool Change` = `Pause for a manual change`,
-`Each New WCS / Part` at its default.
-
-**Fix.** Split `writeWCS()` into a select and an origin-establish, so `onSection()` can order
-select → change → establish and the part is probed once, with the tool that cuts it. That is
-the ordering `design.md` describes and the one-call shape is what prevents it.
-**Not urgent, and deliberately not taken with the rebuild** — the correctness half landed
-there, and the split touches code the multi-WCS work has only just settled.
-
-### CR-21 — `resetPostState()` does not reset the modal formatters — Machine damage
-
-**Problem.** `gAbsIncModal`, `gUnitModal`, `gFeedModeModal` and the six coordinate variables
-are left out. They are what is left: the walk of every mutable module global against this
-function found one more, `forceRapidXYBeforeZ`, and that one is now reset. In the second file `Start()`'s `G90`, `G21`/`G20` and `G94` find the modal
-already holding those values and emit **nothing** — so file two has no preamble, and every
-absolute coordinate, `G53` move and probe target depends on the controller still being in
-the mode file one left it in. **`gPlaneModal` was singled out for reset with a comment
-explaining exactly this failure mode** — the tell that the other three were an oversight.
-
-**Reproduce.** Two or more NC files posted from one Fusion invocation where the JavaScript
-context is reused.
-
-**Fix.** Reset all three formatters and the six coordinate variables. `HR-22` closed onto this
-row, having asked the same question.
-
-### CR-22 — the four coolant "custom file" properties are not in the include pre-flight — Wrong output
-
-**Problem.** `validateJob()`'s pre-flight checks the start, stop and two tool-change files
-and refuses before any output when one is missing. The four `coolantChannel*Custom`
-properties are read through the same `loadFile()` and are absent from the list, so they get
-exactly the late failure the pre-flight exists to prevent — and the coolant-*off* files fail
-at `onClose()`, after the whole job has been written.
-
-**Reproduce.** Any `Turn Channel A/B On/Off` set to `Use custom`, naming a file not in the
-NC output folder.
-
-**Fix.** Add them under the condition that makes them reachable. `HB-7` deliberately scoped
-them out.
 
 ### CR-23 — a Safe-Z expression of `0` is accepted, making every non-negative Z "safe air" — Machine damage
 
@@ -149,7 +99,7 @@ and fine.
 
 ## 3. Closed findings
 
-**59 fixed · 7 closed by design · 1 withdrawn — 67 rows.** Permanent: commit messages and
+**62 fixed · 7 closed by design · 1 withdrawn — 70 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -161,7 +111,7 @@ diagnosis, the diff and the argument.
 | **HB-4** | A non-zero `Probe X/Y Offset` traversed to the probe point at the operator's own jogged Z, with no lift and no warning | Med | `cb1c9f2` — retract before the traverse, gated on the offset | ✅ |
 | **HB-5** | A malformed group-6 `Safe Z` fell back to 15 mm with only a `Debug` trace, where its group-3 twin warned | Low | `e5db625` — both properties fail the same way, in both channels | ✅ |
 | **HB-6** | `G17` and `G94` are emitted only on the GRBL branch, so RepRap inherits whatever plane and feed mode the last job left | — | Closed by design — the fix was worse than the defect: neither code exists on Marlin, nor on RRF below 3.5.1, and `circular()` linearizes every non-XY arc off GRBL so the exposure is unreachable | ➖ |
-| **HB-7** | A missing group-8 include file aborted the post *after* part of the file was written | Low | `b61c005` — pre-flight in `validateJob()`. Coolant custom files deliberately out of scope — `CR-22` | ✅ |
+| **HB-7** | A missing group-8 include file aborted the post *after* part of the file was written | Low | `b61c005` — pre-flight in `validateJob()`. The four coolant custom files joined it with `CR-22` | ✅ |
 | **HB-8** | `Enforce Feedrate` and the word separator leaked into the next post in the same session | Low | `b84f602` | ✅ |
 | **HB-9** | `Comment Level` = `Off` suppressed every `>>> WARNING:` the post writes | Low | `1c5fcce` — all thirteen sites go through `writeWarning()`, which bypasses the level gate | ✅ |
 | **HB-11** | The two blank separator comments disagreed by one character | Low | `18ec9aa` | ✅ |
@@ -169,7 +119,7 @@ diagnosis, the diff and the argument.
 | **HB-13** | `Use WCS X0 Y0, Probe Z0` holds no Z reference, and neither creates one nor bounds what it does without one | Med | `556a378` — a warning in both channels. The proposed relative lift was rejected: it would be the only motion in no frame at all | ✅ |
 | **HB-14** | The in-file `format error` warning ran the property title into its group with no separator | Low | `eea70d1` — one shared writer; the sanitizer eats parentheses, so quotes and `--` are used | ✅ |
 | **HB-15** | The include-file refusal explained the post's own history to the operator | Low | `18ec9aa` | ✅ |
-| **HB-16** | `gPlaneModal` outlived the file it was created for | Low | `ae0e013` + `eea70d1` — reset in `resetPostState()` and after an include. `gAbsIncModal`/`gUnitModal`/`gFeedModeModal` deliberately excluded — `HR-22`, `CR-21` | ✅ |
+| **HB-16** | `gPlaneModal` outlived the file it was created for | Low | `ae0e013` + `eea70d1` — reset in `resetPostState()` and after an include. `gAbsIncModal`/`gUnitModal`/`gFeedModeModal` were excluded, and joined it with `CR-21` | ✅ |
 | **HB-17** | `fixedZEstablishedAtStart()` answered a question about the dialog and was read as one about the file, silencing HB-13's warning where it was needed most | Low | `556a378` — split into a dialog answer and `fixedZEstablishedInFile()`, which tests the firmware | ✅ |
 | **HB-18** | HB-14's defect had a third call site the fix did not reach | Low | `2b5dfd5` — fixed as a pattern: the no-parentheses rule now lives at `writeWarning()` itself | ✅ |
 | **HB-19** | HB-13's dialog warning closed by recommending `Fixed Z Reference` on Marlin, where neither answer can deliver it | Low | `2b5dfd5` — the closing sentence is conditional on Marlin | ✅ |
@@ -222,6 +172,9 @@ diagnosis, the diff and the argument.
 | **CR-09** | Commanded spindle control emits `M3`/`M4`/`M5`, a build option on Marlin | Wrong output | Said in `Manual Spindle On/Off`'s description, beside the same class of fact the post documents for `G38.2`, `G53` and `G17`. `M3`/`M4`/`M5` compile under `HAS_CUTTER`, which is `ANY(SPINDLE_FEATURE, LASER_FEATURE)` (`Marlin/src/inc/Conditionals_adv.h`, 2.1.2.5) — a stock build has neither and answers with an unknown-command warning, running the whole job with the spindle never started. **V1 Engineering's own builds are not stock and the description says so**: every `V1CNC_*` config sources `src/configs/accessories/laser`, which `opt_enable`s `LASER_FEATURE` (`V1EngineeringInc/MarlinBuilder`, master, read 2026-08-16; latest release 515 = Marlin 2.1.1). There `M3` does drive the spindle/laser pin — but `S` is read as cutter power rather than RPM, and `M4` is not a reversal, `TERN_(SPINDLE_CHANGE_DIR, cutter.set_reverse(is_M4))` compiling away without `SPINDLE_FEATURE` (`src/gcode/control/M3-M5.cpp`, 2.1.2.5) | ✅ |
 | **CR-15** | The shipped default `First WCS / Part` was incompatible with a filled `Machine Travel Z` | Wrong part | **The preamble stops moving the tool before it records where the tool is.** `writeFirstSection()` now has two orders and `originIsPreJogged()` picks between them: on the two `Set … to Current Pos` modes the origin is written **first** and the fixed Z reference established after it, everywhere else the shipped order stands. The establish had to run first only because it is the height a **travel** to the part origin starts from, and these modes make no travel — the tool is already there. So `Set X0 Y0 Z0 to Current Pos` records the operator's own jogged height instead of bed clearance, and the default's `G38.2` searches `G38 Target` down from a millimetre over the stock instead of from the travel height, which it could not reach at the shipped `-10`. **`Prompt for the First Tool` is dropped on those modes, not reordered**: a pre-jog can only have been made with a tool fitted, so the prompt has nothing left to ask and answering it with a different tool is the very defect it exists to prevent. Warned in both channels, naming the two `Jog to …` modes, which prompt and *then* position. **`PR-10`'s post-time warning is deleted** — it reported a defect that no longer exists — and `forceRapidXYBeforeZ` gains its second caller, the deferred `G53` being a height the work frame has no number for | ✅ |
 | **HR-27** | A geometry guard leaves a truncated `.gcode` | Med | **Closed by design**, by the author's ruling: `currentSection.isMultiAxis()` and `isSectionOrientationSupported()` stay in `onSection()`. Moving them into `validateJob()`'s section loop would strand the orientation guard's `Debug` trace, which is emitted on **every** path by design and is the only thing that distinguishes a guard that read nothing from one that read `+Z` and allowed it — at post-validation time there is no output stream to write it to. `PR-2c` carries the falsifier: what a refused job leaves must not be a runnable `.gcode` | ➖ |
+| **PR-23** | A boundary that is both a WCS change and a tool change probes the part twice | Low-Med | **The part is set up once, by the tool that cuts it.** `writeWCS()` is the select alone — the machine-frame retract and the `G5x` — and returns the origin work still owed; `writeWcsEstablish()` is that work, and `onSection()` runs it **after** the change, so the order is select → change → establish. The outgoing tool no longer probes a Z0 the incoming tool's re-probe overwrites. **The two probes become one and not zero**: `wcsOriginEstablishesZ0()` is the single statement of whether the establish sets Z0 itself, and `toolChange()` hands its re-probe over only where that is true — `Use WCS X0 Y0 Z0`, a tool that cannot probe, a change with no WCS change, and a **return** with `Re-probe Z0 After a Change` off all keep it, nothing else correcting Z0 there. On a `Jog to …` mode the hand-over is more than economy: the new part's X0 Y0 does not exist until the operator jogs to it, so a change-time probe would have touched off wherever the stored register happened to point | ✅ |
+| **CR-21** | `resetPostState()` did not reset the modal formatters or the coordinate variables | Machine damage | `gAbsIncModal`, `gUnitModal`, `gFeedModeModal` and `xOutput`/`yOutput`/`zOutput`/`iOutput`/`jOutput`/`kOutput` reset beside `gPlaneModal`, which was singled out with a comment describing exactly this failure mode — the tell that the other three were an oversight. In a reused JavaScript context the second file's `Start()` found the modals already holding `G90`, the unit code and `G94` and emitted **nothing**, leaving every absolute coordinate, `G53` move and probe target in that file resting on the mode file one left behind. **A stale belief is a missing word, not a wrong one**, which is why nothing in file two looks wrong. `sOutput` needs none, being `force: true`, and `fOutput` and `gMotionModal` are rebuilt in `onOpen()` on both branches. `HR-22` asked the same question | ✅ |
+| **CR-22** | The four coolant "custom file" properties were not in the include pre-flight | Wrong output | Added to `validateJob()`'s pre-flight, each gated on the enum beside it reading `Use custom` — the same shape as the tool-change files, which are gated on the mode that loads them. They are read through the same `loadFile()` as every other include, so a missing one took its `error()` mid-stream, and the two **off** files are read at `onClose()`, after the whole job is written. An empty field is still not an error: it is the answer *no custom file*, and `writeCustomCoolantFile()` warns on it | ✅ |
 
 ---
 
@@ -259,7 +212,7 @@ witnessed in an existing artifact, say which one.
 
 ## 5. Passed tests
 
-**✅ 129 PASS · ❌ 0 FAIL · ➖ 17 n/a — 146 tests in 139 rows** (an `(A)`/`(B)` pair shares a
+**✅ 133 PASS · ❌ 0 FAIL · ➖ 16 n/a — 149 tests in 142 rows** (an `(A)`/`(B)` pair shares a
 row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
 `PR-2g`, `PR-2h`, `PR-14a`, `PR-14b`, `PB1`, `PB2`, `M2`, `PBV1`, `PBV2`, `PBV3`, `M1` and `M4`
@@ -279,6 +232,10 @@ on a ruling rather than on an artifact in this register.
 **Three closed by walk against the code that landed with them** — `CR-05`'s include-file warning,
 `CR-09`'s description and `CR-10`'s park warning. They owe a posted file for the same reason every
 walked row does.
+
+**Four more closed the same way** — `PR-23a`/`PR-23b`, `CR-21` and `CR-22`, walked against the split
+that landed with them. `PR-23` itself stops being a `➖` pointer row: what `TC-4`'s file was to
+witness is now a defect that no longer exists, so the pair below assert its absence instead.
 
 **Fifty-one more closed by code walk 2026-08-16, against `99f623d`** — `WR-1`, `WR-2`, `CR-16` and
 the forty-eight the register re-walk settled. **Four were corrected rather than confirmed**, and the
@@ -405,7 +362,7 @@ gained a second caller. **`PR-10`'s row is the one to read for what a deleted wa
 | **HR-24** | **Walk of the source diff.** Both call sites pass `currentSection`, whose tool **is** the global at that moment, so no emission can move — which is the whole assertion. The change makes the agreement structural rather than coincidental |
 | **HR-13** | **Walk, both halves, and the absence is a source grep.** `COMMAND_OPTIONAL_STOP` writes its own warning and then `M0`; every unnamed command falls past the switch to a second `writeWarning()`, which outlives `Comment Level` `Off` because Manual NC has no post-time twin. `mFormat.format(1)` does not occur in the post |
 | **HR-28 (A)** | **Proved by `PR-1b`'s walk** — `Axes Homed and Trusted` = `None` on a two-offset job is exactly its multi-WCS arm. **Trap: the row asks for an in-file channel and there is none**; like `S3d` this warning is post-time only, and `PR-14a` has shown the configuration refuses before a file exists |
-| **FCR-4** | **Walk.** `CoolantA()` / `CoolantB()` route `Use custom` to `writeCustomCoolantFile()`, which warns and emits nothing on an empty field and otherwise calls `loadFile()` — contents, never the name, and a missing file takes `loadFile()`'s own `error()`. **`CR-22` is the open half**: that error arrives after the job is part-written |
+| **FCR-4** | **Walk.** `CoolantA()` / `CoolantB()` route `Use custom` to `writeCustomCoolantFile()`, which warns and emits nothing on an empty field and otherwise calls `loadFile()` — contents, never the name, and a missing file takes `loadFile()`'s own `error()`. **`CR-22` was the open half** and closed onto `validateJob()`'s pre-flight, so that `error()` is now unreachable with the enum on `Use custom` |
 | **FCR-5** | **Walk of `writeWcsOnStart()`'s `canProbe` false arm.** The default mode writes `G10 L20 P1 X0 Y0` with **no Z word** and then the *cannot probe* warning; suppressing the provisional Z0 is deliberate, since writing one would turn the mode into `Set X0 Y0 Z0 to Current Pos`. `M6` is the same arm's `Skip` counterpart |
 | **REG-S0** | **Walk of the three Step 0 diffs.** `0.3` is the probing refusal's text, reachable only from an F360 probing operation; `0.6` is `onCommand()`'s fallthrough warning, reachable only from an unnamed Manual NC command; `0.4` collapsed six predicates into three pure property reads. An ordinary job reaches none of them |
 | **D1** | **At the dialog, by the author 2026-08-16.** The ten groups read `1` … `10` in numeric order and the properties sit within them as declared, so Fusion sorts on `groupDefinitions[].order` and `properties[].order` rather than on the title text. **Zero-padded group titles are not needed and should not be re-proposed**, and `propertyOrder()`'s note that the dialog may ignore it is now answered: it does not |
@@ -432,7 +389,10 @@ gained a second caller. **`PR-10`'s row is the one to read for what a deleted wa
 | **CR-15h** | **Walk of the three readers of the deleted warning, and of what took its place.** `validateJob()` no longer holds the establish warning; the first-tool warning stands where it did, gated `toolChangeFirstLoad && originIsPreJogged()`. The homing warning is **unchanged in behaviour** — same mode pair, now read through the predicate — because homing destroys the pre-jog in every axis and cannot be reordered away, `writeMachineHoming()` being step 2. The gSender `earlyPrompts` entry gains `&& !originIsPreJogged()`. **Trap: the `Attach ZProbe` entry keeps its inline mode list** — it asks which modes *probe*, not which pre-jog, and swapping it would be wrong |
 | **PR-7b** | ➖ Retired on the author's ruling 2026-08-16: **the dialog reads as designed and the group order is fine.** `D1` had already settled the only claim here a dialog could falsify — that Fusion sorts on `groupDefinitions[].order` and `properties[].order` and not on title text |
 | **REG-MF** | ➖ Retired 2026-08-16 as unneeded. Each of the four changes standing behind it is separately walked — `D5` the dump delta, `S2a` the g-code half, `CR-01a` the warning line, `CR-02` the comma — so a factory-default diff would re-witness them rather than settle anything. **The artifact refresh it also carried is stated where it belongs**, in *Invalidated by landed fixes* below |
-| **PR-23** | ➖ Proved by `TC-4`, whose file carries two probes into the same register, the first with the outgoing tool. The row records the cost; nothing about it fails |
+| **PR-23a** | **Walk of the boundary that is both, on the shipped `Each New WCS / Part` default and a tool that can probe.** `onSection()` runs `writeWCS()` → `toolChange()` → `writeWcsEstablish()`. The select emits `G53 G0 Z<travel>` and `G55` and returns `{2, "Probe Z", true}`; `wcsOriginEstablishesZ0()` is true on it, so the change empties `wcsZ0Trusted`, writes ` Work Z0 for this part is established below …` at `Important` and calls **no** `partProbe()`; the establish then takes the `Probe Z` arm and probes once. **Pass: exactly one `G38.2` between the `G55` and the section's first cut, and exactly one `Attach ZProbe` / `Detach ZProbe` pair** — the second of each is the defect. **Trap: `wcsZ0Trusted[2]` is set by the establish and not by the change**, so a later return to part 2 must not re-probe. **Trap: the boundary now carries two identical `G53 G0 Z<travel>` blocks in a row** — the select's retract and the change's arrive, with only the `G5x` between them. That is deliberate and the code says why: read it as expected, not as a regression |
+| **PR-23b** | **Walk of the arms that KEEP the change's re-probe — the other branch of one predicate, and each is a case nothing else corrects Z0 in.** (1) a tool change with **no** WCS change: `writeWCS()` returns `undefined` at *WCS unchanged*, `onSection()` passes `false`, the change probes as it always did. (2) `Use WCS X0 Y0 Z0`: the mode establishes nothing, so the predicate is false on it and the change probes. (3) a jet tool / tool 0 incoming on a probing mode: `canProbe` false, predicate false, and the change takes its existing `>>> WARNING:` arm. (4) a **return** to a visited offset with `Re-probe Z0 After a Change` **off**: `wcsZ0Trusted` is never emptied, so `writeWcsOnReturn()` takes its non-establishing arm — the predicate reads `wcsVisited[workOffset]` for exactly this, and answering true would drop a correction nothing makes. **Pass: one `G38.2` per boundary in (1), (2) and (4)-with-the-property-on, none in (3), and in every case the file states which side established Z0.** `Jog to X0 Y0 Z0` is the one mode where the predicate is true with `canProbe` false — the hand is what establishes it |
+| **CR-21** | **Walk of `resetPostState()` against every mutable module global, the second time.** The three formatters and the six coordinate variables are reset beside `gPlaneModal`; `sOutput` and `fOutput` are the two `createVariable`s deliberately absent and each says why, and `gMotionModal` and `fOutput` are rebuilt in `onOpen()` on **both** branches. **Trap: no posted file can carry this** — every artifact in this register is the FIRST file of its invocation, where nothing is stale and the emission is unchanged. What a second file would show is the presence of `G90`, the unit code and `G94` in its own preamble, and the assertion is that the first file's bytes do not move |
+| **CR-22** | **Walk of the pre-flight loop, both branches on all four fields.** Each `coolantChannel*Custom` is pushed only where its own enum reads `Use custom`, so a job on `M7`/`M8`/`M9` reaches the loop with the list it had before this fix and nothing changes; with `Use custom` set and a name not in the NC output folder the shared `error()` fires **before any output**, naming the property's title and the folder. An empty field is skipped by the loop's own `includeName != ""`, leaving `writeCustomCoolantFile()`'s warning as the answer. **Trap: no `.gcode` can carry either branch** — the failing one writes no file (`PR-14a`'s 51-byte `.failed`) and the passing one emits nothing new |
 | **HR-20** | ➖ Retired with `HR-20` — closed as unsupported with no code change, so there was never anything to post |
 | **HR-27** | ➖ Proved by `PR-2c`: a refused job leaves nothing that will run, the two `onSection()` geometry guards included |
 | **P4** | ➖ Superseded by `PR-1a`: the enum it tested no longer exists |
@@ -451,12 +411,13 @@ asserts it or its artifact is superseded.
   are the discriminator: a 45° XZ arc at the `F1000` XYZ limit would drive Z at ~636 mm/min.
 - **Added-part re-probe repositions to the new part's `X0 Y0`** before probing — `Test2.gcode`.
   **Single retract per boundary**; **a same-WCS boundary emits no retract at all.**
-- **`resetPostState()` now covers every mutable module global except the three `CR-21` names.**
-  Walked one by one: `safeZMode`, `safeZHeightDefault`, `probeSafeZMode`, `probeSafeZHeightDefault`
-  and `fw` are re-derived in `onOpen()`, `fOutput` and `gMotionModal` are rebuilt there on **both**
-  branches, and `forceRapidXYBeforeZ` was the one omission — reset with the rest. **Within one file
-  it was never reachable**: the first `rapidMovements()` or `rapidMovementsZ()` after a relocated
-  change clears it, and a change is always followed by one.
+- **`resetPostState()` covers every mutable module global.** Walked one by one: `safeZMode`,
+  `safeZHeightDefault`, `probeSafeZMode`, `probeSafeZHeightDefault` and `fw` are re-derived in
+  `onOpen()`, `fOutput` and `gMotionModal` are rebuilt there on **both** branches, and
+  `forceRapidXYBeforeZ` was the one omission — reset with the rest. **Within one file it was never
+  reachable**: the first `rapidMovements()` or `rapidMovementsZ()` after a relocated change clears
+  it, and a change is always followed by one. `CR-21` closed the formatters and the coordinate
+  variables beside it.
 
 > ⚠ **Stale files, assertions intact.** `Setup1 Multi.gcode`, `Test2.gcode`, `Face1.gcode`,
 > `Setup1-Face1.gcode` and the Test A–D files predate the provisional `Z0`, the property dump
@@ -537,12 +498,12 @@ None is a defect; none is scheduled.
 
 ## 7. Owed
 
-1. **Five open findings have no test row** — the four open `CR-` ids and `PR-25`, all filed from
-   source walks and never posted against. Every one owes a row in §4 before it can be closed — the
-   largest single gap in this register, and the one place the *every finding resolves to a test row*
-   rule is unmet. **Two deliberate exceptions**, each stating why in its own row: `PR-16` and
-   `HR-26`, which **closed by deletion** and owe no row at all. `CR-15` left the group by closing,
-   its eight `CR-15a`…`CR-15h` rows being the shape the other five owe.
+1. **Three open findings have no test row** — `CR-23`, `CR-24` and `PR-25`, all filed from source
+   walks and never posted against. Every one owes a row in §4 before it can be closed, and this is
+   the one place the *every finding resolves to a test row* rule is unmet. **Two deliberate
+   exceptions**, each stating why in its own row: `PR-16` and `HR-26`, which **closed by deletion**
+   and owe no row at all. `CR-15` left the group by closing, its eight `CR-15a`…`CR-15h` rows being
+   the shape the other three owe, and `CR-21` and `CR-22` left it the same way.
 2. **A posted file behind the seventy-seven walked rows**, which is now most of what the register
    owes: four unrun rows and an artifact debt. A walk settles what the post writes; it cannot settle
    what Fusion feeds it, and every walked row names its own residue. **Two posts retire most of it
@@ -555,7 +516,7 @@ None is a defect; none is scheduled.
    artifact debt and no longer a coverage one — but the whole of both flows still stands on the
    source alone. **`TC-4` first** — the walk proves the ordering from `onSection()`'s call order
    and `probeTool()`'s `targetWcs`, and a file would prove Fusion presents the boundary that walk
-   assumes.
+   assumes. **`PR-23a` wants the same job and asserts an absence in it**, so one post settles both.
 5. **The one live risk that could still hide a real defect: `HR-6 (B)`.** The orientation
    guard may be a no-op on exactly the case it exists to catch, and the failure mode is a part
    cut in the wrong plane, silently. It needs a rotated Setup, and **`PR-2c` closed on a ruling

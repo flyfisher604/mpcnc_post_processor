@@ -342,13 +342,19 @@ then descend.
 
 Carried from the register the old design filled, because each is a defect the rework can reproduce:
 
-- **Resolve the WCS before the change.** A boundary that is both a tool change and a WCS change must select
-  the new frame first, so a post-change re-probe writes into the register that needs it rather than the
-  previous section's. Ordering the change first is the root defect of the shipped code.
+- **Select the WCS before the change, establish the part's origin after it.** Both halves of that order are
+  a defect if reversed, and they are not the same defect. Selecting late puts a post-change re-probe into
+  the *previous* section's register — the root defect of the shipped code, and a wrong part. Establishing
+  early sets the part up with the tool that is about to be removed, which the change then corrects — right
+  register, right depth, and **two probe cycles and four operator prompts where one and two would do**. So
+  the WCS select and the origin work are separate calls with the change between them, and the change may
+  hand its own re-probe to the establish **only where that establish sets Z0 itself** — not under
+  `Use WCS X0 Y0 Z0`, not with a tool that cannot probe, and not on a return whose Z0 nothing has staled.
 - **Stop coolant and the spindle on *every* route**, not only the one that relocates the tool. That stop is
   not a property of relocating.
 - **A first change happens before the first part's origin work**, or the part's Z0 is established with the
-  tool the change exists to replace.
+  tool the change exists to replace. That is the same rule as the one above, in the one place where the
+  origin work is `writeFirstSection()`'s rather than a boundary's.
 - **No `M84 Z`.** It is Marlin-only, so GRBL halts on it mid-change with the operator holding a tool — and
   on Marlin a release with no brake sinks an unbalanced gantry in Z. It is a hazard under both readings and
   goes with the rework.

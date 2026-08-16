@@ -68,9 +68,6 @@ risk, and `PR-2c` closed on a ruling rather than on an artifact, so that job wou
 
 ## Step 6 — Clarity
 
-- **`PR-23` belongs here** — split `writeWCS()` into a select and an origin-establish, so a
-  boundary that is both a WCS change and a tool change probes the part once, with the tool that
-  cuts it. Correctness landed with Step 5; this is the waste it left.
 - `validateJob()` was **288 lines**; Steps 2 and 3 removed ~100 of it. **Re-measure
   before restructuring** — it may not need it.
 - The property block is **795 lines, 21% of the file.** Step 2 removed description; **Step 4
@@ -144,6 +141,15 @@ height is the post's job — are in `design.md`.
 ---
 
 ## Done
+
+**`PR-23`, `CR-21`, `CR-22` ✅ closed 2026-08-16.** `writeWCS()` is the select alone and
+`writeWcsEstablish()` the origin work, so `onSection()` orders select → change → establish and a
+boundary that is both probes the part **once**, with the tool that cuts it — `wcsOriginEstablishesZ0()`
+being the one statement of when the change may hand its re-probe over and when it is the only
+correction there is. `resetPostState()` gained the three modal formatters and the six coordinate
+variables, without which a second file in one Fusion invocation has no preamble at all; the four
+coolant custom files joined `validateJob()`'s include pre-flight. Four walk rows; `PR-23` stops being
+a `➖` row and asserts an absence instead.
 
 **Register triage ✅ 2026-08-16.** Four fixes and four rulings: `CR-05` puts the replaced-header
 precondition in the file; `CR-09` names Marlin's build option — and V1 Engineering's own
@@ -264,8 +270,7 @@ tool-length system the change's re-probe corrects the active offset alone, so it
 every other part and a return to one of those re-establishes Z by the mode's own answer. **The control
 says so** — `Subsequent WCS / Part` is `Each New WCS / Part`, its default `Use WCS X0 Y0, Probe Z0 Once
 per Part`, and `Active` is gone from all four stored-origin titles; no title reaches a posted file.
-`CR-17a`, `CR-17b` and `CR-17c` are unrun, two of them licence-free. **`PR-23` is untouched** and still
-Step 6's: a boundary that is both a WCS and a tool change probes twice.
+`CR-17a`, `CR-17b` and `CR-17c` are unrun, two of them licence-free.
 
 **Step 5 — the tool change is Flow 1 and nothing else ✅ closed 2026-08-14.** The post changes no
 tool: no `M6`, no `M84 Z`, no `T` word, no beep, and no `Tool Change X/Y/Z` — the hand-over retracts
@@ -277,8 +282,7 @@ foresee:** the multi-tool default became a **refusal** rather than a warning, be
 alternative cut every operation with one tool; the walk found the spindle stop reading the
 **incoming** tool's jet guard, so a change into a laser handed over a turning cutter — `PR-22`; and
 `PR-21`, the Marlin end park being a homing cycle that zeroes the very origin the two-file answer
-depends on. **`PR-23` is what it left**: a boundary that is both a WCS and a tool change probes the
-part twice, register-correct and wasteful, and it belongs to Step 6.
+depends on.
 
 **Step 4 — group 5 keeps every mode and states each one's condition ✅ closed 2026-08-14.** Nothing
 deleted; the group retitled *5 - Part Origins*, both descriptions rewritten around the condition each
