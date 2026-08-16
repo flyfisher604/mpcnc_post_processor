@@ -53,7 +53,7 @@ modal, and thereafter the post alone changes the selection. Hence `writeWCS()` b
 fixed-Z establish and `writeWcsOnStart()`.
 
 Everything unreadable is therefore a **trust assertion**, and there are two: **a stored WCS origin** (every
-`Use Active WCS` mode — which is why the *defaults* establish an origin rather than rely on one) and **a
+`Use WCS …` mode — which is why the *defaults* establish an origin rather than rely on one) and **a
 declared machine frame** (the group-4 declarations, the same species).
 
 **Homing does not change a WCS — it makes one trustworthy.** `G54`–`G59` hold offsets from machine zero and
@@ -283,8 +283,8 @@ the second can start where the first left off**.
   not a preference.
 - **The park is in one stated frame.** The park height and position must say which frame they are measured
   in and emit that frame — `G53`, which requires a declaration including the parked axes, or the work
-  frame, which drifts per WCS. **Not both meanings on one field**, which is what the shipped
-  `Tool Change X/Y/Z` does today: plain `G0` words the dialog presents as absolute.
+  frame, which drifts per WCS. **Not both meanings on one field**, which is what the deleted
+  `Tool Change X/Y/Z` did: plain `G0` words the dialog presented as absolute.
 - **Z is the operator's to re-establish**, by re-probing at the start of the next file — the shipped default
   first-part mode already does exactly this, so Flow 1 adds no mechanism to reach it.
 - **It is an option, not a policy.** A single-tool job must not pay for it.
