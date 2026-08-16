@@ -713,7 +713,7 @@ properties = {
   },
   coolantChannelAOn: {
     title      : "Turn Channel A On",
-    description: "The g-code that switches channel A on. Match it to your CNC Firmware -- the post emits it unchanged, so a Marlin code sent to GRBL is rejected mid-job. Use custom takes it from a file set further down this group.",
+    description: "The g-code that switches channel A on. Match it to your CNC Firmware -- the post emits it unchanged, so a Marlin code sent to GRBL is rejected mid-job. Use custom takes it from a file set further down this group. On GRBL neither code is guaranteed: stock Grbl 1.1 compiles M7 only when ENABLE_M7 is uncommented in grbl/config.h and answers error:20 without it, while FluidNC never errors and acts on M7 or M8 only where config.yaml declares a coolant mist_pin or flood_pin -- V1 Engineering's Jackpot 1 configs declare both pins, and its Jackpot 2 and Jackpot 3 configs ship NO_PIN for both.",
     group      : "coolant",
     order      : 30,
     type       : "enum",
@@ -744,7 +744,7 @@ properties = {
   },
   coolantChannelBOn: {
     title      : "Turn Channel B On",
-    description: "The g-code that switches channel B on -- the second, independent output. Same dialect as your CNC Firmware.",
+    description: "The g-code that switches channel B on -- the second, independent output. Same dialect as your CNC Firmware. M7 and M8 carry the GRBL build and config conditions stated under Turn Channel A On.",
     group      : "coolant",
     order      : 50,
     type       : "enum",
@@ -1625,18 +1625,10 @@ function validateJob() {
         + "declared with M563 in config.g, and it corrects nothing unless tpost<n>.g applies a "
         + "tool-length offset. Both are on the machine and neither is visible to the post."));
 
-      // THE ONE CONFIGURATION WHERE THE TOOL OFFSET IS EXPECTED TO BE NON-ZERO, and it is the post's
-      // G53 heights that pay for it. Worded to hold under EITHER reading of what RRF's G53 does with a
-      // tool offset, because the post cannot settle that from a source it has: if offsets are dropped
-      // the advice is merely unnecessary, and if they are applied it is the difference between a
-      // retract and an axis-limit error.
-      if (fixedZEstablishedInFile()) {
-        warning(localize("This job also moves in the machine's own Z frame, and handing changes to the "
-          + "RepRapFirmware tool table is the one setting that makes a tool-length offset active while "
-          + "it does. Set \"Machine Travel Z\" low enough that it is still reachable with the LONGEST "
-          + "tool this job uses fitted and its offset applied -- a value chosen for a bare spindle can "
-          + "put the requested machine position above the axis limit once tpost has run."));
-      }
+      // NO SECOND WARNING ABOUT THE MACHINE FRAME HERE, and PR-25 is why: RRF's G53 drops the TOOL offset
+      // as well as the workplace offset, so "Machine Travel Z" is a carriage height on RRF exactly as it
+      // is on GRBL, whatever tpost applied. DoStraightMove()/DoArcMove(), src/GCodes/GCodes.cpp -- the
+      // same at 2.05 through 3.6.0. design.md's firmware table carries the read.
     }
 
     if (getProperty(properties.toolChangeProbeAfterChange)) {
@@ -1766,6 +1758,40 @@ function validateJob() {
         + "signed decimal number of millimetres -- so the post reads the field as EMPTY, which is the "
         + "answer \"not set\", and the motion it controls is simply not emitted. Give a plain number "
         + "such as -12 or -12.5, with no unit suffix and no other characters."));
+    }
+  }
+
+  // CR-24 -- M7 IS NOT IN EVERY GRBL BUILD, and the two dialects fail in OPPOSITE directions. Stock
+  // grbl 1.1 compiles the mist code only when ENABLE_M7 is uncommented in grbl/config.h and it ships
+  // commented out -- "// #define ENABLE_M7 // Disabled by default." -- and the #ifdef wraps both the
+  // modal-group arm and the assignment (grbl/gcode.c, gnea/grbl v1.1h), so an M7 falls through to
+  // "default: FAIL(STATUS_GCODE_UNSUPPORTED_COMMAND)": error:20, mid-section, with the tool in the cut.
+  // FluidNC has no build option and NEVER errors: it sets the mist state only where
+  // config->_coolant->hasMist() and otherwise leaves the block inert (FluidNC/src/GCode.cpp, 3.9.1;
+  // hasMist() is _mist.defined(), CoolantControl.h), so the job cuts dry and nothing says so. M8 is
+  // unconditional on stock grbl and pin-gated on FluidNC the same way, which is why one warning names
+  // both codes.
+  //
+  // NAMED, NOT CHECKED -- $1, $27 and $110's precedent: the build and the config.yaml are the machine's,
+  // and the post can read neither. Gated on the channel MODE and not on what a tool requests: the mode
+  // ships Off, so it is the operator's own opt-in, and it is the property the emission itself reads.
+  if (fw == eFirmware.GRBL) {
+    var grblCoolantCodes = [];
+    if (getProperty(properties.coolantChannelAMode) != eCoolant.Off) {
+      grblCoolantCodes.push(getProperty(properties.coolantChannelAOn));
+    }
+    if (getProperty(properties.coolantChannelBMode) != eCoolant.Off) {
+      grblCoolantCodes.push(getProperty(properties.coolantChannelBOn));
+    }
+    if (grblCoolantCodes.indexOf("M7") != -1 || grblCoolantCodes.indexOf("M8") != -1) {
+      warning(localize("This job switches coolant with GRBL's own codes, and neither dialect guarantees "
+        + "them. Stock Grbl 1.1 compiles M7 only when ENABLE_M7 is uncommented in grbl/config.h and it "
+        + "ships commented out -- on such a build the M7 answers error:20 and stops the job mid-operation "
+        + "with the tool in the cut, while M8 is always compiled in. FluidNC never errors here: it acts "
+        + "on M7 only where config.yaml declares a coolant mist_pin and on M8 only where it declares a "
+        + "flood_pin, and otherwise accepts the line and does nothing -- so the job cuts dry and nothing "
+        + "in the file says so. Confirm the build or the config before this job runs; the post can read "
+        + "neither."));
     }
   }
 

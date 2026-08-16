@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **73 findings — 62 fixed ·
-7 closed by design · 1 withdrawn · 3 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **73 findings — 63 fixed ·
+9 closed by design · 1 withdrawn · 0 open.** Test registers in §4 and §5.
 
 > **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
 > with the design that made them defects. `design.md` → *Tool changes* is the replacement
@@ -48,58 +48,14 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**3 open.**
-
-### PR-25 — whether RepRapFirmware applies a tool-length offset to a `G53` move is unsettled — Low-Med
-
-**Problem.** Every machine-frame block the post emits is `G53 G0 Z<Machine Travel Z>`, and the
-height it names is a **carriage** position only if RRF drops the tool offset for that line. If RRF
-keeps applying it, the height is a **tool-tip** position and the carriage goes to
-`Machine Travel Z` minus the tool length — which for a long tool is above the axis limit, so the
-retract errors instead of retracting. **`Tool Change Handled By` = RepRapFirmware tool table is the
-first setting that makes this reachable**: before it the post told RRF nothing about tools, so the
-active offset was whatever `config.g` left and was normally zero. Now `tpost<n>.g` sets a real one,
-at every change, mid-file.
-
-**Reproduce.** Read RRF's own source — `src/GCodes/GCodes.cpp`, the `G53` / machine-coordinates
-handling — and the GCode dictionary entry for `G53`. **A source read, not a controller test.**
-
-**Fix.** None yet, and possibly none needed. The post-time warning already shipped is worded to
-hold under **either** answer: it tells the operator to leave headroom for the longest tool. Settle
-the source question first; only if offsets are applied does the post owe anything more, and the
-candidate is subtracting nothing and saying so rather than computing a length it cannot know.
-
-### CR-23 — a Safe-Z expression of `0` is accepted, making every non-negative Z "safe air" — Machine damage
-
-**Problem.** `parseSafeZExpr()`'s CONST regex `/^\d+\.?\d*$/` matches `0`, so
-`isSafeToRapid()`'s `zr >= safeZHeight` is true for every Z at or above the stock top —
-a cut at exactly Z0, a skim pass, the whole of a 2D engraving at zero depth — and those
-moves are re-emitted as `G0` at travel speed. `validateJob()`'s Safe-Z warning fires only on
-the ERROR arm, so `0` posts silently. **`0` is a plausible thing to type meaning "no
-restriction", and it produces exactly that with the sign reversed.** Same for `probeSafeZ`.
-
-**Reproduce.** `Map G1s -> G0 Rapids` on with `Safe Z to Rapid` = `0` (or `Feed:0`,
-`Retract:0`, `Clearance:0` on an operation with no absolute level).
-
-**Fix.** A lower bound on the accepted value, or a warning at zero. The parser already
-rejects negatives.
-
-### CR-24 — the default channel-B coolant code is behind a default-off GRBL build option — Wrong output
-
-**Problem.** `M7` is compiled into GRBL 1.1 only when `ENABLE_M7` is uncommented in
-`grbl/config.h`, and it ships commented out. On a stock build `M7` returns `error:20` and
-halts the job mid-section with the tool in the cut. The property's title advertises it as
-the GRBL code — true of the dialect, not of the default build. `M8`/`M9` are unconditional
-and fine.
-
-**Reproduce.** `CNC Firmware` = Grbl, `Channel B Mode` set to a coolant a tool requests,
-`Turn Channel B On` at its default `Grbl: M7 (mist)`.
+**None open.** Every row is in §3, resolved to a commit or to a ruling. What the register still
+owes is **artifacts, not diagnoses** — §4's four jet rows and §7's posted files.
 
 ---
 
 ## 3. Closed findings
 
-**62 fixed · 7 closed by design · 1 withdrawn — 70 rows.** Permanent: commit messages and
+**63 fixed · 9 closed by design · 1 withdrawn — 73 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -175,6 +131,9 @@ diagnosis, the diff and the argument.
 | **PR-23** | A boundary that is both a WCS change and a tool change probes the part twice | Low-Med | **The part is set up once, by the tool that cuts it.** `writeWCS()` is the select alone — the machine-frame retract and the `G5x` — and returns the origin work still owed; `writeWcsEstablish()` is that work, and `onSection()` runs it **after** the change, so the order is select → change → establish. The outgoing tool no longer probes a Z0 the incoming tool's re-probe overwrites. **The two probes become one and not zero**: `wcsOriginEstablishesZ0()` is the single statement of whether the establish sets Z0 itself, and `toolChange()` hands its re-probe over only where that is true — `Use WCS X0 Y0 Z0`, a tool that cannot probe, a change with no WCS change, and a **return** with `Re-probe Z0 After a Change` off all keep it, nothing else correcting Z0 there. On a `Jog to …` mode the hand-over is more than economy: the new part's X0 Y0 does not exist until the operator jogs to it, so a change-time probe would have touched off wherever the stored register happened to point | ✅ |
 | **CR-21** | `resetPostState()` did not reset the modal formatters or the coordinate variables | Machine damage | `gAbsIncModal`, `gUnitModal`, `gFeedModeModal` and `xOutput`/`yOutput`/`zOutput`/`iOutput`/`jOutput`/`kOutput` reset beside `gPlaneModal`, which was singled out with a comment describing exactly this failure mode — the tell that the other three were an oversight. In a reused JavaScript context the second file's `Start()` found the modals already holding `G90`, the unit code and `G94` and emitted **nothing**, leaving every absolute coordinate, `G53` move and probe target in that file resting on the mode file one left behind. **A stale belief is a missing word, not a wrong one**, which is why nothing in file two looks wrong. `sOutput` needs none, being `force: true`, and `fOutput` and `gMotionModal` are rebuilt in `onOpen()` on both branches. `HR-22` asked the same question | ✅ |
 | **CR-22** | The four coolant "custom file" properties were not in the include pre-flight | Wrong output | Added to `validateJob()`'s pre-flight, each gated on the enum beside it reading `Use custom` — the same shape as the tool-change files, which are gated on the mode that loads them. They are read through the same `loadFile()` as every other include, so a missing one took its `error()` mid-stream, and the two **off** files are read at `onClose()`, after the whole job is written. An empty field is still not an error: it is the answer *no custom file*, and `writeCustomCoolantFile()` warns on it | ✅ |
+| **CR-23** | A Safe-Z expression of `0` is accepted, making every non-negative Z "safe air" | Machine damage | **Closed by design — the parser functions as designed**, by the author's ruling 2026-08-16, and no code changed. `0` is a legal Safe-Z and not a malformed one: the CONST regex takes no sign, so the accepted range starts at zero, and `isSafeToRapid()`'s `zr >= safeZHeight` then reads every Z at or above the stock top as air — which is what typing `0` asks for. **Same ground as `CR-03`**: the mapper is the operator's assertion about their own toolpaths, not a claim the post can second-guess | ➖ |
+| **CR-24** | The default channel-B coolant code is behind a default-off GRBL build option | Wrong output | **Named, not checked — `$1`, `$27` and `$110`'s precedent — and the two GRBL dialects fail in opposite directions.** Stock Grbl 1.1 compiles `case 7:` only under `ENABLE_M7`, shipped commented out (`// #define ENABLE_M7 // Disabled by default.`, `grbl/config.h`; the `#ifdef` wraps both the modal-group arm and the assignment, `grbl/gcode.c`, gnea/grbl v1.1h), so `M7` falls to `default: FAIL(STATUS_GCODE_UNSUPPORTED_COMMAND)` — `error:20`, mid-section, tool in the cut. **FluidNC has no build option and never errors**: `case 7:` sets the mist state only `if (config->_coolant->hasMist())` and otherwise leaves the block inert (`FluidNC/src/GCode.cpp`, 3.9.1; `hasMist()` is `_mist.defined()`, `CoolantControl.h`), so the job cuts dry and nothing says so. **`M8` is pin-gated there the same way**, which is the half the row did not have — it is unconditional on stock grbl alone — so one post-time warning names both codes, gated on a channel `Mode` other than `Off`: the operator's own opt-in, and the property the emission itself reads. **V1 Engineering's shipped configs are named in the dialog**, `CR-09`'s precedent: `flood_pin: gpio.2` / `mist_pin: gpio.16` on Jackpot 1, `NO_PIN` for both on Jackpot 2 and Jackpot 3 (`V1EngineeringInc/FluidNC_Configs`, `1384b17`, read 2026-08-16) — so on that hardware the failure is silence, not the halt | ✅ |
+| **PR-25** | Whether RepRapFirmware applies a tool-length offset to a `G53` move is unsettled | Low-Med | **Settled from source: it does not, and the hedged warning went with the question.** `G53` drops the tool offset as well as the workplace offset — `currentUserPosition[axis] = moveArg + GetCurrentToolOffset(axis)` in the `g53Active` arm, whose own comment reads *"g53 ignores tool offsets as well as workplace coordinates"*, and that pre-added offset is exactly what `ToolOffsetTransform()` subtracts again on the way to machine coordinates. `src/GCodes/GCodes.cpp`, `DoStraightMove()` and `DoArcMove()`, **the same at 2.05, 3.0, 3.5.4 and 3.6.0**. So `Machine Travel Z` is a **carriage** height on RRF exactly as on GRBL, whatever `tpost<n>.g` applied, and the axis-limit hazard the warning hedged against does not exist. The warning is deleted, four lines of comment stand where it was so it is not re-invented, and the read is in `design.md`'s firmware table | ➖ |
 
 ---
 
@@ -212,7 +171,7 @@ witnessed in an existing artifact, say which one.
 
 ## 5. Passed tests
 
-**✅ 133 PASS · ❌ 0 FAIL · ➖ 16 n/a — 149 tests in 142 rows** (an `(A)`/`(B)` pair shares a
+**✅ 136 PASS · ❌ 0 FAIL · ➖ 17 n/a — 153 tests in 146 rows** (an `(A)`/`(B)` pair shares a
 row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
 `PR-2g`, `PR-2h`, `PR-14a`, `PR-14b`, `PB1`, `PB2`, `M2`, `PBV1`, `PBV2`, `PBV3`, `M1` and `M4`
@@ -251,6 +210,10 @@ the preamble reorder. **The walk corrected two standing rows and one line of the
 phase order is now two orders, `S2e`'s trap named a warning the fix deletes, and
 `rapidMovements()`'s `Debug` trace said *first move after a relocated tool change* on a flag that had
 gained a second caller. **`PR-10`'s row is the one to read for what a deleted warning leaves behind.**
+
+**Three more against the code that landed with them, 2026-08-16, and they empty §2** — `CR-24a`,
+`CR-24b` and `PR-25a`. **`PR-25a` asserts an absence and corrected `TC-15`**, which enumerated the
+warning the fix deletes; `CR-23` retires beside them, closed on a ruling that changed no code.
 
 | Test | Result |
 |---|---|
@@ -339,7 +302,7 @@ gained a second caller. **`PR-10`'s row is the one to read for what a deleted wa
 | **TC-12** | **Walk.** The `Other` arm writes one comment saying the post emits no token of its own and calls `loadFile()`, which brackets the file in ` --- Start/End custom gcode <path>`, repairs a missing trailing newline, and resets the plane, motion and coordinate outputs — the post's beliefs not surviving a program it did not write |
 | **TC-13** | **Walk of four refusals, each `error()` then `return`**: Marlin at any handler, the RRF handler off RepRap, a GRBL sender off GRBL, `Other` with no file — each naming the setting to change, all inside `toolChangeIsMacro() && countDistinctTools() > 1`, so a single-tool job in Macro mode posts. **Extends `PR-2c`, which is now the mid-stream half alone** |
 | **TC-14** | **Walk.** The `RepRap` arm writes `tFormat.format(n)` alone — on RRF the T word **is** the change, and an `M6` beside it would be a second token for a change already made — and the resume's `G94`/`G17` sit inside `if (fw == GRBL)` |
-| **TC-15** | **Walk of four post-time predicates**: sender-must-intercept on `gSender`/`CNCjs`; `M563`/`tpost` on `RepRap`, with `PR-25`'s headroom warning nested on `fixedZEstablishedInFile()`; the re-probe overlap on its own property. All sit inside `toolChangeIsMacro() && countDistinctTools() > 1`, so a single-tool Macro job is silent at every setting |
+| **TC-15** | **Walk of three post-time predicates**: sender-must-intercept on `gSender`/`CNCjs`; `M563`/`tpost` on `RepRap`; the re-probe overlap on its own property. All sit inside `toolChangeIsMacro() && countDistinctTools() > 1`, so a single-tool Macro job is silent at every setting. **Corrected 2026-08-16: it was four.** The fourth was `PR-25`'s headroom warning, nested on `fixedZEstablishedInFile()` and deleted when the source settled the question — `PR-25a` |
 | **TC-17** | **Walk, and it proves a relocated change does not cross the bed low.** Retract → `G53 G0 X.. Y..` → flush → stops → `M0` → `writeToolChangeReturn()`, which with the change Z unset emits no move and sets `forceRapidXYBeforeZ`. **With the re-probe on the flag never reaches that rapid**: `partProbe()`'s `rapidMovementsXY(0, 0)` is the crossing, at the height the change left, and `probeTool()`'s `rapidMovementsZ()` clears it — a commanded work-frame Z being what ends the debt. Both blocks carry `G53 G0` and an `F` and neither a third axis, `writeMachineFrameBlock()` taking two axis words |
 | **TC-18** | **Walk.** Z alone still satisfies `toolChangeMovesToPosition()`; the X/Y block is skipped, and `writeToolChangeReturn()` emits the travel-Z move and sets **no** flag — a Z-only excursion returns the tool over the point it left, so the next rapid is ordered as it would be with no position set at all. The warning is `tcz < parseMachineTravelZ()`, so below warns and above does not |
 | **TC-19** | **Walk of the position guards, and one branch the row asserts does not exist.** X without Y or either unparseable is refused against the **raw** fields; a position with no frame is refused; X/Y without X/Y homed is refused; Macro mode posts and warns once; a single-tool job emits no change, every guard being gated on `countDistinctTools() > 1`. **But *not a signed decimal* held for X and Y alone** — `Tool Change Position Z` was read as unset in silence, which is `WR-2` |
@@ -393,6 +356,10 @@ gained a second caller. **`PR-10`'s row is the one to read for what a deleted wa
 | **PR-23b** | **Walk of the arms that KEEP the change's re-probe — the other branch of one predicate, and each is a case nothing else corrects Z0 in.** (1) a tool change with **no** WCS change: `writeWCS()` returns `undefined` at *WCS unchanged*, `onSection()` passes `false`, the change probes as it always did. (2) `Use WCS X0 Y0 Z0`: the mode establishes nothing, so the predicate is false on it and the change probes. (3) a jet tool / tool 0 incoming on a probing mode: `canProbe` false, predicate false, and the change takes its existing `>>> WARNING:` arm. (4) a **return** to a visited offset with `Re-probe Z0 After a Change` **off**: `wcsZ0Trusted` is never emptied, so `writeWcsOnReturn()` takes its non-establishing arm — the predicate reads `wcsVisited[workOffset]` for exactly this, and answering true would drop a correction nothing makes. **Pass: one `G38.2` per boundary in (1), (2) and (4)-with-the-property-on, none in (3), and in every case the file states which side established Z0.** `Jog to X0 Y0 Z0` is the one mode where the predicate is true with `canProbe` false — the hand is what establishes it |
 | **CR-21** | **Walk of `resetPostState()` against every mutable module global, the second time.** The three formatters and the six coordinate variables are reset beside `gPlaneModal`; `sOutput` and `fOutput` are the two `createVariable`s deliberately absent and each says why, and `gMotionModal` and `fOutput` are rebuilt in `onOpen()` on **both** branches. **Trap: no posted file can carry this** — every artifact in this register is the FIRST file of its invocation, where nothing is stale and the emission is unchanged. What a second file would show is the presence of `G90`, the unit code and `G94` in its own preamble, and the assertion is that the first file's bytes do not move |
 | **CR-22** | **Walk of the pre-flight loop, both branches on all four fields.** Each `coolantChannel*Custom` is pushed only where its own enum reads `Use custom`, so a job on `M7`/`M8`/`M9` reaches the loop with the list it had before this fix and nothing changes; with `Use custom` set and a name not in the NC output folder the shared `error()` fires **before any output**, naming the property's title and the folder. An empty field is skipped by the loop's own `includeName != ""`, leaving `writeCustomCoolantFile()`'s warning as the answer. **Trap: no `.gcode` can carry either branch** — the failing one writes no file (`PR-14a`'s 51-byte `.failed`) and the passing one emits nothing new |
+| **CR-24a** | **Walk of one post-time predicate, both branches.** Fires on GRBL where either channel's `Mode` is other than `Off` **and** that channel's on-code is `M7` or `M8`, so the shipped `Off`/`Off` job is silent whatever the codes say; silent on Marlin and RepRap at every setting; silent on a channel enabled with a `Mrln:` code or `Use custom`, whose conditions the post does not know — §6's dialect warning is that other half. **One warning however many channels qualify**, both codes named in it. **Trap: it does not read what any tool requests** — a job whose tools ask for no coolant still warns, deliberately, the enabled mode being the opt-in. **Trap: post-time only**, like `S3d` and `WR-2`; the in-file half would have to be written at every coolant toggle |
+| **CR-24b** | **At the dialog.** `Turn Channel A On` states both dialects' conditions and names V1 Engineering's shipped Jackpot configs; `Turn Channel B On` points at it rather than repeating it, the two sitting adjacent in group 9. **No byte of any file moves** — a property description reaches no `.gcode`, the dump writing each property's key and its value alone (`CR-09`, `CR-16`) |
+| **PR-25a** | **Walk, and the assertion is an absence.** On `TC-15`'s configuration — `Tool Change Handled By` = RepRapFirmware tool table, two tools, `Machine Travel Z` filled — the dialog carries the `M563`/`tpost` warning **alone**, the second one nested on `fixedZEstablishedInFile()` being deleted with the question it hedged. Nothing else in that branch moves, and no `.gcode` can show it: the deleted half was post-time only. **`TC-15` is corrected by this row**, having enumerated four predicates where three now stand |
+| **CR-23** | ➖ Retired with `CR-23` — closed as designed with no code change, so there was never anything to post |
 | **HR-20** | ➖ Retired with `HR-20` — closed as unsupported with no code change, so there was never anything to post |
 | **HR-27** | ➖ Proved by `PR-2c`: a refused job leaves nothing that will run, the two `onSection()` geometry guards included |
 | **P4** | ➖ Superseded by `PR-1a`: the enum it tested no longer exists |
@@ -498,12 +465,10 @@ None is a defect; none is scheduled.
 
 ## 7. Owed
 
-1. **Three open findings have no test row** — `CR-23`, `CR-24` and `PR-25`, all filed from source
-   walks and never posted against. Every one owes a row in §4 before it can be closed, and this is
-   the one place the *every finding resolves to a test row* rule is unmet. **Two deliberate
-   exceptions**, each stating why in its own row: `PR-16` and `HR-26`, which **closed by deletion**
-   and owe no row at all. `CR-15` left the group by closing, its eight `CR-15a`…`CR-15h` rows being
-   the shape the other three owe, and `CR-21` and `CR-22` left it the same way.
+1. **Every finding now resolves to a row**, the rule met for the first time: `CR-24a`/`CR-24b` and
+   `PR-25a` closed the last of the gap, and `CR-23` carries a `➖` row for a ruling that changed no
+   code, as `HR-20` and `HR-27` do. **Two deliberate exceptions remain**, each stating why in its own
+   row: `PR-16` and `HR-26`, which **closed by deletion** and owe no row at all.
 2. **A posted file behind the seventy-seven walked rows**, which is now most of what the register
    owes: four unrun rows and an artifact debt. A walk settles what the post writes; it cannot settle
    what Fusion feeds it, and every walked row names its own residue. **Two posts retire most of it

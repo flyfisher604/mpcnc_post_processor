@@ -142,6 +142,16 @@ height is the post's job — are in `design.md`.
 
 ## Done
 
+**`CR-23`, `CR-24`, `PR-25` ✅ closed 2026-08-16 — `findings.md` §2 is empty.** `CR-23` closed on the
+author's ruling: the parser functions as designed and `0` is a legal Safe-Z. `CR-24` names what the post
+can only name — stock grbl compiles `M7` only under `ENABLE_M7` and answers `error:20` without it, while
+**FluidNC never errors and pin-gates `M7` *and* `M8`**, so on a V1 Engineering Jackpot 2 or 3 the failure
+is a job that cuts dry in silence rather than a halt in the cut. One warning gated on a channel the
+operator switched on, both codes in it, and V1E's own shipped configs in the description. `PR-25` settled
+from RRF's source: `G53` drops the tool offset with the workplace offset at 2.05 through 3.6.0, so a
+machine-frame height means on RRF what it means on GRBL and the hedged headroom warning is **deleted**.
+Three walk rows; `TC-15` corrected, having counted the warning the fix removes.
+
 **`PR-23`, `CR-21`, `CR-22` ✅ closed 2026-08-16.** `writeWCS()` is the select alone and
 `writeWcsEstablish()` the origin work, so `onSection()` orders select → change → establish and a
 boundary that is both probes the part **once**, with the tool that cuts it — `wcsOriginEstablishesZ0()`
