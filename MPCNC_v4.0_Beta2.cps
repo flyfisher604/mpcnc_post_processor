@@ -360,7 +360,7 @@ properties = {
   },
   probeOnChange: {
     title      : "Each New WCS / Part",
-    description: "Multi-part jobs only: how each part's origin is set the first time the job reaches it. Every mode retracts to Machine Travel Z first. Use WCS X0 Y0, Probe Z0 Once per Part: move to the part's stored X0 Y0 and probe its stock top. Use WCS X0 Y0 Z0: use the stored origin, measure nothing. Jog to X0 Y0, Probe Z0: pause to jog to the part, record X and Y, probe Z0. Jog to X0 Y0 Z0: pause to jog there, record all three. Returning to a part already set up sets nothing again -- the tool moves to its stored origin and cuts, the probe point by then being a machined surface or air. Only a tool change re-opens that part's Z0. One part from several datums, or a flip, is not supported -- run those as separate jobs.",
+    description: "Multi-part jobs only: how each part's origin is set the first time the job reaches it. Every mode retracts to Machine Travel Z first. Use WCS X0 Y0, Probe Z0 Once per Part: move to the part's stored X0 Y0 and probe its stock top. Use WCS X0 Y0 Z0: use the stored origin, measure nothing. Jog to X0 Y0, Probe Z0: pause to jog to the part, record X and Y, probe Z0. Jog to X0 Y0 Z0: pause to jog there, record all three. Returning to a part already set up sets nothing again -- the tool moves to its stored origin and cuts, the probe point by then being a machined surface or air. Only a tool change re-opens that part's Z0. One part from several datums on one fixture is supported -- each datum is a work offset, like a part. A flip or a re-clamp is not: run those as separate jobs.",
     group      : "probe",
     order      : 20,
     type       : "enum",

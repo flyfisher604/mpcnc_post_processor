@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
 Every logged issue and the tests that confirm it. **73 findings — 54 fixed ·
-5 closed by design · 1 withdrawn · 13 open.** Test registers in §4 and §5.
+6 closed by design · 1 withdrawn · 12 open.** Test registers in §4 and §5.
 
 > **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
 > with the design that made them defects. `design.md` → *Tool changes* is the replacement
@@ -48,7 +48,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**13 open, one of them deferred.**
+**12 open, one of them deferred.**
 
 ### PR-25 — whether RepRapFirmware applies a tool-length offset to a `G53` move is unsettled — Low-Med
 
@@ -178,19 +178,6 @@ reaches it the moment the field is filled, which is a route that did not exist b
 **Fix.** A defaults problem rather than a logic one — fix it in the defaults, or in
 `Machine Travel Z`'s description. `PR-10` is the warning half of the same ground.
 
-### CR-16 — one part machined from several WCS is accepted and traverses to an unset register — Machine damage
-
-**Problem.** `Each New WCS / Part`'s description says one part from several datums must be run as
-separate jobs — **and §6's standing decision says that shape is supported** (`PA1`), a flip or
-re-clamp being the part that is not. Settle which before fixing anything. Either way nothing
-checks it, and the post cannot tell that shape from two fixtures. So the job posts, and the first traverse rapids to the *stored* `X0 Y0`
-of a register the operator never set, or probes there. `validateJob()`'s stored-offset
-warning fires only when X/Y is **not** declared homed — so declaring endstops removes the
-only signal.
-
-**Reproduce.** A single physical part whose operations are assigned to different work
-offsets. GRBL or RepRap, X/Y declared homed.
-
 ### CR-21 — `resetPostState()` does not reset the modal formatters — Machine damage
 
 **Problem.** `gAbsIncModal`, `gUnitModal`, `gFeedModeModal` and the six coordinate variables
@@ -251,7 +238,7 @@ and fine.
 
 ## 3. Closed findings
 
-**54 fixed · 5 closed by design · 1 withdrawn — 60 rows.** Permanent: commit messages and
+**54 fixed · 6 closed by design · 1 withdrawn — 61 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -313,6 +300,7 @@ diagnosis, the diff and the argument.
 | **HR-24** | `writeWCS()` read the global `tool`, not the section it was handed | Low | `section.getTool()`, held in a local and read by the `canProbe` test. **Emits exactly what it did**: both callers pass `currentSection`, whose tool *is* the global at that moment, so the change makes the agreement structural rather than coincidental. `writeWCS()` is the only function in the post that takes a section and could be called with one that is not current | ✅ |
 | **HR-20** | Tapping is not really implemented | Med | **Closed by design — tapping is not supported**, by the author's ruling, and no code changed. Both registered halves were already answered: the automatic path no longer always emits `M4` — `spindleOn()` writes `M3` or `M4` off the commanded direction, and prompts a manual spindle for a reversal at an unchanged speed — and the manual path prompts. What is left is **rigid** tapping, which no supported firmware can do at all, there being no `G33`/`G84` on any of them, and `writeSpeedFeedSyncWarning()` says so on **every** speed-feed-synchronization command so every affected move is flagged. An ordinary tapping cycle still expands into `G0`/`G1` through `onCyclePoint()`, which wants a floating/tension holder — the warning's own words | ➖ |
 | **CR-17** | A revisited WCS is re-probed on a surface the job has already cut | Wrong part | **A part this job has set up is never set up again.** `wcsVisited` and `wcsZ0Trusted` record what each offset owes to this file, and a return takes `writeWcsOnReturn()`: retract, select, rapid to the stored X0 Y0, cut. No second `G38.2` onto a machined pocket floor, no jog prompt, no XY write — under **any** mode, X0 Y0 being something nothing in a job moves once it is set. **Only Z re-opens, and only a tool change opens it**: there is no tool-length system on this machine, and `toolChange()`'s re-probe corrects the **active** offset alone, so a change clears the Z half for every other part and a return to one of those re-establishes Z by the mode's own answer — a probe on the two probing modes, a Z-only pause on `Jog to X0 Y0 Z0`, a `writeWarning()` on `Use WCS X0 Y0 Z0` and on a tool that cannot probe, which measure nothing by design. **The clear is tied to `Re-probe Z0 After a Change`** and not to the fact of a change: that property is the post's one statement that a change invalidates Z0, and turned Off it is the operator asserting the handler applies a tool offset instead. **Named on the dialog rather than left implicit** — `Subsequent WCS / Part` is now `Each New WCS / Part`, its default `Use WCS X0 Y0, Probe Z0 Once per Part`, and `Active` is gone from all four stored-origin titles. No title reaches a posted file: the property dump writes each property's **key** and each enum's **id** | ✅ |
+| **CR-16** | One part machined from several WCS is accepted, and the dialog said it should not be | Machine damage | **Closed on the author's ruling, and the ruling is that the acceptance was right**: several datums on one fixture is one part per work offset and is supported — only a **flip or a re-clamp** must be two jobs. So the defect was the sentence, not the behaviour: `Each New WCS / Part` refused in its description a shape the post handles and `PA1` proved it handles, and now names the one that is out. **No code branches on it and none can** — the post cannot tell a flip from two fixtures, so the rule is stated where the operator reads it and nowhere else. The residue, a register the operator never set, is `design.md`'s standing trust assertion and not this row | ➖ |
 | **HR-22** | Should `gAbsIncModal` / `gUnitModal` / `gFeedModeModal` be reset? | Low | **Closed as a duplicate.** It asked the question `CR-21` answers: yes, and the second file in a reused context loses its whole preamble without it. Two ids for one defect is how a fix comes to be applied to one of them, and this is the id with no row of its own — `CR-21` carries the diagnosis, the six coordinate variables beside the three formatters, and the falsifier, `FCR-13` | ➖ |
 | **WR-2** | A machine coordinate that does not parse is read as "not set", in silence | Wrong output | `parseMachineCoordinate()` answers `undefined` for a typo exactly as it does for an empty field, and `undefined` **is** the answer *no frame* / *do not move* — so `"-12mm"` in `Machine Travel Z` silently costs a single-part job its whole machine frame, and a mistyped `Tool Change Position Z` silently changes the tool at the travel height instead. A `validateJob()` warning on all four machine-coordinate fields, beside the Safe-Z loop that answers the identical question for the two expression fields — `HB-5`'s rule, *both properties fail the same way in both channels*, extended to the fields it never reached. **The X/Y refusal is not this**: it tests the raw fields for the same thing but exists only on the manual flow of a multi-tool job, so it left every other configuration silent | ✅ |
 | **WR-1** | The F360-probing refusal sent the operator to a property group that no longer exists | Wrong output | The one dialog that refusal produces named *"On WCS / Part / Fixture Changes"*, retitled in Step 4 — so `PR-12`'s whole gain, a refusal that names where to go instead, pointed at nothing. Now `"5 - Part Origins"`, the same prefix convention the two multi-part guards use for group 4. **The refusal itself is unchanged and still correct** | ✅ |
@@ -378,7 +366,7 @@ lacks.
 
 ## 5. Passed tests
 
-**✅ 114 PASS · ❌ 0 FAIL · ➖ 3 n/a — 117 tests in 110 rows** (an `(A)`/`(B)` pair shares a
+**✅ 115 PASS · ❌ 0 FAIL · ➖ 3 n/a — 118 tests in 111 rows** (an `(A)`/`(B)` pair shares a
 row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
 `PR-2g`, `PR-2h`, `PR-14a`, `PR-14b`, `PB1`, `PB2`, `M2`, `PBV1`, `PBV2`, `PBV3`, `M1` and `M4`
@@ -390,8 +378,8 @@ its emissions are witnessed in, or says plainly that it stands on the source alo
 were corrected by the walk rather than confirmed** — `PR-6c`'s setup could not produce what it
 asked for, and `S3f`'s byte-identity claim is false in one respect it now states.
 
-**Fifty more closed by code walk 2026-08-16 against `99f623d`** — `WR-1`, `WR-2`, and the
-forty-eight the register re-walk settled. **Four were corrected rather than confirmed**, and the
+**Fifty-one more closed by code walk 2026-08-16, against `99f623d`** — `WR-1`, `WR-2`, `CR-16` and
+the forty-eight the register re-walk settled. **Four were corrected rather than confirmed**, and the
 corrections are the reason to keep reading past the verdict: `CR-01a`'s warning is the file's first
 line at `Off` **alone**, `TC-11` cannot assert *no `M0`* while the spindle stop is itself a prompt,
 `TC-19` named a refusal that did not exist — now `WR-2` — and `TC-9`'s Marlin change carries the
@@ -461,6 +449,7 @@ walked against.
 | **S3d** | **Walk.** The gate is `fw != eFirmware.GRBL && fixedZEstablishedInFile() && !homesAtJobStart()`, so Marlin and RepRap warn and GRBL does not — GRBL alone comes up in `Alarm` and refuses motion until homed, which makes a stale declared frame unexecutable there. **Trap: post-time only.** There is no in-file half, so the row is read in the Fusion dialog and a `.gcode` cannot show it |
 | **S3e** | **Walk — the Marlin two-WCS job, and Guard C's deletion is the whole of it.** Two offsets on a Marlin job now reach Guard B on the same terms as any other firmware and pass it. `writeWCS()` emits `G54` for the first section (the single-offset suppression requires a count of one, and this job has two), then at the boundary `G53 G0 Z<n>` → `G54` → `G55`, then the `probeOnChange` dispatch. The origin writes are `G92`, which under `CNC_COORDINATE_SYSTEMS` writes `coordinate_system[active_coordinate_system]` — the register the `G55` just made active — and `writeWcsOrigin()`'s assertion holds at every call because `currentWorkOffset` is assigned before the dispatch runs. **Trap: what a walk cannot reach is the controller.** That Marlin honours this needs a Marlin, and there is none; the row is emitted output, which is what the register has always accepted here |
 | **WR-2** | **Walk of a string predicate, both branches, on all four fields.** Fires on any non-empty value `parseMachineCoordinate()` rejects — `-12mm`, `- 12`, `12.`, `abc` — naming the field's own title and the value typed; silent on every value it accepts, including `+0`, `0` and `-12.5`, and silent on the empty field, which is the answer the fields are designed to give. **The discriminator is `""` against `undefined`**: a test on the parsed value alone would fire on every unset field in every job, which is the whole reason the raw value is read here. **Trap: post-time only**, like `S3d` — there is no in-file half and a `.gcode` cannot show it, and on `Machine Travel Z` the file's own evidence is an absence, `writeResolvedValues()` printing `Fixed Z reference = None` |
+| **CR-16** | **Walk of the one sentence that changed, and of what reads it: nothing.** `Each New WCS / Part`'s description now states the ruling — several datums on one fixture supported, a flip or re-clamp not — and no predicate in the post consults it, `collectDistinctOffsets()` reading `getSection(i).getWorkOffset()` and nothing else. **So no byte of any file moves**, which is the whole assertion, and `PA1` is the row that already walked the behaviour being kept. **Trap: read it in the dialog** — a property description reaches no `.gcode`, the dump writing each property's key and value alone |
 | **WR-1** | **Walk of every group title the post names to an operator.** `groupDefinitions` holds the only titles that exist, and the three messages that quote one now agree with it: the two multi-part guards say `group 4 - Machine Frame` and this refusal says `5 - Part Origins`, both being that group's title prefix. **Trap: no `.gcode` can carry this** — it is an `error()` read in the Fusion dialog, and the job that raises it writes no file, so the row is the source and the dialog |
 | **S3f** | **Walk — and the row as written is FALSE, corrected here.** The `G54` half holds: a single-WCS Marlin file on work offset 1 emits **no select at all**, so no stock-Marlin hobby file gains an unknown command. **But byte-identity does not hold.** The old Marlin branch returned before the `workOffset == currentWorkOffset` test; the new one returns after it, so **every section past the first now emits `( WCS unchanged: 1, not re-selecting)` at `Comment Level` `Info`, which is the default** — a multi-operation Marlin file gains one comment line per added section. **No g-code moves**, and the line is true and matches what GRBL has always said. The corrected assertion: *no `G54`, no g-code change, and one new comment per section after the first.* **A Marlin single-WCS job assigned to work offset 2 or above is a separate case** — it now emits `G55`, where it used to emit a warning and nothing, and that is deliberate: `G92` writes whichever workspace is active |
 | **D2** | **Walk — one level test.** Every line `writeInformation()`, `writeAllProperties()` and `writeResolvedValues()` emit is `writeComment(eComment.Info, …)`, and the gate is `2 <= 1` / `2 <= 0`, both false, so the tables, the dump and the Resolved Values block go together. **Trap: the warnings survive** — `writeWarning()` bypasses the gate, so a suppressed dump is not a silent file |
@@ -576,8 +565,9 @@ covered**, and it is the same line of code. Decide it with **J5**.
 
 Multi-WCS supports two coexisting per-part workflows: pre-set fixture offsets (Replicate),
 and manual per-part via the two `Jog …` modes. One part from **multiple datums on the same
-fixture** is supported (`PA1`); a **flip or re-clamp** is out of scope for a single run —
-those are separate jobs, and remain future work.
+fixture** is supported (`PA1`), each datum being a work offset like any other part; a **flip or
+re-clamp** is two jobs, by the author's ruling 2026-08-16 — settled, not deferred. `CR-16` is
+where the dialog was brought into line with it.
 
 ### Unscheduled ideas
 
@@ -607,7 +597,7 @@ None is a defect; none is scheduled.
 
 ## 7. Owed
 
-1. **Eleven open findings have no test row** — the ten open `CR-` ids and `PR-25`, all filed from
+1. **Ten open findings have no test row** — the nine open `CR-` ids and `PR-25`, all filed from
    source walks and never posted against. Every one owes a row in §4 before it can be closed — the
    largest single gap in this register, and the one place the *every finding resolves to a test row*
    rule is unmet. **Two deliberate exceptions**, each stating why in its own row: `PR-16` and
