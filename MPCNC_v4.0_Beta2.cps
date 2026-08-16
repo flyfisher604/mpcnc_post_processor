@@ -1970,6 +1970,11 @@ function resetPostState() {
   wcsZ0Trusted = {};
   sequenceNumber = getProperty(properties.jobSequenceNumberStart);
   forceSectionToStartWithRapid = false;
+  // The other direction of the same debt: left true at end of file, the NEXT file's first rapid crosses
+  // before it retracts -- the unsafe order on a rising Z. Every path in one file clears it, the first
+  // rapidMovements() or rapidMovementsZ() after a relocated change being what pays it off, so this is
+  // the reset that is owed rather than a live defect. CR-21.
+  forceRapidXYBeforeZ = false;
   sectionComment = undefined;
   machineMode = undefined;
   safeZHeight = undefined;

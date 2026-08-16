@@ -202,7 +202,8 @@ offsets. GRBL or RepRap, X/Y declared homed.
 ### CR-21 — `resetPostState()` does not reset the modal formatters — Machine damage
 
 **Problem.** `gAbsIncModal`, `gUnitModal`, `gFeedModeModal` and the six coordinate variables
-are left out. In the second file `Start()`'s `G90`, `G21`/`G20` and `G94` find the modal
+are left out. They are what is left: the walk of every mutable module global against this
+function found one more, `forceRapidXYBeforeZ`, and that one is now reset. In the second file `Start()`'s `G90`, `G21`/`G20` and `G94` find the modal
 already holding those values and emit **nothing** — so file two has no preamble, and every
 absolute coordinate, `G53` move and probe target depends on the controller still being in
 the mode file one left it in. **`gPlaneModal` was singled out for reset with a comment
@@ -525,6 +526,12 @@ asserts it or its artifact is superseded.
   are the discriminator: a 45° XZ arc at the `F1000` XYZ limit would drive Z at ~636 mm/min.
 - **Added-part re-probe repositions to the new part's `X0 Y0`** before probing — `Test2.gcode`.
   **Single retract per boundary**; **a same-WCS boundary emits no retract at all.**
+- **`resetPostState()` now covers every mutable module global except the three `CR-21` names.**
+  Walked one by one: `safeZMode`, `safeZHeightDefault`, `probeSafeZMode`, `probeSafeZHeightDefault`
+  and `fw` are re-derived in `onOpen()`, `fOutput` and `gMotionModal` are rebuilt there on **both**
+  branches, and `forceRapidXYBeforeZ` was the one omission — reset with the rest. **Within one file
+  it was never reachable**: the first `rapidMovements()` or `rapidMovementsZ()` after a relocated
+  change clears it, and a change is always followed by one.
 
 > ⚠ **Stale files, assertions intact.** `Setup1 Multi.gcode`, `Test2.gcode`, `Face1.gcode`,
 > `Setup1-Face1.gcode` and the Test A–D files predate the provisional `Z0`, the property dump
