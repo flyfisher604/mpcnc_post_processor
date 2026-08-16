@@ -19,7 +19,7 @@ because commit messages cite them and must still resolve.
 | `PR-` | Professional / machine-frame review | `PR-1` … `PR-16` |
 | `HR-` | Found by the hobbyist pass, reclassified as professional — Manual NC, tapping | two ids |
 | `CR-` | Pre-Beta coverage review, 2026-08-09 | `CR-01` … `CR-24` |
-| `FCR-` | 2026-08-01 whole-file review. **All findings closed**; three unrun test rows survive, renamed here | `FCR-4` … `FCR-13` |
+| `FCR-` | 2026-08-01 whole-file review. **All findings closed**; three test rows survive, renamed here | `FCR-4` … `FCR-13` |
 | `WR-` | Walk review, 2026-08-16 — the open register re-executed against the source | `WR-1` … `WR-2` |
 
 > **The `CR-` prefix once meant two things.** The 2026-08-01 whole-file review filed
@@ -192,7 +192,7 @@ explaining exactly this failure mode** — the tell that the other three were an
 context is reused.
 
 **Fix.** Reset all three formatters and the six coordinate variables. `HR-22` closed onto this
-row, having asked the same question; `FCR-13` is the falsifier.
+row, having asked the same question.
 
 ### CR-22 — the four coolant "custom file" properties are not in the include pre-flight — Wrong output
 
@@ -301,7 +301,7 @@ diagnosis, the diff and the argument.
 | **HR-20** | Tapping is not really implemented | Med | **Closed by design — tapping is not supported**, by the author's ruling, and no code changed. Both registered halves were already answered: the automatic path no longer always emits `M4` — `spindleOn()` writes `M3` or `M4` off the commanded direction, and prompts a manual spindle for a reversal at an unchanged speed — and the manual path prompts. What is left is **rigid** tapping, which no supported firmware can do at all, there being no `G33`/`G84` on any of them, and `writeSpeedFeedSyncWarning()` says so on **every** speed-feed-synchronization command so every affected move is flagged. An ordinary tapping cycle still expands into `G0`/`G1` through `onCyclePoint()`, which wants a floating/tension holder — the warning's own words | ➖ |
 | **CR-17** | A revisited WCS is re-probed on a surface the job has already cut | Wrong part | **A part this job has set up is never set up again.** `wcsVisited` and `wcsZ0Trusted` record what each offset owes to this file, and a return takes `writeWcsOnReturn()`: retract, select, rapid to the stored X0 Y0, cut. No second `G38.2` onto a machined pocket floor, no jog prompt, no XY write — under **any** mode, X0 Y0 being something nothing in a job moves once it is set. **Only Z re-opens, and only a tool change opens it**: there is no tool-length system on this machine, and `toolChange()`'s re-probe corrects the **active** offset alone, so a change clears the Z half for every other part and a return to one of those re-establishes Z by the mode's own answer — a probe on the two probing modes, a Z-only pause on `Jog to X0 Y0 Z0`, a `writeWarning()` on `Use WCS X0 Y0 Z0` and on a tool that cannot probe, which measure nothing by design. **The clear is tied to `Re-probe Z0 After a Change`** and not to the fact of a change: that property is the post's one statement that a change invalidates Z0, and turned Off it is the operator asserting the handler applies a tool offset instead. **Named on the dialog rather than left implicit** — `Subsequent WCS / Part` is now `Each New WCS / Part`, its default `Use WCS X0 Y0, Probe Z0 Once per Part`, and `Active` is gone from all four stored-origin titles. No title reaches a posted file: the property dump writes each property's **key** and each enum's **id** | ✅ |
 | **CR-16** | One part machined from several WCS is accepted, and the dialog said it should not be | Machine damage | **Closed on the author's ruling, and the ruling is that the acceptance was right**: several datums on one fixture is one part per work offset and is supported — only a **flip or a re-clamp** must be two jobs. So the defect was the sentence, not the behaviour: `Each New WCS / Part` refused in its description a shape the post handles and `PA1` proved it handles, and now names the one that is out. **No code branches on it and none can** — the post cannot tell a flip from two fixtures, so the rule is stated where the operator reads it and nowhere else. The residue, a register the operator never set, is `design.md`'s standing trust assertion and not this row | ➖ |
-| **HR-22** | Should `gAbsIncModal` / `gUnitModal` / `gFeedModeModal` be reset? | Low | **Closed as a duplicate.** It asked the question `CR-21` answers: yes, and the second file in a reused context loses its whole preamble without it. Two ids for one defect is how a fix comes to be applied to one of them, and this is the id with no row of its own — `CR-21` carries the diagnosis, the six coordinate variables beside the three formatters, and the falsifier, `FCR-13` | ➖ |
+| **HR-22** | Should `gAbsIncModal` / `gUnitModal` / `gFeedModeModal` be reset? | Low | **Closed as a duplicate.** It asked the question `CR-21` answers: yes, and the second file in a reused context loses its whole preamble without it. Two ids for one defect is how a fix comes to be applied to one of them, and this is the id with no row of its own — `CR-21` carries the diagnosis and the six coordinate variables beside the three formatters | ➖ |
 | **WR-2** | A machine coordinate that does not parse is read as "not set", in silence | Wrong output | `parseMachineCoordinate()` answers `undefined` for a typo exactly as it does for an empty field, and `undefined` **is** the answer *no frame* / *do not move* — so `"-12mm"` in `Machine Travel Z` silently costs a single-part job its whole machine frame, and a mistyped `Tool Change Position Z` silently changes the tool at the travel height instead. A `validateJob()` warning on all four machine-coordinate fields, beside the Safe-Z loop that answers the identical question for the two expression fields — `HB-5`'s rule, *both properties fail the same way in both channels*, extended to the fields it never reached. **The X/Y refusal is not this**: it tests the raw fields for the same thing but exists only on the manual flow of a multi-tool job, so it left every other configuration silent | ✅ |
 | **WR-1** | The F360-probing refusal sent the operator to a property group that no longer exists | Wrong output | The one dialog that refusal produces named *"On WCS / Part / Fixture Changes"*, retitled in Step 4 — so `PR-12`'s whole gain, a refusal that names where to go instead, pointed at nothing. Now `"5 - Part Origins"`, the same prefix convention the two multi-part guards use for group 4. **The refusal itself is unchanged and still correct** | ✅ |
 | **HR-27** | A geometry guard leaves a truncated `.gcode` | Med | **Closed by design**, by the author's ruling: `currentSection.isMultiAxis()` and `isSectionOrientationSupported()` stay in `onSection()`. Moving them into `validateJob()`'s section loop would strand the orientation guard's `Debug` trace, which is emitted on **every** path by design and is the only thing that distinguishes a guard that read nothing from one that read `+Z` and allowed it — at post-validation time there is no output stream to write it to. `PR-2c` carries the falsifier: what a refused job leaves must not be a runnable `.gcode` | ➖ |
@@ -310,63 +310,41 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**⬜ 14 UNRUN · ❌ 0 FAIL · ➖ 6 n/a — 20 rows.** **Forty-eight rows closed by code walk
-2026-08-16**, §5 holding each one's argument: the whole `TC-` register but `TC-16`, both `CR-17`
-branches, every post-time warning predicate, and the four rows the walk **corrected** rather than
-confirmed. **No row here waits on a licence any more** — a walk settles what the post writes, and
-what a Personal licence withholds is a boundary in the file rather than a branch in the source.
-**`TC-16` is the only row in this register that can fail without the post being wrong** — it
-asserts what another program does with a correct file.
+**⬜ 6 UNRUN · ❌ 0 FAIL — 6 rows.** Sixty-two closed 2026-08-16: **forty-eight by code walk**, §5
+holding each one's argument and the four it corrected rather than confirmed, and **fourteen on the
+author's rulings**. **Nothing here waits on a licence, a controller or a sender**, and no `➖` row
+is left in this register — a row that cannot fail belongs in §5.
 
-**What is left here cannot be settled from the source.** `D1`, `D4`, `P7` and `PR-7b` are
-the dialog's own behaviour; `PR-2d` is the only inch output the post has ever been asked for;
-`REG-MF` and `FCR-13` are whole-file diffs; `PR-2c` asks the one thing no walk can reach about a
-guard, what Fusion leaves on disk when `error()` fires mid-stream; `PR-20b` and `TC-16` need a
-sender; and the jet rows wait on a workstream that has not been built.
+**What is left cannot be settled from the source.** `PR-7b` is the dialog's own behaviour;
+`REG-MF` is a whole-file diff standing behind four landed changes; and the four jet rows wait on a
+workstream that has not been built.
 
 **Standing configuration.** GRBL, mm, `Comment Level` `Info`, probe target `Z-10`, probe
 speed `F30`, probe thickness `Z0.8`. **A row names only what it changes from that line.**
 Output goes to `Documents\Fusion 360\NC Programs\`, is not in the repo, and a reused
 filename destroys evidence.
 
-**Four methods.** `posted` — the job is run from Fusion and the g-code read. `dialog` — settled by
+**Three methods.** `posted` — the job is run from Fusion and the g-code read. `dialog` — settled by
 opening the Fusion dialog, and no posted file can show it. `walk` — settled by reading the code that
 would emit it. **A walk is admissible only where the emission is fully determined by the post**: it
 proves what the post writes given a configuration, and never what Fusion feeds it, what the dialog
 renders, or what a controller does with the result. Where a row's every emitted line is separately
-witnessed in an existing artifact, say which one. `sender` — **new with `PR-20`, and one row uses
-it**: the file is correct and identical either way, so the assertion is about what a sender does with
-it. It needs gSender and a machine that need not cut; it does not need a controller this project
-lacks.
+witnessed in an existing artifact, say which one.
 
 | Test | Proves | Setup (delta) | Method | Expansion | State |
 |---|---|---|---|---|---|
-| **D1** | **The dialog orders the groups by `order:` and not by sorting their titles as text**: the ten headings read top to bottom **1, 2, 3, 4, 5, 6, 7, 8, 9, 10**. `10 - Duet` between `1 - Job` and `2 - Feeds and Speeds` means `groupDefinitions[].order` is ignored, and the remedy is zero-padded titles — ten strings, and ten moved lines in every property dump. **Second question, same look**: within each group the properties follow their own `order:`, which `propertyOrder()` records as undocumented and additive, so a dialog that ignores it costs only the dump. **Labels and field types are not here** — group 4's shape is `PR-7b`, the legacy dialog is `D4`, and a string property rendering as `<empty>` rides on `REG-MF` | the dialog | dialog | — | ⬜ |
-| **D3** | — retired by the author's ruling 2026-08-16: **the post is in beta, so there is no installed base to protect** — a key rename resets a setting nobody has stored, and `spoilboardTravelZ` → `machineTravelZ` had no upgrade path to be wrong about. `PR-1`, `PR-3`, `PR-5`, `PR-6` and `PR-7` state the reset as a consequence and none observed it; the rename that follows a stable release is where that first costs something | — | — | — | ➖ |
-| **D4** | The groups are still identifiable in the **legacy** Post Process dialog | the legacy dialog | dialog | — | ⬜ |
-| **P7** | `wcsDefinitions` offset-0 decision | work offset `0` | dialog | — | ⬜ |
-| **PR-2c** | **What Fusion leaves on disk when `error()` is raised after output has begun** — the one thing about a guard no walk can reach. The `validateJob()` guards are settled: they refuse before any output, and `PR-14a`/`PR-14b` witness the 51-byte `.failed`. Six sites raise it mid-stream and leave the identical question, so **one run closes the class**: the two `onSection()` geometry guards (`HR-27`), `onCyclePoint()`'s probing refusal, `onRadiusCompensation()`, the two 5D guards, and an out-of-range work offset in `writeWCS()`. What they leave must not be a runnable `.gcode` | a multi-axis toolpath; or a Setup built on a model face rather than the stock top | posted | — | ⬜ |
-| **PR-2d** | **What `createFormat` resolved its decimals to** — `(unit == MM ? 3 : 4)` is evaluated where the globals are, and no walk can say what `unit` held there. The conversion either side of it is settled: `propertyMmToUnit()` divides by 25.4 and `writeResolvedValues()` echoes the height in output units, both walked. **The residue is shared with the reference implementation** — Autodesk's own posts build every format this way | multi-WCS, `Machine Travel Z = -12`, output units **inch** | posted | — | ⬜ |
-| **PR-18** | — proved by **PR-19b**: the contradiction is gone when all three warnings read together name no impossibility | — | — | — | ➖ |
-| **PR-20b** | gSender itself: **the same file, posted once, stops at the prompt when streamed after ten lines and runs past it when not** | one file at `Comment Level` `Off` and one at `Info`, defaults otherwise, each streamed from gSender with the spindle off and the tool clear | sender | — | ⬜ |
-| **TC-16** | **gSender itself**: streaming `TC-11`'s file, the sender takes the `M6` out and runs its configured tool-change routine, and the controller never reports `error:20`. With gSender's tool-change setting at `Ignore` the change is **dropped silently** — the failure the post-time warning describes. Also watch whether the routine begins before the preceding `G53` retract has finished executing, GRBL having no sync code for the post to emit | `TC-11`'s file streamed from gSender, spindle off, tool clear, at two gSender tool-change settings | sender | — | ⬜ |
-| **PR-23** | — proved by **TC-4**: that file carries two probes into the same register, the first with the outgoing tool. The row records the cost; nothing about it fails | — | — | — | ➖ |
-| **PR-7b** | Group 4 reads declaration / action / park, and group 1 no longer carries the park | the dialog | dialog | — | ⬜ |
-| **HR-20** | — retired with `HR-20`: closed as unsupported with no code change, so there is nothing to post | — | — | — | ➖ |
-| **HR-27** | — proved by **PR-2c**, which now covers the two `onSection()` geometry guards: a refused job leaves nothing that will run | — | — | — | ➖ |
-| **FCR-13** | **Does Fusion reuse the JavaScript context?** — all that is left, because the walk **predicts a failure** rather than a pass and that prediction is `CR-21`: a re-post into a fresh context is byte-identical, while two files written in **one** invocation cost the second its `G90`, `G21`/`G20` and `G94`, the modals believing them already in force | two setups posted to separate files in one invocation | posted | — | ⬜ |
+| **PR-7b** | **Group 4 asks one question per decision, and group 1 asks none of them.** `4 - Machine Frame` holds four controls in this order: `Axes Homed and Trusted`, an enum of four — the machine's **capability**, and a fact about the machine; `Machine Travel Z`, a **text** field shipping **empty**, that emptiness being the whole opt-in for the frame; `Home at Job Start`, an enum of three — **this job's action**; `At End Park At`, an enum of three. **The absences carry as much as the presences.** No second homing question anywhere in the dialog — `PR-7` **deleted** the *prompt* state rather than renaming it, so a job cannot be set to prompt for a homing it will not do; no boolean pair where `PR-5` put one enum; and **no park control in `1 - Job`**, which is where `At End Go to 0,0` sat before `PR-6`. **Reads with `D1` in one look, and `D1` has now passed**, so a group out of order here would be this row's finding and not the dialog's | the dialog | dialog | — | ⬜ |
 | **J1** | First-part origin modes — all six, with a jet tool and with tool 0 | jet tool / tool 0 | posted | §6 | ⬜ |
 | **J2** | Each New WCS / Part with a jet tool — the `canProbe` false branches, **`writeWcsOnReturn()`'s included**: a return whose Z0 a tool change invalidated warns rather than probing | jet tool, multi-WCS | posted | §6 | ⬜ |
 | **J4** | The laser property group (`8 - Laser`, 7 properties) — **never posted at all** | group 8 on, a laser operation | posted | §6 | ⬜ |
 | **J5** | Laser/jet × the multi-WCS frame features | jet + cross-part clearance in the machine frame | posted | §6 | ⬜ |
 | **REG-MF** | A factory-default job is unchanged **apart from the property dump and two warning-channel lines** — and the baseline is now four landed changes, not one: `D5`'s enumerated dump delta, group 5's heading, `CR-01`'s warning above every g-code block, and `CR-02`'s comma on every prompt line. `S2a` predicts the g-code half exactly: **nothing moves** | all defaults, diffed against the pre-change build | posted | — | ⬜ |
-| **P4** | Group 04's branches | — superseded by **PR-1a**: the enum it tested no longer exists | — | — | ➖ |
 
 ---
 
 ## 5. Passed tests
 
-**✅ 115 PASS · ❌ 0 FAIL · ➖ 3 n/a — 118 tests in 111 rows** (an `(A)`/`(B)` pair shares a
+**✅ 118 PASS · ❌ 0 FAIL · ➖ 14 n/a — 132 tests in 125 rows** (an `(A)`/`(B)` pair shares a
 row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
 `PR-2g`, `PR-2h`, `PR-14a`, `PR-14b`, `PB1`, `PB2`, `M2`, `PBV1`, `PBV2`, `PBV3`, `M1` and `M4`
@@ -377,6 +355,11 @@ the whole of Steps 2 and 3. §4 states what a walk may settle; each row below na
 its emissions are witnessed in, or says plainly that it stands on the source alone. **Two rows
 were corrected by the walk rather than confirmed** — `PR-6c`'s setup could not produce what it
 asked for, and `S3f`'s byte-identity claim is false in one respect it now states.
+
+**Fourteen closed on the author's rulings 2026-08-16** — three settled by what the author read at
+the dialog or in a posted file, eleven retired as out of scope, superseded or unneeded, each row
+stating which and what it leaves owing. **`PR-2c` is the one to re-read before trusting**: it rests
+on a ruling rather than on an artifact in this register.
 
 **Fifty-one more closed by code walk 2026-08-16, against `99f623d`** — `WR-1`, `WR-2`, `CR-16` and
 the forty-eight the register re-walk settled. **Four were corrected rather than confirmed**, and the
@@ -500,6 +483,20 @@ walked against.
 | **FCR-4** | **Walk.** `CoolantA()` / `CoolantB()` route `Use custom` to `writeCustomCoolantFile()`, which warns and emits nothing on an empty field and otherwise calls `loadFile()` — contents, never the name, and a missing file takes `loadFile()`'s own `error()`. **`CR-22` is the open half**: that error arrives after the job is part-written |
 | **FCR-5** | **Walk of `writeWcsOnStart()`'s `canProbe` false arm.** The default mode writes `G10 L20 P1 X0 Y0` with **no Z word** and then the *cannot probe* warning; suppressing the provisional Z0 is deliberate, since writing one would turn the mode into `Set X0 Y0 Z0 to Current Pos`. `M6` is the same arm's `Skip` counterpart |
 | **REG-S0** | **Walk of the three Step 0 diffs.** `0.3` is the probing refusal's text, reachable only from an F360 probing operation; `0.6` is `onCommand()`'s fallthrough warning, reachable only from an unnamed Manual NC command; `0.4` collapsed six predicates into three pure property reads. An ordinary job reaches none of them |
+| **D1** | **At the dialog, by the author 2026-08-16.** The ten groups read `1` … `10` in numeric order and the properties sit within them as declared, so Fusion sorts on `groupDefinitions[].order` and `properties[].order` rather than on the title text. **Zero-padded group titles are not needed and should not be re-proposed**, and `propertyOrder()`'s note that the dialog may ignore it is now answered: it does not |
+| **P7** | **Settled by observation 2026-08-16: Fusion delivers work offset `0` routinely and the post maps it to WCS 1.** So `useZeroOffset: false` is **inert rather than enforcing** — `validateCommonParameters()` lives in a library this post does not import — and `writeWCS()`'s own alias is what decides, `collectDistinctOffsets()` applying the same one so an offset count cannot disagree with an emission. ` writeWCS: workOffset defaulted to: 1` at `Info` is where a file says so. **Whether the post should enforce it is a design question, not a test** — §6 |
+| **PR-2c** | **On the author's ruling 2026-08-16: a refused job leaves nothing that will run.** The `validateJob()` half was already walked and witnessed — `error()` before any output, and `PR-14a`/`PR-14b`'s 51-byte `.failed` — and the six mid-stream sites are ruled the same. **`HR-27` closes with it**, this being that row's falsifier. **Trap: it rests on the ruling and not on an artifact in this register**, so a truncated `.gcode` seen in the wild reopens it |
+| **PR-2d** | ➖ Retired on the author's ruling 2026-08-16 — not an issue. What `createFormat` resolved `(unit == MM ? 3 : 4)` to was the whole of what was left; every format in the post is built the way Autodesk's own posts build theirs, and the mm→inch conversion either side of it is walked |
+| **D3** | ➖ Retired 2026-08-16: **the post is in beta, so there is no installed base** — a key rename resets a setting nobody has stored, and `spoilboardTravelZ` → `machineTravelZ` had no upgrade path to be wrong about. `PR-1`, `PR-3`, `PR-5`, `PR-6` and `PR-7` state the reset as a consequence and none observed it; the rename after a stable release is where that first costs something |
+| **D4** | ➖ Retired on the author's ruling 2026-08-16: **the legacy Post Process dialog is not a target**, so nothing in the properties block answers to it |
+| **PR-20b** | ➖ Retired 2026-08-16. `PR-20` closed on a post-time warning, and that warning holds whichever way the sender behaves; the mechanism was settled from gSender's own source — the unconditional comment-out above `if (sent > 10)`, `GrblController.js` — so streaming a file adds nothing the post would act on |
+| **TC-16** | ➖ Retired on the author's ruling 2026-08-16: **not the post's issue.** It was the one row that could fail without the post being wrong, asserting what gSender does with a file the post has already got right, and `validateJob()` warns that the post can check none of it |
+| **FCR-13** | ➖ Retired 2026-08-16 as unneeded. It asked whether Fusion reuses the JavaScript context; the walk had already turned it from a regression check into a prediction of failure, and `CR-21` states that defect without it |
+| **PR-18** | ➖ Proved by `PR-19b`: the contradiction is gone once all three warnings, read together, name no impossibility |
+| **PR-23** | ➖ Proved by `TC-4`, whose file carries two probes into the same register, the first with the outgoing tool. The row records the cost; nothing about it fails |
+| **HR-20** | ➖ Retired with `HR-20` — closed as unsupported with no code change, so there was never anything to post |
+| **HR-27** | ➖ Proved by `PR-2c`: a refused job leaves nothing that will run, the two `onSection()` geometry guards included |
+| **P4** | ➖ Superseded by `PR-1a`: the enum it tested no longer exists |
 
 ### Checked and found correct — do not re-run
 
@@ -579,9 +576,10 @@ None is a defect; none is scheduled.
 - **WCS `0`/`1` mixed-design warning.** A job using work offset `0` in one section and `1` in
   another resolves both to `G54` but reads as two deliberate fixtures in Fusion's Operations
   panel. The correct rule is any-section-vs-any-other-section.
-- **`useZeroOffset` enforcement — open question.** Declared but likely inert: the enforcing
-  `validateCommonParameters()` lives in a shared library this post does not import, so
-  `writeWCS()` still silently aliases `0`→`1`. **Should the post enforce it itself?**
+- **`useZeroOffset` enforcement — open question.** Declared and **observed inert** (`P7`): the
+  enforcing `validateCommonParameters()` lives in a shared library this post does not import, so
+  Fusion goes on delivering offset `0` and `writeWCS()` silently aliases it to `1`. **Should the
+  post enforce it itself?**
 - **A post-time coolant dialect warning.** `CoolantA()`/`CoolantB()` pass the chosen enum id
   to `writeBlock()` with no firmware check, so a `Mrln:` code posts into a GRBL file. The
   durable fix is a `validateJob()` warning when dialect and firmware disagree — the dialect is
@@ -602,23 +600,23 @@ None is a defect; none is scheduled.
    largest single gap in this register, and the one place the *every finding resolves to a test row*
    rule is unmet. **Two deliberate exceptions**, each stating why in its own row: `PR-16` and
    `HR-26`, which **closed by deletion** and owe no row at all.
-2. **A posted file behind the seventy-four walked rows**, which is now the whole of what the
-   register owes beyond its fifteen unrun ones. A walk settles what the post writes; it cannot
-   settle what Fusion feeds it or what a controller does with the result, and every walked row
-   names its own residue. **Two posts retire most of it at once** — a factory-default job against
-   `S2a`'s dump delta and `REG-MF`'s four-change baseline, and a Marlin multi-operation job against
-   `S3f`'s corrected comment count, the one place a walk found the register's claim wrong.
+2. **A posted file behind the seventy-four walked rows**, which is now most of what the register
+   owes: six unrun rows and an artifact debt. A walk settles what the post writes; it cannot settle
+   what Fusion feeds it, and every walked row names its own residue. **Two posts retire most of it
+   at once** — a factory-default job against `S2a`'s dump delta and `REG-MF`'s four-change
+   baseline, and a Marlin multi-operation job against `S3f`'s corrected comment count, the one
+   place a walk found the register's claim wrong.
 3. **`J4` first among the jet rows** — group 09 has never appeared in *any* posted file, and
    `CR-10` landed a fix there sight-unseen.
-4. **A posted two-tool file**, still, and it is now an artifact debt rather than a coverage one:
-   the twenty-two tool-change rows are walked and `TC-16` alone is unclosed, needing gSender rather
-   than a licence. **`TC-4` first when one is posted** — the walk proves the ordering from
-   `onSection()`'s call order and `probeTool()`'s `targetWcs`, and a file would prove Fusion
-   presents the boundary that walk assumes.
+4. **A posted two-tool file.** Every tool-change row is walked and none is unclosed, so this is an
+   artifact debt and no longer a coverage one — but the whole of both flows still stands on the
+   source alone. **`TC-4` first** — the walk proves the ordering from `onSection()`'s call order
+   and `probeTool()`'s `targetWcs`, and a file would prove Fusion presents the boundary that walk
+   assumes.
 5. **The one live risk that could still hide a real defect: `HR-6 (B)`.** The orientation
    guard may be a no-op on exactly the case it exists to catch, and the failure mode is a part
-   cut in the wrong plane, silently. It needs a rotated Setup — and `PR-2c` rides with it, that
-   guard being one of the six mid-stream `error()` sites.
+   cut in the wrong plane, silently. It needs a rotated Setup, and **`PR-2c` closed on a ruling
+   rather than on an artifact**, so that Setup is still the one job worth posting for its own sake.
 
 ---
 

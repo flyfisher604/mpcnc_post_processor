@@ -19,12 +19,11 @@ the manual one, and nothing else. `PR-14` closed with 1.2; `PR-16` and `HR-26` c
 `HR-24` and `CR-02` with F6, which closed `HR-20` and `HR-27` by design alongside them; `CR-17` with
 F7.
 
-**What is next: Step V**, and it is **fourteen rows**. The register re-walk of 2026-08-16 closed
-forty-eight from the source — the whole tool-change register but `TC-16`, both `CR-17` branches, and
-every post-time warning predicate — so **nothing in Step V waits on a full licence any more**. A walk
-settles what the post writes and nothing beyond it, so what is left is the dialog, one inch post, two
-sender rows, the jet workstream, and four whole-file or mid-stream questions. §4 states the methods
-and their bounds; §5 carries each row's argument.
+**What is next: Step V**, and it is **six rows**. The register re-walk of 2026-08-16 closed
+forty-eight from the source and the author's rulings closed fourteen more, so **nothing in Step V
+waits on a licence, a controller or a sender**. What is left is one dialog read, one factory-default
+post, and the four-row jet workstream `findings.md` §6 defers. §4 states the methods and their
+bounds; §5 carries each row's argument.
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
@@ -61,19 +60,13 @@ what a walk cannot reach. The order below is by what one post buys.
   `HR-24` ride on it and assert the same absence.
 - **Then the Marlin multi-operation job** — `S3f`'s corrected count, and the only place a walk
   contradicted the register.
-- **`PR-2c`, and one job settles it for six sites.** Any mid-stream `error()` answers what a refused
-  job leaves on disk; **`HR-6 (B)`'s rotated Setup is one of the six**, so the live risk rides here.
-- **`PR-2d` on its own** — the post has never emitted an inch file, and no walk can say what
-  `createFormat` resolved its decimals to.
-- **`FCR-13`** — two setups to separate files in one invocation. **The walk predicts it FAILS**, and
-  that prediction is `CR-21`.
-- **Dialog-only, and one sitting covers all four:** `D1`, `D4`, `P7`, `PR-7b`. **`D1` is the one
-  with a consequence** — if the groups read 1, 10, 2, 3 … then Fusion sorts the titles rather than
-  reading `order:`, and they need zero-padding.
-- **Two sender rows, the only ones here that can fail without the post being wrong** — `TC-16` and
-  `PR-20b`, both needing gSender and a machine that need not cut.
+- **`PR-7b`, one look at the dialog** — group 4 asking one question per decision, and group 1 asking
+  none of them. `D1` has passed, so a group out of order would be this row's finding.
 - **The jet workstream — `J4` first**, group 8 having never appeared in any posted file; then `J1`,
   `J2`, `J5`. Deferred by design, and `findings.md` §6 states what blocks it.
+
+**Worth one post of its own, and it is not a row here:** `HR-6 (B)`'s rotated Setup. It is the live
+risk, and `PR-2c` closed on a ruling rather than on an artifact, so that job would settle both.
 
 ## Step 6 — Clarity
 
@@ -129,7 +122,6 @@ The guides are off-limits during code changes. Do it all here — per-step means
 
 | Blocked | Waiting on |
 |---|---|
-| `TC-16`, `PR-20b` | gSender and a machine that need not cut |
 | Group 9 reduction | a coolant persona |
 | Group 8 audit | laser detail — power scaling, dynamic power, enable sequencing, air assist |
 | A status line in `guide-pro.md` | **deferred by the author 2026-08-13** |
