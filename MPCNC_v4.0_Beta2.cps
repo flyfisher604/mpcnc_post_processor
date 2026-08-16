@@ -2787,8 +2787,7 @@ function onCyclePoint(x, y, z) {
       + "several points and then COMPUTE the work offset from them; GRBL and Marlin have no arithmetic, "
       + "so there is no g-code to expand it into -- and expanding it anyway would emit plain G0/G1 moves "
       + "with no G38 at all, driving the tool into the work at feed rate. Set the work offset by hand in "
-      + "the sender, or use this post's own Z touch-off in the \"On WCS / Part / Fixture Changes\" "
-      + "property group."));
+      + "the sender, or use this post's own Z touch-off in the \"5 - Part Origins\" property group."));
     return;
   }
   expandCyclePoint(x, y, z);
