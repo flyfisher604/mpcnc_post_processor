@@ -126,7 +126,7 @@ properties = {
   },
   jobManualSpindlePowerControl: {
     title      : "Manual Spindle On/Off",
-    description: "On: the post prompts you to switch the router on and off by hand and emits no M3/M5 -- for a trim router or any spindle without electronic control. Off: the post commands the spindle with M3/M5.",
+    description: "On: the post prompts you to switch the router on and off by hand and emits no M3/M5 -- for a trim router or any spindle without electronic control. Off: the post commands the spindle with M3/M5. On Marlin those codes are a build option: a stock build has neither SPINDLE_FEATURE nor LASER_FEATURE, answers M3 with an unknown-command warning and runs the whole job with the spindle never started. V1 Engineering's own V1CNC builds enable LASER_FEATURE, where M3 does switch the spindle/laser pin -- but S is read as cutter power, not RPM, and M4 is not a reversal.",
     group      : "job",
     order      : 20,
     type       : "boolean",
@@ -810,22 +810,27 @@ properties = {
     scope      : "post"
   },
 
+  // RRF 3.x AND 2.05 ARE BOTH NAMED in these descriptions because the field is the operator's to set
+  // and the two generations take different forms: 3.x moved spindle setup out of M453 into M950/M563
+  // entirely, and moved M452's pin from P/I to C"pin". The defaults are the 3.x forms; neither names a
+  // pin, because a missing pin means the laser never fires and a WRONG one drives an output the
+  // operator did not choose. One command per field -- the string goes through a single writeBlock(). PR-13.
   duetMillingMode: {
     title      : "Milling Mode",
-    description: "GCode to set up Duet3d into milling mode.",
+    description: "GCode that puts a Duet into CNC mode, written on the first section and again at every section-type change. RRF 3.x: M453 on its own -- the spindle is created in config.g with M950 R0 C\"<pin>\" Q<freq> L<max rpm> and bound to the tool with M563 ... R0, and M453 S<n> is refused there. RRF 2.05: M453 P<pin> I<0|1> R<max rpm> F<freq>, which is the M453 P2 I0 R30000 F200 this field used to ship. One command only: the string is written as a single line.",
     group      : "duet",
     order      : 10,
     type       : "string",
-    value      : "M453 P2 I0 R30000 F200",
+    value      : "M453",
     scope      : "post"
   },
   duetLaserMode: {
     title      : "Laser Mode",
-    description: "GCode to set up Duet3d into laser mode.",
+    description: "GCode that puts a Duet into laser mode, written on the first section and again at every section-type change. RRF 3.x needs the laser pin named here -- M452 C\"<pin>\" R<max power> F<PWM freq>, the pin being out... on a Duet 3 or exp.heater... on a Duet 2 -- and assigns no pin at all without it. RRF 2.05 uses P<pin> I<0|1> in place of that C. One command only: the string is written as a single line.",
     group      : "duet",
     order      : 20,
     type       : "string",
-    value      : "M452 P2 I0 R255 F200",
+    value      : "M452 R255 F200",
     scope      : "post"
   }
 }
@@ -1406,8 +1411,11 @@ function validateJob() {
 
   // The action alone is not the trigger: with the declaration None nothing moves. Either axis group
   // qualifies -- X/Y homing destroys the pre-jogged XY, Z homing the height recorded as Z0.
-  if (homesAtJobStart() && (homedXY || homedZ) &&
-      (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
+  //
+  // THE ONE PRE-JOG DESTROYER LEFT, and unlike the fixed-Z establish it cannot be reordered away:
+  // homing is step 2 of writeFirstSection() and everything after it depends on the frame it makes.
+  // CR-15 moved the establish; this stands.
+  if (homesAtJobStart() && (homedXY || homedZ) && originIsPreJogged()) {
     // Advice rather than prohibition: with X/Y declared homed, a stored fixture offset in the active
     // WCS is repeatable across power cycles, so it is a better answer than the destroyed pre-jog.
     warning(localize("\"Home at Job Start\" moves the tool onto the endstops of whichever axes "
@@ -1502,7 +1510,11 @@ function validateJob() {
     // writeFirstSection() runs it after the G53 establish and before writeWcsOnStart(). Dropped, the
     // job probes and cuts with the tool the prompt existed to replace -- which is the whole failure the
     // property is there to prevent.
-    if (getProperty(properties.toolChangeFirstLoad)) {
+    //
+    // NOT ON A PRE-JOGGED ORIGIN, where toolChangeFirstLoad() writes no prompt at all: this list names
+    // lines gSender may delete, so naming one the file does not contain sends the operator looking for
+    // it. The suppression has its own warning and does not need this one to repeat it.
+    if (getProperty(properties.toolChangeFirstLoad) && !originIsPreJogged()) {
       earlyPrompts.push("the \"Prompt for the First Tool\" stop, which stands before the first part's origin is set");
     }
     if (startMode == "Jog XY & Probe Z" || startMode == "Jog XYZ") {
@@ -1524,22 +1536,18 @@ function validateJob() {
     }
   }
 
-  // Establishing the fixed Z reference MOVES THE TOOL, before the first part's origin is recorded, so
-  // "current position" is bed clearance. The "Jog" modes are excluded -- they position after it, which
-  // is why the remedy below names them: the warning above states the sender condition they carry on
-  // GRBL and no longer contradicts this one. PR-18/PR-19.
-  if (fixedZEstablishedInFile() &&
-      (startMode == "Current XY & Probe Z" || startMode == "Current XYZ")) {
-    warning(localize("The fixed Z reference is established at job start by moving the tool to "
-      + "\"Machine Travel Z\", and that runs before \"First WCS / Part\" records the current "
-      + "position -- so the origin is recorded at bed clearance rather than at the part, and the "
-      + "probe target measured from it will not reach the stock. Use \"Use WCS X0 Y0, Probe "
-      + "Z0\" or a \"Jog to ...\" mode"
-      // Clearing the field is a real remedy only where the job does not REQUIRE the frame. A multi-part
-      // job does -- Guard B refuses it without one -- so on those jobs the mode is the only thing to move.
-      + (multiWcs
-        ? ". This is a multi-part job, so clearing \"Machine Travel Z\" is not an option -- it needs the frame."
-        : ", or clear \"Machine Travel Z\".")));
+  // The post-time half of toolChangeFirstLoad()'s suppression, on the same predicate the file reads so
+  // the two cannot drift. A SETTING THAT DOES NOTHING, which is the whole complaint: the operator asked
+  // for a stop that is not written, and the reason is that these modes take the origin from a jog made
+  // before the file started -- with a tool already fitted, and by a tip every depth then measures from.
+  // Not gated on the frame: the contradiction is the mode's, and it holds with no frame at all.
+  if (getProperty(properties.toolChangeFirstLoad) && originIsPreJogged()) {
+    warning(localize("\"Prompt for the First Tool\" is on, but \"First WCS / Part\" is a \"Set ... to "
+      + "Current Pos\" mode, which takes this part's origin from where you jog the tool BEFORE "
+      + "starting the file -- so the tool is already fitted by then, and the stop is not written. "
+      + "Fitting a different tool at it would put every depth out by the difference in tool length. "
+      + "To fit the tool during the run, use \"Jog to X0 Y0, Probe Z0\" or \"Jog to X0 Y0 Z0\", which "
+      + "prompt first and position afterwards; otherwise turn \"Prompt for the First Tool\" off."));
   }
 
   // The same boundary from the other side: this fires when no fixed Z reference is established and the
@@ -1693,6 +1701,23 @@ function validateJob() {
       + "the change is then offset by an amount nothing reports. Set $1=255 at the controller to keep "
       + "the steppers locked. The post cannot set it for you: $ settings are not G-code and GRBL "
       + "accepts them only when it is Idle."));
+  }
+
+  // CR-10 -- PR-17's argument applied to X and Y. Machine zero is the point at which the switch TRIPPED,
+  // and homing ends one pull-off inside it, so a rapid to machine X0 Y0 drives the axes back onto the
+  // switches; with hard limits on, the program ends in Alarm instead of parked. $27 cannot be read and no
+  // number is quoted -- the build option is named, as $1 and $110 already are. GRBL-gated for the same
+  // reason PR-17 is: Marlin re-homes here instead of rapiding, and an RRF machine homed to its axis minima
+  // rests AT the coordinate this block asks for. Warned and not refused -- HOMING_FORCE_SET_ORIGIN makes
+  // it correct, and the post cannot read which build it is talking to.
+  if (fw == eFirmware.GRBL && getProperty(properties.machineParkAtEnd) == "Machine") {
+    warning(localize("\"At End Park At\" = machine X0 Y0 sends the tool to where the homing switches "
+      + "tripped, not to where homing left the machine. On a stock Grbl build HOMING_FORCE_SET_ORIGIN "
+      + "is off, so machine zero sits at the trigger point and the axes rest one pull-off inside it -- "
+      + "$27 -- which means this park drives X and Y back onto the switches, and with hard limits "
+      + "enabled the job ends in Alarm rather than parked. Correct only on a machine built with "
+      + "HOMING_FORCE_SET_ORIGIN, which zeroes where homing leaves the axis. Otherwise park at work "
+      + "X0 Y0 -- raising the pull-off does not help, machine zero staying at the trigger point."));
   }
 
   // FLOW 1's END-OF-FILE RULE, stated where the park is set. A two-tool job on a Personal licence is
@@ -2520,6 +2545,16 @@ function writeMachineParkXY() {
     writeBlock(gFormat.format(28), "X");
     writeBlock(gFormat.format(28), "Y");
     return;
+  }
+
+  // The in-file half of validateJob()'s CR-10 warning, so a file read on its own carries what its last
+  // block costs. Below the Marlin return, this route being the only one that rapids at a switch.
+  if (fw == eFirmware.GRBL) {
+    writeWarning("machine X0 Y0 is where the homing switches tripped, and on a stock Grbl build homing"
+      + " leaves the axes one pull-off inside that point -- so the block below drives X and Y back onto"
+      + " the switches, and with hard limits enabled this job ends in Alarm rather than parked. Correct"
+      + " only on a machine built with HOMING_FORCE_SET_ORIGIN, which zeroes where homing leaves the"
+      + " axis");
   }
 
   writeComment(eComment.Info, "   Park at machine X0 Y0");
@@ -3365,20 +3400,60 @@ function writeFirstSection() {
   if (getProperty(properties.includeStartFile) == "") {
        Start();
   } else {
+    // The include REPLACES Start(), which is the ONLY place this post sets absolute positioning, units
+    // and -- on GRBL -- feed mode and plane; nothing re-asserts them later. Unlike a MISSING file, which
+    // validateJob()'s pre-flight refuses before any output, a file that simply omits G90 has no
+    // detectable failure at post time, so the precondition is stated in the FILE: the dialog's contract
+    // is read once at setup, and this is the channel the operator running the job actually has. CR-05.
+    writeWarning("the start file below REPLACES this post's header, and that header is the only place"
+      + " this job sets " + (fw == eFirmware.GRBL
+        ? "G90 absolute positioning, " + (unit == IN ? "G20 inch" : "G21 mm") + " units, G94 feed rate"
+          + " mode and the G17 XY plane"
+        : "G90 absolute positioning, " + (unit == IN ? "G20 inch" : "G21 mm") + " units and the M84 S0"
+          + " that stops the steppers timing out")
+      + " -- nothing re-asserts them afterwards. Every coordinate, every G53 move and every probe target"
+      + " below assumes them, so a start file that omits one, or sets the other unit, misreads the whole"
+      + " job with nothing in this file to show it.");
     loadFile(getProperty(properties.includeStartFile));
   }
 
-  // Establish the job's fixed Z reference (if any) before the first section's own origin --
-  // both after Start() so absolute positioning/units are set for the probe or the G53 move.
-  writeFixedZReference();
-
-  // BEFORE writeWcsOnStart(), and that is the whole reason it lives here rather than in onSection():
-  // the first part's Z0 must be established with the tool that will cut it. Loading afterwards -- which
-  // is where onSection() used to do it -- probes with the very tool the load exists to replace and puts
-  // every depth in the job out by the difference in tool length.
-  toolChangeFirstLoad();
-
-  writeWcsOnStart();
+  // TWO ORDERS, AND WHICH ONE APPLIES IS originIsPreJogged(). Both run the same three steps after
+  // Start(), so absolute positioning and units are set for the probe or the G53 move either way.
+  //
+  // THE ORDINARY ORDER -- establish, load, origin. The establish leaves the tool holding a height
+  // that clears the bed, and that height is where the travel to the first part's X0 Y0 starts from,
+  // so it must precede an origin step that TRAVELS. Then the first tool is loaded before the origin
+  // is set, because the first part's Z0 must be established with the tool that will cut it: loading
+  // afterwards -- which is where onSection() used to do it -- probes with the very tool the load
+  // exists to replace and puts every depth in the job out by the difference in tool length.
+  //
+  // THE PRE-JOG ORDER -- origin, then establish. On the two "... to Current Pos" modes the origin IS
+  // where the operator already put the tool, so there is no travel to start from and the reason above
+  // does not apply; what does apply is that the G53 move would DESTROY the position being recorded.
+  // It carries one axis word, so it cost the Z half alone: "Set X0 Y0 Z0 to Current Pos" recorded
+  // travel height as Z0 with no probe anywhere to correct it, and the shipped default's probe searched
+  // "G38 Target" down from travel height rather than from a millimetre over the stock. CR-15.
+  //
+  // THE LOAD PROMPT IS NOT REORDERED, IT IS DROPPED, and toolChangeFirstLoad() drops it -- these modes
+  // already assert the cutting tool was fitted, the operator having jogged it to the origin by hand.
+  // The "Jog to ..." modes are what prompt and THEN position, and the warning there names them.
+  if (originIsPreJogged()) {
+    toolChangeFirstLoad();
+    writeWcsOnStart();
+    writeFixedZReference();
+    // The tool now stands at a machine height the work frame has no number for, and writeMachineTravelZ()
+    // reports nothing to the kernel -- so getCurrentPosition() still holds the height writeWcsOnStart()
+    // left, and the first section's rapid would be ordered against a Z the tool has left. Same case as
+    // writeToolChangeReturn()'s, same remedy. Guarded, because writeFixedZReference() emits NOTHING
+    // without a frame and an ordering constraint with no move behind it is a constraint on nothing.
+    if (fixedZEstablishedInFile()) {
+      forceRapidXYBeforeZ = true;
+    }
+  } else {
+    writeFixedZReference();
+    toolChangeFirstLoad();
+    writeWcsOnStart();
+  }
 
   // The first part is set up, so a later RETURN to its offset moves to the stored origin rather than
   // re-establishing it. Trusted whatever the mode did -- seeding this from "did the post probe?" would
@@ -3433,6 +3508,25 @@ function probeOffsetY() { return propertyMmToUnit(getProperty(properties.probeOf
 // creates a traverse. One definition, so partProbe() and the first-part "... Current Pos" path -- which
 // must retract before that traverse -- cannot disagree about when it happens.
 function probeOffsetIsSet() { return probeOffsetX() != 0 || probeOffsetY() != 0; }
+
+// THE TWO "Set ... to Current Pos" MODES, and the one thing about them the rest of the post has to
+// reason about: the origin is the position the OPERATOR left the tool at before the file started --
+// "jog there first, there is no prompt", as the property says. Two consequences follow, and this is
+// the single statement of the condition both turn on:
+//
+//   NOTHING EMITTED BEFORE writeWcsOnStart() MAY MOVE THE TOOL. writeFirstSection() therefore defers
+//   the fixed Z reference on these modes, the G53 establish being the one preamble step that does.
+//
+//   THE TOOL THAT MADE THAT JOG IS THE TOOL THE JOB ASSUMES, so toolChangeFirstLoad()'s prompt has
+//   nothing left to ask: fitting a DIFFERENT tool at it puts the recorded Z0 out by the difference
+//   in length, which is the failure the prompt exists to prevent, arriving by the other route.
+//
+// Read by the emission and by validateJob() alike so the file and the dialog cannot come to differ
+// about which modes these are -- the pair was spelled out inline three times before.
+function originIsPreJogged() {
+  var mode = getProperty(properties.probeOnStart);
+  return mode == "Current XY & Probe Z" || mode == "Current XYZ";
+}
 
 // Operator-pause spec the next probeTool() honors: whether to prompt to attach the Z probe before and
 // detach it after. A caller sets these just before invoking the probe; probeTool() reads them and then
@@ -3623,9 +3717,10 @@ var forceRapidXYBeforeZ = false;
 // established at runtime by a G10 L20 from a probe the post cannot read. Autodesk's own posts leave the
 // kernel stale across a machine-frame retract for exactly this reason, reporting that move only to the
 // machine simulator on a channel that accepts MACHINE coordinates (haas.cps, writeRetract(), G53 case).
-// So writeMachineFrameBlock() does not call this, and forceRapidXYBeforeZ still exists for the one move
-// that follows a tool change at a machine-frame position. Passing a made-up number instead would order
-// that move correctly and silently corrupt the three other readers, which is the worse trade.
+// So writeMachineFrameBlock() does not call this, and forceRapidXYBeforeZ still exists for the move that
+// follows a G53 the post has no work-frame number for -- a tool change at a machine-frame position, and
+// the pre-jog order's deferred fixed-Z establish. Passing a made-up number instead would order those
+// moves correctly and silently corrupt the three other readers, which is the worse trade.
 function noteCurrentPosition(_x, _y, _z) {
   var cur = getCurrentPosition();
   setCurrentPosition(new Vector(
@@ -3685,17 +3780,23 @@ function rapidMovementsZ(_z) {
 // never plunge into the part: when Z is descending, position XY first and then bring Z down; when Z is
 // rising or unchanged, retract Z first and then move XY.
 function rapidMovements(_x, _y, _z) {
-  // THE ONE CASE THE COMPARISON BELOW CANNOT DECIDE. After a tool change at a machine-frame position
-  // the tool stands at Machine Travel Z over a point the work frame never named, while
-  // getCurrentPosition() still reports the toolpath position it had before the change. Reading it here
-  // would order this move against a height the tool is not at, and the branch it picks on a RISING or
-  // unchanged Z -- retract first, then cross -- would send the tool across the bed at the section's own
-  // clearance height instead of the travel height it is already holding. So the order is forced: cross
-  // at the height the change left, THEN descend. That is the whole of the "return", and it costs no
-  // motion at all -- there is no point in retracing the excursion when the next move is absolute.
+  // THE CASE THE COMPARISON BELOW CANNOT DECIDE, and it has TWO CALLERS that create it. Either way the
+  // tool stands at a machine-frame height the work frame has never named, while getCurrentPosition()
+  // still reports the last work-frame point the post told the kernel about. Reading it here would order
+  // this move against a height the tool is not at, and the branch it picks on a RISING or unchanged Z --
+  // retract first, then cross -- would send the tool across the bed at the section's own clearance height
+  // instead of the travel height it is already holding. So the order is forced: cross at the height the
+  // machine-frame move left, THEN descend.
+  //
+  //   writeToolChangeReturn() -- a relocated manual change. It costs no motion at all: there is no point
+  //   retracing the excursion when the next move is absolute.
+  //
+  //   writeFirstSection()'s pre-jog order -- the fixed Z reference is established AFTER the first part's
+  //   origin there, so the last preamble block is a G53 and not the probe retract that used to follow it.
+  //   CR-15.
   if (forceRapidXYBeforeZ) {
     forceRapidXYBeforeZ = false;
-    writeComment(eComment.Debug, " rapidMovements: X/Y before Z -- first move after a relocated tool change");
+    writeComment(eComment.Debug, " rapidMovements: X/Y before Z -- the tool holds a machine-frame height the work frame has not named");
     rapidMovementsXY(_x, _y);
     rapidMovementsZ(_z);
     return;
@@ -4088,12 +4189,38 @@ function askUser(text, title, allowJog) {
 }
 
 // The first tool is LOADED, not changed: nothing is running, no Z0 exists yet to invalidate, and the
-// tool stands wherever writeFixedZReference() left it. So this is a prompt and nothing else -- no
-// retract to repeat, no spindle to stop, and no re-probe, because writeWcsOnStart() establishes the
+// tool stands where the operator left it -- at the fixed Z reference on the order that establishes it
+// first, and at their own pre-jog on the order that does not. So this is a prompt and nothing else --
+// no retract to repeat, no spindle to stop, and no re-probe, because writeWcsOnStart() establishes the
 // origin a few blocks below with the tool this prompt just asked for. Called unconditionally so the
-// ordering rule lives in one place; the property is read here.
+// ordering rule lives in one place; the property is read here, and so is the one mode condition that
+// makes the question unaskable.
 function toolChangeFirstLoad() {
   if (!getProperty(properties.toolChangeFirstLoad)) {
+    return;
+  }
+
+  // NOTHING LEFT TO ASK ON A PRE-JOGGED ORIGIN. These modes record the position the operator jogged to
+  // before the file started, which they could only do with a tool already fitted -- so the prompt is
+  // redundant at best, and answering it with a DIFFERENT tool is the very defect it exists to prevent:
+  // the recorded Z0 measures from the tip that made the jog. No reordering rescues it, the jog having
+  // happened before line 1 of the file.
+  //
+  // UNGATED ON THE FRAME. The contradiction is the mode's and not "Machine Travel Z"'s -- it is the
+  // same with no frame at all, where nothing moves the tool and the prompt still lands between the jog
+  // and the origin write.
+  //
+  // A WARNING AND NOT A REFUSAL: the setting is inert here rather than dangerous, and the post says so
+  // in the file, which is the channel the operator running the job actually has. The remedy is a mode,
+  // and the two that prompt and THEN position are named.
+  if (originIsPreJogged()) {
+    writeComment(eComment.Debug, " toolChangeFirstLoad: suppressed -- \"First WCS / Part\" records a pre-jogged origin");
+    writeWarning("\"Prompt for the First Tool\" is on and no prompt was written -- \"First WCS / Part\""
+      + " takes this part's origin from where you jogged the tool before starting this file, so the"
+      + " tool that made that jog is the one this job assumes and measures from. Fitting a different"
+      + " one here would put every depth out by the difference in tool length. To fit the tool during"
+      + " the run instead, use \"Jog to X0 Y0, Probe Z0\" or \"Jog to X0 Y0 Z0\", which prompt first"
+      + " and position afterwards.");
     return;
   }
   writeComment(eComment.Important, " Load the first tool");

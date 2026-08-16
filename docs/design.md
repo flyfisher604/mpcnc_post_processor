@@ -50,7 +50,8 @@ Fusion always supplies a work offset per section, so there is always a design-ti
 `currentWorkOffset` is **not** machine state — `onOpen()` sets it `undefined`, so the suppression cannot
 match on the first section, section 1 **unconditionally emits its select** over whatever the sender left
 modal, and thereafter the post alone changes the selection. Hence `writeWCS()` before `Start()`, the
-fixed-Z establish and `writeWcsOnStart()`.
+fixed-Z establish and `writeWcsOnStart()` — and it is before both **whichever order those two run in**,
+which is the one thing about the preamble that does not vary.
 
 Everything unreadable is therefore a **trust assertion**, and there are two: **a stored WCS origin** (every
 `Use WCS …` mode — which is why the *defaults* establish an origin rather than rely on one) and **a
@@ -418,7 +419,7 @@ In `writeWCS()`, `isTraverse = (previousWorkOffset != undefined)` is false on th
 first section skips **both** the safe-Z retract and the origin/probe dispatch that every later WCS change
 gets. Un-suppressing it where it sits does **not** work:
 
-- **Ordering.** `writeWCS()` is step 3 of `writeFirstSection()`; the fixed-Z establish is step 5. At step 3
+- **Ordering.** `writeWCS()` runs before the fixed-Z establish in `writeFirstSection()`, and where it runs
   the part WCS's Z has not been established and the job has emitted nothing in the machine frame either, so
   a retract there would be an absolute `G0 Z` into a stale frame — the same defect relocated.
 - **Direction.** An absolute Z against a stale zero can move the tool *down*.
@@ -439,6 +440,18 @@ established frame at job start, so on such a machine the arrival emits a real `G
 and the warning is suppressed. The limit stands only where it is still true: a job with no frame at all —
 and on Marlin *declaring* one is not establishing it, the one implementation being refused there, so the
 suppression asks whether the frame is established **in this file** and not what the dialog was set to.
+
+**Two modes make no arrival at all, and they take the order in reverse.** Everything above is about the
+first section *travelling* to its origin. The two `Set … to Current Pos` modes do not travel: the origin
+**is** where the operator left the tool, so there is nothing to arrive at and nothing for the frame to be
+the starting height of. What the establish would be instead is the one thing that destroys the answer —
+`G53 G0 Z<Machine Travel Z>` carries a single axis word, so it left the pre-jogged X and Y standing and
+overwrote the Z the mode exists to record. So `writeFirstSection()` holds **two orders**, chosen by
+`originIsPreJogged()`: establish → load → origin where the origin travels, and origin → establish where it
+does not. The frame is still established once, in the same file, before the first cut; only its place in
+the preamble moves. **The load prompt does not move with it, it goes** — a pre-jog can only have been made
+with a tool already fitted, so `Prompt for the First Tool` has nothing left to ask on those modes and is
+suppressed with a warning naming the `Jog to …` modes, which prompt first and position after. `CR-15`.
 
 ### Computing a safe height is not the post's job
 

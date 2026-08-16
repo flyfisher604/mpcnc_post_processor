@@ -19,11 +19,12 @@ the manual one, and nothing else. `PR-14` closed with 1.2; `PR-16` and `HR-26` c
 `HR-24` and `CR-02` with F6, which closed `HR-20` and `HR-27` by design alongside them; `CR-17` with
 F7.
 
-**What is next: Step V**, and it is **six rows**. The register re-walk of 2026-08-16 closed
-forty-eight from the source and the author's rulings closed fourteen more, so **nothing in Step V
-waits on a licence, a controller or a sender**. What is left is one dialog read, one factory-default
-post, and the four-row jet workstream `findings.md` §6 defers. §4 states the methods and their
-bounds; §5 carries each row's argument.
+**What is next: Step V**, and it is **four rows — the whole of it is the jet workstream**
+`findings.md` §6 defers. The register re-walk of 2026-08-16 closed forty-eight rows from the
+source and the author's rulings closed sixteen more, so **nothing in Step V waits on a licence, a
+controller or a sender**, and nothing outside the jet rows waits on a post to close. What is owed
+in artifacts rather than rows is two posted files: a factory-default GRBL job and a Marlin
+multi-operation one. §4 states the methods and their bounds; §5 carries each row's argument.
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
@@ -50,20 +51,17 @@ quoted comment text, never by line number.
 ## Step V — Post-verify what has landed unposted
 
 The end park and the `CR-` fixes changed the emitted file and **have never been posted**. What the
-source can settle is settled — `findings.md` §5's seventy-four walked rows — so what is left here is
-what a walk cannot reach. The order below is by what one post buys.
+source can settle is settled — `findings.md` §5's seventy-seven walked rows — so what is left here is
+what a walk cannot reach.
 
-- **`REG-MF` first**, and it refreshes more artifacts than any other post: the GRBL/mm
-  factory-default diff, `Scale Feedrate` **on**, against a pre-change build. The expected delta is
-  now four landed changes — the property dump, group 5's heading, `CR-01`'s warning line and
-  `CR-02`'s comma per prompt. **`S2a` predicts the g-code half exactly: nothing moves.** `TC-2` and
-  `HR-24` ride on it and assert the same absence.
-- **Then the Marlin multi-operation job** — `S3f`'s corrected count, and the only place a walk
-  contradicted the register.
-- **`PR-7b`, one look at the dialog** — group 4 asking one question per decision, and group 1 asking
-  none of them. `D1` has passed, so a group out of order would be this row's finding.
 - **The jet workstream — `J4` first**, group 8 having never appeared in any posted file; then `J1`,
-  `J2`, `J5`. Deferred by design, and `findings.md` §6 states what blocks it.
+  `J2`, `J5`. Deferred by design, and `findings.md` §6 states what blocks it. **`J1` is the one that
+  may return a finding rather than a pass**: with a tool that cannot probe, the
+  `Use WCS X0 Y0, Probe Z0` arm writes a `Debug` line where every neighbouring arm writes a warning,
+  so at the shipped comment level the file says nothing about a Z0 nobody established.
+- **Two artifact debts, and neither is a row**: a factory-default GRBL job, which is what
+  `findings.md`'s *Invalidated by landed fixes* waits on, and the Marlin multi-operation job that
+  settles `S3f`'s corrected comment count — the only place a walk contradicted the register.
 
 **Worth one post of its own, and it is not a row here:** `HR-6 (B)`'s rotated Setup. It is the live
 risk, and `PR-2c` closed on a ruling rather than on an artifact, so that job would settle both.
@@ -146,6 +144,21 @@ height is the post's job — are in `design.md`.
 ---
 
 ## Done
+
+**Register triage ✅ 2026-08-16.** Four fixes and four rulings: `CR-05` puts the replaced-header
+precondition in the file; `CR-09` names Marlin's build option — and V1 Engineering's own
+`LASER_FEATURE` builds, where `M3` fires but `S` is not RPM — in the property description; `PR-13`
+takes RRF 3.x defaults with both generations' forms in the description, the group-10 fold not with
+it; `CR-10` warns in both channels instead of taking the `Near Machine X0 Y0` redesign. `CR-03`
+closed as designed, and `PR-7b` and `REG-MF` retired. It also detailed `CR-15`, which closed the
+same day on a fix the detail is what made findable.
+
+**`CR-15` ✅ closed 2026-08-16.** The preamble stops moving the tool before it records where the tool
+is: `writeFirstSection()` holds two orders now, and on the two `Set … to Current Pos` modes the
+fixed-Z establish falls **below** the origin — it led only because it is the height a *travel* to the
+part origin starts from, and those modes make none. `Prompt for the First Tool` is dropped there
+rather than reordered, a pre-jog implying a fitted tool. `PR-10`'s warning is deleted with its
+defect. Eight walk rows; the walk corrected `TC-6`, `S2e` and one `Debug` trace.
 
 **Register re-walk ✅ 2026-08-16.** The open register executed against the source: **forty-eight of
 sixty-three unrun rows closed**, four of them corrected rather than confirmed, and every full-licence
