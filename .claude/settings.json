@@ -12,7 +12,6 @@
       "Bash(git for-each-ref *)",
       "Bash(git merge-base *)",
       "Bash(node --check *)",
-      "Bash(node docs/doc-sync.js)",
       "Bash(ls *)",
       "Bash(wc *)",
       "Bash(file *)",
@@ -27,7 +26,10 @@
       {
         "matcher": "Edit|Write",
         "hooks": [
-          { "type": "command", "command": "node .claude/hooks/post-edit.js" }
+          {
+            "type": "command",
+            "command": "node .claude/hooks/post-edit.js"
+          }
         ]
       }
     ]

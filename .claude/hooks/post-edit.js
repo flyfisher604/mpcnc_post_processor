@@ -11,7 +11,8 @@
 //   not at commit time -- otherwise five more edits can stack on a broken file.
 //
 // It once also nagged that the pre-commit document gate was not armed in a clone. That gate is retired
-// (conventions.md -> Tooling that ships with the repo), so this is now the only hook the repo installs.
+// (46bcf2a), so this is now the only hook the repo installs -- and the only automatic check there is.
+// Nothing gates the documents: every rule in them is enforced in the diff, by a person.
 //
 // Exit 0 = silent success. Exit 2 = Claude Code feeds stderr back into the same turn.
 //

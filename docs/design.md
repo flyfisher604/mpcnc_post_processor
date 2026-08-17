@@ -1,13 +1,21 @@
-# Design — why the shipped behaviour is what it is
+# Design — the target, and why the shipped behaviour is what it is
 
 The **why** behind `MPCNC_v4.0_Beta2.cps`, for the parts of it the code cannot state: the frame model the
 rest of the record reads against, the external firmware facts each decision rests on, and the arguments
 behind orderings that look arbitrary in the source.
 
-Unlike `conventions.md`, this file **grows with the post** — a change to what the post emits may earn a
-paragraph here. Two tests gate the entry and both are in `conventions.md` → *Document contracts*: the fact
-must be one the code cannot state, and it must be either **the model** or **a trap**. A design choice that
-is merely true stays in the code, and several hundred of them do.
+**A section headed ▶ *Target* states the design the code is being changed to, and names the `plan.md` step
+that lands it.** Everything else describes what the post emits today. A target section is written as the
+finished design, in the present tense, because **it is what the diff is checked against** — so read it
+*with* its step, never as a description of the current file. When the step lands, the ▶ comes off and
+nothing else about the section changes; if something else has to change, the design was wrong and the code
+is not the place to discover it.
+
+This file **grows with the post** — a change to what the post emits may earn a paragraph here. Two tests
+gate the entry: the fact must be one **the code cannot state**, and it must be either **the model** — the
+shared vocabulary the rest is unreadable without — or **a trap**, where someone reached the wrong answer or
+the wrong answer fails silently. A design choice that is merely true stays in the code, and several hundred
+of them do.
 
 ---
 
@@ -19,9 +27,15 @@ is no tool-length system at all** — no TLO, no tool setter — so a work-Z re-
 the substitute, and **X/Y is never probed**.
 
 - **Persistence:** WCS origins are written with `G10 L20 P<n>` on GRBL/RepRap — scoped to that WCS's own
-  register. `P` maps 1:1 to Fusion's `workOffset` (P1–P6 = G54–G59; P7–P9 = G59.1–G59.3, RepRap only).
-- **Marlin is single-frame:** no per-WCS registers, so one global `G92` origin. A Marlin job using more
-  than one distinct work offset is a hard error (Guard C).
+  register, so the write names its target and cannot leak. `P` maps 1:1 to Fusion's `workOffset`
+  (P1–P6 = G54–G59; P7–P9 = G59.1–G59.3, not on GRBL).
+- **Marlin has nine registers too, behind one build option.** `CNC_COORDINATE_SYSTEMS` gates `G53`
+  *and* `G54`–`G59` in a single `#if`, so the machine frame and the work offsets arrive together. What
+  differs is **addressing, not capability**: `G92` writes the **active** workspace and only
+  positionally, where `G10 L20 P<n>` names its target. That makes *the origin write targets the active
+  WCS* a precondition on Marlin, enforced as an internal error rather than left to hold by luck.
+  **Guard C is gone** — its message, *"Marlin has a single coordinate frame"*, was false. Verified at
+  **2.0.9.7 and 2.1.2.5**; nothing read below that, so that is the floor.
 - **`workOffset 0`** is Fusion's "default / unset", **not** a request for `G53`; it aliases to WCS 1 /
   `G54`, and must alias identically everywhere, or two paths disagree about which frame a section is in.
 - Undefendable by any post: an operator typing `G55` into the console *mid-run*. Out of scope.
@@ -36,10 +50,11 @@ Fusion always supplies a work offset per section, so there is always a design-ti
 `currentWorkOffset` is **not** machine state — `onOpen()` sets it `undefined`, so the suppression cannot
 match on the first section, section 1 **unconditionally emits its select** over whatever the sender left
 modal, and thereafter the post alone changes the selection. Hence `writeWCS()` before `Start()`, the
-fixed-Z establish and `writeWcsOnStart()`.
+fixed-Z establish and `writeWcsOnStart()` — and it is before both **whichever order those two run in**,
+which is the one thing about the preamble that does not vary.
 
 Everything unreadable is therefore a **trust assertion**, and there are two: **a stored WCS origin** (every
-`Use Active WCS` mode — which is why the *defaults* establish an origin rather than rely on one) and **a
+`Use WCS …` mode — which is why the *defaults* establish an origin rather than rely on one) and **a
 declared machine frame** (the group-4 declarations, the same species).
 
 **Homing does not change a WCS — it makes one trustworthy.** `G54`–`G59` hold offsets from machine zero and
@@ -48,11 +63,16 @@ fixed for *that* power cycle, so origins **created** during a run stay mutually 
 multi-part job is sound. Only a **stored** offset goes bad, which is the whole of why that guard is
 mode-sensitive rather than blanket.
 
-**The one place a trust assertion is not enough:** when a declared frame becomes the **datum for an
-absolute move**, the job must *establish* it — so `Fixed Z Reference = Machine Z` requires `Home at Job
-Start`, not merely the declaration. Firmware forces it: with homing enabled **GRBL comes up in Alarm and
-refuses all motion until homed**, so a stale declared frame cannot execute there, while Marlin and RRF have
-no such lock and run the move against a machine zero that has moved.
+**Where a trust assertion carries an absolute move, the firmware decides whether it is enough.** A declared
+machine Z becomes the datum for an absolute `G53` rapid, and the assertion that carries it is
+`Axes Homed and Trusted` alone — **not** `Home at Job Start`, whose entire purpose is to express *homed at
+the controller, do not home here*. Requiring the action as well would cancel the state the split exists to
+express. The firmwares differ, and only one of them is exposed: with homing enabled **GRBL comes up in
+Alarm and refuses all motion until homed**, so a stale declared frame cannot execute there at all; **Marlin
+never reaches the question**, `G53` being behind `CNC_COORDINATE_SYSTEMS` and the machine-Z frame refused on
+it; **RRF has no such lock** and will run the move against a machine zero that has moved. RRF therefore
+takes a post-time warning when this frame is in use with `Home at Job Start = Off`, and it is the only
+target that needs one.
 
 ### The machine frame — capability, then action
 
@@ -89,48 +109,86 @@ unlike the axis declaration, **this merge deleted a state rather than renaming o
 whenever homing was off, so two booleans offered four settings of which only three did anything. **`$H` uses `writeln()`, not
 `writeBlock()`** — GRBL recognises `$` only as the line's first character (CR-1).
 
-### The fixed Z reference — one concept, two implementations
+### The fixed Z reference is the machine's own homed Z
 
 A frame whose Z0 does not move with stock thickness — the only frame in which one clearance height is
 meaningful across parts of differing thickness, which is why the cross-part safe-Z feature requires one
-(Guard B). A machine can have one two ways, and they are one dialog question:
+(Guard B). **There is exactly one: the machine's own homed Z, addressed with `G53`.** The height is
+`Machine Travel Z`, an absolute machine coordinate, signed, read off the DRO; the machine is declared homed
+in group 4, beside it.
 
-| Answer | The frame | `Inter Part Travel Z` is then… | Costs |
-|---|---|---|---|
-| **Spoilboard** | a probed surface in a reserved WCS | a height **above that surface** — positive | one WCS register — GRBL has six — plus a probe cycle |
-| **Machine Z** | the machine's own homed Z | an **absolute machine coordinate** — signed | a per-machine number read off a DRO |
+**The field is the opt-in — there is no enum and no boolean.** The frame exists when the machine declares Z
+homed **and** `Machine Travel Z` parses, and it does not otherwise. The field **ships empty**, so an
+untouched dialog has no frame and a factory-default job emits exactly what it emits today; filling it is
+the whole act of choosing one, **at any offset count**. It lives in **group 4**, beside the declaration,
+because a height in the machine frame is meaningless without one. **Two controls that must agree is the
+failure mode this retired**, so the design does not add another; the header echo names the frame and its
+height, which is all a second control would have said.
 
-**One clearance field, not two.** The two answers are never both live, they are read at the same two
-moments (the establish in the preamble, and each cross-WCS traverse), and on a correct setup they name the
-*same physical plane* — so they are one control, `Inter Part Travel Z`, and this enum says which frame it
-is measured in. What that costs is a hazard the two separate fields made impossible: **the enum flip**. A
-height valid in the other frame is still a valid-looking height, and only one direction is detectable —
-a spoilboard clearance is measured *up* from the probed surface, so `<= 0` cannot be one and is guarded,
-while a spoilboard `40` left in a machine-Z job is indistinguishable from a real height on a bed-zeroed
-machine. Three things carry that risk: the field **ships empty and is guarded under both answers**, so an
-untouched dialog cannot post; the header echo **names the frame** beside the number; and both tooltips say
-the frame is decided elsewhere.
+**Multi-part is where the frame stops being optional.** A job using more than one work offset must have it
+or be refused (Guard B): the tool has to clear the fixtures on its way between parts, and no single
+clearance height is meaningful across origins that are only known after probing at runtime. A **single-part
+job is never refused for want of one** — it simply gains what the frame is for, when the field is filled: a
+real absolute Z at the first section's arrival instead of a warning, and a retract before the end-of-job
+park crosses the bed.
 
-**Why it is a parsed string and not a number.** Under the spoilboard answer a number would do — `0` is
-meaningless there, so it could have served as *unset*, which is what the old whole-mm integer relied on.
-The machine-Z answer has no such spare value: every signed number is a real reachable height, `0` very
-much included (on a stock GRBL build the machine zeroes into negative space, so `Z0` is the *top of
-travel*). Fusion's schema gives a numeric property no unset state, so *empty* is only expressible on a
-string — and once the field is shared, the stricter of the two requirements wins.
+**The frame itself is Z-only; the X/Y requirement belongs to the workflow.** A `G53` Z move needs machine
+Z trustworthy and nothing else, so a single-part job on a `Z Only` machine may use it. What needs a homed
+X/Y zero is *traversing between stored work offsets*, which is multi-part work — so that requirement sits
+on Guard B as a **second, separately worded refusal**, and the frame predicate carries no trace of it.
 
-> **Rejected: exposing only the spoilboard** — the shipped design, which *rejected* multi-WCS jobs on
-> machines whose homed Z would have served, Guard B refusing for want of a base while the operator had
-> already declared the machine homes Z and the post had discarded the fact.
-> **Rejected: giving the base an XY origin.** The base stays a Z-only reference.
+**Marlin has the frame too, and it costs one build option.** `Marlin/src/gcode/gcode.cpp` (2.1.2.5) puts
+`case 53:` through `case 59:` inside a **single** `#if ENABLED(CNC_COORDINATE_SYSTEMS)`, so a Marlin build
+has the machine frame **and** the nine WCS registers together, or neither. That is one question, not two,
+and **the post assumes the answer is yes and warns rather than refusing** — in the dialog and again in the
+file. Refusing would deny the frame to every correctly configured CNC Marlin, and the post cannot read a
+build; a warning beside a working file is the honest trade. Without the option, `G53` is an unknown command
+and the travel moves are skipped — which is what the warning says, in those words.
 
-**Spoilboard — the base probe emits no XY move, so the park position is an operator precondition**, and
-that is why the probe XY offset never applies to it: the establish runs before any origin exists, so no XY
-target could be trusted. The consequence is real and silent — **whatever is under the tool becomes the
-base's Z0**, so parking over the stock records the stock top as "the spoilboard" and every clearance from
-it is short by the stock thickness. **Mitigation is documentation, not code**; the durable fix is unbuilt,
-in `PReview.md` §6. Ignored on Marlin (warned), which has no registers to reserve.
+> **This corrects the record twice.** An origin write on Marlin is **not** merely a global frame shift:
+> under the same option `G92` runs `coordinate_system[active_coordinate_system] = position_shift` behind a
+> `WITHIN()` bounds check (`src/gcode/geometry/G92.cpp`, in **2.0.9.7 and 2.1.2.5** alike), so `G5x` then
+> `G92` is a real per-WCS register write into the *active* slot. And `G53` reaches native space
+> **regardless of any `G92`**, because it selects `-1` for its own line. So the old claim that *the machine
+> frame survives only until the job sets its first Z origin* was wrong, and with it the conclusion that
+> Marlin multi-part work was a dead end. **`G92.1` also exists** there, under
+> `ENABLED(CNC_COORDINATE_SYSTEMS) && !IS_SCARA` — the open question this record carried is closed.
 
-**Machine Z — one absolute height, collected, never derived.** A height read off the DRO *after* homing is
+**One `G53`, one block, and on Marlin a `G5x` after it.** `G53()` saves `active_coordinate_system`, calls
+`select_coordinate_system(-1)`, and restores it **inside `if (parser.chain())`** — byte-identical at
+2.0.9.7 and 2.1.2.5. So a `G53` chained with its motion on one line restores itself, and **a bare `G53` on
+its own line leaves native space active for the rest of the job**. The post never emits the bare form, for
+this reason and for GRBL's separate one (`G53` is not modal, and is an error without `G0`/`G1` active) —
+**one rule, two firmware justifications, and neither may be dropped without the other being checked**.
+
+The re-select the post adds on top is **belt-and-braces against reports that were never closed**. Marlin
+issues **13843** and **14743** both describe `G53` failing to reach native space, and both were closed
+**without a fix commit** — 13843 by a stale-bot for inactivity, its reporter running *an MPCNC Marlin
+fork*, which is this post's own audience. The current source is correct by inspection, but "correct by
+inspection with two unclosed reports against it" is not the same as fixed. So the post re-selects
+`currentWorkOffset`'s **own** `G5x` — never a fixed `G54`, which would be the wrong register on any job
+whose active offset is not the first.
+
+> **Retired: the spoilboard base** — a surface probed into a reserved WCS, with the clearance read as a
+> positive height above it. It was the **non-homing** machine's route to a frame, and it goes because
+> multi-part work is the operator running stored fixture offsets, whose machine homes. It cost one of
+> GRBL's six registers, a probe cycle at job start, five properties that were only correct together, and
+> its defence was not code at all: **the base was probed wherever the tool already sat** — no XY move, and
+> none possible, since the establish runs before any origin exists — so parking over the stock recorded the
+> stock top as "the spoilboard" and every clearance from it was short by the stock thickness, silently
+> (`findings.md` `PR-16`). **Do not re-propose it without an answer to that.**
+> **Retired with it: the enum flip.** Two frames sharing one clearance field made a height valid in the
+> other frame a valid-*looking* height, and only one direction was detectable. One frame, one meaning, no
+> flip — and the guard that caught the detectable direction goes too, having nothing left to catch.
+> **Rejected: giving the base an XY origin.** It stayed a Z-only reference to the end.
+
+**Why it is a parsed string and not a number** — and it matters more here than it did, because **empty is
+what says *no frame*.** There is no spare value to mean *unset*: every signed number is a real reachable
+height, `0` very much included, since on a stock GRBL build the machine zeroes into negative space and `Z0`
+is the *top of travel*. Fusion's schema gives a numeric property no unset state, so *empty* is expressible
+only on a string — and the property carrying the opt-in is precisely the one that must be able to be unset.
+
+**The height is collected, never computed.** A height read off the DRO *after* homing is
 already in the controller's own frame, which is what makes it immune to everything below. Units are not: a
 `G53` move is read in the active `G20`/`G21` and GRBL's `$13` can report position in inches — hence the mm
 contract and the header echo. And **transplant, not typing, is its hazard with no precedent here**: every
@@ -170,17 +228,24 @@ into plain `G0`/`G1`/`G4` is correct and needs no revisiting.
 Two more settled the same way: **Marlin has never implemented `M2`** (RRF gained it in 3.5.1, with a
 `stop.g` interaction), and **GRBL, Marlin and RRF all accept a bare `\r`** as a block terminator.
 
-Four more settled while designing the machine frame. Each **refutes** something believed at the time, and
-each is a place a one-dialect assumption would have shipped a wrong motion:
+More settled the same way, most of them while designing the machine frame. Each **refutes** something
+believed at the time, and each is a place a one-dialect assumption would have shipped a wrong motion:
 
 | Question | Answer |
 |---|---|
-| `G53` per firmware | GRBL 1.1 supports it (above). **Marlin gates `case 53:` behind `CNC_COORDINATE_SYSTEMS`, off by default** (`gcode.cpp` 2.1.x) — so a *single-WCS* Marlin job passes Guard C and still cannot execute the move: that exclusion is separate, not inherited. It is also **not modal — program it on every line**, and an error without `G0`/`G1` active (LinuxCNC; RRF the same), so a split Z-then-XY move carries `G53` twice |
+| `G53` per firmware | GRBL 1.1 supports it (above). **Marlin gates `case 53:` behind `CNC_COORDINATE_SYSTEMS`, off by default** (`gcode.cpp` 2.1.2.5) — but so are `case 54:` … `case 59:`, in the **same** `#if`, so the frame and the registers are one decision and the post assumes and warns rather than refusing. It is also **not modal — program it on every line**, and an error without `G0`/`G1` active (LinuxCNC; RRF the same), so a split Z-then-XY move carries `G53` twice |
 | Reaching machine X0 Y0 **without** `G53` | **`G28 X` / `G28 Y` does it on Marlin** — it does not *address* the machine frame, it **re-establishes** it, so it needs no build option and no prior homing. The costs are that it is a homing cycle rather than a rapid, and that the same trick is **unsafe on GRBL**: one `$H` homes whatever that build was compiled to home (per-axis `$HX`/`$HY` sit behind `HOMING_SINGLE_AXIS_COMMANDS`, off by default), so it can drive **Z**. Hence `G53` on GRBL/RRF and `G28 X Y` on Marlin |
-| Is Marlin's one frame the machine frame? | **Only until the post writes an origin.** `writeWcsOrigin()` uses `G92` on Marlin, issued *at the current position*, so from the first section on, work X0 Y0 and machine X0 Y0 differ by an offset the post never knew — and cannot read back. Undoing it arithmetically is therefore not a route to the machine frame there |
+| Is Marlin's one frame the machine frame? | **Wrong question, and the earlier answer here was wrong.** With `CNC_COORDINATE_SYSTEMS` Marlin has nine workspaces and `G53` reaches native space on any line, whatever `G92` did — `G53()` selects `-1` for the duration of its own chained command. Work X0 Y0 and machine X0 Y0 still differ by an offset the post cannot read back, so *arithmetic* is still not a route; `G53` is, and it is the one the post takes. Read 2026-08-14, `src/gcode/geometry/G53-G59.cpp` + `gcode.cpp`, 2.1.2.5 |
+| Does Marlin's `G53` restore the workspace after its line? | **Only when chained.** `G53()` saves `active_coordinate_system`, calls `select_coordinate_system(-1)`, and restores **inside `if (parser.chain())`** — so `G53 G0 Z-10` restores itself and a **bare `G53` never does**, leaving native space active for the rest of the job. Byte-identical at **2.0.9.7 and 2.1.2.5**. Issues **13843** and **14743** report it failing even chained; both were closed **with no fix commit** (13843 by a stale-bot, its reporter on an MPCNC Marlin fork), so the post re-selects the active `G5x` itself. `src/gcode/geometry/G53-G59.cpp` |
+| Can Marlin write a *per-WCS* origin? | **Yes, under the same option.** `G92` runs `coordinate_system[active_coordinate_system] = position_shift` behind a `WITHIN()` bounds check, so `G5x` then `G92` writes the selected register, positionally, and persistently. **Corrects the standing "Marlin has one global origin" claim.** `G92.1` exists too, under `ENABLED(CNC_COORDINATE_SYSTEMS) && !IS_SCARA`. `src/gcode/geometry/G92.cpp`, **2.0.9.7 and 2.1.2.5** |
+| Does homing detach a Marlin job from its work origin? | **Not irrecoverably, on a CNC build.** `set_axis_is_at_home()` zeroes `position_shift[axis]` under `HAS_POSITION_SHIFT` but **never touches `coordinate_system[]`**, so re-sending `G5x` re-applies the stored origin. Without the build option there is no register and the shift is simply lost. **This narrows an earlier flat claim that re-sending `G54` does not restore it.** `src/module/motion.cpp`, 2.1.2.5 |
 | `G30` to store a park height | **Dead on all three.** GRBL/LinuxCNC: bare `G30` moves **X and Y too**, and `G30 Z<n>` rapids first to that Z *in the current WCS, offsets included*. Marlin and RRF: `G30` is a **single Z probe** — a plunge. Same trap `G80`–`G83` sets above |
-| Jogging at an `M0` pause | **Not possible on GRBL** — *"a jog command will only be accepted when Grbl is in either the 'Idle' or 'Jog' states"* (Grbl v1.1 Jogging), and `M0` is neither. Only RRF has a real jog-at-pause (`M291 … X1 Y1 Z1`) |
-| `G17` / `G94` off GRBL | **Neither is a free no-op.** Marlin compiles `G17` only under `CNC_WORKSPACE_PLANES` (shipped commented out in `Configuration_adv.h`) and has **no `G93`/`G94` at all** (`gcode.h` 2.1.x) — both reach `parser.unknown_command_warning()`. RRF has `G17` from 2.03 (`G18`/`G19` from 3.3) but gained `G93`/`G94` only in **3.5.1**, "experimentally", and **3.6.3** fixed inverse time mode not being reset at job start. So both stay GRBL-only, and the plane and feed mode a RepRap job inherits are a Start file's problem — `HReview.md` HB-6 |
+| Jogging at an `M0` pause | **A sender property on GRBL, not a firmware one — and the earlier answer here was wrong.** *"A jog command will only be accepted when Grbl is in either the 'Idle' or 'Jog' states"* (Grbl v1.1 Jogging) describes a controller that **received** the `M0`, and a streaming sender decides whether it ever does: gSender rewrites the line to `(M0)` in its sender `dataFilter` and holds its own stream instead — `line = line.replace(/M0+(?!\d)/i, "(M0)")` above `this.workflow.pause(…)`, `src/server/controllers/Grbl/GrblController.js`, master, read 2026-08-14 — so the controller stays `Idle` and jogs. A sender that forwards `M0` produces the hold. **The same file guards that pause with `if (sent > 10)`** while commenting the line out unconditionally, so an `M0` in the first ten streamed lines is swallowed silently. RRF needs none of this: `M291 … X1 Y1 Z1` is a real firmware jog-at-pause |
+| `G17` / `G94` off GRBL | **Neither is a free no-op.** Marlin compiles `G17` only under `CNC_WORKSPACE_PLANES` (shipped commented out in `Configuration_adv.h`) and has **no `G93`/`G94` at all** (`gcode.h` 2.1.x) — both reach `parser.unknown_command_warning()`. RRF has `G17` from 2.03 (`G18`/`G19` from 3.3) but gained `G93`/`G94` only in **3.5.1**, "experimentally", and **3.6.3** fixed inverse time mode not being reset at job start. So both stay GRBL-only, and the plane and feed mode a RepRap job inherits are a Start file's problem — `findings.md` HB-6 |
+| Does the `F` word on a `G0` set the travel speed? | **No on GRBL or FluidNC, and no line a posted file may contain sets it there.** Their planner takes a rapid's rate off the axis limits and never out of the block — `if (block->condition & PL_COND_FLAG_RAPID_MOTION) { block->programmed_rate = block->rapid_rate; }`, `rapid_rate = limit_value_by_axis_maximum(settings.max_rate, unit_vec)` (`grbl/planner.c`, `plan_buffer_line()`, gnea/grbl 1.1); FluidNC is the same planner renamed, `block->motion.rapidMotion` and `limit_rate_by_axis_maximum()` (`FluidNC/src/Planner.cpp`, 3.x). The `F` **is** stored — `gc_state.feed_rate = gc_block.values.f; // Always copy this value` (`grbl/gcode.c`) — so it governs the next *cut*, not the rapid it rode in on, and the post is right to keep emitting it. All three ways out are shut: `$110`–`$112` are settings, blocked outside `Idle`/`Alarm` (`system_execute_line()` → `STATUS_IDLE_ERROR`; FluidNC `Setting::check_state()` → `Error::IdleError`), written to EEPROM, and applied where the line is *parsed* rather than where it is *reached*; and the rapid override is the real-time bytes `0x95`/`0x96`/`0x97`, not stream content, quantised to 100/50/25 %. **And the two dialects diverge here**, which the post's one `Grbl` answer cannot express: FluidNC did not emulate Grbl's numbered machine-setup settings, so `$110` does not exist there and the limit is `max_rate_mm_per_min` per axis (`FluidNC/src/Machine/Axis.cpp`). The post therefore **names the parameter rather than trying to command the speed** — `findings.md` `CR-01`; mapping travels to `G1` was built and rejected. Marlin and RRF honour `F` on a `G0` and need none of this |
+| Does `M1`, the optional stop, stop anything? | **No usable answer on any of the three, and each fails differently** — so the post emits `M0` for Fusion's `COMMAND_OPTIONAL_STOP` and states in the file that the *optional* half is what it could not keep. GRBL 1.1 parses it and does nothing: `case 1: break; // Optional stop not supported. Ignore.` (`grbl/gcode.c`) — accepted, no error, no pause. RepRapFirmware handles `M0`, `M1` and `M2` in **one block** (`src/GCodes/GCodes2.cpp`, *"case 0: // Stop"*, *"case 1: // Sleep"*, *"case 2: // Stop"*), so mid-file it **ends the job**. Only Marlin does what Fusion means, waiting for the LCD in `src/gcode/lcd/M0_M1.cpp` — and only under the same `HAS_RESUME_CONTINUE` that `findings.md` `HB-1` turns on. **The refuted claim was *"`M1` is supported by all three targets"***, which is true of the parser and false of the behaviour: the trap of reading a command table rather than the handler |
+| Does a `(MSG …)` comment need its comma? | **One dialect requires it and the others cannot see it, so the post always writes it.** grblHAL matches `strncasecmp(comment, "MSG,", 4)` in `gc_normalize_block()` (`grblHAL/core`, `gcode.c`, read 2026-08-14) and surfaces **nothing** without the comma — the prompt is an unexplained pause. FluidNC is indifferent: `strstr(comment, "MSG")` then a fixed four-character skip, `offset = strlen("MSG_")`, in `gcode_comment_msg()` (`FluidNC/src/GCode.cpp`, main), so `MSG,` and `MSG ` both reach the log. Stock grbl 1.1 discards comments entirely and never sees either. No space after the comma: grblHAL trims one, FluidNC would keep it. `findings.md` `CR-02` |
+| Does RRF's `G53` apply the **tool** offset? | **No — it drops the tool offset as well as the workplace offset**, so a `G53` height is a carriage position and `Machine Travel Z` means on RRF what it means on GRBL however long the tool is. `currentUserPosition[axis] = moveArg + GetCurrentToolOffset(axis)` in the `g53Active` arm, whose own comment reads *"g53 ignores tool offsets as well as workplace coordinates"* — and that pre-added offset is exactly what `ToolOffsetTransform()` subtracts again on the way to machine coordinates (`totalOffset = babyStep − currentTool->GetOffset(axis)`). `src/GCodes/GCodes.cpp`, `DoStraightMove()` and `DoArcMove()`, **the same at 2.05, 3.0, 3.5.4 and 3.6.0**, the expression gaining `/axisScaleFactors[axis]` in 3.5 and nothing else; read 2026-08-16. **The one setting that makes the offset non-zero mid-file is `Tool Change Handled By` = RepRapFirmware tool table**, where `tpost<n>.g` applies one at every change — and it costs the post nothing. `findings.md` `PR-25` |
 | `G38.2` target frame | **Version-bound on RRF.** `G38.x` on Duet 2+ / RRF 3+, and **up to RRF 3.1.1 the target is machine coordinates**, user coordinates after. This post emits a work-frame target, so leaving it On below 3.1.2 probes to the wrong physical Z |
 
 > **The lesson, twice over — and it is why *do the source read before filing a question as needing
@@ -192,41 +257,168 @@ each is a place a one-dialect assumption would have shipped a wrong motion:
 
 ---
 
+## Tool changes — two flows, and the code implements both
+
+**The shipped tool-change code was a bad design and was replaced rather than repaired.** Flow 1 landed
+first (`findings.md` `PR-15`) and Flow 2 followed (`PR-24`), both 2026-08-14, so this section now
+describes the code rather than aiming at it. The per-defect rows filed against the old design were
+deleted with the design that made them defects; their durable content — the firmware facts and the
+orderings any implementation must respect — is below.
+
+**The premise both flows follow from.** A measured tool change needs a probe, a **subtraction**, and a
+register to hold the result. **The post can supply none of the three.** It cannot compute an offset it will
+not learn until the operator swaps the tool, hours after posting, and it can never read a register back
+(*Selection is deterministic, origin is trusted*). So the post's role is to **arrive correctly, hand over,
+and resume correctly** — never to perform the change. Everything the old design did beyond that was the
+error.
+
+### Flow 1 — the manual change, at the end of a file
+
+**The hobbyist answer, and for a Personal licence the only one:** Fusion Personal does not emit tool changes
+at all, so a two-tool job is two posted files. The post's whole responsibility is to **end the first file so
+the second can start where the first left off**.
+
+- **XY is not lost.** The file ends with the work origin exactly as the job established it — **no
+  `G10 L20`, no `G92`, and no homing**. On Marlin homing is not merely unnecessary but destructive:
+  `set_axis_is_at_home()` zeroes `position_shift`, and re-sending `G54` does not restore it, so the next
+  file would cut against an origin the operator never set. That makes *never home at end of file* a rule,
+  not a preference.
+- **The park is in one stated frame.** The park height and position must say which frame they are measured
+  in and emit that frame — `G53`, which requires a declaration including the parked axes, or the work
+  frame, which drifts per WCS. **Not both meanings on one field**, which is what the deleted
+  `Tool Change X/Y/Z` did: plain `G0` words the dialog presented as absolute.
+- **Z is the operator's to re-establish**, by re-probing at the start of the next file — the shipped default
+  first-part mode already does exactly this, so Flow 1 adds no mechanism to reach it.
+- **It is an option, not a policy.** A single-tool job must not pay for it.
+
+### Flow 2 — the sender's macro, mid-program
+
+**The work is deferred to whatever owns a tool table, and that is never the post.** The three firmwares
+split on who can do the subtraction:
+
+| Firmware | Who can measure and apply a tool offset |
+|---|---|
+| **RepRapFirmware** | **The machine.** Meta-g-code arithmetic and a real tool table — `G10 L1 P<t> Z`, persisted with `M500 P10` — so a `tpost` macro does it, and `M6` is a genuine call into `tfree`/`tpre`/`tpost` |
+| **GRBL** | **The sender.** No arithmetic, and `G43.1` takes a literal, so the offset must be computed off-controller. `M6` reaches the controller as `error:20 Unsupported command` — the route only exists if the sender intercepts the token before the controller sees it |
+| **Marlin** | **The operator.** No TLO register at all, so the only correction is re-probing and re-zeroing work Z by hand. *(This corrects an earlier bare "no TLO" claim.)* |
+
+**So the post's responsibilities are exactly three, and nothing else is in scope:**
+
+1. **Pre-change setup** — leave the machine in the state the macro is entitled to assume: coolant off,
+   spindle stopped or the operator prompted to stop it, tool clear of the work at a known height in a
+   stated frame.
+2. **Call the macro** — emit the agreed token, once, and nothing around it that the macro will redo.
+3. **Post-change resume** — restore the frame and the modal state the macro may have disturbed, and put
+   the tool back over the work before cutting resumes.
+
+**This is a contract, and the contract is the deliverable.** What the macro may change and what it must
+restore has to be written down, because the post cannot verify any of it. Without that written contract the
+call is a trapdoor. **It is written in the dialog, not here** — `Tool Change Handled By`'s own description,
+because the party who has to satisfy it is the operator and that is the only document they read.
+
+**The token stopped being one question by becoming a property.** `M6` is real on RRF and is `error:20` on
+GRBL, so whether the route exists at all depends on the *sender* — a sender-side fact no firmware source
+can settle. The post therefore names the handler and emits what that handler reads: `T<n> M6` for gSender
+and CNCjs, whose Grbl `dataFilter` removes the `M6` before the controller sees it; `T<n>` alone for RRF,
+where the T word **is** the change; the operator's own file for anything else. **A handler is listed only
+where its interception is sourced** — which is why `Other` exists and why UGS is not in the list.
+
+**Where the manual change happens is Flow 1's question alone, and the frame is its whole substance.** The
+deleted `Tool Change X/Y/Z` were bare `G0` words the dialog called absolute while the machine read them in
+whichever WCS was active, so a change position measured against one part's origin was somewhere else for
+the next. Replaced in the **machine frame**, through the same `G53` block as every other machine-frame
+move, where a coordinate means the same thing on every part of every job. Flow 2 has no such fields:
+driving the tool to a changer or a length sensor is the macro's own business, in a frame the post cannot
+see, and a post that guessed would be putting the tool where the macro did not ask for it.
+
+**The return is not a retrace, and the reason is the same one that makes multi-part probing necessary.**
+Nothing after a change is measured from where the tool stood before it — the tracked position is discarded,
+the next move is absolute, and the re-probe re-establishes Z0 from the part origin. The point to return to
+is known only in the *work* frame, and where a change coincides with a change of work offset, the true
+relationship between the two registers is not known until both have been probed. So the post owes the
+**height** and the **order of the next rapid**, and nothing else: cross at the height the change left,
+then descend.
+
+### What any implementation must get right
+
+Carried from the register the old design filled, because each is a defect the rework can reproduce:
+
+- **Select the WCS before the change, establish the part's origin after it.** Both halves of that order are
+  a defect if reversed, and they are not the same defect. Selecting late puts a post-change re-probe into
+  the *previous* section's register — the root defect of the shipped code, and a wrong part. Establishing
+  early sets the part up with the tool that is about to be removed, which the change then corrects — right
+  register, right depth, and **two probe cycles and four operator prompts where one and two would do**. So
+  the WCS select and the origin work are separate calls with the change between them, and the change may
+  hand its own re-probe to the establish **only where that establish sets Z0 itself** — not under
+  `Use WCS X0 Y0 Z0`, not with a tool that cannot probe, and not on a return whose Z0 nothing has staled.
+- **Stop coolant and the spindle on *every* route**, not only the one that relocates the tool. That stop is
+  not a property of relocating.
+- **A first change happens before the first part's origin work**, or the part's Z0 is established with the
+  tool the change exists to replace. That is the same rule as the one above, in the one place where the
+  origin work is `writeFirstSection()`'s rather than a boundary's.
+- **No `M84 Z`.** It is Marlin-only, so GRBL halts on it mid-change with the operator holding a tool — and
+  on Marlin a release with no brake sinks an unbalanced gantry in Z. It is a hazard under both readings and
+  goes with the rework.
+- **Post-injected motion goes through `rapidMovements()`**, as every other post-injected move does. Routing
+  it through the post's own `onRapid()` clears `forceSectionToStartWithRapid` and defeats *First G1 → G0* on
+  exactly the sections that use it.
+- **A suppressed change is announced at the dialog as well as in the file.** An operator who reads only the
+  dialog must not learn at the machine that the change was dropped.
+
+---
+
 ## Design notes behind the shipped behaviour
+
+### The kernel's position is the toolpath's, and only the work frame can correct it
+
+`getCurrentPosition()` is not where the tool is. It is where the **toolpath** is: the kernel advances it
+from the movements it feeds `onRapid` / `onLinear`, and every move the post emits on its own account —
+the probe traverses, the safe-Z retracts, the returns to X0 Y0, the machine-frame retracts — is invisible
+to it. Four things read it, and each is wrong by exactly that gap: the X/Y-against-Z ordering of a rapid,
+the G1→G0 restore, and the feedrate projection for a line and for an arc.
+
+So **the post reports its own moves back**, through `noteCurrentPosition()` and the kernel's
+`setCurrentPosition()`, from inside the two rapid writers rather than at each injection site. The rule
+that follows is the one worth carrying: **only a work-frame move can be reported.** `setCurrentPosition()`
+takes a frame position, and the work-frame value of a `G53` height requires the WCS offset — which on this
+machine is established at runtime by a probe, and is the same unknown that makes an X/Y retrace after a
+tool change unsound and multi-part probing necessary. A machine-frame move therefore leaves the kernel
+knowingly stale, and the one place that matters — the first rapid after a relocated tool change — refuses
+to read the stale value instead of being handed a plausible one. Autodesk's own posts draw the line in the
+same place, reporting a `G53` retract only to the machine simulator, on a channel that accepts machine
+coordinates.
 
 ### Traverse clearance is not the G1→G0 plane
 
 **Group 3's "Safe Z to Rapid"** answers a narrower question — "within *this* operation, is Z high enough to
 re-emit a cut G1 as a G0?" It is operation-scoped and only populated when the hobby group is on, so it is
-the wrong source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance
-measured in the job's fixed Z reference** ("Inter Part Travel Z").
+the wrong source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance in
+the machine frame** (`Machine Travel Z`).
 
-**The Inter Part Travel Z cannot be an F360 expression (asked and answered).** `Clearance:40` would parse
-today and is still the wrong source: every F360 height parameter is **per-operation and expressed in that
-operation's own WCS**, while this must be expressed in the
-**base's** frame — feeding a part-frame number into a base-frame `G0 Z` under-clears by the stock
-thickness, silently. F360 has no job-level "above the machine table" height at all; the base frame is a
-post-invented concept. So it stays a plain whole-mm `integer`. The only sound use of an expression here
-would be as a **floor** (`max(constant, resolved)`), never a substitute.
+**It cannot be an F360 expression (asked and answered).** `Clearance:40` would parse today and is still the
+wrong source: every F360 height parameter is **per-operation and expressed in that operation's own WCS**,
+while this one is an absolute machine coordinate — feeding a part-frame number into a `G53 G0 Z` measures
+it from the wrong zero entirely, and how wrong is unknowable to the post. F360 has no job-level "above the
+machine table" height at all. The only sound use of an expression here would be as a **floor**
+(`max(constant, resolved)`), never a substitute.
 
-### Base WCS is transited, not parked (R1/R2)
+### The cross-part retract enters no WCS at all
 
-The base-relative retract must *select* the base to move in its frame (the numeric relation between two
-WCS is only known after runtime probing). Two rules:
+Every traverse between work offsets retracts with a single `G53 G0 Z<Machine Travel Z>` **before** the
+destination WCS is selected, so no height is ever computed in a frame whose Z origin the job has not
+established. `G53` is not modal and is an error without `G0`/`G1` active, so it is **its own block, with a
+Z word and nothing else** — a future X/Y park is a second block, never a three-axis diagonal. Nothing is
+selected, so nothing has to be restored, and the active WCS after a retract is whatever the next section
+asks for.
 
-- **R1 — always restore the operating WCS.** After a base transit, advance to the next operation's WCS
-  before any cutting; never cut with the base left active.
-- **R2 — never round-trip the base empty.** Enter the base only when a real move is emitted there.
-
-A transit selects the base with a low-level `writeBlock`, **not** `writeWCS()` — going through `writeWCS()`
-would re-probe and rewrite the origin, which is the opposite of passing through a frame. The same rules
-govern the **base establish**: it transit-selects the base *before* probing so that both the `G38.2`
-target and the post-probe retract are measured against the base, then restores the operating WCS.
-
-> **Superseded, kept because it is the plausible wrong answer.** An earlier note argued the base establish
-> needed no `G59` select, since `G10 L20` does not change the active WCS — correct as far as it goes, but
-> it missed that the base's own probe and its post-probe retract would then execute in the *part's* frame,
-> whose Z may be stale. **The missing select was the defect.**
+> **Retired with the base: R1/R2, the transit rules.** A probed base had to be *selected* to move in its
+> frame — the numeric relation between two WCS is knowable only after runtime probing — which bought two
+> standing rules (*always restore the operating WCS*; *never round-trip the base empty*), a transit that had
+> to bypass `writeWCS()` to avoid re-probing on the way through, and one defect on the way: an earlier note
+> argued the establish needed no `G59` select, since `G10 L20` does not change the active WCS — true, and it
+> missed that the base's own probe and post-probe retract would then execute in the *part's* frame, whose Z
+> may be stale. **`G53` needs none of it.** It addresses the machine frame without selecting anything, which
+> is the whole reason one absolute frame beats one probed register.
 
 ### Why the first section's arrival is asymmetric
 
@@ -234,9 +426,9 @@ In `writeWCS()`, `isTraverse = (previousWorkOffset != undefined)` is false on th
 first section skips **both** the safe-Z retract and the origin/probe dispatch that every later WCS change
 gets. Un-suppressing it where it sits does **not** work:
 
-- **Ordering.** `writeWCS()` is step 3 of `writeFirstSection()`; `writeBaseEstablish()` is step 5. At step
-  3 *neither* the part WCS's Z nor the base's Z has been established, so both retract paths would emit an
-  absolute `G0 Z` into a stale frame — the same defect relocated.
+- **Ordering.** `writeWCS()` runs before the fixed-Z establish in `writeFirstSection()`, and where it runs
+  the part WCS's Z has not been established and the job has emitted nothing in the machine frame either, so
+  a retract there would be an absolute `G0 Z` into a stale frame — the same defect relocated.
 - **Direction.** An absolute Z against a stale zero can move the tool *down*.
 - **Blast radius.** With `isTraverse` true on the first section, the fallback fires on *every* job.
 
@@ -250,9 +442,75 @@ substitute a relative `G91` lift: it would be the only motion emitted in no fram
 unknowable on a machine whose Z travel the post cannot see, and it would leave the `G38.2` target — an
 absolute Z in the same stale frame — exactly as unbounded as it found it.
 
-**The machine-Z answer lifts the limit rather than working around it.** A declared, homed machine Z *is* an
-established frame at job start, so on such a machine the arrival emits a real `G53 G0 Z<Inter Part Travel Z>`
-and the warning is suppressed exactly as an established base suppresses it. The limit stands only where it
-is still true: a job that establishes no fixed reference at all — and *declaring* one is not establishing it
-on Marlin, where neither implementation runs, so the suppression asks `fixedZEstablishedInFile()` and not the
-dialog's own answer.
+**The machine frame lifts the limit rather than working around it.** A declared, homed machine Z *is* an
+established frame at job start, so on such a machine the arrival emits a real `G53 G0 Z<Machine Travel Z>`
+and the warning is suppressed. The limit stands only where it is still true: a job with no frame at all —
+and on Marlin *declaring* one is not establishing it, the one implementation being refused there, so the
+suppression asks whether the frame is established **in this file** and not what the dialog was set to.
+
+**Two modes make no arrival at all, and they take the order in reverse.** Everything above is about the
+first section *travelling* to its origin. The two `Set … to Current Pos` modes do not travel: the origin
+**is** where the operator left the tool, so there is nothing to arrive at and nothing for the frame to be
+the starting height of. What the establish would be instead is the one thing that destroys the answer —
+`G53 G0 Z<Machine Travel Z>` carries a single axis word, so it left the pre-jogged X and Y standing and
+overwrote the Z the mode exists to record. So `writeFirstSection()` holds **two orders**, chosen by
+`originIsPreJogged()`: establish → load → origin where the origin travels, and origin → establish where it
+does not. The frame is still established once, in the same file, before the first cut; only its place in
+the preamble moves. **The load prompt does not move with it, it goes** — a pre-jog can only have been made
+with a tool already fitted, so `Prompt for the First Tool` has nothing left to ask on those modes and is
+suppressed with a warning naming the `Jog to …` modes, which prompt first and position after. `CR-15`.
+
+### Computing a safe height is not the post's job
+
+**And Autodesk agrees in code.** *Z untrusted* means the controller was never told where its own frame is,
+so an absolute machine height is not approximately right — it is **arbitrary**. A relative lift is always
+*exact*; only its **sufficiency** is unknown. That is why a warning is the correct response and an error is
+not: erroring would refuse the hand-zeroed hobbyist, who is 24 of the 24 posted files. When Autodesk's own
+post is in this situation it emits *"Ensure the clearance height will clear the part and or fixtures"* — a
+warning and a comment, nothing else.
+
+**Asking for a travel height fills a hole rather than duplicating a field.** F360 has a machine-frame safe-Z
+slot, `getRetractPlane()`, and **no way for an operator to fill it** — zero occurrences across 211 cached
+machine definitions, and `setRetractPlane` commented out in all 159 posts that mention it.
+
+**The legitimate exception:** where the program **itself** homed, the frame is known for the rest of that
+program and an absolute retract is honest — a condition the post can verify, because it emitted the homing.
+
+### The post does not reach into F360's job
+
+F360 **never learns where the fixtures are**, so it cannot compute a path between work offsets and does not
+claim to. This is read from Autodesk's own machine-definition files, not from this project's documents. The
+consequence is that inter-part traverse logic has to live in the post or nowhere — which is why the post
+carries it, and why the *orchestration* above it belongs to the operator instead.
+
+---
+
+## Working on the post
+
+**Guards should attempt to be executed when `onOpen` runs.** Where a guard runs decides what a rejected job
+leaves on disk: `onOpen()` refuses before any output, so the job writes **no file at all**, while a guard in
+`onSection()` leaves a **truncated `.gcode`** an operator may not notice. `validateJob()` runs from
+`onOpen()` and already walks `getSection(i)`, so a guard needing section data can still live there.
+
+**Properties** use the combined-inline `properties = {}` form, read with `getProperty(properties.key)`.
+
+**`Personal.cps`** (repo root, git-excluded) is the post with `onRapid()` rerouted into `onLinear()` — the
+only way to reach the group-3 code, since a paid licence emits real `G0`s. Re-create it from the current
+`.cps`; its evidence is about *logic*, never about what the post emits.
+
+**`git commit -m` with a PowerShell here-string mangles messages containing double quotes.** Write the
+message to a file and use `git commit -F`, or pipe it in.
+
+---
+
+## References
+
+- **PostProcessor API class reference** — <https://cam.autodesk.com/posts/reference/classPostProcessor.html>
+- **Post Processor Training Guide (PDF)** — <https://cam.autodesk.com/posts/posts/guides/Post%20Processor%20Training%20Guide.pdf>
+- **Dumper post** — emits every property/parameter/section value Fusion exposes; run it before relying on
+  anything: <https://cam.autodesk.com/hsmposts?p=dump>
+- **Library of existing posts** — <https://cam.autodesk.com/hsmposts> · **Forum** —
+  <https://forums.autodesk.com/t5/hsm-post-processor-forum/bd-p/218>
+
+Firmware: Marlin <https://marlinfw.org/meta/gcode/> · GRBL 1.1 <https://github.com/gnea/grbl/wiki> ·
+FluidNC <http://wiki.fluidnc.com/> · Duet/RRF <https://docs.duet3d.com/User_manual/Reference/Gcodes>

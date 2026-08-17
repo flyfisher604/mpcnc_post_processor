@@ -3,18 +3,13 @@
 A Fusion 360 post for GRBL / Marlin / RepRap hobby CNC. The deliverable is
 `MPCNC_v4.0_Beta2.cps`; everything else in the repo supports it.
 
-## Read in this order
+## Read `docs/plan.md` first
 
-1. **`docs/plan.md` → *Checkpoint*** — always, first. The only place that says what is next.
-   `/checkpoint` reads it and reports in ten lines.
-2. **`docs/conventions.md`** — when writing code. The guards, the property and dialog rules, how to run
-   a test, and the harness method and its hard-won lessons.
-3. **`docs/design.md`** — only when changing frame, Z-reference or ordering behaviour. Why the post emits
-   what it does, and the firmware facts behind it.
-4. **`docs/HReview.md`** — only when a specific finding or test row is in play. `docs/PReview.md` is
-   **out of the tree** until the professional review runs; recover it with `git show 347ce5d:docs/PReview.md`.
+**It is the only file that says what is next.** Start at its *Checkpoint*, and reach everything else from
+there — `docs/findings.md` when a specific finding or test row is in play, `docs/design.md` when changing
+frame, Z-reference or ordering behaviour. Do not read or search under `./Test/` unless asked.
 
-Do not read or search files under `./Test/` unless explicitly asked.
+Each of those files states its own rules at its foot. Follow them when you edit it.
 
 ## Changing the post
 
@@ -22,22 +17,26 @@ Do not read or search files under `./Test/` unless explicitly asked.
   is applied immediately. Proposing and applying are separate steps.
 - **Never propose a verification that needs a non-GRBL controller, a sender console or a dry run.** Settle
   firmware questions from the firmware's own source and changelog, and cite file and version.
-- `node --check` runs itself on every edit. **Nothing gates the documents** — their contracts in
-  `docs/conventions.md` are enforced in the diff, by a person. `node docs/doc-sync.js` answers the one
-  question a diff cannot: whether `property-reference.md` still matches the post.
+- `node --check` runs itself on every edit. **Nothing gates the documents** — every rule in them is
+  enforced in the diff, by a person.
 
-## Registers ship with the code
+## Findings ship with the code
 
-Update the register **before the commit lands** — not after every intermediate edit, but once the change
-is settled, so the commit carries the code and its row together. Hobbyist → `docs/HReview.md`. A
-**professional** finding (multi-WCS, spoilboard base, tool changes, Manual NC, dialog) stays in the
-register it was filed in until `PReview.md` returns — a row split across two files is how seven ids went
-stale. **`/close-finding <id>` runs the procedure.** Don't ask whether to add the row — add it.
+Update the row in `docs/findings.md` **before the commit lands** — not after every intermediate edit, but
+once the change is settled, so the commit carries the code and its row together. The procedure is at the
+foot of that file. Don't ask whether to add the row — add it.
+
+**No register lives outside the tree:** too unfinished to commit is too unfinished to hold the only copy of
+an open finding.
 
 ## Commits
 
 Every commit carries a descriptive message — no exceptions, no placeholders, however mechanical the
 change. The message describes **the code change and why**; it never narrates doc bookkeeping.
+
+A commit that acts on a registered finding **leads its subject with the id** — `CR-11: …`, `HB-4: …` — so
+the work on a finding is findable with `git log --grep` and visible in a one-line log. A commit that only
+builds tooling around a register does not take a prefix, however much it mentions one.
 
 ## Before writing to memory
 
@@ -48,7 +47,8 @@ side effect of another task. Repo docs are reviewed in a diff; memories go stale
 ## Leave alone
 
 - **The user guides** — `README.md` and `docs/guide-hobbyist.md` / `guide-pro.md` /
-  `property-reference.md`. Not touched during code changes, only when asked. The **`doc-sync` marker on
-  `property-reference.md`** records the ref they last synced to; refresh from
-  `git diff <ref>..HEAD -- MPCNC_v4.0_Beta2.cps`, then re-bump it.
-- **`Personal.cps`** — a git-excluded test harness, not part of the post.
+  `property-reference.md`. Not touched during code changes, only when asked — and **when they fall behind
+  the post, that is the author's call to make**, not something a session detects or acts on.
+- **`Personal.cps`** — a git-excluded test harness, not part of the post. What it is, is in `design.md`.
+- **`Assessment/`** — the analysis this plan came from, dated 2026-08-13. Read it for evidence, never for
+  where things live: its file pointers predate the document consolidation.
