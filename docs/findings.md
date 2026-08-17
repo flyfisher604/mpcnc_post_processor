@@ -68,13 +68,17 @@ into its own header were enough to ask whether the hazard holds, rather than war
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
-> **Two property names in these rows no longer exist, and the rows are not rewritten.** `PV-10`
-> replaced the boolean **`Re-probe Z0 After a Change`** (`toolChangeProbeAfterChange`) with the enum
-> **`Tool Length Correction By`** (`toolChangeZ0Correction`), and renamed **`Tool Change Position
-> X/Y/Z`** to **`Manual Change Position X/Y/Z`** — a title-only change, keys untouched. `CR-17`,
-> `PR-23`, `PR-23b`, `PR-26`, `TC-19` and `WR-2` argue against the old names because those were the
-> names when they closed. **Read *Off* in them as *me, by hand* or *the tool change*** — which
-> assertion was meant is the whole of what `PV-10` found undecidable.
+> **Labels in these rows no longer exist, and the rows are not rewritten.** `PV-10` replaced the
+> boolean **`Re-probe Z0 After a Change`** (`toolChangeProbeAfterChange`) with the enum **`Tool Length
+> Correction By`** (`toolChangeZ0Correction`), and renamed **`Tool Change Position X/Y/Z`** —
+> to `Manual Change Position X/Y/Z`, and then to **`Manual Position X/Y/Z`**. `PV-10`'s three enum
+> values were relabelled with it: read *this post* as **`GCode reprobes Z0 after change`**, *the tool
+> change* as **`Tool change applies tool offset`**, and *me, by hand* as **`User re-zeroed Z by hand at
+> pause`**. **Every one of those is display text only — property keys and enum ids never moved**, so no
+> posted artifact and no matrix case turns on any of them. `CR-17`, `PR-23`, `PR-23b`, `PR-26`, `TC-19`
+> and `WR-2` argue against the old names because those were the names when they closed. **Read *Off* in
+> them as *me, by hand* or *the tool change*** — which assertion was meant is the whole of what `PV-10`
+> found undecidable.
 
 | ID | Finding | Sev | Resolution | Status |
 |---|---|---|---|---|

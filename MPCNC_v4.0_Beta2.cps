@@ -479,7 +479,7 @@ properties = {
   // correctly, hand over, and resume correctly. design.md -> Tool changes.
   toolChangeMode: {
     title      : "At a Tool Change",
-    description: "What the job does when the tool number changes. The post never changes the tool itself. Refuse to post: a job with more than one tool does not post -- split it into one file per tool. Pause for a manual change: the tool retracts, moves to the Manual Change Position if set, the spindle and coolant stop, and the program stops (M0) for you to change the tool. Do not jog at that pause. Hand over to the sender/firmware macro: the same retract and stops, then the token named by Tool Change Handled By below. Test that on air -- the post cannot check anything is listening, and an ignored token cuts on with the wrong tool. Hand-over needs Machine Travel Z, and is not available on Marlin.",
+    description: "What the job does when the tool number changes. The post never changes the tool itself. Refuse to post: a job with more than one tool does not post -- split it into one file per tool. Pause for a manual change: the tool retracts, moves to the Manual Position if set, the spindle and coolant stop, and the program stops (M0) for you to change the tool. Do not jog at that pause. Hand over to the sender/firmware macro: the same retract and stops, then the token named by Tool Change Handled By below. Test that on air -- the post cannot check anything is listening, and an ignored token cuts on with the wrong tool. Hand-over needs Machine Travel Z, and is not available on Marlin.",
     group      : "toolChange",
     order      : 10,
     type       : "enum",
@@ -523,7 +523,7 @@ properties = {
   // were plain G0 words the dialog presented as absolute while the machine read them in whichever WCS
   // happened to be active, so the "fixed" change spot moved with every part origin. These are G53.
   toolChangePositionX: {
-    title      : "Manual Change Position X",
+    title      : "Manual Position X",
     description: "Where the tool goes in X for a manual tool change -- an absolute machine coordinate in mm. Empty: it does not move in X or Y, and the change happens above the last cut. Fill both X and Y or neither. Needs X and Y declared homed and Machine Travel Z set, and is read only on Pause for a manual change. The tool does not return to the point it left; it returns to Machine Travel Z.",
     group      : "toolChange",
     order      : 40,
@@ -532,7 +532,7 @@ properties = {
     scope      : "post"
   },
   toolChangePositionY: {
-    title      : "Manual Change Position Y",
+    title      : "Manual Position Y",
     description: "Where the tool goes in Y for a manual tool change -- an absolute machine coordinate in mm. Fill it with X or not at all. Bringing Y forward is usually what puts the spindle where you can reach it.",
     group      : "toolChange",
     order      : 50,
@@ -541,7 +541,7 @@ properties = {
     scope      : "post"
   },
   toolChangePositionZ: {
-    title      : "Manual Change Position Z",
+    title      : "Manual Position Z",
     description: "The height the tool holds during a manual tool change -- an absolute machine coordinate in mm. Empty: the change happens at Machine Travel Z. Fill it only to get a spanner on the collet; the post moves there after the X/Y move and returns to Machine Travel Z afterwards. Below Machine Travel Z the tool sits lower than the height you declared clears your fixtures, so the post warns. May be filled without X and Y.",
     group      : "toolChange",
     order      : 60,
@@ -576,14 +576,14 @@ properties = {
   // who had the old field Off gets "Probe" until they answer this one.
   toolChangeZ0Correction: {
     title      : "Tool Length Correction By",
-    description: "Who corrects the work Z0 for the new tool's length. This machine has no tool-length system, so something must. This post: re-probe Z0 at every change, and mark every OTHER part's Z0 stale so a return to it is re-measured too. The tool change: your sender or macro applies a tool-length offset, which shifts the whole Z frame -- every part's stored Z0 stays valid and this post probes nothing. Me: you re-zero Z by hand at the pause, which corrects the part active at that pause and no other -- every other part is marked stale and is re-measured, or warned about, when the job returns to it. The probe searches down from Machine Travel Z, so G38 Target must reach the stock from there. No probe is written for tool 0 or a laser tool.",
+    description: "Who corrects the work Z0 for the new tool's length. This machine has no tool-length system, so something must. GCode reprobes Z0 after change: this post re-probes Z0 at every change, and marks every OTHER part's Z0 stale so a return to it is re-measured too. Tool change applies tool offset: your sender or macro applies a tool-length offset, which shifts the whole Z frame -- every part's stored Z0 stays valid and this post probes nothing. User re-zeroed Z by hand at pause: you re-zero Z by hand at the pause, which corrects the part active at that pause and no other -- every other part is marked stale and is re-measured, or warned about, when the job returns to it. The probe searches down from Machine Travel Z, so G38 Target must reach the stock from there. No probe is written for tool 0 or a laser tool.",
     group      : "toolChange",
     order      : 80,
     type       : "enum",
     values: [
-      { title: "This post -- re-probe Z0 after each change",  id: "Probe"  },
-      { title: "The tool change -- it applies a tool offset", id: "Offset" },
-      { title: "Me -- I re-zero Z by hand at the pause",      id: "Manual" }
+      { title: "GCode reprobes Z0 after change",    id: "Probe"  },
+      { title: "Tool change applies tool offset",   id: "Offset" },
+      { title: "User re-zeroed Z by hand at pause", id: "Manual" }
     ],
     value: "Probe",
     scope: "post"
@@ -1722,7 +1722,7 @@ function validateJob() {
         + "original stock top it writes the machined depth as Z0, and every cut after it goes that much "
         + "deeper -- Fusion computed those depths against the original datum. Move the touch-point onto "
         + "uncut material with \"Probe X/Y Offset\" in \"5 - Part Origins\", or set \"Tool Length "
-        + "Correction By\" to \"Me -- I re-zero Z by hand at the pause\". This pass reports every "
+        + "Correction By\" to \"User re-zeroed Z by hand at pause\". This pass reports every "
         + "boundary where a re-probe CAN happen; the file itself warns only at the probes that are "
         + "actually written."));
     }
@@ -1757,12 +1757,12 @@ function validateJob() {
     }
 
     if (changeReprobesZ0()) {
-      warning(localize("\"Tool Length Correction By\" is this post while changes are handed to \""
-        + toolChangeSenderTitle() + "\", so the post probes Z again after the macro returns and "
-        + "overwrites whatever the macro measured. That is right for a handler that only pauses and "
-        + "wrong for one that re-zeroes or applies a tool offset -- there it asks you to fit the touch "
-        + "plate at every change for a measurement already made. Set it to \"The tool change -- it "
-        + "applies a tool offset\" if the macro establishes Z0."));
+      warning(localize("\"Tool Length Correction By\" is \"GCode reprobes Z0 after change\" while "
+        + "changes are handed to \"" + toolChangeSenderTitle() + "\", so the post probes Z again after "
+        + "the macro returns and overwrites whatever the macro measured. That is right for a handler "
+        + "that only pauses and wrong for one that re-zeroes or applies a tool offset -- there it asks "
+        + "you to fit the touch plate at every change for a measurement already made. Set it to \"Tool "
+        + "change applies tool offset\" if the macro establishes Z0."));
     }
   }
 
@@ -1777,12 +1777,12 @@ function validateJob() {
     // the operator may apply G43.1 through their sender by hand while the job waits, and the post can
     // no more see that than it can see a macro's tool table.
     if (toolLengthCorrection() == "Offset" && getProperty(properties.toolChangeMode) == "Pause") {
-      warning(localize("\"Tool Length Correction By\" is \"The tool change -- it applies a tool "
-        + "offset\" while \"At a Tool Change\" is \"Pause for a manual change\". A manual pause hands "
-        + "over to nothing -- the post stops the program and waits -- so unless YOU apply a "
-        + "tool-length offset at that pause, no offset is applied and every part's stored Z0 still "
-        + "measures from the tool just removed. Choose \"Me -- I re-zero Z by hand at the pause\" if "
-        + "that is what you do, or \"This post\" to have it measured."));
+      warning(localize("\"Tool Length Correction By\" is \"Tool change applies tool offset\" while "
+        + "\"At a Tool Change\" is \"Pause for a manual change\". A manual pause hands over to nothing "
+        + "-- the post stops the program and waits -- so unless YOU apply a tool-length offset at that "
+        + "pause, no offset is applied and every part's stored Z0 still measures from the tool just "
+        + "removed. Choose \"User re-zeroed Z by hand at pause\" if that is what you do, or \"GCode "
+        + "reprobes Z0 after change\" to have it measured."));
     }
 
     // THE HAND-ZERO REACHES ONE PART, and on a multi-part job that is the thing the operator has to
@@ -1790,7 +1790,7 @@ function validateJob() {
     // reads the dialog and sends the job would otherwise meet it only in a place they had no reason to
     // open -- and it is this value that puts the other parts in that position. PV-10.
     if (toolLengthCorrection() == "Manual" && collectDistinctOffsets().length > 1) {
-      warning(localize("\"Tool Length Correction By\" is \"Me -- I re-zero Z by hand at the pause\" "
+      warning(localize("\"Tool Length Correction By\" is \"User re-zeroed Z by hand at pause\" "
         + "and this job cuts " + collectDistinctOffsets().length + " parts. Re-zeroing at the pause "
         + "corrects the ONE part whose work offset is active there; every other part's stored Z0 was "
         + "measured by the tool being removed. The post marks those parts stale, so a return to one "
@@ -1811,7 +1811,7 @@ function validateJob() {
     // but the tool holds this Z with hands on it, so the condition is worth stating once.
     if (tcz != undefined && getProperty(properties.toolChangeMode) == "Pause"
         && fixedZEstablishedInFile() && tcz < parseMachineTravelZ()) {
-      warning(localize("\"Manual Change Position Z\" is " + tcz + ", below the \"Machine Travel Z\" of "
+      warning(localize("\"Manual Position Z\" is " + tcz + ", below the \"Machine Travel Z\" of "
         + parseMachineTravelZ() + " -- the tool is held LOWER during the change than the height you "
         + "declared clears your fixtures. That is right only if the change position itself is clear of "
         + "everything on the bed at that height; the post crosses the bed at the travel height and "
@@ -2027,7 +2027,7 @@ function validateJob() {
     // "hold the other axis" and "use 0" are both moves nobody asked for.
     if ((getProperty(properties.toolChangePositionX) != "" || getProperty(properties.toolChangePositionY) != "")
         && (posX == undefined || posY == undefined)) {
-      error("\"Manual Change Position X\" and \"Manual Change Position Y\" are read as one point, and this"
+      error("\"Manual Position X\" and \"Manual Position Y\" are read as one point, and this"
         + " job sets one of them without the other -- or sets one to something that is not a signed"
         + " decimal number of millimetres. Fill both, or empty both to change the tool where the cut"
         + " ended.");
@@ -5023,7 +5023,8 @@ function toolChange(partOriginEstablishesZ0) {
           ? ", which corrects THIS part and no other -- the remaining " + strandedParts + " part"
             + (strandedParts == 1 ? " is" : "s are") + " marked stale here, and re-measured, or"
             + " warned about, at the return to each"
-          : ", or set \"Tool Length Correction By\" to \"This post\" to have it probed"));
+          : ", or set \"Tool Length Correction By\" to \"GCode reprobes Z0 after change\" to have it"
+            + " probed"));
   }
 
   if (getProperty(properties.includeToolFile2) != "") {
