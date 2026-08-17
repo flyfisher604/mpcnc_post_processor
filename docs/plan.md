@@ -6,26 +6,23 @@ claim, is `integration.md`.
 
 ## Checkpoint — read this first
 
-**Baseline.** Branch **`Assessment`**, 44 commits ahead of `master`. `CoverageFixes`
-contributes 18 of them and is **itself unmerged**, so a merge to `master` carries two
-ranges, not one. `master` is 6 commits ahead of `origin/master`; `Assessment` is unpushed.
+**Baseline.** Branch **`autoreview`**, 15 commits ahead of `master`. `master` carries the
+`Assessment` merge and is **77 commits ahead of `origin/master`** — nothing since that merge is
+pushed. `CoverageFixes` and `Assessment` are both merged into it and stale.
 
-**What is true now.** Phase C, Step 0, **Steps 1.1, 1.2, 1.3, 2, 3, 4, 5 and F2 are done and closed.** A
-multi-WCS job posts on any of the three firmwares given a machine declared homed; the spoilboard
-base and the old group 5 no longer exist; the multi-part register is settled; every origin mode
-states the condition it depends on; the tool change is both flows, a machine-frame change position on
-the manual one, and nothing else. `PR-14` closed with 1.2; `PR-16` and `HR-26` closed by deletion with
-2; `PR-17` closed with 2; `PR-18` and `PR-19` closed with 4; `PR-15`, `PR-21` and `PR-22` closed with
-5; `PR-24` with F2; `PR-26` and `PR-27` with F3; `PR-28` with F4; `CR-01` with F5; `HR-13`, `HR-19`,
-`HR-24` and `CR-02` with F6, which closed `HR-20` and `HR-27` by design alongside them; `CR-17` with
-F7.
+**What is true now.** Phase C, Step 0, **Steps 1.1, 1.2, 1.3, 2, 3, 4, 5, F2–F7 and V are done and
+closed.** A multi-WCS job posts on any of the three firmwares given a machine declared homed; the
+spoilboard base and the old group 5 no longer exist; every origin mode states the condition it
+depends on; a part is set up once, by the tool that cuts it; the tool change is both flows, a
+machine-frame change position on the manual one, and nothing else. **And the post is now *run*
+rather than walked** — four matrices over Autodesk's own intermediate files and fourteen job files
+built for the paths those cannot reach, 103 cases, all passing. `integration.md` is that machinery
+and what a run may claim.
 
-**What is next: Step V**, and it is **four rows — the whole of it is the jet workstream**
-`findings.md` §6 defers. The register re-walk of 2026-08-16 closed forty-eight rows from the
-source and the author's rulings closed sixteen more, so **nothing in Step V waits on a licence, a
-controller or a sender**, and nothing outside the jet rows waits on a post to close. What is owed
-in artifacts rather than rows is two posted files: a factory-default GRBL job and a Marlin
-multi-operation one. §4 states the methods and their bounds; §5 carries each row's argument.
+**What is next: Step W** — the **five findings** those runs left open in `findings.md` §2 and the
+**three rows** in §4. **Three of the five need no ruling and two are the author's**, and `J1` is red
+rather than unrun: it ran and confirmed the asymmetry it was written to catch. Nothing here waits on
+a licence, a controller, a sender or a job file — the artifact debt closed with Step V.
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
@@ -44,26 +41,34 @@ quoted comment text, never by line number.
 
 | | Item | Blocked on |
 |---|---|---|
-| **V** | Post-verify what has landed unposted | — |
+| **W** | Close the five open findings and empty §4 | two rulings, for two of them |
 | **6** | Clarity | — |
-| **7** | Documents, once | 6, V |
+| **7** | Documents, once | 6, W |
 
 ---
 
-## Step V — Post-verify what has landed unposted
+## Step W — the open findings and the three open rows
 
-The end park and the `CR-` fixes changed the emitted file and **have never been posted**. What the
-source can settle is settled — `findings.md` §5's seventy-seven walked rows — so what is left here is
-what a walk cannot reach.
+`findings.md` §2 holds five findings and §4 holds three rows. **The order is what blocks what**, not
+severity: every row in §4 is downstream of a fix.
 
-- **The jet workstream — `J4` first**, group 8 having never appeared in any posted file; then `J1`,
-  `J2`, `J5`. Deferred by design, and `findings.md` §6 states what blocks it. **`J1` is the one that
-  may return a finding rather than a pass**: with a tool that cannot probe, the
-  `Use WCS X0 Y0, Probe Z0` arm writes a `Debug` line where every neighbouring arm writes a warning,
-  so at the shipped comment level the file says nothing about a Z0 nobody established.
-- **Two artifact debts, and neither is a row**: a factory-default GRBL job, which is what
-  `findings.md`'s *Invalidated by landed fixes* waits on, and the Marlin multi-operation job that
-  settles `S3f`'s corrected comment count — the only place a walk contradicted the register.
+- **The three fixes no ruling blocks, `PV-3` first.** It is the only Med-High of them and it is why
+  `J1` is red: three arms write an `eComment.Debug` trace where their neighbours write
+  `>>> WARNING:`, so at the shipped `Info` the file commands `Z0` moves against an origin nothing
+  established and says so nowhere. **Three call sites — count them in the diff.** Then `PV-2`, a
+  fall-through that warns on every laser power change that the post did not do what it did two lines
+  above, and `PV-6`, one line.
+- **Then the rows, which the fixes unblock.** `J1` re-runs against `PV-3`'s fix **and still owes tool
+  0**, only the jet tool having been posted — `canProbe` is one expression, so a difference between
+  the two is a finding rather than a pass. `J2` and `J5` owe assertion sets over artifacts that
+  already exist. That empties §4.
+- **Two rulings are the author's and both are one hazard** — `PV-9` and `PV-10`: a multi-part job
+  strands the Z0 of every part the tool change did not stand on. Neither is a change to what the post
+  emits; each is a change to what it says, and each row states the question it needs answered.
+- **The audit `PV-9` is one instance of** — `findings.md` §7 item 5. Each of the ~25 `writeWarning()`
+  sites marked *emission-point-only* or *owes a twin*, with the verdict recorded beside the call. It
+  bounds the class three of these five findings are drawn from; until it exists, each new one is
+  argued from scratch.
 
 **Worth one post of its own, and it is not a row here:** `HR-6 (B)`'s rotated Setup. It is the live
 risk, and `PR-2c` closed on a ruling rather than on an artifact, so that job would settle both.
@@ -135,15 +140,25 @@ The guides are off-limits during code changes. Do it all here — per-step means
 The over-built place was the spoilboard base: it served the non-homing machine at a cost —
 five interlocking properties, a register, and a probe defended only by where the operator
 parked — that the multi-part user did not have to pay, because that user's machine homes.
-Steps 1, 1.3 and 2 were the remedy, and all of them have landed. **The under-verification is the
-half still standing** — smaller than it was, and now explicit about which of its rows a posted
-file could still overturn. The two design questions the assessment
+Steps 1, 1.3 and 2 were the remedy, and all of them have landed. **The under-verification was the
+half still standing, and Step V is where it stopped being deferred**: the deliberate deferral the
+repository nowhere stated is now a document that states its own bounds, and what the runs could not
+reach is named there rather than left silent. The two design questions the assessment
 settled on the way — whether the post reaches into F360's job, and whether computing a safe
 height is the post's job — are in `design.md`.
 
 ---
 
 ## Done
+
+**Step V — post-verify what has landed unposted ✅ closed 2026-08-17**, `6b3ae3e` … `1acec1a`. The
+post is **run** rather than walked, by Autodesk's own engine over its own intermediate files and
+fourteen built for the paths those cannot reach: four matrices, 103 cases. It closed both artifact
+debts, found the jet rows' stated blocker to be false, reached group 3 — which **no** job file can
+exercise, the condition being in the licence that produced the job — through a `visible: false` test
+hook, and returned eleven findings a walk could not. **`PV-1` is why the step existed**: a post that
+produced no file at all, closed by walk after walk with `node --check` passing on it throughout.
+`PV-1`, `PV-4` and `PV-7` closed with fixes; five findings and three rows go to Step W.
 
 **`CR-23`, `CR-24`, `PR-25` ✅ closed 2026-08-16 — `findings.md` §2 is empty.** `CR-23` closed on the
 author's ruling: the parser functions as designed and `0` is a legal Safe-Z. `CR-24` names what the post
