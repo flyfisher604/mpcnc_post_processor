@@ -1637,6 +1637,75 @@ function validateJob() {
       + ". Enter \"Machine Travel Z\" in \"4 - Machine Frame\"."));
   }
 
+  // PV-7's post-time half, reading the SAME containment predicate the file half reads so the two
+  // channels cannot come to disagree about what counts as a machined datum. What it cannot share is the
+  // live state: at output time partProbe() knows a probe IS happening, and here the post has to decide
+  // where one CAN happen. Two triggers, both read off the sections alone:
+  //
+  //   A TOOL CHANGE with "Re-probe Z0 After a Change" on -- PV-7's own site, and the one that reaches a
+  //   SINGLE-part job, where nothing else in the post re-probes at all.
+  //
+  //   A WCS CHANGE under a probing "Each New WCS / Part" -- writeWcsOnReturn()'s re-probe of a part this
+  //   job has already cut, which is the same hazard one path over.
+  //
+  // IT OVER-REPORTS, AND THE TEXT SAYS SO: a return re-probes only where a change has since made that
+  // part's Z0 stale, and that is state this pass does not carry. Over-reporting is the right direction
+  // for a pre-flight about a datum, and the file half is exact -- it fires at the probe or not at all.
+  //
+  // TOOL 0 AND JET TOOLS ARE SKIPPED because neither can probe, so no arm of either dispatch touches
+  // the part at all; those sections carry their own warning about a Z0 nobody established.
+  if (getProperty(properties.toolChangeMode) != "Refuse") {
+    var changeReprobes = getProperty(properties.toolChangeProbeAfterChange);
+    var returnReprobes = (changeMode == "Probe Z" || changeMode == "Jog XY & Probe Z");
+    var hazardBoundaries = 0;
+    var hazardCutters = [];
+    var hazardSeen = {};
+    var hazardZMin = undefined;
+    for (var si = 1; si < getNumberOfSections(); ++si) {
+      var sec = getSection(si);
+      var secTool = sec.getTool();
+      if (secTool.number == 0 || secTool.isJetTool()) {
+        continue;
+      }
+      var prevSec = getSection(si - 1);
+      var secWo = sec.getWorkOffset();
+      if (secWo == 0) { secWo = 1; }
+      var prevWo = prevSec.getWorkOffset();
+      if (prevWo == 0) { prevWo = 1; }
+      var probesHere = (changeReprobes && secTool.number != prevSec.getTool().number)
+                    || (returnReprobes && secWo != prevWo);
+      if (!probesHere) {
+        continue;
+      }
+      var hazard = probePointMachinedBefore(si, secWo);
+      if (hazard == undefined) {
+        continue;
+      }
+      ++hazardBoundaries;
+      if (hazardZMin == undefined || hazard.zMin < hazardZMin) {
+        hazardZMin = hazard.zMin;
+      }
+      for (var hi = 0; hi < hazard.names.length; ++hi) {
+        if (!hazardSeen[hazard.names[hi]]) {
+          hazardSeen[hazard.names[hi]] = true;
+          hazardCutters.push(hazard.names[hi]);
+        }
+      }
+    }
+    if (hazardBoundaries > 0) {
+      warning(localize("This job re-probes work Z0 at a point it has already machined. Every part probe "
+        + "touches off at " + probePointDescription() + ", and " + hazardCutters.join(", ") + " cuts "
+        + "through that point, down to Z" + xyzFormat.format(hazardZMin) + ". At "
+        + hazardBoundaries + " later boundar" + (hazardBoundaries == 1 ? "y" : "ies")
+        + " the post re-probes Z0 there: where the tool lands on that machined surface instead of the "
+        + "original stock top it writes the machined depth as Z0, and every cut after it goes that much "
+        + "deeper -- Fusion computed those depths against the original datum. Move the touch-point onto "
+        + "uncut material with \"Probe X/Y Offset\" in \"5 - Part Origins\", or turn \"Re-probe Z0 After "
+        + "a Change\" off and re-zero Z by hand at each change. This pass reports every boundary where a "
+        + "re-probe CAN happen; the file itself warns only at the probes that are actually written."));
+    }
+  }
+
   // FLOW 2's THREE WARNINGS, all of them about the same thing: the post emits a token and cannot see
   // whether anything acts on it. Nothing here is refusable -- each names a condition the operator can
   // satisfy and the post cannot check.
@@ -2071,6 +2140,7 @@ function resetPostState() {
   currentWorkOffset = undefined;          // no work offset emitted yet
   wcsVisited = {};                        // no part has been set up in this file
   wcsZ0Trusted = {};
+  sectionsCompleted = 0;                  // nothing has been cut in this file yet -- PV-7
   sequenceNumber = getProperty(properties.jobSequenceNumberStart);
   forceSectionToStartWithRapid = false;
   // The other direction of the same debt: left true at end of file, the NEXT file's first rapid crosses
@@ -2227,6 +2297,12 @@ var currentWorkOffset;   // last work offset (WCS) emitted, to suppress redundan
 // just removed. So a change clears the Z half and nothing else clears either. CR-17.
 var wcsVisited = {};     // work offset -> this job has entered it and established its origin
 var wcsZ0Trusted = {};   // work offset -> its stored Z0 was established under the tool now loaded
+
+// HOW MANY SECTIONS HAVE FINISHED CUTTING. A count and not a section id: what PV-7 asks of it is
+// "which toolpaths have already removed material", and onSectionEnd() is the one callback that answers
+// that without the post having to reason about where it is in the job. probePointMachinedBefore() reads
+// it; nothing else does, and nothing writes it but the callback below and resetPostState().
+var sectionsCompleted = 0;
 
 // Emit the work coordinate system (WCS) for a section. GRBL and RepRap/Duet support G54-G59 (RepRap
 // also G59.1-G59.3), so the offset assigned in Fusion is honored. Stock Marlin has none -- the post
@@ -2907,6 +2983,8 @@ function onSection() {
 
 function onSectionEnd() {
   resetAll();
+  // This section's material is gone, so it counts against the next probe's touch-point. PV-7.
+  ++sectionsCompleted;
   // Clear the operation name so the next section cannot inherit it: Fusion sends the next section's
   // operation-comment AFTER this callback, so an unnamed operation would keep this one's.
   sectionComment = undefined;
@@ -3723,6 +3801,73 @@ function probeOffsetY() { return propertyMmToUnit(getProperty(properties.probeOf
 // must retract before that traverse -- cannot disagree about when it happens.
 function probeOffsetIsSet() { return probeOffsetX() != 0 || probeOffsetY() != 0; }
 
+// HAS THIS JOB ALREADY CUT THE POINT A PART PROBE TOUCHES OFF ON? The touch-point is the part origin
+// plus "Probe X/Y Offset", and that offset ships 0 -- so on a job whose earlier operations machine
+// across their own origin, a later probe reads the MACHINED floor and writes it as Z0. Every depth after
+// it, computed by Fusion against the ORIGINAL datum, then cuts that much deeper into the part. PV-7.
+//
+// THE ANSWER IS KNOWABLE FROM WHAT THE POST ALREADY WRITES INTO ITS OWN HEADER: getGlobalRange() and
+// getGlobalZRange() are the toolpath's extents in the same WORK frame the touch-point is expressed in,
+// so containment is a comparison and not an estimate. That is what makes the warning conditional rather
+// than a line every job carries and every operator learns to skip.
+//
+// SCOPED TO ONE WORK OFFSET, because a range is measured from ITS OWN part's origin: a section in G55
+// that cut through X0 Y0 says nothing about the material standing over G54's. Fusion's ambiguous 0 is
+// aliased to 1 exactly as writeWCS() and collectDistinctOffsets() alias it.
+//
+// A BOUNDING BOX AND NOT A FOOTPRINT, which is the one thing this cannot be exact about: a contour whose
+// box spans the origin may never have passed over it. So it over-reports and never under-reports -- the
+// right direction for a warning about a datum, and the reason neither channel says the surface IS
+// machined, only that the probe may land on it.
+function sectionCutsProbePoint(section, px, py) {
+  if (section.getGlobalZRange().getMinimum() >= 0) {
+    return false;   // nothing below this part's datum: the touch-point is still the stock top
+  }
+  var xr = section.getGlobalRange(new Vector(1, 0, 0));
+  var yr = section.getGlobalRange(new Vector(0, 1, 0));
+  return (px >= xr.getMinimum()) && (px <= xr.getMaximum())
+      && (py >= yr.getMinimum()) && (py <= yr.getMaximum());
+}
+
+// The sections before index `upto` that share `workOffset` and have cut through that part's probe point
+// -- {names, zMin}, or undefined where there are none. ONE STATEMENT OF THE HAZARD, read by partProbe()
+// for the file and by validateJob() for the dialog, so the two channels cannot come to disagree about
+// which operations are at issue or how deep they went. HB-5's rule needs both halves to be the same
+// question asked twice, not two questions that happen to agree today.
+function probePointMachinedBefore(upto, workOffset) {
+  var px = probeOffsetX();
+  var py = probeOffsetY();
+  var names = [];
+  var zMin = undefined;
+  for (var i = 0; i < upto; ++i) {
+    var s = getSection(i);
+    var wo = s.getWorkOffset();
+    if (wo == 0) {
+      wo = 1;
+    }
+    if (wo != workOffset || !sectionCutsProbePoint(s, px, py)) {
+      continue;
+    }
+    names.push(s.hasParameter("operation-comment")
+      ? ("\"" + s.getParameter("operation-comment") + "\"")
+      : ("operation " + (i + 1)));
+    var z = s.getGlobalZRange().getMinimum();
+    if (zMin == undefined || z < zMin) {
+      zMin = z;
+    }
+  }
+  return (names.length > 0) ? { names: names, zMin: zMin } : undefined;
+}
+
+// How the two channels name the touch-point, in one place: which of the two things the operator has to
+// look at -- the origin itself, or the origin plus an offset that has not moved it far enough.
+function probePointDescription() {
+  return probeOffsetIsSet()
+    ? ("this part's X0 Y0 plus \"Probe X/Y Offset\" -- X" + xyzFormat.format(probeOffsetX())
+       + " Y" + xyzFormat.format(probeOffsetY()))
+    : "this part's X0 Y0, \"Probe X/Y Offset\" being 0";
+}
+
 // THE TWO "Set ... to Current Pos" MODES, and the one thing about them the rest of the post has to
 // reason about: the origin is the position the OPERATOR left the tool at before the file started --
 // "jog there first, there is no prompt", as the property says. Two consequences follow, and this is
@@ -3761,6 +3906,31 @@ function partProbe(atOrigin, zUntrusted) {
   var ox = probeOffsetX();
   var oy = probeOffsetY();
   var offsetSet = probeOffsetIsSet();
+
+  // PV-7's in-file half, and it stands ABOVE the traverse and the G38.2 rather than beside them: it
+  // reports a datum the operator has to correct BEFORE the probe runs, PV-4a's ordering rule.
+  //
+  // HERE RATHER THAN AT toolChange()'s CALL SITE, because every part probe touches the same point and
+  // the question is the same at all of them. PV-7 found it on the tool-change re-probe;
+  // writeWcsOnReturn()'s stale-Z re-probe is the identical hazard one path over, on a part this job has
+  // demonstrably cut. The first part's probe reaches this with nothing completed and the walk answers
+  // undefined, so the arm costs a factory job nothing.
+  //
+  // A WARNING AND NOT A SUPPRESSION: with no tool-length system this probe is the only correction there
+  // is, and an origin off the material is the common professional case and correct as it stands. The
+  // remedy already exists and is named -- "Probe X/Y Offset" is exactly the field that moves the
+  // touch-point onto uncut stock, and its description names only the origin-at-a-corner case.
+  var machined = probePointMachinedBefore(sectionsCompleted, currentWorkOffset);
+  if (machined != undefined) {
+    writeWarning("this probe touches off at " + probePointDescription() + " -- a point this job has"
+      + " ALREADY CUT, down to Z" + xyzFormat.format(machined.zMin) + " in "
+      + machined.names.join(", ") + ". Where the tool lands on that machined surface instead of the"
+      + " original stock top, the Z0 written below is that much low and every depth after it cuts that"
+      + " much deeper into the part -- Fusion computed them against the original datum. Move the"
+      + " touch-point onto uncut material with \"Probe X/Y Offset\" in group 5 - Part Origins, or set"
+      + " Z0 by hand instead of letting this probe write it");
+  }
+
   if (!atOrigin || offsetSet) {
     resetAll();
     // The rapid below is at an unknown height, so the file must say so. A WARNING and not an Info

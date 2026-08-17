@@ -286,6 +286,42 @@ const cases = [
 { id:'PRO31', desc:'compensation IN THE CONTROL is refused - the professional habit these firmwares cannot serve',
   cnc:full, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause') }),
   refuse:[/Cutter radius compensation in the control is not supported/,'refused, naming the Fusion setting that fixes it'] },
+
+// === G. the re-probe's touch-point, and whether the job has already cut it (PV-7) =====
+// PRO8's configuration exactly, so the pair below adds one property to a case already
+// passing: the ONLY probe in the file is the change re-probe, which is what makes the
+// warning's presence and absence attributable to nothing else.
+{ id:'PRO32', desc:'the change re-probe touches off on a datum section 1 machined - both channels, above the probe',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause') }),
+  // The operation and the depth are named, not just the shape: "2D-Face" runs X-92.662..80
+  // by Y-24.375..0.95 down to Z-1, so the box contains X0 Y0 and the touch-point is a
+  // machined floor 1 mm below the datum every later depth was computed against.
+  must:[[/>>> WARNING: this probe touches off at this part's X0 Y0, "Probe X\/Y Offset" being 0/,
+         'the file names the point and the field that moves it'],
+        [/ALREADY CUT, down to Z-1 in "2D-Face"/,'and names the operation that cut it, and how deep']],
+  mustLog:[[/This job re-probes work Z0 at a point it has already machined/,'and the dialog says it too - HB-5'],
+           [/At 1 later boundary the post re-probes Z0 there/,'one boundary, counted rather than hedged']],
+  // ABOVE THE MOTION IT WARNS ABOUT, PV-4a's rule: a line below the G38.2 would describe a
+  // datum already written. The traverse to the touch-point is between them.
+  //
+  // READ FROM THE CHANGE PROMPT DOWN, not from line 1: section 1 travels to X0 Y0 itself and
+  // ordered() searches for the FIRST match, so a whole-file order proves nothing here. It is
+  // the trap `PV-8` names, met a second time.
+  custom:(t)=>{ const after = t.slice(t.search(/Change to Tool #2/));
+    return ordered(after,[['warning',/ALREADY CUT/],
+                          ['traverse to the point',/Move to part origin X0 Y0, then probe Z/],
+                          ['re-probe',/^G38\.2 /m]]); } },
+
+{ id:'PRO33', desc:'... and the remedy the warning names is what silences it - the offset moves the point off the cut',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause'), probeOffsetY:N(10) }),
+  // Y10 clears "2D-Face"'s Y maximum of 0.95, so the touch-point stands on uncut stock. The
+  // OTHER branch of the same condition: the probe is unchanged and only the warning leaves.
+  must:[[/^(G0 )?X0 Y10 F\d/m,'the traverse goes to the origin plus the offset']],
+  mustNot:[[/ALREADY CUT/,'nothing in the file claims a machined datum any more']],
+  mustNotLog:[[/already machined/,'and the dialog is silent as well']],
+  custom:(t)=>{ const n=countOf(t,/^G38\.2 /gm);
+    return n===1? [true,'the probe itself is untouched - one re-probe, as PRO8 has']
+                : [false,`${n} probes, expected 1 -- the offset must move the point, not the probe`]; } },
 ];
 
 // ---- run ------------------------------------------------------------------------------

@@ -88,7 +88,7 @@ node tools/wcs-matrix.js          "$POST" MPCNC_v4.0_Beta2.cps tools/wcs-jobs ou
 node tools/personal-matrix.js     "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/personal
 ```
 
-**101 cases — 28 hobbyist, 31 professional, 31 WCS, 11 personal — over 19 job files, and all 101
+**103 cases — 28 hobbyist, 33 professional, 31 WCS, 11 personal — over 19 job files, and all 103
 pass as of 2026-08-17.** The whole run is about two minutes.
 
 **The four are independent by design and stay that way.** The personas they encode disagree about
@@ -289,7 +289,7 @@ so every section arrives as offset 0. Verified by editing that attribute in Auto
 
 ### 4.3 Every `.cnc` file the suite uses
 
-**19 files, 101 cases.** Five are Autodesk's; fourteen are generated. `A` = 2D-Face tool 1 (which cuts
+**19 files, 103 cases.** Five are Autodesk's; fourteen are generated. `A` = 2D-Face tool 1 (which cuts
 **across** the part origin, so it is the block that puts a machined surface under a later probe);
 `B` = 2D-Contour tool 2; `J` = a Through-medium laser operation, tool 2; `K` = an Etch laser
 operation, tool 2.
@@ -299,7 +299,7 @@ operation, tool 2.
 | File | Blocks | Cases | What it covers |
 |---|---|---|---|
 | `Milling/2D/face.cnc` | 1 section, T1 | **38** | the workhorse: preamble, all six `First WCS / Part` modes, probe geometry, comment levels, sequence numbers, travel speeds, the frame, homing, the park, and every refusal that needs only a plain job |
-| `Milling/2D/toolchange.cnc` | 2 sections, T1→T2 | **17** | both tool-change flows, the sender tokens, the change position and its three refusals, the re-probe and its absence |
+| `Milling/2D/toolchange.cnc` | 2 sections, T1→T2 | **19** | both tool-change flows, the sender tokens, the change position and its three refusals, the re-probe and its absence — and, because `A` cuts across the origin `B`'s re-probe touches off on, `PV-7`'s machined-datum warning in both its branches |
 | `Milling/2D/bore.cnc` | 1 section, 1067 cutting moves, arcs | **13** | arcs on and off, and **the whole of groups 2 and 3**: it is the only job with enough motion for a feed *distribution* to be read, and its arcs are what put `limitArcFeed()` under the same ceiling as the linear path |
 | `Cutting/Laser/center.cnc` | 7 sections, T2 laser | 1 | a jet tool withholding the provisional Z0 a milling tool receives |
 | `Milling/2D/full program.cnc` | 4 sections, 2 tools | 1 | compensation **in the control**, which all three firmwares refuse |
