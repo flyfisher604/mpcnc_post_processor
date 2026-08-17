@@ -4941,7 +4941,11 @@ function toolChangeMacroCall() {
   if (sender == "RepRap") {
     writeComment(eComment.Important, " Hand over to RepRapFirmware -- T" + tool.number
       + " runs tfree/tpre/tpost");
-    writeComment(eComment.Info, "   " + tool.comment + ", declared with M563 in config.g");
+    // TOOL NUMBER FIRST, because tool.comment is empty on most of Autodesk's own tools and the line
+    // then had no subject at all -- ";   , declared with M563 in config.g". The gSender arm below is
+    // where the form comes from; the comment is appended only where there is one. PV-6.
+    writeComment(eComment.Info, "   Tool #" + tool.number
+      + (tool.comment ? " " + tool.comment : "") + ", declared with M563 in config.g");
     writeBlock(tFormat.format(tool.number));
     return;
   }

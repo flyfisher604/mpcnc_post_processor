@@ -173,8 +173,12 @@ const cases = [
                         toolChangeMode:S('Macro'), toolChangeSender:S('RepRap') }),
   must:[[/^T2$/m,'the T word alone - tfree/tpre/tpost do the work'],
         [/^G53 G0 Z-5 F\d/m,'the post still returns the tool to a known height'],
-        [/declared with M563 in config\.g/,'names what the machine must already have']],
+        // PV-6: tool.comment is empty on most of Autodesk's own tools, so this line read
+        // ";   , declared with M563 in config.g" -- a sentence with no subject. The number is what
+        // makes it one, and asserting the bare tail is what let the defect pass unread.
+        [/Tool #2[^\n]*, declared with M563 in config\.g/,'the line names the tool it is about']],
   mustNot:[[/M6/,'an M6 would be a second token for a change already made'],
+           [/^;\s*, declared with M563/m,'and never the subjectless form - PV-6'],
            [/^G94$/m,'G94 is not re-asserted off GRBL'],[/^G17$/m,'nor G17']],
   mustLog:[[/errors unless every tool number it uses is declared with M563/,'and the dialog says it too']] },
 
