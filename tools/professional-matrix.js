@@ -197,7 +197,12 @@ const cases = [
 
 { id:'PRO16', desc:'the shipped default refuses a two-tool job outright',
   cnc:change, props:pro({}),
-  refuse:[/Refuse to post/,'refused, naming both remedies'] },
+  // ON THE REMEDIES AND NOT ON THE MODE'S OWN NAME. The title is display text and has now moved twice;
+  // what this row is for is that the refusal tells the operator the two ways out, and those are the
+  // other two modes by name. A pattern on "Refuse ..." asserts only that the error quotes its own
+  // setting back, which is the least informative half of the line.
+  refuse:[/"Manual change at a pause".*"Sender or firmware macro changes it"/s,
+          'refused, naming both remedies'] },
 
 // === C. the tool change position -- F3's machine-frame excursion =====================
 { id:'PRO17', desc:'a change position: X/Y crosses at the travel height, THEN Z descends, then it returns',

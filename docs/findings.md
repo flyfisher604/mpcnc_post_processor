@@ -77,11 +77,17 @@ diagnosis, the diff and the argument.
 > to `Manual Change Position X/Y/Z`, and then to **`Manual Position X/Y/Z`**. `PV-10`'s three enum
 > values were relabelled with it: read *this post* as **`GCode reprobes Z0 after change`**, *the tool
 > change* as **`Tool change applies tool offset`**, and *me, by hand* as **`User re-zeroed Z by hand at
-> pause`**. **Every one of those is display text only — property keys and enum ids never moved**, so no
-> posted artifact and no matrix case turns on any of them. `CR-17`, `PR-23`, `PR-23b`, `PR-26`, `TC-19`
-> and `WR-2` argue against the old names because those were the names when they closed. **Read *Off* in
-> them as *me, by hand* or *the tool change*** — which assertion was meant is the whole of what `PV-10`
-> found undecidable.
+> pause`**. **`At a Tool Change`'s own three values were relabelled 2026-08-17**, ids `Refuse` / `Pause`
+> / `Macro` untouched: read **`Refuse to post`** as **`Refuse a multi-tool job`**, **`Pause for a manual
+> change`** as **`Manual change at a pause`**, and **`Hand over to the sender/firmware macro`** as
+> **`Sender or firmware macro changes it`**. **Every one of the above is display text only — property
+> keys and enum ids never moved**, so no posted artifact turns on any of them. **One matrix case did
+> move and the distinction is worth keeping**: a case may assert the title *text* inside a warning or an
+> error, which is not the same as turning on the id — `PRO16` asserted `Refuse to post` and now asserts
+> the two remedies the error names, which is what the row was for. `CR-17`, `PR-23`, `PR-23b`, `PR-26`,
+> `TC-19` and `WR-2` argue against the old names because those were the names when they closed. **Read
+> *Off* in them as *me, by hand* or *the tool change*** — which assertion was meant is the whole of what
+> `PV-10` found undecidable.
 
 | ID | Finding | Sev | Resolution | Status |
 |---|---|---|---|---|

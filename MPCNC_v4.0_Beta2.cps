@@ -479,21 +479,30 @@ properties = {
   // correctly, hand over, and resume correctly. design.md -> Tool changes.
   toolChangeMode: {
     title      : "At a Tool Change",
-    description: "What the job does when the tool number changes. The post never changes the tool itself. Refuse to post: a job with more than one tool does not post -- split it into one file per tool. Pause for a manual change: the tool retracts, moves to the Manual Position if set, the spindle and coolant stop, and the program stops (M0) for you to change the tool. Do not jog at that pause. Hand over to the sender/firmware macro: the same retract and stops, then the token named by Tool Change Handled By below. Test that on air -- the post cannot check anything is listening, and an ignored token cuts on with the wrong tool. Hand-over needs Machine Travel Z, and is not available on Marlin.",
+    description: "What the job does when the tool number changes. The post never changes the tool itself. Refuse a multi-tool job: a job with more than one tool does not post -- split it into one file per tool. Manual change at a pause: the tool retracts, moves to the Manual Position if set, the spindle and coolant stop, and the program stops (M0) for you to change the tool. Do not jog at that pause. Sender or firmware macro changes it: the same retract and stops, then the token named by Tool Change Handled By below. Test that on air -- the post cannot check anything is listening, and an ignored token cuts on with the wrong tool. Hand-over needs Machine Travel Z, and is not available on Marlin.",
     group      : "toolChange",
     order      : 10,
     type       : "enum",
+    // THE TITLES SAY WHO ACTS AND WHAT HAPPENS; the ids are unchanged and are not display text. "Refuse
+    // to post" read as a blanket refusal and this mode refuses exactly one thing, a job carrying more
+    // than one tool -- a single-tool job posts on it, which is the shipped default and the commonest
+    // configuration there is. "Pause for a manual change" named the M0 rather than the party doing the
+    // work, which is what the operator is actually choosing between.
+    //
+    // THE IDS STAY. A property id is what Fusion stores and what all four matrices pass on the command
+    // line, so moving one resets every saved setting, alters the property dump in every saved artifact
+    // and rewrites every case that names it. Nothing an operator sees says "Pause".
     values: [
-      { title: "Refuse to post",                        id: "Refuse" },
-      { title: "Pause for a manual change",             id: "Pause"  },
-      { title: "Hand over to the sender/firmware macro", id: "Macro" }
+      { title: "Refuse a multi-tool job",           id: "Refuse" },
+      { title: "Manual change at a pause",          id: "Pause"  },
+      { title: "Sender or firmware macro changes it", id: "Macro" }
     ],
     value: "Refuse",
     scope: "post"
   },
   toolChangeSender: {
     title      : "Tool Change Handled By",
-    description: "Who does the change after the hand-over, and so which token is emitted. Read only on Hand over to the sender/firmware macro. gSender: T and M6, which the sender must be set to intercept -- GRBL itself rejects M6. CNCjs: T and M6, but it only pauses, so the change and the re-zero are yours. RepRapFirmware tool table: T alone; your tools must be declared in config.g. Other: no token -- the file named in Sender Macro File is included instead. The post then re-asserts absolute mode, units and the work offset, and returns to Machine Travel Z.",
+    description: "Who does the change after the hand-over, and so which token is emitted. Read only on Sender or firmware macro changes it. gSender: T and M6, which the sender must be set to intercept -- GRBL itself rejects M6. CNCjs: T and M6, but it only pauses, so the change and the re-zero are yours. RepRapFirmware tool table: T alone; your tools must be declared in config.g. Other: no token -- the file named in Sender Macro File is included instead. The post then re-asserts absolute mode, units and the work offset, and returns to Machine Travel Z.",
     group      : "toolChange",
     order      : 20,
     type       : "enum",
@@ -524,7 +533,7 @@ properties = {
   // happened to be active, so the "fixed" change spot moved with every part origin. These are G53.
   toolChangePositionX: {
     title      : "Manual Position X",
-    description: "Where the tool goes in X for a manual tool change -- an absolute machine coordinate in mm. Empty: it does not move in X or Y, and the change happens above the last cut. Fill both X and Y or neither. Needs X and Y declared homed and Machine Travel Z set, and is read only on Pause for a manual change. The tool does not return to the point it left; it returns to Machine Travel Z.",
+    description: "Where the tool goes in X for a manual tool change -- an absolute machine coordinate in mm. Empty: it does not move in X or Y, and the change happens above the last cut. Fill both X and Y or neither. Needs X and Y declared homed and Machine Travel Z set, and is read only on Manual change at a pause. The tool does not return to the point it left; it returns to Machine Travel Z.",
     group      : "toolChange",
     order      : 40,
     type       : "string",
@@ -1720,10 +1729,10 @@ function validateJob() {
   if (getProperty(properties.toolChangeMode) != "Refuse" && countDistinctTools() > 1
       && !fixedZEstablishedInFile()) {
     warning(localize("\"At a Tool Change\" is \"" + (toolChangeIsMacro()
-      ? "Hand over to the sender/firmware macro\", but this job establishes no fixed Z reference, so the "
+      ? "Sender or firmware macro changes it\", but this job establishes no fixed Z reference, so the "
         + "post can neither lift the tool before the macro runs nor return it to a known height "
         + "afterwards -- the next move starts from wherever the macro left it"
-      : "Pause for a manual change\", but this job establishes no fixed Z reference, so the post cannot "
+      : "Manual change at a pause\", but this job establishes no fixed Z reference, so the post cannot "
         + "lift the tool before handing it to you -- the pause happens at whatever height the last "
         + "operation ended at, and the re-probe after it rapids to the part origin from there")
       + ". Enter \"Machine Travel Z\" in \"4 - Machine Frame\"."));
@@ -1849,7 +1858,7 @@ function validateJob() {
     // no more see that than it can see a macro's tool table.
     if (toolLengthCorrection() == "Offset" && getProperty(properties.toolChangeMode) == "Pause") {
       warning(localize("\"Tool Length Correction By\" is \"Tool change applies tool offset\" while "
-        + "\"At a Tool Change\" is \"Pause for a manual change\". A manual pause hands over to nothing "
+        + "\"At a Tool Change\" is \"Manual change at a pause\". A manual pause hands over to nothing "
         + "-- the post stops the program and waits -- so unless YOU apply a tool-length offset at that "
         + "pause, no offset is applied and every part's stored Z0 still measures from the tool just "
         + "removed. Choose \"User re-zeroed Z by hand at pause\" if that is what you do, or \"GCode "
@@ -2053,14 +2062,14 @@ function validateJob() {
   // THE POST PERFORMS NO TOOL CHANGE. Refused rather than warned, and refused HERE rather than at the
   // boundary, because the alternative is a file that cuts every operation with whichever tool is in the
   // spindle, at the other tools' feeds and speeds -- a broken cutter at best. The shipped default did
-  // exactly that behind a warning. "Pause for a manual change" is the operator's decision to hand over
+  // exactly that behind a warning. "Manual change at a pause" is the operator's decision to hand over
   // in one file; posting one tool per file is the other answer and needs no setting at all.
   if (countDistinctTools() > 1 && getProperty(properties.toolChangeMode) == "Refuse") {
-    error("This job uses " + countDistinctTools() + " tools and \"At a Tool Change\" is \"Refuse to"
-      + " post\". This post changes no tool itself on any supported firmware -- it emits no M6 on this"
-      + " setting, which a GRBL controller answers with error:20 anyway. Post one tool per file; or set"
-      + " \"At a Tool Change\" to \"Pause for a manual change\" to stop at each boundary and swap the"
-      + " tool by hand; or to \"Hand over to the sender/firmware macro\" if your sender or firmware owns"
+    error("This job uses " + countDistinctTools() + " tools and \"At a Tool Change\" is \"Refuse a"
+      + " multi-tool job\". This post changes no tool itself on any supported firmware -- it emits no M6"
+      + " on this setting, which a GRBL controller answers with error:20 anyway. Post one tool per file;"
+      + " or set \"At a Tool Change\" to \"Manual change at a pause\" to stop at each boundary and swap"
+      + " the tool by hand; or to \"Sender or firmware macro changes it\" if your sender or firmware owns"
       + " a tool table and you have configured it to do the change.");
     return;
   }
@@ -2073,10 +2082,10 @@ function validateJob() {
     // into and no sender in the list that speaks to it. The operator is the only route, and the post
     // already has one: the manual pause. design.md -> Tool changes, the who-can-subtract table.
     if (fw == eFirmware.MARLIN) {
-      error("\"At a Tool Change\" is \"Hand over to the sender/firmware macro\", but the firmware is"
+      error("\"At a Tool Change\" is \"Sender or firmware macro changes it\", but the firmware is"
         + " Marlin, which has no tool-length offset register -- there is nothing for a macro to correct"
         + " and no supported sender intercepts a tool change for it. M6 reaches Marlin as an unknown"
-        + " command and the job carries on with the wrong cutter. Use \"Pause for a manual change\","
+        + " command and the job carries on with the wrong cutter. Use \"Manual change at a pause\","
         + " which re-probes Z0 with the new tool and is the only correction Marlin has.");
       return;
     }
