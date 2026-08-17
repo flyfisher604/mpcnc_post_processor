@@ -2426,6 +2426,23 @@ function wcsOriginEstablishesZ0(plan) {
   return !wcsVisited[plan.workOffset] || getProperty(properties.toolChangeProbeAfterChange);
 }
 
+// NOTHING ESTABLISHED Z0, and the file is the only place that can say so at the moment it becomes true.
+// ONE WRITER for all four arms where a probing origin mode meets a tool that cannot probe -- tool 0 or a
+// jet tool -- so the three that were silent and the one that warned cannot come to differ again.
+//
+// THE RECOMMENDED MODE IS THE CALLER'S, because the two dispatches offer different ones: group 5's
+// first-part property has "Set X0 Y0 Z0 to Current Pos" and the subsequent-part one "Jog to X0 Y0 Z0",
+// and those are the only values of each that set Z0 with no probe -- wcsOriginEstablishesZ0() is where
+// that is stated, and this must not recommend a mode it would answer false for.
+//
+// writeWarning() and not writeComment(eComment.Info, ...): HB-9's rule, and this outliving Comment Level
+// Off is the whole of the finding -- the three silent arms wrote eComment.Debug, so at the shipped Info
+// the file commanded absolute Z words against an origin nothing had checked and said so nowhere. PV-3.
+function warnZ0NotEstablished(useInstead) {
+  writeWarning("a jet tool / tool 0 cannot probe, so Z0 was NOT established -- this job runs against"
+    + " whatever Z origin is already stored. Use \"" + useInstead + "\" for a jet/laser job.");
+}
+
 // THE ORIGIN-ESTABLISH HALF of what used to be one writeWCS() call, taking the plan that call returned.
 // It runs from onSection() AFTER any tool change at the same boundary, so the part is set up once, by
 // the tool that cuts it: the change no longer arrives to overwrite a Z0 the outgoing tool measured, and
@@ -2464,6 +2481,7 @@ function writeWcsEstablish(plan) {
     if (canProbe) {
       partProbe(false, true);
     } else {
+      warnZ0NotEstablished("Jog to X0 Y0 Z0");
       writeComment(eComment.Debug, " writeWcsEstablish: probe skipped (tool 0 or jet tool) -- moving to stored X0 Y0");
       resetAll();
       rapidMovementsXY(0, 0);
@@ -2492,6 +2510,9 @@ function writeWcsEstablish(plan) {
       partProbe(true);
     } else {
       writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
+      // The jog set X0 Y0 and nothing set Z0, so the register keeps whatever Z it already held --
+      // which is the same silence as the arm above, one mode over.
+      warnZ0NotEstablished("Jog to X0 Y0 Z0");
       writeComment(eComment.Debug, " writeWcsEstablish: probe skipped (tool 0 or jet tool)");
     }
   }
@@ -4009,6 +4030,7 @@ function writeWcsOnStart() {
     if (canProbe) {
       partProbe(false, true);
     } else {
+      warnZ0NotEstablished("Set X0 Y0 Z0 to Current Pos");
       writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool) -- moving to stored X0 Y0");
       resetAll();
       rapidMovementsXY(0, 0);
@@ -4055,9 +4077,7 @@ function writeWcsOnStart() {
     writeWcsOrigin(currentWorkOffset, 0, 0, undefined);
     // ... which leaves Z0 at whatever the register already holds, while the jet section that follows
     // emits ABSOLUTE Z words against that unknown zero. Suppressing the write is right; silence is not.
-    writeWarning("a jet tool / tool 0 cannot probe, so Z0 was NOT"
-      + " established -- this job runs against whatever Z origin is already stored. Use"
-      + " \"Set X0 Y0 Z0 to Current Pos\" for a jet/laser job.");
+    warnZ0NotEstablished("Set X0 Y0 Z0 to Current Pos");
     writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool)");
   }
 }

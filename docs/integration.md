@@ -88,7 +88,7 @@ node tools/wcs-matrix.js          "$POST" MPCNC_v4.0_Beta2.cps tools/wcs-jobs ou
 node tools/personal-matrix.js     "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/personal
 ```
 
-**104 cases — 29 hobbyist, 33 professional, 31 WCS, 11 personal — over 19 job files, and all 104
+**105 cases — 29 hobbyist, 33 professional, 32 WCS, 11 personal — over 19 job files, and all 105
 pass as of 2026-08-17.** The whole run is about two minutes.
 
 **The four are independent by design and stay that way.** The personas they encode disagree about
@@ -289,7 +289,7 @@ so every section arrives as offset 0. Verified by editing that attribute in Auto
 
 ### 4.3 Every `.cnc` file the suite uses
 
-**19 files, 104 cases.** Five are Autodesk's; fourteen are generated. `A` = 2D-Face tool 1 (which cuts
+**19 files, 105 cases.** Five are Autodesk's; fourteen are generated. `A` = 2D-Face tool 1 (which cuts
 **across** the part origin, so it is the block that puts a machined surface under a later probe);
 `B` = 2D-Contour tool 2; `J` = a Through-medium laser operation, tool 2; `K` = an Etch laser
 operation, tool 2.
@@ -627,13 +627,14 @@ part 1 up; section 2 is a change **into** the laser and a new part at once; sect
 stale. `W27` reads what is left: the move to the stored origin, and a warning that every depth below
 is out by a tool length.
 
-**Two of these files record findings rather than passes.**
+**Both files recorded findings rather than passes, and one of them has since been fixed.**
 
-`W25b` — at the shipped comment level the second part says nothing about the Z0 nobody established:
-no probe, correctly, but no warning in the file and none in the dialog. That is `PV-3` at two further
-sites, both `canProbe`-false arms of `writeWcsEstablish()`, which write `eComment.Debug` while the
-function's own closing comment says *"the tool-0 arms, which have already warned that nothing
-established it."* They have not.
+`W25b` found that at the shipped comment level the second part said nothing about the Z0 nobody
+established — no probe, correctly, but no warning in either channel. That was `PV-3` at two further
+sites, both `canProbe`-false arms of `writeWcsEstablish()`. **It closed 2026-08-17**, and the case
+now asserts the warning it was written to find missing; `W28` covers the third site on the same file
+and a different property set. What `W25b` still pins is the **absence of a dialog twin**, which is
+`PV-9`'s question and not `PV-3`'s.
 
 `W27` — the return **does** warn, and in the file alone. That answers the first of `PV-9`'s two open
 questions with an artifact instead of an argument: **yes, the `canProbe`-false arm carries the same
@@ -663,6 +664,23 @@ sitting in the block, so there is no word to change — unlike the work offset, 
 that one is editable. Reaching it needs a Fusion job authored in vaporize mode.
 
 Group 8 is blocked on laser detail in any case, so this is recorded as a bound rather than pursued.
+
+**Two more things no `.cnc` in this suite reaches, found 2026-08-17 and recorded here for the same
+reason.**
+
+**A tool numbered 0.** `canProbe` is `tool.number != 0 && !tool.isJetTool()` — one expression, two
+disjuncts — and only the jet one can be posted. No file Autodesk ships carries a tool 0, and the
+splice cannot add one: `operation:tool_number` was stamped to `0` and the post reported `Tool: 1`,
+then to `7` with the same result, so the kernel does not build `tool.number` from that parameter.
+Whatever record it does read is one `make-wcs-jobs.js` decodes by guess or not at all, and its own
+header refuses to guess. The generated job was deleted rather than kept — a file named for a tool it
+does not carry is worse than no file. Like the vaporize level, this needs a Fusion-authored Setup.
+
+**`onCommand()`'s fall-through.** With `PV-2` landed, the census over all 105 posted files finds
+**zero** commands reaching it — before that fix the only ones anywhere were the 60 power denials in
+one laser job. So `HR-13`'s warning, which is the whole reason the fall-through exists, is now
+witnessed by nothing in the suite, and a regression there would be silent. It needs a job carrying a
+Manual NC instruction the switch does not name.
 
 ### 7.7 Group 3 — **reached, 2026-08-17**
 
@@ -703,7 +721,7 @@ count as varied, and §6.2's 37 includes them.
 | **Needs a case only** | manual spindle control, `probePause` = `Before` | `G28` probing on Marlin/RRF, the Duet modes, `Pause & Home`, and item 6's last three residues |
 | **Needs fixtures** | — | the four include files, the four custom coolant files |
 | **Needs a ruling, not an artifact** | coolant (a persona), laser (group 8 detail) | the same |
-| **Unreachable** | — | `laserOnVaporize` |
+| **Unreachable** | — | `laserOnVaporize`, a tool numbered 0, `onCommand()`'s fall-through |
 
 **The job-file debt is closed and the licence debt with it.** Every path the post has that a `.cnc`
 file can reach now has one; the one path no file could reach is reached by the post's own test hook;

@@ -315,15 +315,34 @@ const cases = [
                           ['G55',/^G55$/m],
                           ['probe skipped',/writeWcsEstablish: probe skipped/]]) },
 
-{ id:'W25b', desc:'... and at the shipped level the file says nothing about the Z0 it never established - PV-3',
+{ id:'W25b', desc:'PV-3 - and at the shipped level the second part SAYS that nothing established its Z0',
   job:'jet-two-parts.cnc',
   props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Probe Z') }),
-  must:[[/^G55$/m,'the second part is selected and cut']],
-  // ASSERTS THE GAP. writeWcsEstablish()'s own closing comment says the tool-0 arms "have already
-  // warned that nothing established it" -- and both of them write eComment.Debug, so at Info there is
-  // no such warning in either channel. Closing PV-3 turns this case red, which is the point.
-  mustNot:[[/>>> WARNING[^)]*(Z0|established)/,'no warning in the file -- PV-3, not a pass']],
-  mustNotLog:[[/probe skipped|nothing established/,'and none in the dialog either']] },
+  // This case asserted the GAP until PV-3 closed it: writeWcsEstablish()'s closing comment granted
+  // trust to "the tool-0 arms, which have already warned that nothing established it", and both of
+  // them wrote eComment.Debug, so at the shipped Info nothing said it in either channel.
+  must:[[/^G55$/m,'the second part is selected and cut'],
+        [/>>> WARNING[^)]*Z0 was NOT established/,'and the file says nothing established its Z0'],
+        [/Use "Jog to X0 Y0 Z0"/,'naming the SUBSEQUENT-part mode that sets Z0 with no probe']],
+  mustNot:[[/^G38\.2/m,'still nothing probes - a jet tool cannot']],
+  // ONE CHANNEL, and whether that is right is PV-9's question rather than this row's. Asserting the
+  // absence of a twin pins today's behaviour deliberately: the PV-9 ruling turns this case red, the
+  // way W11b and W22 are written to, and that is how a ruling gets noticed here.
+  mustNotLog:[[/Z0 was NOT established/,'no dialog twin yet - PV-9 owns that question']] },
+
+{ id:'W28', desc:'PV-3/J2 - the Jog XY & Probe Z arm met by a tool that cannot probe',
+  job:'jet-two-parts.cnc',
+  props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Jog XY & Probe Z') }),
+  // The third of PV-3's three sites and the last thing J2 owed. The jog establishes X0 Y0 and
+  // nothing establishes Z0, so the register keeps whatever Z it held -- the same silence as W25b,
+  // one mode over, and reached by a property set rather than by a new job file.
+  must:[[/^G10 L20 P2 X0 Y0$/m,"the jog sets X0 Y0 into the second part's own register"],
+        [/>>> WARNING[^)]*Z0 was NOT established/,'and the file says the Z half was not set']],
+  mustNot:[[/^G10 L20 P2 X0 Y0 Z0$/m,'no provisional Z0 - nothing would overwrite it, CR-12'],
+           [/^G38\.2/m,'and no probe: the tool cannot']],
+  custom:t => ordered(t, [['jog prompt',/MSG,Jog to X0 Y0 above Z0/],
+                          ['X0 Y0 only',/^G10 L20 P2 X0 Y0$/m],
+                          ['warning',/Z0 was NOT established/]]) },
 
 // === J. a change INTO a tool that cannot probe (PR-22) ===============================
 { id:'W26', desc:'a mill hands over to a laser: the OUTGOING tool is what decides the spindle stop',

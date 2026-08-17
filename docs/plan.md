@@ -16,13 +16,13 @@ spoilboard base and the old group 5 no longer exist; every origin mode states th
 depends on; a part is set up once, by the tool that cuts it; the tool change is both flows, a
 machine-frame change position on the manual one, and nothing else. **And the post is now *run*
 rather than walked** — four matrices over Autodesk's own intermediate files and fourteen job files
-built for the paths those cannot reach, 103 cases, all passing. `integration.md` is that machinery
+built for the paths those cannot reach, 105 cases, all passing. `integration.md` is that machinery
 and what a run may claim.
 
-**What is next: Step W** — the **five findings** those runs left open in `findings.md` §2 and the
-**three rows** in §4. **Three of the five need no ruling and two are the author's**, and `J1` is red
-rather than unrun: it ran and confirmed the asymmetry it was written to catch. Nothing here waits on
-a licence, a controller, a sender or a job file — the artifact debt closed with Step V.
+**What is next: Step W**, and it is **two findings and two rulings — the same two.** `findings.md`
+§2 holds `PV-9` and `PV-10`, one hazard read from two sides, and neither is a change to what the post
+emits. **§4 is empty for the first time**: every registered question has been asked of the post. What
+is left beside the rulings is the audit that bounds their whole class.
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
@@ -41,34 +41,28 @@ quoted comment text, never by line number.
 
 | | Item | Blocked on |
 |---|---|---|
-| **W** | Close the five open findings and empty §4 | two rulings, for two of them |
+| **W** | Close the last two findings | two rulings, and they are the findings |
 | **6** | Clarity | — |
 | **7** | Documents, once | 6, W |
 
 ---
 
-## Step W — the open findings and the three open rows
+## Step W — the two open findings
 
-`findings.md` §2 holds five findings and §4 holds three rows. **The order is what blocks what**, not
-severity: every row in §4 is downstream of a fix.
+`findings.md` §2 holds two findings and both wait on the same decision. **The audit is what should
+run first**, because it answers them as a class rather than one at a time.
 
-- **The three fixes no ruling blocks, `PV-3` first.** It is the only Med-High of them and it is why
-  `J1` is red: three arms write an `eComment.Debug` trace where their neighbours write
-  `>>> WARNING:`, so at the shipped `Info` the file commands `Z0` moves against an origin nothing
-  established and says so nowhere. **Three call sites — count them in the diff.** Then `PV-2`, a
-  fall-through that warns on every laser power change that the post did not do what it did two lines
-  above, and `PV-6`, one line.
-- **Then the rows, which the fixes unblock.** `J1` re-runs against `PV-3`'s fix **and still owes tool
-  0**, only the jet tool having been posted — `canProbe` is one expression, so a difference between
-  the two is a finding rather than a pass. `J2` and `J5` owe assertion sets over artifacts that
-  already exist. That empties §4.
-- **Two rulings are the author's and both are one hazard** — `PV-9` and `PV-10`: a multi-part job
-  strands the Z0 of every part the tool change did not stand on. Neither is a change to what the post
-  emits; each is a change to what it says, and each row states the question it needs answered.
-- **The audit `PV-9` is one instance of** — `findings.md` §7 item 5. Each of the ~25 `writeWarning()`
-  sites marked *emission-point-only* or *owes a twin*, with the verdict recorded beside the call. It
-  bounds the class three of these five findings are drawn from; until it exists, each new one is
-  argued from scratch.
+- **The audit** — `findings.md` §7 item 5. `warning()` exists only inside `validateJob()` and
+  `writeWarning()` is a comment writer, so every condition raised while blocks are emitted reaches
+  the file alone unless a twin was written for it. Mark each of the ~25 sites *emission-point-only*
+  or *owes a twin*, verdict recorded beside the call. **Cheap, and it bounds the class** both open
+  findings are drawn from; until it exists each one is argued from scratch.
+- **Then the two rulings, which are one hazard.** `PV-9`: does the pre-flight name the stale parts,
+  which needs the section walk, or only the shape, which needs three properties? `PV-10`: should
+  `Re-probe Z0 After a Change` = `Off` clear `wcsZ0Trusted` for every offset **except** the active
+  one — what is actually true of a manual change — at the cost of making an Off setting emit
+  something? **`W11b`, `W22` and `W25b` pin today's behaviour**, so either answer turns a case red
+  and no ruling can land unnoticed.
 
 **Worth one post of its own, and it is not a row here:** `HR-6 (B)`'s rotated Setup. It is the live
 risk, and `PR-2c` closed on a ruling rather than on an artifact, so that job would settle both.
