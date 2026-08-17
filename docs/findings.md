@@ -165,11 +165,18 @@ witnessed in an existing artifact, say which one.
 `utility` — the post run by Autodesk's own `post.exe` over one of the intermediate `.cnc` files that
 ship with the HSM VS Code extension. **It is the same engine Fusion uses and the same toolpath data**,
 so it settles everything a `walk` settles *and* whether the post runs at all, which is what `PV-1`
-cost. Two bounds, and both are real: **the dialog is not exercised** — properties are set by an
-appended `properties.<id>.value` block, because `post.exe --property` cannot set an enum on any post,
-Autodesk's `haas.cps` included — and **the job is Autodesk's, not the operator's**, so a row needing a
-particular Setup, work offset or tool list still wants a `posted` file. A `utility` row names the
-`.cnc` file it ran, as a `posted` row names its `.gcode`.
+cost. Its bounds are the dialog, which it does not exercise, and the job, which is Autodesk's rather
+than the operator's — so a row needing a particular Setup, work offset or tool list still wants a
+`posted` file. A `utility` row names the `.cnc` file it ran, as a `posted` row names its `.gcode`.
+
+**Every property is reachable, and `--property NAME VALUE` takes a JavaScript literal.** A string or
+an enum carries its own quotes — `--property jobSelectedFirmware '"Marlin"'` — and numbers and
+booleans go bare. **Getting that wrong is silent twice over.** The utility validates nothing, so
+`'"Klipper"'` is set as happily as `'"Marlin"'`; and an unquoted value that still parses is stored as
+the wrong type, where `machineTravelZ -2` becomes the **number** `-2` and `parseMachineCoordinate()`
+reads the field as *empty* — the machine frame switched off by an argument that looked right, caught
+only because `WR-2` put a warning there. So a run states its property set from the schema
+`--interrogate` returns, and the posted file's own property dump is what confirms it.
 
 | Test | Proves | Setup (delta) | Method | Expansion | State |
 |---|---|---|---|---|---|
