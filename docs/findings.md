@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **76 findings — 64 fixed ·
-9 closed by design · 1 withdrawn · 2 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **77 findings — 64 fixed ·
+9 closed by design · 1 withdrawn · 3 open.** Test registers in §4 and §5.
 
 > **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
 > with the design that made them defects. `design.md` → *Tool changes* is the replacement
@@ -21,7 +21,7 @@ because commit messages cite them and must still resolve.
 | `CR-` | Pre-Beta coverage review, 2026-08-09 | `CR-01` … `CR-24` |
 | `FCR-` | 2026-08-01 whole-file review. **All findings closed**; three test rows survive, renamed here | `FCR-4` … `FCR-13` |
 | `WR-` | Walk review, 2026-08-16 — the open register re-executed against the source | `WR-1` … `WR-2` |
-| `PV-` | Post-verify pass, 2026-08-16 — the post **run**, by the post utility over Autodesk's own intermediate files | `PV-1` … `PV-3` |
+| `PV-` | Post-verify pass, 2026-08-16 — the post **run**, by the post utility over Autodesk's own intermediate files | `PV-1` … `PV-4` |
 
 > **The `CR-` prefix once meant two things.** The 2026-08-01 whole-file review filed
 > `CR-1 … CR-17`, dissolved into the hobbyist register at `c73726c` / `a68dd11` / `1232929`
@@ -49,20 +49,22 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**Two, both found by posting a laser job 2026-08-16 — the artifact `J4` was owed.** Neither is
-reachable by a walk: one is a count of what the file contains, the other is what a second callback
-does after the first has already acted.
+**Three, all found by running the post 2026-08-16.** None is reachable by a walk: two are a count of
+what the file contains, one is what a second callback does after the first has already acted. **`PV-4`
+is a channel, not a diagnosis** — the condition is already tested and the wording already written, and
+the author has ruled that it belongs in the file as well as the dialog.
 
 | ID | Finding | Sev | Reproduce | Action | Status |
 |---|---|---|---|---|---|
 | **PV-2** | **Every laser power change warns that the post did not do what it just did.** `onCommand()`'s fall-through — `HR-13`'s fix, so that no Manual NC instruction vanishes in silence — names `COMMAND_POWER_ON` and `COMMAND_POWER_OFF` as *"not supported by this post and was not emitted"*. **The post emits them**, two lines above, from `onPower()`: `>>> LASER Power ON`, then `M4 S800`. The kernel calls both callbacks for one event and only `onCommand()` believes nothing happened | Med | `Cutting/Laser/center.cnc`, factory GRBL: **60 of the file's 975 lines**, one pair per cut | Name both commands in `onCommand()`'s switch and return — `onPower()` owns the emission. **Do not soften the fall-through**: `HR-13`'s rule is right and this is a missing case, not a wrong channel. It reaches the operator at `Comment Level` `Off` too, `writeWarning()` bypassing the gate by `HB-9`'s design | ⬜ |
+| **PV-4** | **Homing destroys the pre-jog the origin mode is about to record, and only the dialog is told.** `Home at Job Start` = `Home` with either `… Current Pos` mode drives the tool onto the endstops **before** the origin write, so the position recorded as X0 Y0 is the homing corner rather than the part. `validateJob()` warns, and the wording is right — but it is a post-time `warning()` alone, so the file carries nothing. **The operator who posts once and runs later, or who is handed the `.gcode`, is told nothing at all** | Wrong part | `Milling/2D/face.cnc`, `machineHomedAxes` `XYZ`, `machineHomeAtStart` `Home`, factory `probeOnStart`: `$H` at file line 106, `G10 L20 P1 X0 Y0 Z0` at 122, and none of the file's three `>>> WARNING:` lines is this one | **The author's ruling 2026-08-16: both channels.** Add a `writeWarning()` beside the existing `warning()`, on the same gate — `homesAtJobStart() && (homedXY \|\| homedZ) && originIsPreJogged()` — which is already exactly the right condition and needs no change. `PR-17`, `CR-10`, `HB-13` and `HB-5` are the precedent, and `HB-5`'s rule is the one being applied: **a property that fails one way fails in both channels**. Not a refusal: the code's *"advice rather than prohibition"* stands, a fixture at machine zero being rare rather than impossible | ⬜ |
 | **PV-3** | **`Use WCS X0 Y0, Probe Z0` runs a jet job against a Z0 nobody established, and the file does not say so.** With a tool that cannot probe, that arm of `writeWcsOnStart()` writes a **`Debug`** trace — *"probe skipped tool 0 or jet tool"* — where both neighbouring arms write `>>> WARNING`. At the shipped `Info` the line is absent, and the file then commands `Z0` moves against an origin it never checked | Med-High | `Cutting/Laser/center.cnc` at `Info`, `First WCS / Part` = `Use WCS X0 Y0, Probe Z0`: no `G38.2`, four `Z0` motion lines, and nothing anywhere about Z0 | The warning `HB-13` already writes for this mode on a probing tool, extended to the arm where the tool **cannot** probe. `J1` is the row and predicted this exactly | ⬜ |
 
 ---
 
 ## 3. Closed findings
 
-**64 fixed · 9 closed by design · 1 withdrawn · 2 open in §2 — 76 rows.** Permanent: commit messages and
+**64 fixed · 9 closed by design · 1 withdrawn · 3 open in §2 — 77 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
