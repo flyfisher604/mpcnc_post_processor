@@ -21,7 +21,7 @@ because commit messages cite them and must still resolve.
 | `CR-` | Pre-Beta coverage review, 2026-08-09 | `CR-01` … `CR-24` |
 | `FCR-` | 2026-08-01 whole-file review. **All findings closed**; three test rows survive, renamed here | `FCR-4` … `FCR-13` |
 | `WR-` | Walk review, 2026-08-16 — the open register re-executed against the source | `WR-1` … `WR-2` |
-| `PV-` | Post-verify pass, 2026-08-16 — the post **run**, by the post utility over Autodesk's own intermediate files; from `PV-8` over job files built for the paths those cannot reach, and from `PV-11` under a simulated Personal licence for the group no job file can reach | `PV-1` … `PV-11` |
+| `PV-` | Post-verify pass, 2026-08-16 — the post **run**, by the post utility over Autodesk's own intermediate files; from `PV-8` over job files built for the paths those cannot reach, from `PV-11` under a simulated Personal licence for the group no job file can reach, and from `PV-14` against the toolpath the kernel delivered rather than against a pattern | `PV-1` … `PV-15` |
 
 > **The `CR-` prefix once meant two things.** The 2026-08-01 whole-file review filed
 > `CR-1 … CR-17`, dissolved into the hobbyist register at `c73726c` / `a68dd11` / `1232929`
@@ -61,7 +61,8 @@ up rather than something you find.
 > only right channel, not merely that no twin exists.
 
 **What an empty §2 does and does not mean.** Every registered defect has been answered. It is not a
-claim that the post is correct — §7 holds what is owed and unasked, and `HR-6 (B)` is a live risk in it.
+claim that the post is correct — §7 holds what is owed and unasked. **The live risk that used to stand
+there, `HR-6 (B)`, is answered**: `PV-14` refuses all six rotated Setups the library ships.
 
 ---
 
@@ -220,7 +221,7 @@ the case id, as a `utility` row names its `.cnc` and a `posted` row names its `.
 
 ## 5. Passed tests
 
-**✅ 150 PASS · ❌ 0 FAIL · ➖ 17 n/a — 167 tests in 160 rows** (an `(A)`/`(B)` pair shares a
+**✅ 152 PASS · ❌ 0 FAIL · ➖ 17 n/a — 169 tests in 162 rows** (an `(A)`/`(B)` pair shares a
 row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
 `PR-2g`, `PR-2h`, `PR-14a`, `PR-14b`, `PB1`, `PB2`, `M2`, `PBV1`, `PBV2`, `PBV3`, `M1` and `M4`
@@ -266,6 +267,8 @@ warning the fix deletes; `CR-23` retires beside them, closed on a ruling that ch
 
 | Test | Result |
 |---|---|
+| **PV-14** | ✅ `utility`, 2026-08-17 — **CorrectGcode: is the emitted file the job Fusion asked for, spelled so a controller can parse it. 41 cases, all passing**, `tools/correct-gcode-matrix.js`. **The oracle is a second post, not a pattern.** `tools/trace.cps` records every callback the kernel raises — each rapid, cut, arc, cycle point, power change, speed change and command, in order, at six decimals — and its twelve kernel-configuration lines are copied from the deliverable, because arc fitting and sweep splitting are decisions the kernel makes from those globals before either post sees a callback. `tools/gcode-model.js` reads the g-code back as g-code: a block parser, a modal simulator that answers *unknown* rather than zero for a position a `G53`, a `G38.2` or a homing cycle has made unknowable, and a dialect linter. **Nothing in the four persona matrices reads a toolpath**; each of them would pass on a post that took every decision correctly and then wrote the moves out at the wrong coordinates. **Agreement, on four dialect/job crossings**: `bore.cnc`'s **1072 cutting moves and 12 arcs match the request one for one** — same order, same endpoints at the formatter's own precision, same arc directions, and **I/J recomputed from the kernel's centre against the arc's own start point**, which is the half nothing else reads and the half a wrong start point corrupts into a file that still parses. Marlin and RepRapFirmware carry the same toolpath; a tool change does not reorder it; a work-offset change does not (`CG31`); arcs off become chords that still reach every arc endpoint; and with the three ceilings on, **1072 feeds fall and none rises and no endpoint moves** — scaling may change a rate and nothing else. **Spelling runs on every case, not as a case**: all 30 files the matrix produces are linted for tokenization, declared precision, exponents, `NaN`, modal-group collisions, arcs with no centre, and each dialect's own comment and message form — the other 11 cases are refusals, where the right answer is no file. **Reach**: a drilled cycle expanded, a tap's synchronization refusal per occurrence, a counterclockwise spindle prompt, a mid-section speed change, a mid-cycle spindle stop, a helix linearized, a laser at two power levels, a torch, a jet, coolant paired, an optional stop — and **every family the post does not support refused rather than mis-emitted**: multi-axis, WCS probing, control-side compensation, turning and additive. **`HR-6 (B)` is discharged here**: all six rotated Setups refused by name, each for a forward vector the trace records, against thirty upright posts in the same matrix. **§7.1's five residues closed** — `CG32`–`CG36`. **Five cases failed on their first run and every one was the harness's error** — `integration.md` §3 has them, and the twenty-sixth is the one to read: a rapid walk that was PASSING while reading 64 of 126 requests as satisfied, because it searched forward before asking whether the tool was already standing there |
+| **PV-15** | ✅ `utility`, 2026-08-17 — **GCodeStructure: does the whole file read like a program an operator would run. 20 invariants over 16 programs, all passing**, `tools/gcode-structure-matrix.js`. **Shaped as invariants × programs and not as cases, deliberately**: nobody asks whether `face.cnc` under Marlin retracts before it traverses, they ask whether the post ever traverses without retracting, and only a rule applied to every file answers that. What a rule may assert is what an operator could object to **without knowing this post** — preamble before any coordinate, origin before coordinates, a first motion that is not a cut, a feedrate in force at every cut, the spindle running before the first cut and stopped before the end, **nothing crossing the part in X/Y between the last cut and the stop**, a retract before every rapid crossing, no tool prompt above a turning spindle, a probe stored and lifted before anything moves, banners matching the job's own operation order, one program end with nothing after it, the park last, coolant off, line numbers increasing, a plane in force at every arc, and homing leading the file where the job homes. **Applicability is part of each rule** — `Comment Level Off` leaves no banners, a jet program has no spindle — and a program reaching fewer than half the rules **fails**, so skipping cannot empty the file. The sixteen programs span three firmwares, both tool-change flows, a multi-part job, a laser, a drilled job, the Personal-licence hook, a commanded spindle, and `Comment Level Off`. **What proves these rules can go red is `integration.md` §5.1**: ten deliberately broken copies of the post, nine caught. **One rule exists only because a mutant found it** — parking *before* the spindle stop left the park still last and the spindle still stopped, so both rules that read those passed, and the missing claim was the order |
 | **J4** | ✅ `utility`, 2026-08-16 — **group 8 in a posted file at last**, `Cutting/Laser/center.cnc`, five posts. **Six of the seven properties are witnessed emitting, not merely dumped**: `laserGrblMode` `4`→`M4 S800` and `3`→`M3 S800`; `laserMarlinMode` `106`→`M106 S204` and `42` with `laserMarlinPin` `7`→`M42 P7 S204`; `laserCoolant` `Flood`→`M8`/`M9`; and **the two power levels prove the scaling in both dialects** — `laserOnThrough` 80 and `laserOnEtch` 40 give `S800`/`S400` on GRBL (×10) and `S204`/`S102` on Marlin (×2.55), one file carrying both because the job has a through cut and an etch. **`laserOnVaporize` is the one left**, no shipped `.cnc` having a Vaporize operation, and it shares its only code path with the other two. **What the same post also returned is `PV-2`** — 60 of that file's 975 lines are `COMMAND_POWER_ON`/`OFF` warnings for the emission two lines above them — and **`J1`'s failure**, `PV-3` |
 | **J1** | ✅ `utility`, 2026-08-17 — **re-run against `PV-3`'s fix and the asymmetry is gone**, `Cutting/Laser/center.cnc`, six posts, one per `First WCS / Part` value. No `G38.2` in any of the six; one `G10 L20` per file of the shape the row demanded — `X0 Y0` on the two `… Probe Z` modes, `X0 Y0 Z0` on the two that set Z0 by hand — and **the warning now present on (2), (3) and absent on (4)**, where before only (3) carried it. **The tool-0 half is a stated bound rather than a pass, and the reason is worth the space**: `canProbe` is `tool.number != 0 && !tool.isJetTool()`, and only the jet disjunct can be posted. No file Autodesk ships has a tool 0, and **the splice cannot add one** — `operation:tool_number` was stamped to `0` and the post still reported `Tool: 1`, then to `7` with the same result, so the kernel does not build `tool.number` from that parameter and the field it does use is in a record `make-wcs-jobs.js` deliberately does not decode by guess. The generated job was deleted rather than kept: a file named for a tool it does not carry is a trap. Reaching it needs a Fusion Setup with a tool numbered 0 — `laserOnVaporize`'s shape, `integration.md` §7.6 |
 | **J2** | ✅ `utility`, 2026-08-17 — `W25`, `W25b` and **`W28`, which is what the row still owed**: the `Jog XY & Probe Z` arm on a jet tool, a property set over `jet-two-parts.cnc` and no new file. The jog writes `G10 L20 P2 X0 Y0` with no Z word, nothing probes, and the file says the Z half was not set — `PV-3`'s third site, asserted in the order it is emitted |
@@ -544,12 +547,18 @@ None is a defect; none is scheduled.
    *Invalidated by landed fixes* is waiting on and what `S2a`'s dump delta predicts, and a Marlin
    multi-operation job against `S3f`'s corrected comment count, the one place a walk found the
    register's claim wrong.
-3. **Two things nothing in the suite can reach, and both are stated where they are claimed rather
-   than left to be re-discovered.** `tool.number == 0` is unpostable — the splice cannot write it and
-   no library file carries it (`J1`) — so half of `canProbe`'s one expression stands on the source
-   alone. And **nothing now reaches `onCommand()`'s fall-through**: with `PV-2` landed, the census
-   over all 105 posted files finds zero, so `HR-13`'s warning — the whole reason the fall-through
-   exists — is witnessed by nothing. Both want a Fusion-authored job, not a case.
+3. **Things nothing in the suite can reach, stated where they are claimed rather than left to be
+   re-discovered.** `tool.number == 0` is unpostable — the splice cannot write it and no library file
+   carries it (`J1`) — so half of `canProbe`'s one expression stands on the source alone. Joined
+   2026-08-17 by two measured bounds: **no shipped job asks for a diagonal rapid**, so
+   `rapidMovements()`'s ordering branch cannot be exercised at all, and **nothing produces a dwell**.
+   `integration.md` §7.6 holds each with its measurement.
+   > **`onCommand()`'s fall-through was in this item and did not belong.** It read *nothing now
+   > reaches it, so `HR-13`'s warning is witnessed by nothing, and it wants a Fusion-authored job* —
+   > and `Milling/Drilling/fine boring.cnc` raises `COMMAND_ORIENTATE_SPINDLE` twice, from Autodesk's
+   > own library, on a file that was on disk the whole time. `PV-14`'s `CG16` posts it. **The claim
+   > was reasoned from the post rather than measured against the library**, which is the same failure
+   > §7 item 5 recorded about a claim in a document, one round earlier.
 4. **A posted two-tool file.** Every tool-change row is walked and none is unclosed, so this is an
    artifact debt and no longer a coverage one — but the whole of both flows still stands on the
    source alone. **`TC-4` first** — the walk proves the ordering from `onSection()`'s call order
@@ -582,13 +591,10 @@ None is a defect; none is scheduled.
    being walked and not posted; no **Flow 2 on RepRapFirmware across a WCS change**, where `PR-25`'s
    `G53`-and-tool-offset reading would be witnessed rather than sourced; and no **`Tool Change
    Position` crossed with a WCS traverse**, which is two machine-frame excursions in one boundary.
-7. **The one live risk that could still hide a real defect, and now the only unasked question in the
-   register: `HR-6 (B)`.** The orientation
-   guard may be a no-op on exactly the case it exists to catch, and the failure mode is a part
-   cut in the wrong plane, silently. **`PR-2c` closed on a ruling rather than on an artifact**, so it is
-   still the one job worth posting for its own sake — and it needs **no new file**: `Milling/3+2/a30.cnc`,
-   `a-30.cnc`, `b30.cnc`, `b-30.cnc` and `c-45b22.cnc` are five rotated Setups already on disk, so this
-   is a `utility` row waiting to be written rather than an artifact debt.
+7. **DISCHARGED 2026-08-17 — `HR-6 (B)` was the live risk and it is answered.** The orientation guard
+   is not a no-op: all six rotated Setups in the library are refused by name, each for a forward vector
+   the trace records — `PV-14`. **`PR-2c`'s half went with it**: `all.cnc` is refused at the *first* of
+   its five rotated sections and leaves no runnable `.gcode`.
 
 ---
 

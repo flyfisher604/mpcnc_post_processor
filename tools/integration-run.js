@@ -23,11 +23,16 @@ if (!POST || !CPS || !CNCR || !OUT) {
 }
 
 const here = __dirname;
+// The last two take the CNC root like the first two, and reach `wcs-jobs` themselves for the handful
+// of cases that need a second part -- they are categories rather than personas, so a case in them is
+// chosen by the question it asks and not by whose job file it runs on.
 const MATRICES = [
   { name:'hobbyist',     script:'hobbyist-matrix.js',     jobs:CNCR },
   { name:'professional', script:'professional-matrix.js', jobs:CNCR },
   { name:'wcs',          script:'wcs-matrix.js',          jobs:path.join(here, 'wcs-jobs') },
   { name:'personal',     script:'personal-matrix.js',     jobs:CNCR },
+  { name:'correct-gcode',   script:'correct-gcode-matrix.js',   jobs:CNCR },
+  { name:'gcode-structure', script:'gcode-structure-matrix.js', jobs:CNCR },
 ];
 
 let pass = 0, total = 0, failed = [];
