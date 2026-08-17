@@ -505,6 +505,18 @@ the only check that answers *does the post run at all* — `PV-1` was a crash in
 What a row settled this way may claim is `findings.md` §4's `utility` method; `tools/census.cps` reports
 a `.cnc` file's sections, work offsets and tools without posting it, the format being binary.
 
+**Two matrices sit on top of it**, one per persona: `tools/hobbyist-matrix.js` and
+`tools/professional-matrix.js`. Each case declares what the file must and must not contain **before** it
+is posted, and the professional one adds the two channels a file cannot show — the post-time `warning()`
+stream, which reaches the dialog, and `error()`, where the right answer is no file at all. **Writing the
+expectation first is the whole discipline**: fifteen cases across the two failed on their first run and
+**every one was the harness's error, not the post's** — a wrong regex, a warning asserted in the wrong
+channel, a job file that refuses for a reason unrelated to the case. Both findings these matrices
+returned came from **reading the passing output**, which is the half a matrix does not automate: a green
+run means the questions asked were answered, not that the right questions were asked. They spawn
+`post.exe` from Node with an
+argument **array**, so the CRT quoting below is Node's problem rather than the harness's.
+
 **A `--property` value is a JavaScript literal, and this is the trap.** A string or an enum carries its
 own quotes — `--property jobSelectedFirmware '"Marlin"'` — while numbers and booleans go bare. Bare
 `Marlin` is an undefined identifier, and *"Failed to set property"* is the utility saying so rather than
