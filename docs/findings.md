@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **74 findings — 64 fixed ·
-9 closed by design · 1 withdrawn · 0 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **76 findings — 64 fixed ·
+9 closed by design · 1 withdrawn · 2 open.** Test registers in §4 and §5.
 
 > **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
 > with the design that made them defects. `design.md` → *Tool changes* is the replacement
@@ -21,7 +21,7 @@ because commit messages cite them and must still resolve.
 | `CR-` | Pre-Beta coverage review, 2026-08-09 | `CR-01` … `CR-24` |
 | `FCR-` | 2026-08-01 whole-file review. **All findings closed**; three test rows survive, renamed here | `FCR-4` … `FCR-13` |
 | `WR-` | Walk review, 2026-08-16 — the open register re-executed against the source | `WR-1` … `WR-2` |
-| `PV-` | Post-verify pass, 2026-08-16 — the post **run**, by the post utility over Autodesk's own intermediate files | `PV-1` |
+| `PV-` | Post-verify pass, 2026-08-16 — the post **run**, by the post utility over Autodesk's own intermediate files | `PV-1` … `PV-3` |
 
 > **The `CR-` prefix once meant two things.** The 2026-08-01 whole-file review filed
 > `CR-1 … CR-17`, dissolved into the hobbyist register at `c73726c` / `a68dd11` / `1232929`
@@ -49,14 +49,20 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**None open.** Every row is in §3, resolved to a commit or to a ruling. What the register still
-owes is **artifacts, not diagnoses** — §4's four jet rows and §7's posted files.
+**Two, both found by posting a laser job 2026-08-16 — the artifact `J4` was owed.** Neither is
+reachable by a walk: one is a count of what the file contains, the other is what a second callback
+does after the first has already acted.
+
+| ID | Finding | Sev | Reproduce | Action | Status |
+|---|---|---|---|---|---|
+| **PV-2** | **Every laser power change warns that the post did not do what it just did.** `onCommand()`'s fall-through — `HR-13`'s fix, so that no Manual NC instruction vanishes in silence — names `COMMAND_POWER_ON` and `COMMAND_POWER_OFF` as *"not supported by this post and was not emitted"*. **The post emits them**, two lines above, from `onPower()`: `>>> LASER Power ON`, then `M4 S800`. The kernel calls both callbacks for one event and only `onCommand()` believes nothing happened | Med | `Cutting/Laser/center.cnc`, factory GRBL: **60 of the file's 975 lines**, one pair per cut | Name both commands in `onCommand()`'s switch and return — `onPower()` owns the emission. **Do not soften the fall-through**: `HR-13`'s rule is right and this is a missing case, not a wrong channel. It reaches the operator at `Comment Level` `Off` too, `writeWarning()` bypassing the gate by `HB-9`'s design | ⬜ |
+| **PV-3** | **`Use WCS X0 Y0, Probe Z0` runs a jet job against a Z0 nobody established, and the file does not say so.** With a tool that cannot probe, that arm of `writeWcsOnStart()` writes a **`Debug`** trace — *"probe skipped tool 0 or jet tool"* — where both neighbouring arms write `>>> WARNING`. At the shipped `Info` the line is absent, and the file then commands `Z0` moves against an origin it never checked | Med-High | `Cutting/Laser/center.cnc` at `Info`, `First WCS / Part` = `Use WCS X0 Y0, Probe Z0`: no `G38.2`, four `Z0` motion lines, and nothing anywhere about Z0 | The warning `HB-13` already writes for this mode on a probing tool, extended to the arm where the tool **cannot** probe. `J1` is the row and predicted this exactly | ⬜ |
 
 ---
 
 ## 3. Closed findings
 
-**64 fixed · 9 closed by design · 1 withdrawn — 74 rows.** Permanent: commit messages and
+**64 fixed · 9 closed by design · 1 withdrawn · 2 open in §2 — 76 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -141,14 +147,16 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**⬜ 4 UNRUN · ❌ 0 FAIL — 4 rows.** Sixty-four closed 2026-08-16: **forty-eight by code walk**, §5
+**⬜ 2 UNRUN · ❌ 1 FAIL — 3 rows.** Sixty-four closed 2026-08-16: **forty-eight by code walk**, §5
 holding each one's argument and the four it corrected rather than confirmed, and **sixteen on the
 author's rulings**. **Nothing here waits on a licence, a controller or a sender**, and no `➖` row
 is left in this register — a row that cannot fail belongs in §5.
 
-**What is left is one workstream.** All four rows are the jet/laser workstream §6 defers, and none
-of them can be settled from the source: the branches they exercise are entered only for a tool the
-post cannot probe with, so what they assert is what Fusion feeds the post for such a tool.
+**The jet workstream is half run, and it returned what it was written to catch.** `J4` closed
+`utility` 2026-08-16 and is in §5; **`J1` ran and FAILED**, confirming the asymmetry it predicted
+rather than clearing it — `PV-3` in §2 is the finding, and this row stays open until the fix lands.
+`J2` and `J5` need a multi-WCS job and **no shipped `.cnc` file has one**, so they are the two rows
+here that a `utility` run cannot reach at all.
 
 **Standing configuration.** GRBL, mm, `Comment Level` `Info`, probe target `Z-10`, probe
 speed `F30`, probe thickness `Z0.8`. **A row names only what it changes from that line.**
@@ -180,16 +188,15 @@ only because `WR-2` put a warning there. So a run states its property set from t
 
 | Test | Proves | Setup (delta) | Method | Expansion | State |
 |---|---|---|---|---|---|
-| **J1** | **The four distinct things `writeWcsOnStart()` does when the tool cannot probe** — `canProbe` is `tool.number != 0 && !tool.isJetTool()`, one expression, so **a jet tool and tool 0 must emit identically and a difference between them is the finding**. Per `First WCS / Part` value: (1) `Use WCS X0 Y0 Z0` — the retract to `Safe Z` is suppressed and the `G0 X0 Y0` is **not**, so the move to the origin runs at whatever height the tool holds; (2) `Use WCS X0 Y0, Probe Z0` — no probe, a bare `G0 X0 Y0`, and **nothing in the file says Z0 was never established**: this arm writes a `Debug` comment where the two `… Current Pos` modes write a `>>> WARNING:`, so at the shipped `Info` the file is silent about a job running on a stored Z0 nobody checked, **and if the post confirms that asymmetry it is a finding, not a pass**; (3) `Set X0 Y0 to Current Pos, Probe Z0` and `Jog to X0 Y0, Probe Z0` — `G10 L20 P<n> X0 Y0` with **no Z word**, a provisional Z0 here being what would silently turn the mode into `Set X0 Y0 Z0`, then the *cannot probe* warning naming `Set X0 Y0 Z0 to Current Pos` as the mode to use (`FCR-5` walked this); (4) `Set X0 Y0 Z0 to Current Pos` and `Jog to X0 Y0 Z0` — `canProbe` is not read at all, `G10 L20 P<n> X0 Y0 Z0`, which is what (3) recommends. **Pass:** `grep -c G38` = 0 in every file; one `G10 L20` per file of exactly the shape above; the warning present in (3), absent in (4), and (2) as found | a jet tool, then tool 0 — one post per `First WCS / Part` value | posted | §6 | ⬜ |
-| **J2** | Each New WCS / Part with a jet tool — the `canProbe` false branches, **`writeWcsOnReturn()`'s included**: a return whose Z0 a tool change invalidated warns rather than probing | jet tool, multi-WCS | posted | §6 | ⬜ |
-| **J4** | The laser property group (`8 - Laser`, 7 properties) — **never posted at all** | group 8 on, a laser operation | posted | §6 | ⬜ |
-| **J5** | Laser/jet × the multi-WCS frame features | jet + cross-part clearance in the machine frame | posted | §6 | ⬜ |
+| **J1** | **The four distinct things `writeWcsOnStart()` does when the tool cannot probe** — `canProbe` is `tool.number != 0 && !tool.isJetTool()`, one expression, so **a jet tool and tool 0 must emit identically and a difference between them is the finding**. Per `First WCS / Part` value: (1) `Use WCS X0 Y0 Z0` — the retract to `Safe Z` is suppressed and the `G0 X0 Y0` is **not**, so the move to the origin runs at whatever height the tool holds; (2) `Use WCS X0 Y0, Probe Z0` — no probe, a bare `G0 X0 Y0`, and **nothing in the file says Z0 was never established**: this arm writes a `Debug` comment where the two `… Current Pos` modes write a `>>> WARNING:`, so at the shipped `Info` the file is silent about a job running on a stored Z0 nobody checked, **and if the post confirms that asymmetry it is a finding, not a pass**; (3) `Set X0 Y0 to Current Pos, Probe Z0` and `Jog to X0 Y0, Probe Z0` — `G10 L20 P<n> X0 Y0` with **no Z word**, a provisional Z0 here being what would silently turn the mode into `Set X0 Y0 Z0`, then the *cannot probe* warning naming `Set X0 Y0 Z0 to Current Pos` as the mode to use (`FCR-5` walked this); (4) `Set X0 Y0 Z0 to Current Pos` and `Jog to X0 Y0 Z0` — `canProbe` is not read at all, `G10 L20 P<n> X0 Y0 Z0`, which is what (3) recommends. **Pass:** `grep -c G38` = 0 in every file; one `G10 L20` per file of exactly the shape above; the warning present in (3), absent in (4), and (2) as found. **RAN `utility` 2026-08-16, `Cutting/Laser/center.cnc`, six posts — one per `First WCS / Part` value — and it FAILED on (2), exactly as written.** No `G38.2` in any of the six; `G10 L20 P1 X0 Y0` on (3) with the `>>> WARNING:` present, `X0 Y0 Z0` on (4) with none. **(2) writes the `Debug` line and nothing else**, so at `Info` the file carries four `Z0` motion lines and no statement anywhere that Z0 was never established — `PV-3`. **Trap: `grep -c G38` is the wrong count** — it matches three property-dump lines in every file, `probeG38Target` among them, and the criterion is `^G38\.2`. Re-run against the fix; tool 0 is still owed, only the jet tool having been posted | a jet tool, then tool 0 — one post per `First WCS / Part` value | utility | §6 | ❌ |
+| **J2** | Each New WCS / Part with a jet tool — the `canProbe` false branches, **`writeWcsOnReturn()`'s included**: a return whose Z0 a tool change invalidated warns rather than probing. **Out of `utility`'s reach**: no shipped `.cnc` file has a second work offset | jet tool, multi-WCS | posted | §6 | ⬜ |
+| **J5** | Laser/jet × the multi-WCS frame features. **Out of `utility`'s reach**, for `J2`'s reason | jet + cross-part clearance in the machine frame | posted | §6 | ⬜ |
 
 ---
 
 ## 5. Passed tests
 
-**✅ 137 PASS · ❌ 0 FAIL · ➖ 17 n/a — 154 tests in 147 rows** (an `(A)`/`(B)` pair shares a
+**✅ 138 PASS · ❌ 0 FAIL · ➖ 17 n/a — 155 tests in 148 rows** (an `(A)`/`(B)` pair shares a
 row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
 `PR-2g`, `PR-2h`, `PR-14a`, `PR-14b`, `PB1`, `PB2`, `M2`, `PBV1`, `PBV2`, `PBV3`, `M1` and `M4`
@@ -235,6 +242,7 @@ warning the fix deletes; `CR-23` retires beside them, closed on a ruling that ch
 
 | Test | Result |
 |---|---|
+| **J4** | ✅ `utility`, 2026-08-16 — **group 8 in a posted file at last**, `Cutting/Laser/center.cnc`, five posts. **Six of the seven properties are witnessed emitting, not merely dumped**: `laserGrblMode` `4`→`M4 S800` and `3`→`M3 S800`; `laserMarlinMode` `106`→`M106 S204` and `42` with `laserMarlinPin` `7`→`M42 P7 S204`; `laserCoolant` `Flood`→`M8`/`M9`; and **the two power levels prove the scaling in both dialects** — `laserOnThrough` 80 and `laserOnEtch` 40 give `S800`/`S400` on GRBL (×10) and `S204`/`S102` on Marlin (×2.55), one file carrying both because the job has a through cut and an etch. **`laserOnVaporize` is the one left**, no shipped `.cnc` having a Vaporize operation, and it shares its only code path with the other two. **What the same post also returned is `PV-2`** — 60 of that file's 975 lines are `COMMAND_POWER_ON`/`OFF` warnings for the emission two lines above them — and **`J1`'s failure**, `PV-3` |
 | **PV-1a** | ✅ `utility`, 2026-08-16 — **the whole of `Milling/2D`, six files, at the standing configuration.** Three post: `bore.cnc` 1240 lines, `face.cnc` 166, `optional stop.cnc` 229. Three refuse, and **each refusal is one the post is supposed to make**: `compensation.cnc` on cutter radius compensation in the control, mid-stream at `onLinear` record 463; `full program.cnc`, `optional stop.cnc` and `toolchange.cnc` on two tools against `At a Tool Change` = `Refuse to post`, at `onOpen()` before a byte is written. **`toolChangeMode` = `Pause` is the whole delta that turns the last three into files** — `optional stop` and `toolchange` then post, `full program` refusing again on the compensation operation it also contains. **Two things a walk could not have said.** Every refusal leaves `<name>.gcode.failed` and no `.gcode`, the mid-stream one included at 5039 bytes — `PR-2c`'s falsifier, witnessed in an artifact rather than assumed. And `toolchange__manual-change.gcode`:169-187 is the **two-tool boundary §7.4 is owed**, in the order the design states: spindle stop, `Change to Tool #2`, the no-fixed-Z warning, provisional `G10 L20 P1 Z0`, `Attach ZProbe`, `G38.2 F30 Z-10`, `G10 L20 P1 Z0.8`, detach — **no `M6`, no `T` word, and the spindle stop ahead of the prompt** (`PR-22`). **Bound: it is Autodesk's job, not the operator's** — one work offset, no rotated Setup, no jet tool — so §4's four rows and `HR-6 (B)` are untouched by it |
 | **HB-1 (A)/(B)** | ➖ Retired with HB-1 — no warning was added, so there was nothing to post |
 | **HB-2 (A)/(B)** | `HB-2 (A).gcode`, the baseline every other row diffs against. `grep -c '%'` = 0. **Trap: `M30` is the last g-code *block*; `( *** STOP end ***)` is the last *line*** |
