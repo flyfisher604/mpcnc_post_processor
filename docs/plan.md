@@ -29,7 +29,8 @@ multi-operation one. §4 states the methods and their bounds; §5 carries each r
 
 **Live risk.** `HR-6 (B)` — the orientation guard may be a no-op on exactly the case it
 exists to catch, and the failure mode is a part cut in the wrong plane, silently. It needs a
-rotated Setup. `findings.md` → *Owed*.
+rotated Setup and **the library ships five**, so it is a `utility` row to write rather than a
+job to build. `findings.md` → *Owed*.
 
 **No controller access.** Firmware questions are settled from firmware source, citing file
 and version.
@@ -66,6 +67,7 @@ what a walk cannot reach.
 
 **Worth one post of its own, and it is not a row here:** `HR-6 (B)`'s rotated Setup. It is the live
 risk, and `PR-2c` closed on a ruling rather than on an artifact, so that job would settle both.
+`Milling/3+2/a30.cnc` and four siblings are rotated Setups already on disk — `integration.md` §7.5.
 
 ## Step 6 — Clarity
 

@@ -348,6 +348,158 @@ only what it changes from it.
 
 ---
 
+## 7. What full coverage would take, and how much of it is a job file
+
+The 27 properties no case varies (§6.3) look like one debt and are five different ones. **Only two
+new job files are actually owed**, and one group can never be reached at all. Everything below was
+run rather than reasoned, except where it says otherwise.
+
+### 7.1 Needs a case, not a file — the jobs already exist
+
+Six residues, all reachable today with `Milling/2D/face.cnc`, `bore.cnc` or `toolchange.cnc`.
+
+| Residue | Needs | What a case would assert |
+|---|---|---|
+| `jobManualSpindlePowerControl` = `false` | any job | `M3 S5000` and `M5` **replace** the two operator prompts. Verified: eight lines of `face.cnc` change, `M0 (MSG,Turn ON 5000 RPM)` → `M3 S5000` and `M0 (MSG,Turn OFF spindle)` → `M5` |
+| `probeG382orG28` = `false` | any probing job, **Marlin or RepRap** | `G28 Z` in place of `G38.2`. **A GRBL case would assert nothing** — the GRBL arm emits `G38.2` unconditionally and the description says so, which is why the first probe of this property showed no change at all |
+| `duetMillingMode`, `duetLaserMode` | any job, RepRap | the mode token reaches the file. Verified: `T0` |
+| `machineHomeAtStart` = `Pause & Home` | any job | the stop that precedes the homing cycle — one of only two unreached values outside coolant and laser |
+| `probePause` = `Before` | any probing job | the fit prompt without the removal prompt. `H15` covers `No`, the default covers `Before & After` |
+| `feedsScaleFeedrate` = `false` | `bore.cnc` | feeds pass through **unscaled**. `H9` asserts the ceiling holds when it is on; nothing asserts what happens when it is off, so the property's effect is only half witnessed |
+
+### 7.2 Needs fixture files, not job files
+
+Eight properties name **a file, not a value**, and this is worth stating plainly because half of them
+do not read that way:
+
+`includeStartFile`, `includeStopFile`, `includeToolFile1`, `includeToolFile2`, and the four
+`coolantChannel{A,B}{On,Off}Custom`.
+
+**The custom-coolant fields are include files.** Setting `coolantChannelAOnCustom` to `M42 P4 S255` —
+which looks exactly like the g-code it is meant to produce — **refuses the whole job at `onOpen()`**:
+
+```
+Error: "Channel A On Custom" names "M42 P4 S255", which is not a file in the NC output
+folder <dir> -- check the spelling and the extension, or clear the field.
+```
+
+Put that same text in a file called `coolA-on.nc` in the output folder and it posts, emitting the
+line verbatim. All eight were verified this way with one-line fixtures, including the start file's
+`>>> WARNING` that it **replaces** the post's header and with it the only `G90`/`G21`/`G94`/`G17` the
+job sets — `CR-05`, witnessed here for the first time.
+
+So what is owed is a `tools/include-fixtures/` directory and a matrix that copies it into the output
+folder before the run. **No new `.cnc` file, and no new technique.**
+
+### 7.3 Needs no new file — the library already has ten of them
+
+**Coolant is 10 properties and 30 of the 43 unreached enum values, and every one is reachable now.**
+`Milling/Coolant Codes/` ships ten job files — `flood`, `mist`, `air`, `suction`, `through tool`,
+`flood and mist`, `flood and through`, `air through`, `air through tool`, `off` — which is one job per
+coolant request the post can be asked to serve.
+
+Verified: `flood.cnc` with `coolantChannelAMode` = `Flood` emits `M8` … `M9`; `flood and mist.cnc`
+with a channel set to `Flood and Mist` emits `M8`. And a mismatch is **named, not silent** — channel A
+`Flood` plus channel B `Mist` against a job asking `Flood and Mist` gives
+`>>> WARNING: No matching Coolant channel : Flood and Mist requested`. So the post matches a request
+against a channel **whole** and does not compose two channels to meet it, which is a design question
+rather than a coverage one.
+
+`plan.md` blocks group 9 on **a coolant persona**. That block is correct and this does not lift it:
+what is missing is a ruling on which of the ten a hobby machine should serve, not an artifact.
+
+### 7.4 Needs no new file — but is a deferred workstream
+
+**Laser is 7 properties and 11 unreached values**, and `Cutting/Laser/` ships three jobs. The library
+is richer than the register assumes: `center.cnc` censuses as **7 sections and 2 tools**, not one
+operation.
+
+Verified: `laserOnThrough` = 11 and `laserOnEtch` = 22 produce `S110` and `S220` — percent scaled ten
+times into GRBL's `S` range — while `laserOnVaporize` never appears, `center.cnc` using only the
+through and etch modes. So the third power property wants `in-computer.cnc` or `in-control.cnc`, both
+of which are already on disk.
+
+Group 8 is blocked on laser detail in `findings.md` §6, and `J1` has already run and failed here
+(`PV-3`). Again: a ruling, not an artifact.
+
+### 7.5 The genuine new-file debt — two files, and one of them is nearly free
+
+**A multi-WCS jet job — `J2` and `J5`.** These are the only two rows `findings.md` §4 says a `utility`
+run cannot reach. That row states what is still owed as *"a jet block to splice, `make-wcs-jobs.js`
+sourcing from a milling file; `Cutting/Laser/center.cnc` is one operation and the same splice reaches
+it."* **Both halves of that are wrong, and the correction makes the job cheaper, not dearer.**
+`center.cnc` is seven operations across two tools, and **no cross-source splice is needed**: the
+existing byte-splice applied to `center.cnc` alone produces the file.
+
+Built and posted as a feasibility probe — seven blocks re-stamped `1,1,1,2,2,2,2`, censused
+`sections=7 offsets=1/2 tools=2`, posted at exit 0:
+
+```
+(   Retract to the travel height in the machine frame before traverse -- machine Z -5)
+G53 G0 Z-5 F300
+( WCS changed: 1 -> 2)
+G55
+G0 X0 Y0 F2500
+```
+
+The traverse, the select and the move to the stored origin are all correct. **And the second part
+says nothing whatever about a Z0 nobody established** — no probe, correctly, a jet tool being unable
+to; but no warning in the file and none in the dialog either. That is `PV-3`'s shape on the
+*subsequent*-part side, which is exactly what `J2` was written to catch and what `PV-9`'s second open
+question is about. The artifact is one row in the generator's table, and it would return a finding.
+
+**A mill-then-jet job — `PR-22`'s falsifier.** The spindle stop once read the **incoming** tool's jet
+guard, so a change into a laser handed over a turning cutter. It was fixed on a walk and **no artifact
+witnesses it**. This is the one file that genuinely needs cross-source splicing — a milling block and
+a jet block in a single job — and **its feasibility is not proven**. Two questions have to be settled
+first: which source's prologue survives, and whether the kernel accepts a jet section beneath a
+milling prologue. Everything else in §7 has been run; this has not.
+
+**The `wcs-jobs` table residue** is already `findings.md` §7 *Owed* item 6 — a jog mode on a stale
+return, Flow 2 on RepRapFirmware across a WCS change, the change position crossed with a traverse, and
+work offsets 2, 3, 5 and 8 which no job ever selects. Each is one row in the `JOBS` table.
+
+**And the live risk needs no file at all.** `plan.md` calls `HR-6 (B)` the live risk — the orientation
+guard may be a no-op on exactly the case it exists to catch — and says *"It needs a rotated Setup."*
+The library ships five: `Milling/3+2/a30.cnc`, `a-30.cnc`, `b30.cnc`, `b-30.cnc`, `c-45b22.cnc`.
+
+### 7.6 Out of reach, and not a gap to close
+
+**Group 3 — `mapRapidsRestoreRapids` and `mapRapidsSafeZ` — cannot be exercised by any `.cnc` file,
+shipped or built.**
+
+The feature restores a `G1` to a `G0`, from two places in `onLinear()`: a section's first cut move,
+and any move `isSafeToRapid()` clears. `onRapid()` clears `forceSectionToStartWithRapid`, and
+`isSafeToRapid()` is reached from `onLinear()` alone. **Autodesk's library is full-licence output**,
+where every rapid arrives as `onRapid` — so there is nothing to restore, and setting `mapRapidsSafeZ`
+on `face.cnc` changes **nothing but the property-dump line**. Verified: zero differing g-code lines.
+
+A spliced job cannot fix it either. The generator copies motion records as **opaque bytes** and never
+authors them, which is the property that makes its fixtures trustworthy (§4.2) and the same property
+that puts this out of reach.
+
+The feature exists for a **personal-licence** toolpath, where Fusion emits rapids as feed moves. So it
+is reachable only from a personal-licence job posted from Fusion, or from `Personal.cps` — and
+`design.md` is explicit that `Personal.cps`'s evidence is about *logic*, never about what the post
+emits. **This is a bound to state, not a gap to close**, and it should not be counted against the
+coverage number.
+
+### 7.7 The answer, by persona
+
+| | Hobbyist | Professional |
+|---|---|---|
+| **Needs a case only** | manual spindle control, `probePause` = `Before`, unscaled feeds | `G28` probing on Marlin/RRF, the Duet modes, `Pause & Home` |
+| **Needs fixtures** | — | the four include files, the four custom coolant files |
+| **Needs a ruling, not an artifact** | coolant (a persona), laser (group 8 detail) | the same |
+| **Needs a new job file** | — | **multi-WCS jet** (one table row, proven) · **mill-then-jet** (feasibility unproven) |
+| **Unreachable** | group 3 — personal-licence rapids | group 3 |
+
+**So: two files.** One is a row in a table and a source path, and building it would return a finding
+today. The other needs a question answered before it can be attempted. Everything else that looks
+like a coverage gap is a case, a fixture, a ruling, or a bound.
+
+---
+
 ## How to write in this file
 
 **Three rules.**

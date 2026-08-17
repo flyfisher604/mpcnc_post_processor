@@ -166,8 +166,9 @@ is left in this register — a row that cannot fail belongs in §5.
 **The jet workstream is half run, and it returned what it was written to catch.** `J4` closed
 `utility` 2026-08-16 and is in §5; **`J1` ran and FAILED**, confirming the asymmetry it predicted
 rather than clearing it — `PV-3` in §2 is the finding, and this row stays open until the fix lands.
-`J2` and `J5` need a multi-WCS job and **no shipped `.cnc` file has one**, so they are the two rows
-here that a `utility` run cannot reach at all.
+**`J2` and `J5` are `utility` rows now.** They read *"no shipped `.cnc` file has a multi-WCS job"*,
+which `tools/wcs-jobs/` answered for milling; the jet half turned out to need no new technique
+either, and `integration.md` §7.5 carries the built artifact and the correction that unblocked it.
 
 **Standing configuration.** GRBL, mm, `Comment Level` `Info`, probe target `Z-10`, probe
 speed `F30`, probe thickness `Z0.8`. **A row names only what it changes from that line.**
@@ -198,8 +199,8 @@ the case id, as a `utility` row names its `.cnc` and a `posted` row names its `.
 | Test | Proves | Setup (delta) | Method | Expansion | State |
 |---|---|---|---|---|---|
 | **J1** | **The four distinct things `writeWcsOnStart()` does when the tool cannot probe** — `canProbe` is `tool.number != 0 && !tool.isJetTool()`, one expression, so **a jet tool and tool 0 must emit identically and a difference between them is the finding**. Per `First WCS / Part` value: (1) `Use WCS X0 Y0 Z0` — the retract to `Safe Z` is suppressed and the `G0 X0 Y0` is **not**, so the move to the origin runs at whatever height the tool holds; (2) `Use WCS X0 Y0, Probe Z0` — no probe, a bare `G0 X0 Y0`, and **nothing in the file says Z0 was never established**: this arm writes a `Debug` comment where the two `… Current Pos` modes write a `>>> WARNING:`, so at the shipped `Info` the file is silent about a job running on a stored Z0 nobody checked, **and if the post confirms that asymmetry it is a finding, not a pass**; (3) `Set X0 Y0 to Current Pos, Probe Z0` and `Jog to X0 Y0, Probe Z0` — `G10 L20 P<n> X0 Y0` with **no Z word**, a provisional Z0 here being what would silently turn the mode into `Set X0 Y0 Z0`, then the *cannot probe* warning naming `Set X0 Y0 Z0 to Current Pos` as the mode to use (`FCR-5` walked this); (4) `Set X0 Y0 Z0 to Current Pos` and `Jog to X0 Y0 Z0` — `canProbe` is not read at all, `G10 L20 P<n> X0 Y0 Z0`, which is what (3) recommends. **Pass:** `grep -c G38` = 0 in every file; one `G10 L20` per file of exactly the shape above; the warning present in (3), absent in (4), and (2) as found. **RAN `utility` 2026-08-16, `Cutting/Laser/center.cnc`, six posts — one per `First WCS / Part` value — and it FAILED on (2), exactly as written.** No `G38.2` in any of the six; `G10 L20 P1 X0 Y0` on (3) with the `>>> WARNING:` present, `X0 Y0 Z0` on (4) with none. **(2) writes the `Debug` line and nothing else**, so at `Info` the file carries four `Z0` motion lines and no statement anywhere that Z0 was never established — `PV-3`. **Trap: `grep -c G38` is the wrong count** — it matches three property-dump lines in every file, `probeG38Target` among them, and the criterion is `^G38\.2`. Re-run against the fix; tool 0 is still owed, only the jet tool having been posted | a jet tool, then tool 0 — one post per `First WCS / Part` value | utility | §6 | ❌ |
-| **J2** | Each New WCS / Part with a jet tool — the `canProbe` false branches, **`writeWcsOnReturn()`'s included**: a return whose Z0 a tool change invalidated warns rather than probing. **The stated blocker is gone**: it read *"out of `utility`'s reach — no shipped `.cnc` file has a second work offset"*, and `tools/wcs-jobs/` now builds them, `PV-8`. What is still owed is a **jet** block to splice, `make-wcs-jobs.js` sourcing from a milling file; `Cutting/Laser/center.cnc` is one operation and the same splice reaches it. `PV-9` is this row's warning seen from the mode side rather than the tool side | jet tool, multi-WCS | posted | §6 | ⬜ |
-| **J5** | Laser/jet × the multi-WCS frame features. **Out of `utility`'s reach for `J2`'s reason, and reachable by `J2`'s remedy** — the multi-WCS half is built, `PV-8`; the jet block is what is missing | jet + cross-part clearance in the machine frame | posted | §6 | ⬜ |
+| **J2** | Each New WCS / Part with a jet tool — the `canProbe` false branches, **`writeWcsOnReturn()`'s included**: a return whose Z0 a tool change invalidated warns rather than probing. **The blocker is gone and the artifact is one row in `make-wcs-jobs.js`'s table.** It read *"out of `utility`'s reach — no shipped `.cnc` file has a second work offset"*; `tools/wcs-jobs/` answered that, `PV-8`. **No cross-source splice is needed** — `Cutting/Laser/center.cnc` is **seven** operations across two tools, not one, so the existing byte-splice re-stamps its own blocks. Built and posted as a probe: `sections=7 offsets=1/2 tools=2`, exit 0, and the boundary emits the machine-frame retract, `WCS changed: 1 -> 2`, `G55`, then the move to the stored origin — **and nothing in either channel about the Z0 it never established**, which is what this row predicted. `integration.md` §7.5. `PV-9` is this row's warning seen from the mode side rather than the tool side | jet tool, multi-WCS | utility | §6 | ⬜ |
+| **J5** | Laser/jet × the multi-WCS frame features. **Reachable by `J2`'s artifact, which is built** — the cross-part clearance in the machine frame is already witnessed on the jet probe run, `G53 G0 Z-5` ahead of the `G55`; what this row still owes is the assertion set | jet + cross-part clearance in the machine frame | utility | §6 | ⬜ |
 
 ---
 
@@ -537,8 +538,8 @@ None is a defect; none is scheduled.
    `Debug` rather than misrouted. **Cheap to settle and it bounds a whole class**: walk the sites once,
    mark each *emission-point-only* or *owes a twin*, and record the verdict beside the call.
 6. **What `PV-8`'s matrix does not reach, stated so it is not mistaken for covered.** The job files are
-   milling blocks from one source, so: **no jet block in a multi-WCS job** — `J2` and `J5`, whose stated
-   blocker this work removed and whose remaining need is one spliced laser operation; **no `Jog to …`
+   milling blocks from one source, so: **no jet block in a multi-WCS job** — `J2` and `J5`, now built
+   and posted as a probe and needing no splice at all, `integration.md` §7.5; **no `Jog to …`
    mode on a return whose Z0 a change invalidated**, that arm of `writeWcsOnReturn()` being walked and
    not posted; **no Flow 2 on RepRapFirmware across a WCS change**, where `PR-25`'s `G53`-and-tool-offset
    reading would be witnessed rather than sourced; **no `Tool Change Position` crossed with a WCS
@@ -547,8 +548,10 @@ None is a defect; none is scheduled.
    by adding a row to `make-wcs-jobs.js`'s table, which is the point of it being a table.
 7. **The one live risk that could still hide a real defect: `HR-6 (B)`.** The orientation
    guard may be a no-op on exactly the case it exists to catch, and the failure mode is a part
-   cut in the wrong plane, silently. It needs a rotated Setup, and **`PR-2c` closed on a ruling
-   rather than on an artifact**, so that Setup is still the one job worth posting for its own sake.
+   cut in the wrong plane, silently. **`PR-2c` closed on a ruling rather than on an artifact**, so it is
+   still the one job worth posting for its own sake — and it needs **no new file**: `Milling/3+2/a30.cnc`,
+   `a-30.cnc`, `b30.cnc`, `b-30.cnc` and `c-45b22.cnc` are five rotated Setups already on disk, so this
+   is a `utility` row waiting to be written rather than an artifact debt.
 
 ---
 
