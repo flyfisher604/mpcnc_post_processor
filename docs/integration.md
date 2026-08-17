@@ -69,10 +69,10 @@ node tools/professional-matrix.js "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/profes
 node tools/wcs-matrix.js          "$POST" MPCNC_v4.0_Beta2.cps tools/wcs-jobs out/wcs
 ```
 
-**84 cases — 28 hobbyist, 31 professional, 25 WCS — and all 84 pass as of 2026-08-17.** The whole
-run is about ninety seconds. There is no runner above the three; they are independent by design,
-because the personas they encode disagree about what the factory defaults should do and a shared
-baseline would have to pick one.
+**90 cases — 28 hobbyist, 31 professional, 31 WCS — over 19 job files, and all 90 pass as of
+2026-08-17.** The whole run is about ninety seconds. There is no runner above the three; they are
+independent by design, because the personas they encode disagree about what the factory defaults
+should do and a shared baseline would have to pick one.
 
 **One case at a time, by hand:** `tools/post-run.ps1` posts a single `.cnc` under a named property
 set — a profile in `tools/profiles/*.json`, or `-Set @{...}` — and prints the exit code, the line
@@ -137,12 +137,24 @@ mistake has been made here twice — see §5.
 This is the whole discipline and it is worth stating plainly, because the alternative looks
 identical afterwards and proves nothing.
 
-**Seventeen cases across the three matrices failed on their first run, and every one was the
+**Nineteen cases across the three matrices failed on their first run, and every one was the
 harness's error, not the post's.** A wrong regex; a warning asserted in the channel it does not use;
 a job file that refuses for a reason unrelated to the case; an ordering helper that cannot see a
 second occurrence of a block because it searches for the first. Two of the hobbyist failures were
 wrong because a registered finding had already changed the answer — `CR-12`'s provisional Z0, and
 `CR-15` dropping the first-tool prompt on a mode that implies a tool is already fitted.
+
+The last two are the cleanest examples, and they fail in opposite directions.
+
+The **eighteenth** asserted the trace `probe skipped (tool 0 or jet tool)` exactly as
+`writeWcsEstablish()` writes it — and the file says `probe skipped tool 0 or jet tool`, parentheses
+stripped, because a nested `(` would terminate a GRBL comment early. Write the expectation from the
+**emitted** text, never from the source that emits it.
+
+The **nineteenth** asserted that a job whose returning tool cannot probe emits no `G38.2` *"after the
+laser is fitted"* — with a regex that read the whole file, where section 1 legitimately probes with a
+**milling** tool. It failed a correct post. **Scope the claim to the boundary it is about**, which is
+what `between()` and the after-the-token slices exist for.
 
 A matrix written *after* reading the output would have encoded the behaviour instead of testing it,
 and all seventeen would have been green on the first run while asserting nothing.
@@ -159,24 +171,34 @@ is what makes them worth using: nothing in them was authored to make this post l
 
 The ones the matrices run on:
 
-| File | Shape | Reaches |
+| File | Shape (censused) | Reaches |
 |---|---|---|
-| `Milling/2D/face.cnc` | one section, one tool | the preamble, the origin modes, the frame, the park |
-| `Milling/2D/bore.cnc` | one section, arcs and many feed changes | arcs, feed scaling, the feedrate-enforcement count |
-| `Milling/2D/toolchange.cnc` | two sections, **two tools**, one offset | both tool-change flows, the change position |
-| `Milling/2D/full program.cnc` | four sections, two tools, **compensation in the control** | the compensation refusal |
-| `Cutting/Laser/center.cnc` | one jet section | `canProbe` false — a tool that cannot probe |
+| `Milling/2D/face.cnc` | 1 section, tool 1 | the preamble, the origin modes, the frame, the park |
+| `Milling/2D/bore.cnc` | 1 section, arcs and many feed changes | arcs, feed scaling, the feedrate-enforcement count |
+| `Milling/2D/toolchange.cnc` | 2 sections, **tools 1 and 2**, offset 1 | both tool-change flows, the change position |
+| `Milling/2D/full program.cnc` | 4 sections, 2 tools, **compensation in the control** | the compensation refusal |
+| `Cutting/Laser/center.cnc` | **7 sections**, tool 2, a laser, offset 0 | `canProbe` false — a tool that cannot probe |
 
 **And the bound they all share: every one uses a single work offset.** The census settled that
 2026-08-16 across the whole library. So `Each New WCS / Part`, `writeWCS()`'s traverse arm and
 `writeWcsOnReturn()` — a third of the multi-part design — were unreachable from Autodesk's library by
 any harness at all.
 
+**Read the census, not the filename.** Two of the rows above were wrong in this project's own
+register until they were measured. `center.cnc` was recorded as *"one operation"* and is seven; its
+`tools=2` reads as *two tools* and is one tool **numbered** 2. And its seventh operation is called
+`Vaporize_Center` while its `jetMode` is `Through` — the name is the CAM author's, the mode is the
+data's.
+
 ### 4.2 `tools/wcs-jobs/` — job files built for the paths the library cannot reach
 
-`tools/wcs-jobs/make-wcs-jobs.js` builds ten job files that use several work offsets. **It does not
-author a job.** Nothing here synthesises toolpath data, and that is deliberate: a fixture you cannot
-reason about from its source is not evidence.
+`tools/wcs-jobs/make-wcs-jobs.js` builds **fourteen** job files. **It does not author a job.**
+Nothing here synthesises toolpath data, and that is deliberate: a fixture you cannot reason about
+from its source is not evidence.
+
+*(The directory is named for the work that created it. Eleven of the fourteen are about work
+offsets; `mill-then-jet.cnc` is about a tool change and `one-part.cnc` is the control that proves a
+suppression. Renaming it would move every path in the register for no gain.)*
 
 **The format.** A `.cnc` is CIMCO's `compact-nc`: a length-prefixed format string, a seven-byte
 preamble, then a flat stream of `[uint32 opcode][payload]` records. Only what is needed is decoded —
@@ -187,38 +209,72 @@ everything past the context is copied as opaque bytes and never parsed. Opcode `
 unmapped — it never occurs in the sources, its payload length is unknown, and guessing would walk off
 a record boundary silently.
 
-**So each job is a byte copy** of the prologue and the operation blocks of `Milling/2D/toolchange.cnc`
-with **one 32-bit word changed per block**. The generator asserts exactly that: it re-splits the file
-it just wrote, confirms the `T<n>@<offset>` plan it intended, and byte-compares every block against
-its source — zero differing bytes where the offset was already 1, and one to four where it changed.
+**So each job is a byte copy** of one source's prologue and operation blocks, with **at most one
+32-bit word changed per block**. The generator asserts exactly that: it re-splits the file it just
+wrote, confirms the `T<n>@<offset>` plan it intended, and byte-compares every block against its
+source — zero differing bytes where the offset already matched, one to four where it changed.
 
 That assertion is what the fixtures' value rests on. Two blocks in different work offsets are *the
 same operation with one variable moved*, so any difference in the emitted g-code is attributable to
 the WCS logic and not to the fixture.
 
+**"Unchanged" is per source, and that detail is load-bearing.** The milling blocks ship at offset 1
+and the laser blocks at 0. A check hard-coded to 1 would have passed every jet job for the wrong
+reason — the exact failure mode §5 is about — so the generator reads each source's own shipped
+offset and holds it to that.
+
+**Two sources, and mixing them is safe — measured, not assumed.** `mill-then-jet.cnc` puts a milling
+block and a laser block in one job, which raised the question of whose prologue survives. Both
+variants were built and posted: **the emitted g-code is identical apart from the header's own
+metadata** — Fusion version, date, document and Setup names — because the prologue carries job
+identity while the section data the post reads travels in the blocks.
+
 ```
-node tools/wcs-jobs/make-wcs-jobs.js "<CNC files>/Milling/2D/toolchange.cnc" tools/wcs-jobs
+node tools/wcs-jobs/make-wcs-jobs.js "<CNC files>" tools/wcs-jobs
 ```
 
-Regeneration is byte-identical.
-
-| Job | Blocks (`tool@offset`) | Puts to the post |
-|---|---|---|
-| `one-part.cnc` | T1@1 | the single-offset control — what must *not* happen when there is only one part |
-| `two-parts.cnc` | T1@1, T1@2 | a part this job has never seen: the whole of `Subsequent WCS / Part` |
-| `return-to-part.cnc` | T1@1, T1@2, T1@1 | a return with no tool change since — `CR-17`, which must set up nothing |
-| `change-then-return.cnc` | T1@1, T1@2, T2@1 | a return whose Z0 a tool change has invalidated |
-| `part-then-tools.cnc` | T1@1, T2@1, T1@2, T2@2 | a boundary that is **both** a new part and a new tool |
-| `tools-across-parts.cnc` | T1@1, T1@2, T2@1, T2@2 | a change that strands every part it is not standing on |
-| `spread-offsets.cnc` | T1@1, T1@4, T1@6 | non-adjacent offsets — the code is computed, not counted |
-| `high-offsets.cnc` | T1@7, T1@9 | past `G59`: refused on GRBL, `G59.1`/`G59.3` elsewhere |
-| `offset-out-of-range.cnc` | T1@10 | past `G59.3`, which no supported firmware has |
-| `default-offset.cnc` | T1@0, T1@2 | the untouched Work Offset field, aliased to `G54` beside a real second offset |
+The argument is the **root** of `res/CNC files`, not one file. Regeneration is byte-identical.
 
 **The XML serialisation cannot be used for this.** `post.exe` also reads an XML form of the same data
 and `--format XML` will accept it on any extension — but **its reader silently drops `work-offset`**,
 so every section arrives as offset 0. Verified by editing that attribute in Autodesk's own
 `Milling/2D/bore.xml` and posting it. The binary was not the convenient route; it was the only one.
+
+### 4.3 Every `.cnc` file the suite uses
+
+**19 files, 90 cases.** Five are Autodesk's; fourteen are generated. `A` = 2D-Face tool 1 (which cuts
+**across** the part origin, so it is the block that puts a machined surface under a later probe);
+`B` = 2D-Contour tool 2; `J` = a Through-medium laser operation, tool 2; `K` = an Etch laser
+operation, tool 2.
+
+**Autodesk's library** — `<CNC files>` in the HSM VS Code extension:
+
+| File | Blocks | Cases | What it covers |
+|---|---|---|---|
+| `Milling/2D/face.cnc` | 1 section, T1 | **37** | the workhorse: preamble, all six `First WCS / Part` modes, probe geometry, comment levels, sequence numbers, feeds, the frame, homing, the park, and every refusal that needs only a plain job |
+| `Milling/2D/toolchange.cnc` | 2 sections, T1→T2 | **17** | both tool-change flows, the sender tokens, the change position and its three refusals, the re-probe and its absence |
+| `Milling/2D/bore.cnc` | 1 section, arcs | 3 | arcs on and off, the cut-speed ceiling, the feedrate-enforcement count |
+| `Cutting/Laser/center.cnc` | 7 sections, T2 laser | 1 | a jet tool withholding the provisional Z0 a milling tool receives |
+| `Milling/2D/full program.cnc` | 4 sections, 2 tools | 1 | compensation **in the control**, which all three firmwares refuse |
+
+**Generated** — `tools/wcs-jobs/`, all fourteen from the two sources above:
+
+| File | Blocks (`tool@offset`) | Cases | What it covers |
+|---|---|---|---|
+| `two-parts.cnc` | T1@1, T1@2 | **7** | a part this job has never seen — the whole of `Subsequent WCS / Part`, the traverse retract, Guard B's refusal, and Marlin's multi-offset dialect |
+| `tools-across-parts.cnc` | T1@1, T1@2, T2@1, T2@2 | 3 | one change then two returns, both stale — `PV-9` and `PV-10`'s job |
+| `change-then-return.cnc` | T1@1, T1@2, T2@1 | 3 | a return whose Z0 a tool change invalidated, and the same with re-probing off |
+| `high-offsets.cnc` | T1@7, T1@9 | 3 | past `G59`: refused on GRBL, `G59.1`/`G59.3` on Marlin and RepRap |
+| `part-then-tools.cnc` | T1@1, T2@1, T1@2, T2@2 | 2 | a boundary that is **both** a new part and a new tool, on each flow |
+| `return-to-part.cnc` | T1@1, T1@2, T1@1 | 2 | a return with no change since — `CR-17`, which must set up nothing and re-prompt nothing |
+| `one-part.cnc` | T1@1 | 2 | the single-offset control: what must *not* be emitted when there is one part, framed and frameless |
+| `mid-offsets.cnc` | T1@2, T1@3, T1@5, T1@8 | 2 | the four registers nothing else selects, and the only job that **starts** anywhere but WCS 1 |
+| `jet-two-parts.cnc` | T2@1, T2@2 | 2 | the multi-part half met by a tool that **cannot probe** — `J2`, `J5` |
+| `jet-return.cnc` | T1@1, T2@2, T2@1 | 1 | a **return** the returning tool cannot re-measure — the one arm of `writeWcsOnReturn()` that can only warn, and `PV-9` on the tool side |
+| `spread-offsets.cnc` | T1@1, T1@4, T1@6 | 1 | non-adjacent offsets: the code is computed, not counted |
+| `default-offset.cnc` | T1@0, T1@2 | 1 | the untouched Work Offset field aliased to `G54`, beside a real second offset |
+| `offset-out-of-range.cnc` | T1@10 | 1 | past `G59.3`, which no supported firmware has |
+| `mill-then-jet.cnc` | T1@1, T2@1 | 1 | a change **into** a tool that cannot probe — `PR-22`'s falsifier |
 
 ---
 
@@ -350,9 +406,9 @@ only what it changes from it.
 
 ## 7. What full coverage would take, and how much of it is a job file
 
-The 27 properties no case varies (§6.3) look like one debt and are five different ones. **Only two
-new job files are actually owed**, and one group can never be reached at all. Everything below was
-run rather than reasoned, except where it says otherwise.
+The 27 properties no case varies (§6.3) look like one debt and are five different ones. **The
+job-file half of it is built** — §7.5 — and what remains is cases, fixture files, rulings and two
+stated bounds. Everything below was run rather than reasoned, except where it says otherwise.
 
 ### 7.1 Needs a case, not a file — the jobs already exist
 
@@ -411,59 +467,84 @@ what is missing is a ruling on which of the ten a hobby machine should serve, no
 ### 7.4 Needs no new file — but is a deferred workstream
 
 **Laser is 7 properties and 11 unreached values**, and `Cutting/Laser/` ships three jobs. The library
-is richer than the register assumes: `center.cnc` censuses as **7 sections and 2 tools**, not one
+is richer than the register assumes: `center.cnc` censuses as **7 sections** on one tool, not one
 operation.
 
 Verified: `laserOnThrough` = 11 and `laserOnEtch` = 22 produce `S110` and `S220` — percent scaled ten
-times into GRBL's `S` range — while `laserOnVaporize` never appears, `center.cnc` using only the
-through and etch modes. So the third power property wants `in-computer.cnc` or `in-control.cnc`, both
-of which are already on disk.
+times into GRBL's `S` range. **`laserOnVaporize` is the exception and it is not a coverage gap but a
+bound** — §7.6.
 
 Group 8 is blocked on laser detail in `findings.md` §6, and `J1` has already run and failed here
 (`PV-3`). Again: a ruling, not an artifact.
 
-### 7.5 The genuine new-file debt — two files, and one of them is nearly free
+### 7.5 The new-file debt — **built, 2026-08-17**
 
-**A multi-WCS jet job — `J2` and `J5`.** These are the only two rows `findings.md` §4 says a `utility`
-run cannot reach. That row states what is still owed as *"a jet block to splice, `make-wcs-jobs.js`
-sourcing from a milling file; `Cutting/Laser/center.cnc` is one operation and the same splice reaches
-it."* **Both halves of that are wrong, and the correction makes the job cheaper, not dearer.**
-`center.cnc` is seven operations across two tools, and **no cross-source splice is needed**: the
-existing byte-splice applied to `center.cnc` alone produces the file.
+Four files closed it, and the suite went from 84 cases to 90.
 
-Built and posted as a feasibility probe — seven blocks re-stamped `1,1,1,2,2,2,2`, censused
-`sections=7 offsets=1/2 tools=2`, posted at exit 0:
+**`jet-two-parts.cnc` — the multi-part half met by a tool that cannot probe.** `J2` and `J5` were the
+only two rows `findings.md` §4 said a `utility` run could not reach, blocked on *"a jet block to
+splice, `make-wcs-jobs.js` sourcing from a milling file; `Cutting/Laser/center.cnc` is one operation"*.
+**Both halves of that were wrong**, and the correction made the job cheaper: `center.cnc` is seven
+operations, so no cross-source splice was needed at all. `W25` posts it and reads the traverse
+retract, the `WCS changed: 1 -> 2`, the `G55`, the move to the stored origin — **and the arm that
+runs when nothing can probe**, reached here for the first time.
 
-```
-(   Retract to the travel height in the machine frame before traverse -- machine Z -5)
-G53 G0 Z-5 F300
-( WCS changed: 1 -> 2)
-G55
-G0 X0 Y0 F2500
-```
+**`mill-then-jet.cnc` — `PR-22`'s falsifier.** The spindle stop once read the **incoming** tool's jet
+guard, so a change into a laser handed the operator a still-turning cutter. It was fixed on a walk
+and nothing witnessed it. The prologue question §7.5 flagged as unproven was settled by building
+both variants (§4.2): it is cosmetic. `W26` now reads the whole boundary in order — machine-frame
+retract, `M0 (MSG,Turn OFF spindle)`, the hand-over, the warning that the arriving tool cannot
+correct Z0, and the laser firing.
 
-The traverse, the select and the move to the stored origin are all correct. **And the second part
-says nothing whatever about a Z0 nobody established** — no probe, correctly, a jet tool being unable
-to; but no warning in the file and none in the dialog either. That is `PV-3`'s shape on the
-*subsequent*-part side, which is exactly what `J2` was written to catch and what `PV-9`'s second open
-question is about. The artifact is one row in the generator's table, and it would return a finding.
+**`mid-offsets.cnc` — the four registers nothing else selected.** `W23` and `W24` take offsets 2, 3,
+5 and 8. Two things fell out that the arithmetic alone would not have shown: **offset 8 is refused on
+GRBL** and the refusal names the offset rather than the count, and this is the only job that
+**starts** on a register other than WCS 1 — every other file, shipped or generated, opens on `G54`.
 
-**A mill-then-jet job — `PR-22`'s falsifier.** The spindle stop once read the **incoming** tool's jet
-guard, so a change into a laser handed over a turning cutter. It was fixed on a walk and **no artifact
-witnesses it**. This is the one file that genuinely needs cross-source splicing — a milling block and
-a jet block in a single job — and **its feasibility is not proven**. Two questions have to be settled
-first: which source's prologue survives, and whether the kernel accepts a jet section beneath a
-milling prologue. Everything else in §7 has been run; this has not.
+**`jet-return.cnc` — the one arm of `writeWcsOnReturn()` nothing else reaches.** A milling tool sets
+part 1 up; section 2 is a change **into** the laser and a new part at once; section 3 returns to part
+1 with Z0 stale and no way to re-measure it. Every other return either can probe or has nothing
+stale. `W27` reads what is left: the move to the stored origin, and a warning that every depth below
+is out by a tool length.
 
-**The `wcs-jobs` table residue** is already `findings.md` §7 *Owed* item 6 — a jog mode on a stale
-return, Flow 2 on RepRapFirmware across a WCS change, the change position crossed with a traverse, and
-work offsets 2, 3, 5 and 8 which no job ever selects. Each is one row in the `JOBS` table.
+**Two of these files record findings rather than passes.**
+
+`W25b` — at the shipped comment level the second part says nothing about the Z0 nobody established:
+no probe, correctly, but no warning in the file and none in the dialog. That is `PV-3` at two further
+sites, both `canProbe`-false arms of `writeWcsEstablish()`, which write `eComment.Debug` while the
+function's own closing comment says *"the tool-0 arms, which have already warned that nothing
+established it."* They have not.
+
+`W27` — the return **does** warn, and in the file alone. That answers the first of `PV-9`'s two open
+questions with an artifact instead of an argument: **yes, the `canProbe`-false arm carries the same
+one-channel silence** as the mode-side arm. Different reason, identical consequence — so a fix scoped
+to the mode would leave this one behind.
+
+Both cases assert the gap, so closing `PV-3` or `PV-9` turns them red and brings the reader here.
+
+**The remaining residue is cases, not files.** `findings.md` §7 *Owed* item 6 listed five gaps; the
+jet block and the four offsets are now built, and the other three need no artifact — a jog mode on a
+stale return, Flow 2 on RepRapFirmware across a WCS change, and the change position crossed with a
+WCS traverse are all property sets over `change-then-return.cnc` and `part-then-tools.cnc`.
 
 **And the live risk needs no file at all.** `plan.md` calls `HR-6 (B)` the live risk — the orientation
 guard may be a no-op on exactly the case it exists to catch — and says *"It needs a rotated Setup."*
 The library ships five: `Milling/3+2/a30.cnc`, `a-30.cnc`, `b30.cnc`, `b-30.cnc`, `c-45b22.cnc`.
 
-### 7.6 Out of reach, and not a gap to close
+### 7.6 One more thing no job file has, and no splice can add
+
+**`laserOnVaporize` is unreachable from the entire shipped library.** The post reads
+`currentSection.jetMode` and maps `Vaporize` to that property. Every jet file in `Cutting/` was
+posted and **none produces `jetMode: Vaporize`** — only `Through` and `Etching`. `center.cnc`'s
+seventh operation is *named* `Vaporize_Center` and its jetMode is `Through`.
+
+A splice cannot add it. `jetMode` is a **section property the kernel computes**, not a parameter
+sitting in the block, so there is no word to change — unlike the work offset, which is exactly why
+that one is editable. Reaching it needs a Fusion job authored in vaporize mode.
+
+Group 8 is blocked on laser detail in any case, so this is recorded as a bound rather than pursued.
+
+### 7.7 Out of reach, and not a gap to close
 
 **Group 3 — `mapRapidsRestoreRapids` and `mapRapidsSafeZ` — cannot be exercised by any `.cnc` file,
 shipped or built.**
@@ -484,19 +565,22 @@ is reachable only from a personal-licence job posted from Fusion, or from `Perso
 emits. **This is a bound to state, not a gap to close**, and it should not be counted against the
 coverage number.
 
-### 7.7 The answer, by persona
+### 7.8 The answer, by persona
 
 | | Hobbyist | Professional |
 |---|---|---|
-| **Needs a case only** | manual spindle control, `probePause` = `Before`, unscaled feeds | `G28` probing on Marlin/RRF, the Duet modes, `Pause & Home` |
+| **New job files** | ✅ none were needed | ✅ **built** — `jet-two-parts`, `mill-then-jet`, `mid-offsets` |
+| **Needs a case only** | manual spindle control, `probePause` = `Before`, unscaled feeds | `G28` probing on Marlin/RRF, the Duet modes, `Pause & Home`, and item 6's last three residues |
 | **Needs fixtures** | — | the four include files, the four custom coolant files |
 | **Needs a ruling, not an artifact** | coolant (a persona), laser (group 8 detail) | the same |
-| **Needs a new job file** | — | **multi-WCS jet** (one table row, proven) · **mill-then-jet** (feasibility unproven) |
-| **Unreachable** | group 3 — personal-licence rapids | group 3 |
+| **Unreachable** | group 3 — personal-licence rapids | group 3 · `laserOnVaporize` |
 
-**So: two files.** One is a row in a table and a source path, and building it would return a finding
-today. The other needs a question answered before it can be attempted. Everything else that looks
-like a coverage gap is a case, a fixture, a ruling, or a bound.
+**The job-file debt is closed.** Every path the post has that a `.cnc` file can reach now has one,
+and the two that no file can reach — group 3's restored rapids and the vaporize power level — are
+stated as bounds with the reason, so neither is mistaken for a gap someone forgot.
+
+What is left is cheaper than what was built: **six cases, eight fixture files, and two rulings the
+author owns.** None of it needs a new job file, and none of it needs Fusion.
 
 ---
 

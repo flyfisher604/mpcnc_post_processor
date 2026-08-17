@@ -513,9 +513,11 @@ executes.
 `Each New WCS / Part`, `writeWCS()`'s traverse arm and `writeWcsOnReturn()` — a third of the multi-part
 design — were unreachable from that library by any harness, and Fusion can produce such a job only by
 hand and only with a licence. `tools/wcs-jobs/` closes it by **splicing rather than authoring**: each
-job is a byte copy of `Milling/2D/toolchange.cnc`'s blocks with one 32-bit word changed per block, so
+job is a byte copy of one Autodesk file's blocks with at most one 32-bit word changed per block, so
 two blocks in different offsets are the same operation with one variable moved and any difference in
-the output is attributable to the WCS logic rather than to a fixture. **The XML serialisation cannot
+the output is attributable to the WCS logic rather than to a fixture. **The same splice reaches the
+jet tool and the change into one**, drawing blocks from a milling source and a laser source, which is
+how `PR-22` and the `canProbe`-false arms came to be posted at all. **The XML serialisation cannot
 substitute** — its reader silently drops `work-offset` and every section arrives as offset 0, verified
 by editing that attribute in Autodesk's own `Milling/2D/bore.xml` and posting it.
 

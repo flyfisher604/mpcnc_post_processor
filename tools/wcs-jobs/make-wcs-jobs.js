@@ -1,22 +1,34 @@
-// make-wcs-jobs.js -- build the intermediate .cnc job files that exercise the post's WCS paths.
+// make-wcs-jobs.js -- build the intermediate .cnc job files the shipped library cannot supply.
 //
-//   node tools/wcs-jobs/make-wcs-jobs.js "<CNC files>/Milling/2D/toolchange.cnc" tools/wcs-jobs
+//   node tools/wcs-jobs/make-wcs-jobs.js "<CNC files>" tools/wcs-jobs
+//
+// The argument is the ROOT of the Autodesk HSM extension's `res/CNC files`, not one file: the jobs
+// below draw blocks from two of them. `integration.md` lists every job and what it covers.
 //
 // WHY THESE FILES EXIST
 //
 // Every .cnc Autodesk ships uses exactly ONE work offset, so `Each New WCS / Part`, writeWCS()'s
 // traverse arm and writeWcsOnReturn() cannot be reached from their library at all -- the whole
 // multi-part half of the post is unreachable by the harness. Fusion can produce such a job, but
-// only with a licence and by hand, one job at a time. These files close that gap.
+// only with a licence and by hand, one job at a time. These files close that gap, and two of them
+// close a second one: no shipped file changes tool INTO a jet tool, or cuts one part with a laser
+// and another with the same laser in a different register.
 //
 // WHAT THEY ARE
 //
-// Not synthesised. Each job is a byte-for-byte concatenation of the prologue and the operation
-// blocks of Autodesk's own `Milling/2D/toolchange.cnc`, and in every copied block **exactly one
-// 32-bit word differs from the source** -- the context record's work offset. Nothing else is
-// touched: not a parameter, not a tool, not a coordinate. So a job that behaves oddly cannot be
-// blamed on a hand-built fixture, and two blocks in different offsets are the same operation with
-// one variable changed, which is what makes the emitted difference attributable to the WCS logic.
+// Not synthesised. Each job is a byte-for-byte concatenation of one source file's prologue and
+// operation blocks, and in every copied block **at most one 32-bit word differs from its source**
+// -- the context record's work offset. Nothing else is touched: not a parameter, not a tool, not a
+// coordinate. So a job that behaves oddly cannot be blamed on a hand-built fixture, and two blocks
+// in different offsets are the same operation with one variable changed, which is what makes the
+// emitted difference attributable to the WCS logic.
+//
+// MIXING SOURCES IS SAFE, AND THAT WAS MEASURED RATHER THAN ASSUMED. `mill-then-jet.cnc` puts a
+// milling block and a laser block in one job, which raised the question of whose prologue survives.
+// Both variants were built and posted: the emitted g-code is IDENTICAL apart from the header's own
+// metadata -- the Fusion version, the date, the document and Setup names -- because the prologue
+// carries job identity and the section data the post reads travels in the blocks. So a mixed job
+// takes the prologue of whichever source it is mostly made of, and the choice is cosmetic.
 //
 // THE FORMAT, AS FAR AS IT IS USED HERE
 //
@@ -114,14 +126,38 @@ function withWorkOffset(blk, n) {
   return { buf: buf, params: blk.params, contextAt: blk.contextAt };
 }
 
+// ---------------------------------------------------------------- the sources
+//
+// Two files, and each one's blocks keep their own source offset so the "one word changed" check
+// below knows what unchanged looks like: toolchange.cnc's blocks ship at offset 1, center.cnc's
+// at 0 (the Work Offset field left alone, which the post aliases to WCS 1).
+
+var SOURCES = {
+  mill: { file: 'Milling/2D/toolchange.cnc', blocks: 2, offset: 1 },
+  jet:  { file: 'Cutting/Laser/center.cnc',  blocks: 7, offset: 0 }
+};
+
+// The block pool. `source` names the file, `index` the operation within it.
+//
+// `A` is 2D-Face, tool 1, cutting to Z-1 ACROSS the part origin -- which is what makes it the block
+// that puts a machined surface under a later probe. `B` is 2D-Contour, tool 2. `J` and `K` are two
+// laser operations on tool 2, kept distinct so a jet job across two parts is two operations rather
+// than the same one twice.
+//
+// A tool change is a block whose tool differs from the one before it, so the ARRANGEMENT is what
+// puts a change where it is wanted; whether it is Flow 1 or Flow 2 is a post property, not a
+// property of the job. A change into `J` is a change into a tool that cannot probe.
+
+var POOL = {
+  A: { source: 'mill', index: 0 },
+  B: { source: 'mill', index: 1 },
+  J: { source: 'jet',  index: 3 },   // Through-medium quality
+  K: { source: 'jet',  index: 5 }    // Etch
+};
+
 // ---------------------------------------------------------------- the jobs
 //
-// `A` is toolchange.cnc's first operation -- 2D-Face, tool 1, cutting to Z-1 across the part
-// origin. `B` is its second -- 2D-Contour, tool 2. A tool change is a block whose tool differs
-// from the one before it, so the arrangement of A and B is what puts a change where it is wanted;
-// whether that change is Flow 1 or Flow 2 is a post property, not a property of the job.
-//
-// Each entry is a list of [block, workOffset].
+// Each entry is a list of [block, workOffset], plus the prologue to carry them.
 
 var JOBS = [
   { file: 'one-part.cnc',
@@ -176,42 +212,87 @@ var JOBS = [
   { file: 'default-offset.cnc',
     plan: [['A', 0], ['A', 2]],
     what: "Fusion reports offset 0 for a Setup whose Work Offset field was left alone. The alias " +
-          'to WCS 1 has to survive a job where a real second offset is also present.' }
+          'to WCS 1 has to survive a job where a real second offset is also present.' },
+
+  { file: 'mid-offsets.cnc',
+    plan: [['A', 2], ['A', 3], ['A', 5], ['A', 8]],
+    what: 'The four registers no other job selects. wcsGcode() is proved at 1, 4, 6, 7 and 9 and ' +
+          'refused at 10, which leaves 2, 3, 5 and 8 computed but never emitted -- and 8 is the ' +
+          'one that crosses from the G54-G59 run into the G59.x run on the firmwares that have it. ' +
+          'It also starts a job on a register that is NOT WCS 1, which every other job does.' },
+
+  { file: 'jet-two-parts.cnc',
+    prologue: 'jet',
+    plan: [['J', 1], ['K', 2]],
+    what: 'The multi-part half met by a tool that CANNOT PROBE -- J2 and J5, the two rows that ' +
+          'were out of reach of every harness. Each canProbe-false arm of the Subsequent WCS / ' +
+          'Part dispatch runs here, writeWcsOnReturn() included, and the cross-part clearance ' +
+          'happens in the machine frame with a jet tool held over the work.' },
+
+  { file: 'jet-return.cnc',
+    plan: [['A', 1], ['J', 2], ['J', 1]],
+    what: 'A RETURN, in a job whose returning tool cannot probe. Section 1 sets part 1 up with a ' +
+          'milling tool; section 2 is a change INTO the laser and a new part at once; section 3 ' +
+          'returns to part 1 with Z0 stale and no way to re-measure it. That is the one arm of ' +
+          "writeWcsOnReturn() nothing else reaches -- the arm that can only warn, which is PV-9's " +
+          'open question about the canProbe-false path.' },
+
+  { file: 'mill-then-jet.cnc',
+    plan: [['A', 1], ['J', 1]],
+    what: 'A tool change INTO a tool that cannot probe -- PR-22\'s falsifier, and the only job ' +
+          'here that is not about work offsets. The spindle stop once read the INCOMING tool\'s ' +
+          'jet guard, so a change into a laser handed the operator a still-turning cutter; the ' +
+          'fix was walked and never witnessed. One offset, deliberately: the tool is the variable.' }
 ];
 
 // ---------------------------------------------------------------- main
 
 function main() {
-  var source = process.argv[2];
+  var root = process.argv[2];
   var outDir = process.argv[3] || path.join(__dirname);
-  if (!source) {
-    console.error('usage: node make-wcs-jobs.js "<CNC files>/Milling/2D/toolchange.cnc" [outDir]');
+  if (!root) {
+    console.error('usage: node make-wcs-jobs.js "<CNC files>" [outDir]');
     process.exit(2);
   }
 
-  var src = split(source);
-  if (src.blocks.length !== 2) {
-    throw new Error('expected 2 operations in ' + source + ', found ' + src.blocks.length);
-  }
-  var pool = { A: src.blocks[0], B: src.blocks[1] };
-  Object.keys(pool).forEach(function (k) {
-    var wo = workOffsetOf(pool[k]);
-    if (wo !== 1) throw new Error('source block ' + k + ' has work offset ' + wo + ', expected 1 -- the format has moved');
+  // Read each source once, and hold it to its declared shape. A library that reorganises its
+  // sample files must fail here, loudly, rather than produce jobs built from whatever it found.
+  var src = {};
+  Object.keys(SOURCES).forEach(function (name) {
+    var s = SOURCES[name];
+    var file = path.join(root, s.file);
+    var got = split(file);
+    if (got.blocks.length !== s.blocks) {
+      throw new Error(s.file + ': expected ' + s.blocks + ' operations, found ' + got.blocks.length);
+    }
+    got.blocks.forEach(function (b, i) {
+      var wo = workOffsetOf(b);
+      if (wo !== s.offset) {
+        throw new Error(s.file + ' block ' + i + ': work offset ' + wo + ', expected ' + s.offset + ' -- the format or the library has moved');
+      }
+    });
+    src[name] = got;
+    console.log('source: ' + s.file + '  (' + got.blocks.length + ' operations at offset ' + s.offset + ')');
   });
 
-  console.log('source: ' + source);
-  console.log('  A = T' + pool.A.params['operation:tool_number'] + ' ' +
-              pool.A.params[NS + 'parameter/operation-comment'] + ', ' + pool.A.buf.length + ' bytes');
-  console.log('  B = T' + pool.B.params['operation:tool_number'] + ' ' +
-              pool.B.params[NS + 'parameter/operation-comment'] + ', ' + pool.B.buf.length + ' bytes');
+  // Resolve the pool, and report it -- the letters in the plans below are unreadable otherwise.
+  var pool = {};
+  Object.keys(POOL).forEach(function (k) {
+    var d = POOL[k];
+    var blk = src[d.source].blocks[d.index];
+    pool[k] = { blk: blk, source: d.source };
+    console.log('  ' + k + ' = T' + blk.params['operation:tool_number'] + ' ' +
+                blk.params[NS + 'parameter/operation-comment'] +
+                ' [' + d.source + ' ' + d.index + '], ' + blk.buf.length + ' bytes');
+  });
   console.log('');
 
   JOBS.forEach(function (job) {
-    var parts = [src.prologue];
+    var parts = [src[job.prologue || 'mill'].prologue];
     job.plan.forEach(function (step) {
-      var blk = pool[step[0]];
-      if (!blk) throw new Error(job.file + ': no source block named ' + step[0]);
-      parts.push(withWorkOffset(blk, step[1]).buf);
+      var entry = pool[step[0]];
+      if (!entry) throw new Error(job.file + ': no source block named ' + step[0]);
+      parts.push(withWorkOffset(entry.blk, step[1]).buf);
     });
     var out = Buffer.concat(parts);
     var dest = path.join(outDir, job.file);
@@ -223,21 +304,27 @@ function main() {
       return 'T' + b.params['operation:tool_number'] + '@' + workOffsetOf(b);
     });
     var want = job.plan.map(function (s) {
-      return 'T' + pool[s[0]].params['operation:tool_number'] + '@' + s[1];
+      return 'T' + pool[s[0]].blk.params['operation:tool_number'] + '@' + s[1];
     });
     if (got.join(' ') !== want.join(' ')) {
       throw new Error(job.file + ': wrote ' + want.join(' ') + ' but reads back as ' + got.join(' '));
     }
 
     // And check the claim this tool makes about itself: one word per block, nothing else.
+    // "Unchanged" is per SOURCE -- the milling blocks ship at offset 1 and the jet blocks at 0,
+    // so a jet block asked for offset 0 must differ by nothing while a milling one must differ
+    // by the single word. Hard-coding 1 here would have passed every jet job for the wrong reason.
     back.blocks.forEach(function (b, i) {
-      var srcBuf = pool[job.plan[i][0]].buf;
+      var entry = pool[job.plan[i][0]];
+      var srcBuf = entry.blk.buf;
       if (b.buf.length !== srcBuf.length) throw new Error(job.file + ' block ' + i + ': length changed');
       var diffs = 0;
       for (var k = 0; k < srcBuf.length; k++) if (srcBuf[k] !== b.buf[k]) diffs++;
-      var expected = job.plan[i][1] === 1 ? 0 : null;   // offset 1 is the source value: no bytes differ
-      if (expected === 0 && diffs !== 0) throw new Error(job.file + ' block ' + i + ': ' + diffs + ' bytes differ, expected none');
-      if (expected === null && (diffs < 1 || diffs > 4)) {
+      var unchanged = job.plan[i][1] === SOURCES[entry.source].offset;
+      if (unchanged && diffs !== 0) {
+        throw new Error(job.file + ' block ' + i + ': ' + diffs + ' bytes differ, expected none');
+      }
+      if (!unchanged && (diffs < 1 || diffs > 4)) {
         throw new Error(job.file + ' block ' + i + ': ' + diffs + ' bytes differ, expected 1 to 4 (one u32)');
       }
     });

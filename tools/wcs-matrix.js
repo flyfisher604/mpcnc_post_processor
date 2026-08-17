@@ -281,6 +281,90 @@ const cases = [
   mustNot:[[/since been changed/,'and the return to the OTHER part warns about nothing -- PV-10']],
   custom:t => counts(t, /^G38\.2/gm, 2,
     'two probes, both first visits: no return re-measures, because the change never marked any part stale') },
+
+// === H. the registers no other job selects ===========================================
+{ id:'W23', desc:'offset 8 is past what GRBL has, and a job whose FIRST offset is not 1 is still refused for it',
+  job:'mid-offsets.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip') }),
+  refuse:[/Work offset 8 is out of range for Grbl/,'names the offset, not just the count'] },
+
+{ id:'W24', desc:'... and on RepRapFirmware all four resolve, including the one that crosses into the G59.x run',
+  job:'mid-offsets.cnc',
+  props:mp({ jobSelectedFirmware:S('RepRap'), probeOnStart:S('Skip'), probeOnChange:S('Skip') }),
+  // 2, 3 and 5 are 53+n; 8 is 59+(8-6)/10 = G59.2. The pair is the point: one arithmetic, two ranges.
+  must:[[/^G55$/m,'offset 2'],[/^G56$/m,'offset 3'],[/^G58$/m,'offset 5'],[/^G59\.2$/m,'offset 8']],
+  mustNot:[[/^G54$/m,'and G54 never appears - no job here has ever STARTED anywhere but WCS 1']],
+  custom:t => ordered(t, [['G55',/^G55$/m],['G56',/^G56$/m],['G58',/^G58$/m],['G59.2',/^G59\.2$/m]]) },
+
+// === I. a tool that cannot probe, on a part this job has never seen (J2, J5) ==========
+{ id:'W25', desc:'a jet tool meets a second part: it travels to the stored origin and measures nothing',
+  job:'jet-two-parts.cnc',
+  // Debug, because what this case is about is which arm ran -- and on a tool that cannot probe the
+  // post says so only at Debug. That silence at Info is W25b.
+  props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Probe Z'), jobCommentLevel:S('Debug') }),
+  must:[[/^G54$/m,'the first part selects its register'],
+        [/^G55$/m,'and the second selects its own'],
+        // NO PARENTHESES: the source writes "(tool 0 or jet tool)" and writeComment() strips them,
+        // a nested "(" being what would terminate a GRBL comment early. Asserting the source's own
+        // text rather than the emitted text is what made this case red on its first run.
+        [/writeWcsEstablish: probe skipped tool 0 or jet tool -- moving to stored X0 Y0/,
+         'the canProbe-false arm of Subsequent WCS / Part, reached for the first time']],
+  mustNot:[[/G38\.2/,'nothing probes: a jet tool cannot, and the arm knows it']],
+  custom:t => ordered(t, [['G54',/^G54$/m],
+                          ['travel-height retract',/^G53 G0 Z-5 F\d/m],
+                          ['WCS change',/WCS changed: 1 -> 2/],
+                          ['G55',/^G55$/m],
+                          ['probe skipped',/writeWcsEstablish: probe skipped/]]) },
+
+{ id:'W25b', desc:'... and at the shipped level the file says nothing about the Z0 it never established - PV-3',
+  job:'jet-two-parts.cnc',
+  props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Probe Z') }),
+  must:[[/^G55$/m,'the second part is selected and cut']],
+  // ASSERTS THE GAP. writeWcsEstablish()'s own closing comment says the tool-0 arms "have already
+  // warned that nothing established it" -- and both of them write eComment.Debug, so at Info there is
+  // no such warning in either channel. Closing PV-3 turns this case red, which is the point.
+  mustNot:[[/>>> WARNING[^)]*(Z0|established)/,'no warning in the file -- PV-3, not a pass']],
+  mustNotLog:[[/probe skipped|nothing established/,'and none in the dialog either']] },
+
+// === J. a change INTO a tool that cannot probe (PR-22) ===============================
+{ id:'W26', desc:'a mill hands over to a laser: the OUTGOING tool is what decides the spindle stop',
+  job:'mill-then-jet.cnc', props:mp({ probeOnStart:S('Skip'), toolChangeMode:S('Pause') }),
+  // PR-22 was this exact boundary read the wrong way round: the guard consulted the INCOMING tool,
+  // saw a jet tool, and skipped the spindle stop -- handing the operator a still-turning cutter.
+  // The fix was walked and never witnessed, and this is the only job that can witness it.
+  must:[[/^M0 \(MSG,Turn OFF spindle\)$/m,'the milling spindle is stopped before the operator reaches in'],
+        [/M0 \(MSG,Change to Tool #2[^)]*\)/,'and then the change is handed over'],
+        [/cannot probe, so work Z0 still measures from the tool just removed/,
+         'and the file names what the incoming tool cannot correct']],
+  mustNot:[[/G38\.2/,'no re-probe after the change: the tool that arrived cannot probe']],
+  custom:t => ordered(t, [['retract',/Retract to the travel height in the machine frame before the tool change/],
+                          ['spindle stop',/^M0 \(MSG,Turn OFF spindle\)$/m],
+                          ['hand over',/MSG,Change to Tool #2/],
+                          ['jet warning',/cannot probe, so work Z0 still measures/],
+                          ['laser fires',/^M4 S\d+$/m]]) },
+
+{ id:'W27', desc:'a return the returning tool cannot re-measure: the one arm of writeWcsOnReturn() that can only warn',
+  job:'jet-return.cnc',
+  props:mp({ probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z'), toolChangeMode:S('Pause') }),
+  must:[[/Return to a part already set up -- move to its stored origin X0 Y0/,'it reaches the part'],
+        [/stored Z0 was measured with a tool that has since been changed/,
+         'and says the depths below it are wrong by a tool length']],
+  mustNot:[[/a tool change since means Z0 is re-probed/,'it cannot re-probe, so it must not claim to']],
+  // SCOPED TO AFTER THE CHANGE. Section 1 is a MILLING tool and probes correctly; an unscoped
+  // "no G38.2" reads that legitimate probe as the defect and fails a passing post, which is what
+  // it did on this case's first run.
+  custom:t => {
+    const all = countOf(t, /^G38\.2/gm);
+    if (all !== 1) return [false, `${all} probes in the job, expected 1 -- the first part, with the milling tool`];
+    const after = t.slice(t.search(/MSG,Change to Tool #2/));
+    const n = countOf(after, /^G38\.2/gm);
+    return [n === 0, n === 0 ? 'one probe before the laser is fitted and none after'
+                             : `${n} probes after a change into a tool that cannot probe`];
+  },
+  // PV-9's first open question, answered: the canProbe-false arm has the SAME one-channel silence as
+  // the mode-side arm W11b covers. Different reason, identical consequence -- so a fix scoped to the
+  // mode would leave this one behind. Asserts the gap; closing PV-9 turns it red.
+  mustNotLog:[[/stored Z0 was measured with a tool that has since been changed/,
+               'and the dialog never hears it -- PV-9, on the tool side this time']] },
 ];
 
 // ---- run ------------------------------------------------------------------------------
