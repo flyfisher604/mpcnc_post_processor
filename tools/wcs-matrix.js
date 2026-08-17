@@ -1,0 +1,286 @@
+/**
+  wcs-matrix.js -- the multi-part half of the post, on job files built for it.
+
+  `professional-matrix.js` states the bound it cannot cross: every .cnc Autodesk ships uses one
+  work offset, so "Each New WCS / Part", writeWCS()'s traverse arm and writeWcsOnReturn() are
+  unreachable from their library. `tools/wcs-jobs/` closes that gap and this matrix is what reads
+  the result. Its through-line is the pair "First WCS / Part" x "Subsequent WCS / Part", crossed
+  with the tool change on both flows -- manual (Pause) and automated (Macro) -- because a boundary
+  that changes BOTH the part and the tool is where the post has to decide which of the two owns
+  the origin work, and no shipped job has ever put it to that question.
+
+  Three channels, as in `professional-matrix.js`:
+    must / mustNot        the emitted g-code
+    mustLog / mustNotLog  the post-time channel -- warning(), which reaches the dialog
+    refuse                error(), where the right answer is no file at all
+
+  WHAT MOST OF THESE CASES ASSERT IS ORDER AND COUNT, not presence. The two defects this area has
+  actually had were an ordering (CR-15) and a duplicated probe (CR-17, PR-23): a preamble with
+  every block present but in the wrong sequence, and a G38.2 driven into a surface the previous
+  pass had cut. A presence check sees neither.
+
+  Run:
+    node tools/wcs-matrix.js <post.exe> <post.cps> tools/wcs-jobs <output dir>
+  VERBOSE=1 prints the checks that passed as well as the ones that did not.
+*/
+const { spawnSync } = require('child_process');
+const fs = require('fs'), path = require('path');
+
+const POST = process.argv[2];
+const CPS  = process.argv[3];
+const JOBS = process.argv[4];
+const OUT  = process.argv[5];
+fs.mkdirSync(OUT, { recursive: true });
+
+const S = v => `"${v}"`;
+const B = v => (v ? 'true' : 'false');
+
+// THE MULTI-PART BASELINE. Guard B refuses any job with more than one work offset unless the
+// machine declares X/Y homed -- a stored offset is measured from machine zero, which moves at
+// every reset when nothing homes -- and the traverse retract needs the Z frame. So this is not a
+// preference: it is the minimum configuration in which these job files post at all.
+const MP = { machineHomedAxes:S('XYZ'), machineTravelZ:S('-5'), machineHomeAtStart:S('Home') };
+const mp = (extra) => Object.assign({}, MP, extra);
+
+const at = (t, re) => t.search(re);
+const ordered = (t, steps) => {
+  const idx = steps.map(s => [s[0], at(t, s[1])]);
+  const missing = idx.filter(p => p[1] < 0);
+  if (missing.length) return [false, `never emitted: ${missing.map(p => p[0]).join(', ')}`];
+  for (let i = 1; i < idx.length; i++) {
+    if (idx[i][1] < idx[i-1][1]) {
+      return [false, `${idx[i][0]} (@${idx[i][1]}) precedes ${idx[i-1][0]} (@${idx[i-1][1]})`];
+    }
+  }
+  return [true, `ordered: ${idx.map(p => p[0]).join(' -> ')}`];
+};
+const countOf = (t, re) => (t.match(re) || []).length;
+const counts = (t, re, n, what) => {
+  const got = countOf(t, re);
+  return [got === n, `${got === n ? '' : `${got} not ${n}: `}${what}`];
+};
+// The text between two anchors -- how a claim is confined to one section boundary rather than
+// being satisfied by something the file happens to contain somewhere else entirely.
+const between = (t, a, b) => {
+  const i = t.search(a); if (i < 0) return '';
+  const rest = t.slice(i);
+  const j = rest.slice(1).search(b);
+  return j < 0 ? rest : rest.slice(0, j + 1);
+};
+
+const cases = [
+// === A. the first part, then a part this job has never seen ===========================
+{ id:'W1', desc:'Use WCS X0 Y0 Z0 on both: two registers selected, nothing measured, nothing asked',
+  job:'two-parts.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip') }),
+  must:[[/^G54$/m,'the first part selects its register'],
+        [/^G55$/m,'the second selects its own'],
+        [/Move to this part's stored origin X0 Y0/,'the added part is reached, not established']],
+  mustNot:[[/G38\.2/,'no probe anywhere - neither mode measures'],
+           [/G10 L20 P2/,"nothing is written into the second part's register"],
+           [/MSG,Jog/,'no operator prompt']],
+  custom:t => ordered(t, [['G54',/^G54$/m], ['travel-height retract',/^G53 G0 Z-5 F\d/m], ['G55',/^G55$/m]]) },
+
+{ id:'W2', desc:'Probe Z0 Once per Part: the added part is probed, into ITS OWN register',
+  job:'two-parts.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Probe Z') }),
+  must:[[/^G10 L20 P2 Z0$/m,'the provisional Z0 names P2 - CR-12'],
+        [/^G38\.2 F\d+ Z-\d/m,'and searches down from it'],
+        [/^G10 L20 P2 Z0\.8$/m,'and the result lands in P2, not the active-register accident']],
+  mustNot:[[/^G10 L20 P1 Z/m,"the first part's register is never rewritten"]],
+  custom:t => counts(t, /G38\.2/g, 1, 'exactly one probe: the first part is skipped, the second measured') },
+
+{ id:'W3', desc:'Jog to X0 Y0 Z0 on the added part: the hand sets all three, no probe',
+  job:'two-parts.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Jog XYZ') }),
+  must:[[/MSG,Jog to X0 Y0 Z0/,'the operator is asked, at the part'],
+        [/^G10 L20 P2 X0 Y0 Z0$/m,'and where they stopped becomes the origin']],
+  mustNot:[[/G38\.2/,'nothing is probed']] },
+
+{ id:'W4', desc:'Jog to X0 Y0, Probe Z0: the provisional Z0 goes in before the probe, not after',
+  job:'two-parts.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Jog XY & Probe Z') }),
+  custom:t => ordered(t, [['G55',/^G55$/m],
+                          ['jog prompt',/MSG,Jog to X0 Y0 above Z0/],
+                          ['provisional Z0',/^G10 L20 P2 X0 Y0 Z0$/m],
+                          ['probe',/^G38\.2 F\d+ Z-\d/m],
+                          ['result',/^G10 L20 P2 Z0\.8$/m]]) },
+
+{ id:'W5', desc:'the traverse retracts in the machine frame BEFORE selecting the new register',
+  job:'two-parts.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Probe Z') }),
+  must:[[/Retract to the travel height in the machine frame before traverse/,'and says why']],
+  custom:t => {
+    // Confined to the boundary: the retract has to be the block before G55, not merely present.
+    const seg = between(t, /WCS changed: 1 -> 2/, /^G55$/m);
+    return [/G53 G0 Z-5/.test(seg) || /G53 G0 Z-5[\s\S]*WCS changed: 1 -> 2/.test(t),
+            'the G53 retract precedes the G55 select at the boundary itself'];
+  } },
+
+{ id:'W6', desc:'... and with no machine frame the whole job is refused, not posted unsafely',
+  job:'two-parts.cnc', props:{ machineHomedAxes:S('XYZ'), probeOnChange:S('Probe Z') },
+  refuse:[/multiple work offsets|fixed Z reference|Machine Travel Z/i,'Guard B names what is missing'] },
+
+// === B. a return to a part this job has already set up (CR-17) ========================
+{ id:'W7', desc:'a return with no tool change since sets NOTHING up - it selects and travels',
+  job:'return-to-part.cnc', props:mp({ probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z') }),
+  must:[[/Return to a part already set up -- move to its stored origin X0 Y0/,'and says so'],
+        [/WCS changed: 2 -> 1/,'the register is re-selected']],
+  mustNot:[[/a tool change since means Z0 is re-probed/,'nothing has invalidated Z0']],
+  custom:t => counts(t, /G38\.2/g, 2, 'two probes for three sections: the return adds none - CR-17') },
+
+{ id:'W8', desc:'... and it re-prompts nothing either, under a jog mode',
+  job:'return-to-part.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Jog XYZ') }),
+  custom:t => counts(t, /MSG,Jog to X0 Y0 Z0/g, 1,
+    'one jog prompt for two visits to two parts: the return does not re-ask for a part already cut') },
+
+// === C. a return whose Z0 a tool change has invalidated ===============================
+{ id:'W9', desc:'a return AFTER a tool change re-probes Z0 - and only Z0',
+  job:'change-then-return.cnc',
+  props:mp({ probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z'), toolChangeMode:S('Pause') }),
+  must:[[/Return to a part already set up; a tool change since means Z0 is re-probed/,'named at the boundary'],
+        [/^G10 L20 P1 Z0\.8$/m,"the re-probe lands in the returned-to part's register"]],
+  mustNot:[[/^G10 L20 P1 X0 Y0/m,'X0 Y0 is never re-established on a return - it is what nothing moves']] },
+
+{ id:'W10', desc:'... and with re-probing turned off the return is silent about nothing',
+  job:'change-then-return.cnc',
+  props:mp({ probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z'),
+             toolChangeMode:S('Pause'), toolChangeProbeAfterChange:B(false) }),
+  must:[[/work Z0 was NOT re-established/,'the change says what it did not do']],
+  mustNot:[[/a tool change since means Z0 is re-probed/,'and the return does not claim otherwise']] },
+
+{ id:'W11', desc:'Use WCS X0 Y0 Z0 across a change: the change keeps the re-probe the establish will not make',
+  job:'change-then-return.cnc',
+  props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip'), toolChangeMode:S('Pause') }),
+  must:[[/^G10 L20 P1 Z0\.8$/m,"the change corrects Z0 itself, in the part's own register"]],
+  mustNot:[[/Work Z0 for this part is established below/,'the hand-over is NOT taken: under this mode the establish measures nothing'],
+           [/stored Z0 was measured with a tool that has since been changed/,
+            'and so the return has nothing to warn about - the correction was already made']],
+  custom:t => counts(t, /G38\.2/g, 1, 'one probe in the whole job, and it belongs to the change') },
+
+{ id:'W11b', desc:'... but a part LEFT BEHIND by that change is stale, and the file is the only place that says so - PV-9',
+  job:'tools-across-parts.cnc',
+  props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip'), toolChangeMode:S('Pause') }),
+  must:[[/stored Z0 was measured with a tool that has since been changed/,'the depth error is named in the file']],
+  // ASSERTS THE GAP, so that closing PV-9 turns this case red and brings the reader here. The
+  // condition is decided by two properties and the job's shape, all three of which validateJob()
+  // can see at onOpen() -- which is what makes the dialog's silence a defect rather than a limit.
+  mustNotLog:[[/stored Z0 was measured with a tool that has since been changed/,
+               'and the dialog is silent -- PV-9, not a pass']],
+  custom:t => counts(t, /G38\.2/g, 1,
+    'the change re-probes the part it is standing on and no other: there is no tool-length system to correct the rest') },
+
+// === D. a boundary that is BOTH a new part and a new tool (PR-23, CR-21, CR-22) =======
+{ id:'W12', desc:'select, THEN change, THEN establish - the part is set up once, by the tool that cuts it',
+  job:'part-then-tools.cnc',
+  props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Probe Z'), toolChangeMode:S('Pause') }),
+  custom:t => {
+    const seg = between(t, /WCS changed: 1 -> 2/, /2D-Face - Milling - Tool: 1/);
+    const n = countOf(seg, /G38\.2/g);
+    if (n !== 1) return [false, `${n} probes at the new-part-and-new-tool boundary, expected exactly 1`];
+    return ordered(seg, [['G55',/^G55$/m], ['tool change',/Tool Change Start/],
+                         ['hand over',/MSG,Change to Tool #1/], ['change ends',/Tool Change End/],
+                         ['establish',/^G10 L20 P2 Z0$/m], ['probe',/^G38\.2/m]]);
+  } },
+
+{ id:'W13', desc:'the automated hand-over reaches the same boundary and re-selects the register after it',
+  job:'part-then-tools.cnc',
+  props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Probe Z'),
+             toolChangeMode:S('Macro'), toolChangeSender:S('gSender') }),
+  must:[[/^T1 M6$/m,'the sender token, not an M6 the post invents'],
+        [/^G55$/m,'the added part is selected']],
+  custom:t => {
+    const seg = between(t, /WCS changed: 1 -> 2/, /2D-Face - Milling - Tool: 1/);
+    const first = ordered(seg, [['G55',/^G55$/m], ['hand over',/^T1 M6$/m], ['modal re-assert',/^G90$/m]]);
+    if (!first[0]) return first;
+    // The re-select is a SECOND G55 after the token, which an index-of-first search cannot see:
+    // a macro the post did not write may have left any register active, so this one is unconditional.
+    const afterToken = seg.slice(seg.search(/^T1 M6$/m));
+    return ordered(afterToken, [['modal re-assert',/^G90$/m], ['WCS re-select',/^G55$/m],
+                                ['travel height',/^G53 G0 Z-5 F\d/m], ['establish',/^G10 L20 P2 Z0$/m]]);
+  } },
+
+{ id:'W14', desc:'tools sorted across parts: two returns, both with Z0 invalidated, both re-probed',
+  job:'tools-across-parts.cnc',
+  props:mp({ probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z'), toolChangeMode:S('Pause') }),
+  must:[[/^G10 L20 P1 Z0\.8$/m,'part 1 is re-measured for the second tool'],
+        [/^G10 L20 P2 Z0\.8$/m,'and so is part 2']],
+  custom:t => counts(t, /a tool change since means Z0 is re-probed/g, 2,
+    'both returns say why they are re-probing') },
+
+// === E. which g-code a work offset becomes ============================================
+{ id:'W15', desc:'non-adjacent offsets: the code is computed, not counted',
+  job:'spread-offsets.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip') }),
+  custom:t => ordered(t, [['G54',/^G54$/m], ['G57',/^G57$/m], ['G59',/^G59$/m]]) },
+
+{ id:'W16', desc:'above G59 on GRBL: refused, naming the offset and what each firmware has',
+  job:'high-offsets.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip') }),
+  refuse:[/Work offset 7 is out of range for Grbl \(GRBL supports G54-G59/,'the offset and the range'] },
+
+{ id:'W17', desc:'... and on RepRapFirmware the same job is G59.1 and G59.3',
+  job:'high-offsets.cnc',
+  props:mp({ jobSelectedFirmware:S('RepRap'), probeOnStart:S('Skip'), probeOnChange:S('Skip') }),
+  must:[[/^G59\.1$/m,'offset 7'], [/^G59\.3$/m,'offset 9']] },
+
+{ id:'W18', desc:'past G59.3 there is nothing on any firmware, and the post says which',
+  job:'offset-out-of-range.cnc',
+  props:mp({ jobSelectedFirmware:S('RepRap'), probeOnStart:S('Skip') }),
+  refuse:[/Work offset 10 is out of range/,'refused on the firmware with the most registers'] },
+
+{ id:'W19', desc:'the untouched Work Offset field aliases to G54 even beside a real second offset',
+  job:'default-offset.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip') }),
+  must:[[/writeWCS: workOffset defaulted to: 1/,'the alias is stated in the file'],
+        [/^G54$/m,'and it is G54'], [/^G55$/m,'while the declared second offset is its own']] },
+
+// === F. Marlin, where the dialects differ and one build option carries the job ========
+{ id:'W20', desc:'Marlin multi-part: the single-offset suppression must NOT fire, and G92 is the dialect',
+  job:'two-parts.cnc',
+  props:mp({ jobSelectedFirmware:S('Marlin'), probeOnStart:S('Skip'), probeOnChange:S('Probe Z') }),
+  must:[[/^G54$/m,'the first register is selected, because a second one exists'],
+        [/^G55$/m,'and so is the second'],
+        [/^G92 Z0$/m,'the provisional origin is written positionally']],
+  mustNot:[[/G10 L20/,'Marlin has no G10 L20 register write']],
+  mustLog:[[/CNC_COORDINATE_SYSTEMS/,'and the one build option the whole job rests on is named']] },
+
+{ id:'W21', desc:'a single-offset Marlin job is the control: no G54 at all',
+  job:'offset-out-of-range.cnc',
+  props:mp({ jobSelectedFirmware:S('Marlin'), probeOnStart:S('Skip') }),
+  refuse:[/Work offset 10 is out of range/,'this job cannot reach that arm - offset 10 refuses first'] },
+];
+
+// ---- run ------------------------------------------------------------------------------
+const results = [];
+
+for (const c of cases) {
+  const gcode = path.join(OUT, `${c.id}.gcode`);
+  const log   = path.join(OUT, `${c.id}.log`);
+  if (fs.existsSync(gcode)) fs.unlinkSync(gcode);
+  if (fs.existsSync(log)) fs.unlinkSync(log);
+
+  const args = ['--noeditor','--nointeraction','--nobackup','--noprogress','--log',log];
+  for (const [k,v] of Object.entries(c.props)) args.push('--property', k, v);
+  args.push(CPS, path.join(JOBS, c.job), gcode);
+
+  const r = spawnSync(POST, args, { encoding:'utf8' });
+  const posted = r.status === 0 && fs.existsSync(gcode);
+  const text = posted ? fs.readFileSync(gcode,'utf8') : '';
+  const logText = (fs.existsSync(log) ? fs.readFileSync(log,'utf8') : '')
+                + (r.stdout || '') + (r.stderr || '');
+
+  const checks = [];
+  if (c.refuse) {
+    checks.push([!posted, `refuse: no file is produced (exit ${r.status})`]);
+    checks.push([c.refuse[0].test(logText), `refuse: ${c.refuse[1]}`]);
+  } else if (!posted) {
+    checks.push([false, `post refused (exit ${r.status}) -- ${(logText.match(/Error: .*/) || ['no error line'])[0]}`]);
+  } else {
+    for (const [re,what] of (c.must||[]))       checks.push([re.test(text),      `must: ${what}`]);
+    for (const [re,what] of (c.mustNot||[]))    checks.push([!re.test(text),     `must not: ${what}`]);
+    for (const [re,what] of (c.mustLog||[]))    checks.push([re.test(logText),   `must warn: ${what}`]);
+    for (const [re,what] of (c.mustNotLog||[])) checks.push([!re.test(logText),  `must not warn: ${what}`]);
+    if (c.custom) checks.push(c.custom(text));
+  }
+  const pass = checks.every(x=>x[0]);
+  results.push({ id:c.id, desc:c.desc, pass, checks });
+}
+
+for (const r of results) {
+  console.log(`${r.pass?'PASS':'FAIL'}  ${r.id}  ${r.desc}`);
+  for (const [ok,what] of r.checks) if (!ok || process.env.VERBOSE) console.log(`        ${ok?'ok ':'>> '} ${what}`);
+}
+console.log(`\n${results.filter(r=>r.pass).length} / ${results.length} cases pass`);
