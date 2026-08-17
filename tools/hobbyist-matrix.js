@@ -132,6 +132,22 @@ const cases = [
 { id:'H25', desc:'A jet tool withholds the provisional Z0 a milling tool gets', cnc:'Cutting/Laser/center.cnc', props:{},
   must:[[/^G10 L20 P1 X0 Y0$/m,'no Z word - a fake Z0 would silently become Set X0 Y0 Z0']],
   mustNot:[[/^G10 L20 P1 X0 Y0 Z0$/m,'the milling form must not appear']] },
+
+// --- PV-4, both branches of the condition -------------------------------------------
+{ id:'H26', desc:'PV-4 - homing before a Current Pos origin warns IN THE FILE', cnc:'Milling/2D/face.cnc',
+  props:{machineHomedAxes:S('XYZ'), machineHomeAtStart:S('Home'), probeOnStart:S('Current XY & Probe Z')},
+  must:[[/>>> WARNING: the homing below runs BEFORE/,'the file says the pre-jog is destroyed']],
+  mustNot:[], custom:(t)=>{
+    const w=t.indexOf('the homing below runs BEFORE'), h=t.search(/^\$H$/m), o=t.search(/^G10 L20 P1 X0 Y0 Z0$/m);
+    return (w>=0 && w<h && h<o)? [true,'ordered: warning, then homing, then the origin write']
+                              : [false,`out of order - warning@${w} homing@${h} origin@${o}`]; } },
+{ id:'H27', desc:'PV-4 - and stays silent where the mode records nothing pre-jogged', cnc:'Milling/2D/face.cnc',
+  props:{machineHomedAxes:S('XYZ'), machineHomeAtStart:S('Home'), probeOnStart:S('Probe Z')},
+  must:[[/^\$H$/m,'still homes']], mustNot:[[/the homing below runs BEFORE/,'no warning - nothing pre-jogged to destroy']] },
+{ id:'H28', desc:'PV-4 - and stays silent when the job does not home at all', cnc:'Milling/2D/face.cnc',
+  props:{machineHomedAxes:S('XYZ'), machineHomeAtStart:S('Off'), probeOnStart:S('Current XY & Probe Z')},
+  must:[[/^G10 L20 P1 X0 Y0 Z0$/m,'records the pre-jogged origin']],
+  mustNot:[[/the homing below runs BEFORE/,'no warning - nothing homes'],[/^\$H$/m,'no homing']] },
 ];
 
 const results = [];

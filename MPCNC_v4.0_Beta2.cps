@@ -3454,6 +3454,22 @@ function writeMachineHoming() {
     return;
   }
 
+  // THE PRE-JOG DESTROYER, in the channel the operator running the file actually has. validateJob()
+  // carries the post-time half and cannot carry this one: it runs from onOpen() with no output stream,
+  // which is why the "nothing was homed" warning above is paired the same way. HB-5's rule -- a
+  // property that fails one way fails in BOTH channels -- and PR-17, CR-10 and HB-13's precedent.
+  // Above the homing motion rather than beside the origin write, because the homing is what destroys
+  // the position and the operator reads downward. The two early returns above have already established
+  // that homing is on and that an axis is declared, so the mode is the whole remaining condition.
+  // Advice, not prohibition: a fixture AT machine zero is rare rather than impossible. PV-4.
+  if (originIsPreJogged()) {
+    writeWarning("the homing below runs BEFORE \"First WCS / Part\" records the current position as"
+      + " the part origin, so whatever this job records as X0 Y0 is where homing left the machine --"
+      + " the endstop corner -- and not where you parked the tool. Positioning the tool before"
+      + " starting this file has no effect on any axis \"Axes Homed and Trusted\" declares. Use"
+      + " \"Use WCS X0 Y0, Probe Z0\" or a \"Jog to ...\" mode, or set \"Home at Job Start\" to Off.");
+  }
+
   // A single stop before ANY homing motion, so the operator can prepare the machine -- place a movable
   // Z-homing plate, clear the bed. Independent of firmware and of which axes home.
   if (promptsBeforeHome()) {
