@@ -106,10 +106,15 @@ const cases = [
   job:'two-parts.cnc', props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Probe Z') }),
   must:[[/Retract to the travel height in the machine frame before traverse/,'and says why']],
   custom:t => {
-    // Confined to the boundary: the retract has to be the block before G55, not merely present.
-    const seg = between(t, /WCS changed: 1 -> 2/, /^G55$/m);
-    return [/G53 G0 Z-5/.test(seg) || /G53 G0 Z-5[\s\S]*WCS changed: 1 -> 2/.test(t),
-            'the G53 retract precedes the G55 select at the boundary itself'];
+    // ANCHORED ON THE RETRACT'S OWN ANNOUNCEMENT, and the ordering read from there forward. A
+    // check that only asks whether a G53 appears before the boundary is satisfied by the FIRST
+    // section's clearance move, which is a different block entirely and proves nothing.
+    const i = t.search(/Retract to the travel height in the machine frame before traverse/);
+    if (i < 0) return [false, 'the traverse retract is never announced'];
+    return ordered(t.slice(i), [['announced',/Retract to the travel height in the machine frame/],
+                                ['G53 retract',/^G53 G0 Z-5 F\d/m],
+                                ['WCS change',/WCS changed: 1 -> 2/],
+                                ['G55 select',/^G55$/m]]);
   } },
 
 { id:'W6', desc:'... and with no machine frame the whole job is refused, not posted unsafely',
@@ -237,10 +242,45 @@ const cases = [
   mustNot:[[/G10 L20/,'Marlin has no G10 L20 register write']],
   mustLog:[[/CNC_COORDINATE_SYSTEMS/,'and the one build option the whole job rests on is named']] },
 
-{ id:'W21', desc:'a single-offset Marlin job is the control: no G54 at all',
-  job:'offset-out-of-range.cnc',
-  props:mp({ jobSelectedFirmware:S('Marlin'), probeOnStart:S('Skip') }),
-  refuse:[/Work offset 10 is out of range/,'this job cannot reach that arm - offset 10 refuses first'] },
+{ id:'W21', desc:'... and the control that proves the gate: the plain Marlin hobby file selects nothing at all',
+  job:'one-part.cnc',
+  // NO MACHINE FRAME, deliberately -- that is the job the suppression exists for. The frame is what
+  // W21c covers, and conflating the two is what made the first version of this case wrong.
+  props:{ jobSelectedFirmware:S('Marlin'), machineHomedAxes:S('XYZ'), probeOnStart:S('Skip') },
+  mustNot:[[/^G5[4-9]/m,'no select where W20 shows one is required - the pair is the test'],
+           [/^G53/m,'and no machine-frame move to pull one in']],
+  must:[[/^G0 /m,'and the job is otherwise a job']] },
+
+{ id:'W21c', desc:'... but the frame re-selects G54 on Marlin regardless, and that is not the gate failing',
+  job:'one-part.cnc',
+  // Debug level, because what is under test is which of two functions decided what -- and that is
+  // stated in the file only at Debug. The G54 itself is asserted as g-code, at any level.
+  props:mp({ jobSelectedFirmware:S('Marlin'), probeOnStart:S('Skip'), jobCommentLevel:S('Debug') }),
+  must:[[/writeWCS: Marlin single-offset job on WCS 1 -- default workspace, no select emitted/,
+         'the select really is suppressed'],
+        [/re-selecting G54 -- Marlin restores a CHAINED G53 itself/,'and a different function emits one anyway, saying why'],
+        [/^G54$/m,'so a G54 does reach the file']],
+  // Coherent rather than contradictory, and the reason is worth pinning: the frame needs
+  // CNC_COORDINATE_SYSTEMS, and a build that has it has G54 too. The suppression's guarantee is
+  // therefore about the FRAMELESS job only, which reading writeWCS() alone would not tell you.
+  mustLog:[[/CNC_COORDINATE_SYSTEMS/,'the build option both codes depend on is named']] },
+
+{ id:'W21b', desc:'Marlin reaches G59.1 to G59.3 for the same reason RepRap does, and no further',
+  job:'high-offsets.cnc',
+  props:mp({ jobSelectedFirmware:S('Marlin'), probeOnStart:S('Skip'), probeOnChange:S('Skip') }),
+  must:[[/^G59\.1$/m,'offset 7'], [/^G59\.3$/m,'offset 9']] },
+
+// === G. what the operator is told to do about it =====================================
+{ id:'W22', desc:'re-probing Off on the MANUAL flow: the remedy the file offers reaches one part - PV-10',
+  job:'tools-across-parts.cnc',
+  props:mp({ probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z'),
+             toolChangeMode:S('Pause'), toolChangeProbeAfterChange:B(false) }),
+  must:[[/Re-zero Z by hand at the pause above/,'the change tells the operator what to do']],
+  // ASSERTS THE GAP -- see PV-10. The instruction is correct for the offset active at the pause and
+  // silently insufficient for every other part this job returns to, and the return says nothing.
+  mustNot:[[/since been changed/,'and the return to the OTHER part warns about nothing -- PV-10']],
+  custom:t => counts(t, /^G38\.2/gm, 2,
+    'two probes, both first visits: no return re-measures, because the change never marked any part stale') },
 ];
 
 // ---- run ------------------------------------------------------------------------------

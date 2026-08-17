@@ -124,6 +124,13 @@ function withWorkOffset(blk, n) {
 // Each entry is a list of [block, workOffset].
 
 var JOBS = [
+  { file: 'one-part.cnc',
+    plan: [['A', 1]],
+    what: 'The control for every job below it. One operation in one offset is what Autodesk ships ' +
+          "and what the Marlin single-offset suppression is gated on, so proving that gate needs " +
+          'this file and `two-parts.cnc` together -- one where G54 must be absent, one where it ' +
+          'must not be.' },
+
   { file: 'two-parts.cnc',
     plan: [['A', 1], ['A', 2]],
     what: 'One tool, two parts. The first WCS is established, then a second is met for the first ' +
