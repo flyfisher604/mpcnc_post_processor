@@ -11,9 +11,9 @@ the file that computes it is named instead.
 
 ## Checkpoint
 
-**Next: Step W.** `findings.md` §2 holds the two open findings; both are rulings for the author,
-and neither changes what the post emits. **The audit runs first** — it bounds the class they are
-drawn from, so it answers them together rather than one at a time.
+**Next: Step 6.** Step W is done: the audit ran, `PV-9` closed on it, and the class it bounded is now
+a verdict beside every `writeWarning()` call — `grep -n "// TWIN:"`. **The audit found one finding
+while closing another**, and `findings.md` §2 holds it.
 
 **Live risk: `HR-6 (B)`** — the orientation guard may be a no-op on exactly the case it exists to
 catch, and the failure mode is a part cut in the wrong plane, silently. `findings.md` §7 has it.
@@ -30,18 +30,11 @@ version — never from a sender console, a dry run or a non-GRBL controller.
 
 | | Item | Blocked on |
 |---|---|---|
-| **W** | Close the last two findings | the audit first — it bounds the class both are drawn from |
 | **6** | Clarity | — |
-| **7** | Documents, once | 6, W |
+| **7** | Documents, once | 6 |
 
-## Step W — the audit, then the two rulings
-
-- **The audit** — `findings.md` §7 item 5, which states it in full. Walk the `writeWarning()`
-  sites once, mark each *emission-point-only* or *owes a twin*, record the verdict beside the
-  call. **It is the cheapest thing on the list and the only one that bounds a class**; until it
-  exists, every warning question is argued from scratch.
-- **Then the two rulings.** `W11b`, `W22` and `W25b` pin today's behaviour, so either answer
-  turns a case red and no ruling can land unnoticed.
+**`PV-12` is not a row here.** It is one open finding with its remedy already argued in its own row,
+and `findings.md` is where it lives — this file lists steps, not findings.
 
 **Worth one post of its own, and it is not a row here:** `HR-6 (B)`'s rotated Setup. Five rotated
 Setups are on disk already, so it is a `utility` row to write rather than a job to build —

@@ -144,7 +144,8 @@ once as written and once as its reference -- because every claim it makes is a d
 The second pair is the point. `HB-5`'s rule is that **a property which fails one way fails in both
 channels**, and a matrix that reads only the file cannot see half of what the post promises. Two of
 the three findings this machinery has returned — `PV-9` and `PV-10` — are exactly that asymmetry:
-a condition the post detects and states somewhere the operator will not be.
+a condition the post detects and states somewhere the operator will not be. **`PV-9` closed by making
+the two channels one statement**, and `mustLog` is what witnesses it: the file half was never in doubt.
 
 A refusal is asserted as *two* things, not one: the pattern in the stream **and** that no `.gcode`
 was produced. A guard that names the right problem but leaves a truncated file behind is a different
@@ -627,21 +628,24 @@ part 1 up; section 2 is a change **into** the laser and a new part at once; sect
 stale. `W27` reads what is left: the move to the stored origin, and a warning that every depth below
 is out by a tool length.
 
-**Both files recorded findings rather than passes, and one of them has since been fixed.**
+**Both files recorded findings rather than passes, and both of those findings are now fixed.**
 
 `W25b` found that at the shipped comment level the second part said nothing about the Z0 nobody
 established — no probe, correctly, but no warning in either channel. That was `PV-3` at two further
-sites, both `canProbe`-false arms of `writeWcsEstablish()`. **It closed 2026-08-17**, and the case
-now asserts the warning it was written to find missing; `W28` covers the third site on the same file
-and a different property set. What `W25b` still pins is the **absence of a dialog twin**, which is
-`PV-9`'s question and not `PV-3`'s.
+sites, both `canProbe`-false arms of `writeWcsEstablish()`. **It closed 2026-08-17**, and the case now
+asserts the warning it was written to find missing; `W28` covers the third site on the same file and a
+different property set. Its remaining assertion — the **absence of a dialog twin** — was `PV-9`'s
+question, and `PV-9` closed on it the same day.
 
-`W27` — the return **does** warn, and in the file alone. That answers the first of `PV-9`'s two open
-questions with an artifact instead of an argument: **yes, the `canProbe`-false arm carries the same
-one-channel silence** as the mode-side arm. Different reason, identical consequence — so a fix scoped
-to the mode would leave this one behind.
+`W27` — the return **does** warn, and it warned in the file alone. That answered the first of `PV-9`'s
+two open questions with an artifact instead of an argument: **yes, the `canProbe`-false arm carried the
+same one-channel silence** as the mode-side arm. Different reason, identical consequence — which is why
+a fix scoped to the mode would have left it behind, and why the fix went to the one
+`writeWcsOnReturn()` statement both arms fall to.
 
-Both cases assert the gap, so closing `PV-3` or `PV-9` turns them red and brings the reader here.
+**Both cases now assert the presence they were written to find missing**, on the same regexes, in the
+other channel. That inversion is deliberate: a `warnBothChannels()` reverted to `writeWarning()` turns
+them red again, so the closure is pinned exactly as the gap was.
 
 **The remaining residue is cases, not files.** `findings.md` §7 *Owed* item 6 listed five gaps; the
 jet block and the four offsets are now built, and the other three need no artifact — a jog mode on a

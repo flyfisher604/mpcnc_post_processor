@@ -161,15 +161,15 @@ const cases = [
             'and so the return has nothing to warn about - the correction was already made']],
   custom:t => counts(t, /G38\.2/g, 1, 'one probe in the whole job, and it belongs to the change') },
 
-{ id:'W11b', desc:'... but a part LEFT BEHIND by that change is stale, and the file is the only place that says so - PV-9',
+{ id:'W11b', desc:'... and a part LEFT BEHIND by that change is stale, in BOTH channels - PV-9',
   job:'tools-across-parts.cnc',
   props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip'), toolChangeMode:S('Pause') }),
   must:[[/stored Z0 was measured with a tool that has since been changed/,'the depth error is named in the file']],
-  // ASSERTS THE GAP, so that closing PV-9 turns this case red and brings the reader here. The
-  // condition is decided by two properties and the job's shape, all three of which validateJob()
-  // can see at onOpen() -- which is what makes the dialog's silence a defect rather than a limit.
-  mustNotLog:[[/stored Z0 was measured with a tool that has since been changed/,
-               'and the dialog is silent -- PV-9, not a pass']],
+  // THE MODE-SIDE ARM: "Use WCS X0 Y0 Z0" re-establishes nothing by design. This row asserted the GAP
+  // until PV-9 closed it, and the assertion is inverted rather than deleted -- the same regex, the
+  // other channel, so a warnBothChannels() reverted to writeWarning() turns this case red again.
+  mustLog:[[/stored Z0 was measured with a tool that has since been changed/,
+            'and the dialog says it too -- PV-9']],
   custom:t => counts(t, /G38\.2/g, 1,
     'the change re-probes the part it is standing on and no other: there is no tool-length system to correct the rest') },
 
@@ -376,10 +376,10 @@ const cases = [
         [/>>> WARNING[^)]*Z0 was NOT established/,'and the file says nothing established its Z0'],
         [/Use "Jog to X0 Y0 Z0"/,'naming the SUBSEQUENT-part mode that sets Z0 with no probe']],
   mustNot:[[/^G38\.2/m,'still nothing probes - a jet tool cannot']],
-  // ONE CHANNEL, and whether that is right is PV-9's question rather than this row's. Asserting the
-  // absence of a twin pins today's behaviour deliberately: the PV-9 ruling turns this case red, the
-  // way W11b and W22 are written to, and that is how a ruling gets noticed here.
-  mustNotLog:[[/Z0 was NOT established/,'no dialog twin yet - PV-9 owns that question']] },
+  // BOTH CHANNELS, on PV-9's ruling. PV-3 raised this warning and left its channel open on purpose,
+  // and this row pinned the absence so the ruling could not land unnoticed -- which is exactly what
+  // happened: it went red on the twin and was inverted here rather than deleted.
+  mustLog:[[/Z0 was NOT established/,"and the dialog says nothing established it - PV-9 closed PV-3's question"]] },
 
 { id:'W28', desc:'PV-3/J2 - the Jog XY & Probe Z arm met by a tool that cannot probe',
   job:'jet-two-parts.cnc',
@@ -391,6 +391,10 @@ const cases = [
         [/>>> WARNING[^)]*Z0 was NOT established/,'and the file says the Z half was not set']],
   mustNot:[[/^G10 L20 P2 X0 Y0 Z0$/m,'no provisional Z0 - nothing would overwrite it, CR-12'],
            [/^G38\.2/m,'and no probe: the tool cannot']],
+  // THE THIRD OF PV-3's ARMS, and it reaches the same one writer -- so the twin covers it without a
+  // second edit, which is the whole argument for warnZ0NotEstablished() having one caller-supplied
+  // clause and one text. Asserted here because "covered by construction" is a claim, not a witness.
+  mustLog:[[/Z0 was NOT established/,'the Jog XY & Probe Z arm reaches the dialog too -- PV-9']],
   custom:t => ordered(t, [['jog prompt',/MSG,Jog to X0 Y0 above Z0/],
                           ['X0 Y0 only',/^G10 L20 P2 X0 Y0$/m],
                           ['warning',/Z0 was NOT established/]]) },
@@ -406,6 +410,11 @@ const cases = [
         [/cannot probe, so work Z0 still measures from the tool just removed/,
          'and the file names what the incoming tool cannot correct']],
   mustNot:[[/G38\.2/,'no re-probe after the change: the tool that arrived cannot probe']],
+  // THE CHANGE-SIDE MEMBER of PV-9's class, which Step W's walk found: the same "Z0 measures from a
+  // tool no longer fitted" that W11b and W27 assert on the RETURN, one boundary earlier. Nothing
+  // pinned its channel before the audit, which is how it would have been left behind.
+  mustLog:[[/cannot probe, so work Z0 still measures from the tool just removed/,
+            'and the dialog carries the change-side statement as well -- PV-9']],
   custom:t => ordered(t, [['retract',/Retract to the travel height in the machine frame before the tool change/],
                           ['spindle stop',/^M0 \(MSG,Turn OFF spindle\)$/m],
                           ['hand over',/MSG,Change to Tool #2/],
@@ -430,11 +439,11 @@ const cases = [
     return [n === 0, n === 0 ? 'one probe before the laser is fitted and none after'
                              : `${n} probes after a change into a tool that cannot probe`];
   },
-  // PV-9's first open question, answered: the canProbe-false arm has the SAME one-channel silence as
-  // the mode-side arm W11b covers. Different reason, identical consequence -- so a fix scoped to the
-  // mode would leave this one behind. Asserts the gap; closing PV-9 turns it red.
-  mustNotLog:[[/stored Z0 was measured with a tool that has since been changed/,
-               'and the dialog never hears it -- PV-9, on the tool side this time']] },
+  // THE canProbe-FALSE ARM of the same statement, and the reason PV-9 could not be fixed at the mode:
+  // different cause, identical consequence, one writeWcsOnReturn() call. W11b covers the mode side, so
+  // the pair of them proves warnBothChannels() reaches the dialog from both.
+  mustLog:[[/stored Z0 was measured with a tool that has since been changed/,
+            'and the dialog hears it on the tool side too -- PV-9']] },
 ];
 
 // ---- run ------------------------------------------------------------------------------

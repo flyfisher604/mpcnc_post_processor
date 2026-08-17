@@ -49,22 +49,27 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**One.** A tool change strands the Z0 of every part it did not stand on, and the post detects that and
-then states it somewhere the operator will not be — in the g-code file and in no other channel.
-**Not a fix to what the post emits**: the suppression is right and `CR-17` settled that. It is a fix to
-which channel carries it, and **it is owed a ruling first**. **`PV-7` is the precedent and it is in
-§3**: the same shape, and its ruling was *conditional* — the section ranges the post already writes
-into its own header were enough to ask whether the hazard holds, rather than warning on every job.
+**One, and it is what Step W's audit found rather than what Step W set out to close.** `PV-9` closed and
+the walk that closed it marked all twenty-seven `writeWarning()` sites; two of them state a
+configuration the dialog never mentions, and both are coolant. **The class is now bounded**: the verdict
+for every site lives beside the call as `// TWIN:`, so this is the last of that kind that can be
+discovered rather than looked up.
+
+> **The verdict table is `grep -n "// TWIN:" MPCNC_v4.0_Beta2.cps` and lives nowhere else.** 27 sites —
+> **15 paired** with a `validateJob()` warning that states the same condition before the job runs,
+> **4 both-channel** through `warnBothChannels()`, **6 emission-point-only**, **2 owed**, below. Four
+> values, and the reason clause beside each is the point: a site marked *none* says why the file is the
+> only right channel, not merely that no twin exists.
 
 | ID | Finding | Sev | Reproduce | Action | Status |
 |---|---|---|---|---|---|
-| **PV-9** | **A multi-part job strands the Z0 of every part the tool change did not stand on, and only the g-code file says so.** A tool change under `Tool Length Correction By` = *this post* empties `wcsZ0Trusted` for **every** work offset — correctly, there being no tool-length system to correct the rest — and re-probes the **active** one alone; under *me, by hand* it empties every offset but the active one, which strands the same parts by the same reasoning (`PV-10`). So a return to any other part arrives with `zStale` true, and where the mode cannot re-establish Z0 — `Subsequent WCS / Part` = `Use WCS X0 Y0 Z0`, or a probing mode on a tool that cannot probe — `writeWcsOnReturn()` writes exactly what is wrong: *"this part's stored Z0 was measured with a tool that has since been changed … every depth below is out by the difference in tool length"*. **That statement reaches the file and not the dialog.** `writeWarning()` is `writeCommentLine()` and nothing else; every `warning()` in the post is in `validateJob()`, so a condition raised at output time has no second channel unless a twin is written for it — and `HR-27` is the precedent that the twin is what the design asks for, not an extra. The operator who posts from Fusion, reads the dialog and sends the file cuts the second part deep by a tool-length difference having been told, in a place they had no reason to open | Wrong part | `tools/wcs-jobs/tools-across-parts.cnc`, `W11b` of `tools/wcs-matrix.js`: `T1@G54`, `T1@G55`, `T2@G54`, `T2@G55` with `Subsequent WCS / Part` = `Use WCS X0 Y0 Z0` and a manual change. The change at section 3 re-probes `G54` and leaves `G55` measured by the removed tool; section 4 returns to `G55`, warns in the file, and the log carries no line about it. `W11b` asserts the gap, so closing this turns that case red | **The condition is knowable before a block is emitted**, which is what separates this from the mid-stream warnings that legitimately have one channel: it is `probeOnChange` = `Skip` and more than one work offset and more than one tool, all three of which `validateJob()` already reads — `collectDistinctOffsets()` exists and the tool count is what the `Refuse to post` guard counts. So the fix is a `warning()` beside the existing `writeWarning()`, on `HB-5`'s rule and by `HR-27`'s method. **The first of two questions is now answered by an artifact rather than an argument.** `tools/wcs-jobs/jet-return.cnc` and `W27` post the `canProbe`-false arm — a return whose tool cannot re-measure what a change invalidated — and it carries **the same one-channel silence**: `writeWcsOnReturn()`'s final `writeWarning()` reaches the file and nothing reaches the dialog. Different reason, identical consequence, so **a fix scoped to the mode leaves this arm behind** and the twin has to cover both. **What the author still owns** is whether the pre-flight names the parts or only the shape — naming them needs the section walk, the shape needs three properties. **Not a change to what the post emits**: the suppression is right and `CR-17` settled that. **`PV-10` neither closed this nor widened it.** The *me, by hand* answer it added produces return warnings that did not exist before, so it carries its own `validateJob()` pre-flight naming the regime — shape only, and **that is not the twin this row asks for**: it fires once for the job, before any block, where the twin owed here fires with the specific `writeWarning()` at the specific part. `W22`'s `mustLog` holds the pre-flight; `W11b`, `W25b` and `W27` still hold the gap | ⬜ |
+| **PV-12** | **A coolant channel that cannot deliver what the job asks for says so in the file alone.** Two sites, both marked `// TWIN: owed` by Step W's walk and neither yet paired. **The empty custom file**: a channel `Mode` reading `Use custom` beside an empty `... Custom` field emits nothing at all for that channel, and `writeCustomCoolantFile()` states it where only the file carries it. `CR-22` ruled the empty field is the answer *no custom file* rather than an error — **which settled the severity and not the channel**, and its own pre-flight already loops these four properties, so the twin is a clause in a guard that exists. **The unmatched level**, and this is the one that cuts dry: where a section's tool requests a coolant level that neither channel `Mode` is set to, `setCoolant()` warns in the file and the job runs with no coolant at all. `CR-24` already worried about exactly this outcome — *"the job cuts dry and nothing in the file says so"* — and here the file does say so and the operator reading the dialog does not | Wrong output | Not yet cased. The unmatched level needs a job whose tool requests a level the two channel `Mode` properties do not carry; the empty-custom half is a property set over any coolant job — `Mode` on a channel, its `On` value `Use custom`, its `... Custom` field left blank | **Both conditions are fixed before a block is emitted, which is the audit's own test.** The empty-custom one is two properties read together and nothing else. The unmatched level is a walk: every section's tool carries its coolant, so the set of requested levels is knowable at `onOpen()` and comparable against the two `Mode` values — the same shape as `PV-7`'s existing walk over sections, and it may over-report for the same reason and admit it in the same way. **`warnBothChannels()` is not the route here**: `PV-9` used it where the emitter's own condition IS the statement, and these two are configuration questions whose answer does not depend on where in the file they are noticed — which is what `validateJob()` is for. **What the author owns** is whether the unmatched-level twin names the operations that requested it or only the level | ⬜ |
 
 ---
 
 ## 3. Closed findings
 
-**70 fixed · 9 closed by design · 1 withdrawn · 1 open in §2 — 81 rows.** Permanent: commit messages and
+**71 fixed · 9 closed by design · 1 withdrawn · 1 open in §2 — 82 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -161,6 +166,7 @@ diagnosis, the diff and the argument.
 | **PV-3** | A job ran against a Z0 nobody established and said so only at `Debug`, at three sites not one | Med-High | **One writer, four callers.** `warnZ0NotEstablished()` is called by every `canProbe`-false arm of the two origin dispatches — the three that wrote an `eComment.Debug` trace (`writeWcsOnStart()`'s `Probe Z`, `writeWcsEstablish()`'s `Probe Z` and `Jog XY & Probe Z`) and the one that already warned, which routes through it and emits byte-identical text. **The recommended mode is the caller's**, the two dispatches offering different ones: `Set X0 Y0 Z0 to Current Pos` on the first part and `Jog to X0 Y0 Z0` after it, which are the only values of each that set Z0 with no probe — `wcsOriginEstablishesZ0()` is where that is stated. **Two comments in the post asserted this warning and were false until now**: `writeWcsEstablish()`'s *"the tool-0 arms, which have already warned that nothing established it"*, and `validateJob()`'s reason for skipping tool-0 sections in `PV-7`'s pre-flight. **The dialog twin is `PV-9`'s question and not this row's**; `W25b` pins the absence so the ruling cannot land unnoticed | ✅ |
 | **PV-2** | Every laser power change warned that the post had not done what it had just done | Med | `COMMAND_POWER_ON` and `COMMAND_POWER_OFF` named in `onCommand()`'s switch. The kernel raises both callbacks for one event and `onPower()` owns the emission — the `>>> LASER Power ON` comment and the `M3`/`M4 S<n>` two lines above. **The fall-through is untouched**: `HR-13`'s rule is right and this was a missing case, not a wrong channel. `Cutting/Laser/center.cnc` goes from 976 lines to 916, and every line number in every laser artifact moves | ✅ |
 | **PV-6** | A Flow 2 hand-over to RepRapFirmware named no tool where the tool carried no comment | Low | `Tool #<n>` leads the line and the comment is appended only where there is one — the form the gSender arm two blocks below already used. `PRO12` asserted the bare tail, which is what let the defect pass unread | ✅ |
+| **PV-9** | A multi-part job strands the Z0 of every part the tool change did not stand on, and only the g-code file said so | Wrong part | **Both channels, from one statement, at the emission point — and the row's own premise was wrong.** It argued a `validateJob()` pre-flight was the only route because *"every `warning()` in the post is in `validateJob()`"*; `onDwell()` has called one mid-output all along, and `error()` is called mid-stream in fifteen places. So `warnBothChannels()` writes the file line and raises the dialog line from one call: **one condition, one text, no second predicate to drift** — where a pre-flight would have had to re-derive at `onOpen()` what the emitter decides later, which is the cost `PV-7`'s hand-built pair pays and says so in both halves. **Three sites, not one.** `writeWcsOnReturn()`'s stale-Z0 warning covers both arms the row named — the mode-side and the `canProbe`-false — because both fall to the same statement; `warnZ0NotEstablished()` is `PV-3`'s deferred twin, one writer for four arms; and **Step W's walk found a third**, `toolChange()`'s jet/tool-0 arm, which says the same thing one boundary earlier and would have been left behind. **A pre-flight is not inherently earlier**: the post dialog is read *after* the post runs, so the two channels arrive together, and what this loses — one statement per job — is a count that should be per stranded part anyway. `W11b`, `W25b`, `W26`, `W27`, `W28` | ✅ |
 | **PV-10** | `Re-probe Z0 After a Change` Off told the operator to re-zero at the pause, which corrects one part of a multi-part job and no other | Wrong part | **The boolean was the defect: one Off carrying two assertions that differ in reach.** A tool-length offset shifts the Z *frame*, so every stored Z0 stays valid; a hand-zero corrects the one *register* active at the pause. Replaced by `Tool Length Correction By` — *this post* / *the tool change* / *me, by hand* — where the hand-zero now strands every other offset, so each is re-measured or warned about at its own return. `W22`, `W22b`, `W22c`; the key changed with the type, so a saved Off reverts to *this post* until it is answered | ✅ |
 
 ---
@@ -542,22 +548,21 @@ None is a defect; none is scheduled.
    assumes. **`PV-1a` discharges the boundary half of it** — a two-tool file exists and the change block
    is in it — leaving what only a Fusion post can add: the operator's own Setup, and `PR-23a`'s absence
    asserted against a job that is also a WCS change. **`PR-23a` wants that job**, so one post settles both.
-5. **An audit `PV-9` is one instance of: which output-time warnings owe a dialog twin. This is now
-   the cheapest thing on the list and it bounds the other two.** `warning()`
-   appears in this post **only inside `validateJob()`**; `writeWarning()` is `writeCommentLine()` and
-   nothing else, so every condition raised while blocks are being emitted reaches the file alone unless
-   a twin was written for it, as `HR-27` says it should be. There are **roughly twenty-five
-   `writeWarning()` sites** and they are not one kind: some state a fact only the emission point knows
-   and legitimately have one channel, while others state a condition fixed by the properties and the
-   job's shape before a block is written — which `validateJob()` could have pre-flighted. **The list of
-   which is which does not exist**, and until it does, each new one is argued from scratch. `PV-9` and
-   `PV-10` are two that are pre-flightable; **`PV-3` was a third of a different kind — a warning demoted
-   to `Debug` rather than misrouted — and its fix left the twin question open on purpose**, `W25b`
-   pinning the absence so the ruling cannot land unnoticed. **Cheap to settle and it bounds a whole class**: walk the sites once,
-   mark each *emission-point-only* or *owes a twin*, and record the verdict beside the call. **The
-   twenty-sixth site is the model to mark them against**: the test hook's announcement was written
-   with its `warning()` twin in the same statement, so `R2` can assert both channels at once and
-   neither can be removed without a case going red.
+5. **DISCHARGED 2026-08-17 — the audit ran, and this is what it cost to have deferred it.** The item
+   asked which output-time warnings owe a dialog twin, because the list did not exist and every new one
+   was argued from scratch. **The list now lives in the code**: `grep -n "// TWIN:"` returns one verdict
+   per `writeWarning()` call site, with a reason clause, and the count of tags must equal the count of
+   call sites — 27 each. **Twenty-seven, not the twenty-five this item estimated**, and estimating it
+   was part of the problem. **`PV-9` closed on the walk and `PV-12` was found by it.**
+   > **This item argued from a premise that was false the whole time.** It stated that `warning()`
+   > *"appears in this post only inside `validateJob()`"*, and `PV-9`'s row repeated it. `onDwell()`
+   > calls one mid-output — Autodesk boilerplate, unreachable below 27 hours of dwell, but a call site —
+   > and `error()` is called mid-stream in fifteen places. **That premise is what made a `validateJob()`
+   > pre-flight look compulsory**, and it is why `PV-9` sat open owing a ruling about *which* pre-flight
+   > to write. Neither answer was needed: `warnBothChannels()` raises both channels from one statement.
+   > **A claim about the shape of the code, in a document, unchecked against the code.** The `// TWIN:`
+   > tags exist where they do so that this particular failure cannot recur — a verdict beside the call
+   > is re-read whenever the call is.
 6. **What `PV-8`'s matrix does not reach — the artifact half is closed, and three cases are left.**
    The job-file gaps went 2026-08-17: the **jet block in a multi-WCS job** is `jet-two-parts.cnc` and
    `jet-return.cnc`, and **offsets 2, 3, 5 and 8** are `mid-offsets.cnc`, which found offset 8 refused

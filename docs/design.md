@@ -399,6 +399,39 @@ Carried from the register the old design filled, because each is a defect the re
 
 ## Design notes behind the shipped behaviour
 
+### Which channel a warning belongs in, and the one question that decides it
+
+The post writes to two channels and they reach different people. `writeWarning()` puts a `>>> WARNING:`
+line in the g-code — ungated by `Comment Level`, because a warning is not commentary — and it reaches
+whoever opens the file. `warning()` raises a line in Fusion's post dialog, and it reaches whoever posts.
+**Those are often the same person on different days, and the operator who posts, reads the dialog and
+sends the file without opening it is the one every one-channel warning was written past.**
+
+**The question is not "is this important". It is: could a person who never opens the file act on this?**
+
+- A condition **the properties and the job's shape fix** is answerable before the job runs and belongs in
+  both channels. A stranded work Z0, a mode that establishes nothing, a coolant channel with no file —
+  the operator would have posted differently had they known.
+- A condition **the emitting block discovers** belongs in the file. An unsupported Manual NC command, a
+  clamped dwell, a rigid-tapping request: the post learns of it from the kernel, mid-stream, and there
+  was no earlier moment at which to say it.
+- A condition **true of every job on a firmware** belongs in the file even though it is knowable, and the
+  GRBL rapid-`F` warning is the case. A dialog line on every post is one the operator learns to dismiss,
+  and that costs the pairs above the attention they depend on.
+
+**Both channels should leave from one statement.** `warnBothChannels()` writes the file line and raises
+the dialog line from one call, so the condition is evaluated once and the text exists once. The
+alternative — a `validateJob()` pre-flight beside the emitter's own warning — needs a **second
+predicate**, computed at `onOpen()` to predict what the emitter will decide later, and the two can come
+to disagree; `PV-7` has such a pair by necessity (only the emission point knows a probe is actually
+happening) and each half says in its own text that it must not drift from the other. Prefer the paired
+form only where the pre-flight can say something the emitter cannot.
+
+**A pre-flight is not earlier in any sense that helps.** The post dialog is read *after* the post has
+run, so both channels arrive at the same moment. What a pre-flight buys is one statement about the whole
+job; what the emission point buys is one per occurrence — which for three stranded parts is the honest
+count. `PV-9`, and `grep -n "// TWIN:"` in the post is the verdict for every site.
+
 ### The kernel's position is the toolpath's, and only the work frame can correct it
 
 `getCurrentPosition()` is not where the tool is. It is where the **toolpath** is: the kernel advances it
