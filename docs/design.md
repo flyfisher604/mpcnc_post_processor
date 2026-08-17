@@ -498,60 +498,30 @@ leaves on disk: `onOpen()` refuses before any output, so the job writes **no fil
 only way to reach the group-3 code, since a paid licence emits real `G0`s. Re-create it from the current
 `.cps`; its evidence is about *logic*, never about what the post emits.
 
-**`tools/post-run.ps1` runs the post without Fusion**, over the intermediate `.cnc` files that ship with
-the Autodesk HSM Post Processor VS Code extension, through the same `post.exe` Fusion posts with. It is
-the only check that answers *does the post run at all* — `PV-1` was a crash in the first statement of
-`onOpen()` that `node --check` passes and a code walk had no way to see, and it stood for four commits.
-What a row settled this way may claim is `findings.md` §4's `utility` method; `tools/census.cps` reports
-a `.cnc` file's sections, work offsets and tools without posting it, the format being binary.
+**The post runs without Fusion, and `integration.md` is how.** `post.exe` over the intermediate `.cnc`
+files, driven by `tools/post-run.ps1` for one job or by the three matrices in `tools/` for many — that
+file owns the machinery, the property-coverage measure and the bounds. What a row settled that way may
+claim is `findings.md` §4's `utility` method. Three facts about it are design's rather than the
+harness's, and only these are stated here:
 
-**Three matrices sit on top of it**: `tools/hobbyist-matrix.js` and `tools/professional-matrix.js`, one
-per persona, and `tools/wcs-matrix.js` for the multi-part half neither persona's job files can reach.
-Each case declares what the file must and must not contain **before** it is posted, and the last two add
-the two channels a file cannot show — the post-time `warning()` stream, which reaches the dialog, and
-`error()`, where the right answer is no file at all. **Writing the expectation first is the whole
-discipline**: seventeen cases across the three failed on their first run and **every one was the
-harness's error, not the post's** — a wrong regex, a warning asserted in the wrong channel, a job file
-that refuses for a reason unrelated to the case, an ordering helper that cannot see a second occurrence
-of a block because it searches for the first. All three findings these matrices returned came from
-**reading the passing output**, which is the half a matrix does not automate: a green run means the
-questions asked were answered, not that the right questions were asked. They spawn `post.exe` from Node
-with an argument **array**, so the CRT quoting below is Node's problem rather than the harness's.
+**It is the only check that answers *does the post run at all*.** `PV-1` was a crash in the first
+statement of `onOpen()` that `node --check` passes and a code walk had no way to see, and it stood for
+four commits. A walk proves what the post writes given a configuration; it cannot prove the post
+executes.
 
-**The job files the third one runs on are built, and `tools/wcs-jobs/make-wcs-jobs.js` is what builds
-them.** Every `.cnc` Autodesk ships uses one work offset — the census settled it — so `Each New WCS /
-Part`, `writeWCS()`'s traverse arm and `writeWcsOnReturn()` were unreachable by any harness, which is a
-third of the multi-part design never posted. Fusion can produce such a job only by hand and only with a
-licence. **The generator does not author one.** A `.cnc` is CIMCO's `compact-nc`: a length-prefixed
-format string, a seven-byte preamble, then a flat stream of `[uint32 opcode][payload]` records. Only the
-parameter opcodes and the context record are decoded; an operation runs from its `.../nc/marker`
-parameter to the next one, and everything past the context is copied as opaque bytes. So each job is a
-byte copy of the prologue and operation blocks of `Milling/2D/toolchange.cnc` with **one 32-bit word
-changed per block** — the work offset at byte 108 of the context payload — and the generator asserts
-that, re-reading what it wrote and counting the bytes that differ. Two blocks in different offsets are
-therefore the same operation with one variable moved, which is what makes the emitted difference
-attributable to the WCS logic rather than to a fixture. **The XML serialisation `post.exe` also accepts —
-`--format XML`, and the same data in text — cannot be used for this**: its reader silently drops
-`work-offset`, so every section arrives as offset 0. Verified by editing that attribute in Autodesk's own
-`Milling/2D/bore.xml` and posting it.
+**Every `.cnc` Autodesk ships uses one work offset**, censused 2026-08-16 across the whole library. So
+`Each New WCS / Part`, `writeWCS()`'s traverse arm and `writeWcsOnReturn()` — a third of the multi-part
+design — were unreachable from that library by any harness, and Fusion can produce such a job only by
+hand and only with a licence. `tools/wcs-jobs/` closes it by **splicing rather than authoring**: each
+job is a byte copy of `Milling/2D/toolchange.cnc`'s blocks with one 32-bit word changed per block, so
+two blocks in different offsets are the same operation with one variable moved and any difference in
+the output is attributable to the WCS logic rather than to a fixture. **The XML serialisation cannot
+substitute** — its reader silently drops `work-offset` and every section arrives as offset 0, verified
+by editing that attribute in Autodesk's own `Milling/2D/bore.xml` and posting it.
 
-**A `--property` value is a JavaScript literal, and this is the trap.** A string or an enum carries its
-own quotes — `--property jobSelectedFirmware '"Marlin"'` — while numbers and booleans go bare. Bare
-`Marlin` is an undefined identifier, and *"Failed to set property"* is the utility saying so rather than
-refusing enums, which is the wrong conclusion this project drew first. **The two ways past it are
-silent.** Nothing validates the value, so `'"Klipper"'` sets as readily as `'"Marlin"'`; and an unquoted
-value that still parses is stored as the wrong *type*, where `machineTravelZ -2` becomes the **number**
-`-2`, `parseMachineCoordinate()` reads the field as empty, and the machine frame switches off with only
-`WR-2`'s warning to show for it. `post-run.ps1` builds the literal from the property's declared type and
-checks every name and enum id against `post.exe --interrogate` first. **Two bounds it does not reach**:
-the dialog, and the job — the shipped `.cnc` files were censused 2026-08-16 and **not one uses more than
-a single work offset**, so Guard B, `writeWcsOnReturn()` and the whole multi-part register still want a
-job posted from Fusion.
-
-**PowerShell 5.1 will not quote a native argument that already contains a quote**, so `"Probe Z"` reaches
-the CRT bare, splits at the space, and shifts every following `--property` by one position —
-*"Expected property but got &lt;output path&gt;"*. `post-run.ps1` builds the command line to the CRT's rules
-itself; anything else driving `post.exe` has to do the same.
+**A green matrix is not a verified post.** All three findings these matrices have returned came from
+**reading the passing output**, and two of the cases themselves were passing while asserting nothing
+useful. A green run means the questions asked were answered, not that the right questions were asked.
 
 **`git commit -m` with a PowerShell here-string mangles messages containing double quotes.** Write the
 message to a file and use `git commit -F`, or pipe it in.

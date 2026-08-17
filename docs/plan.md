@@ -1,7 +1,8 @@
 # Plan — what is next
 
 The only file that says what is next. Findings and tests are `findings.md`; why the post
-behaves as it does is `design.md`.
+behaves as it does is `design.md`; how a run against a job file is performed, and what it may
+claim, is `integration.md`.
 
 ## Checkpoint — read this first
 
