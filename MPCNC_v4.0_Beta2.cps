@@ -1250,9 +1250,10 @@ function isSafeToRapid(x, y, z) {
 // missing-file error and its missing-trailing-newline repair.
 function writeCustomCoolantFile(channel, on, file) {
   if (file == "") {
-    // TWIN: owed -- the condition is two properties and nothing else: a channel reading "Use custom"
-    // beside an empty file field. CR-22 ruled the empty field is the answer "no custom file" rather
-    // than an error, which settled the SEVERITY and not the channel. PV-12.
+    // TWIN: paired -- validateJob()'s "is Use custom ... and that field is empty" warning, in CR-22's
+    // own loop over the same four code/file pairs and on the same enum gate. CR-22 ruled the empty
+    // field is the answer "no custom file" rather than an error, which settled the SEVERITY and not
+    // the channel; the twin is what settled the channel. PV-12.
     writeWarning("coolant channel " + channel + " is set to \"Use custom\""
       + " but no custom file is named -- nothing emitted");
     return;
@@ -1290,6 +1291,23 @@ function CoolantB(on) {
 var curCoolant = eCoolant.Off;        // The coolant requested by the tool
 var coolantChannelA = eCoolant.Off;   // The coolant running in ChannelA
 var coolantChannelB = eCoolant.Off;   // The coolant running in ChannelB
+
+// WHAT A TOOL ASKS FOR, in ONE place, because two things read it and they must not be able to disagree:
+// onCommand(COMMAND_COOLANT_ON) decides what to switch on, and validateJob()'s pre-flight decides what
+// to warn about before the job runs. probePointMachinedBefore() is the same rule one path over, and
+// HB-5's is why -- the two channels have to be the same question asked twice, not two questions that
+// happen to agree today.
+//
+// TWO SOURCES AND NOT ONE. tool.coolant is Fusion's own constant and coolantLevels IS that index, so a
+// milling tool answers for itself. F360 defines no coolant at all for a JET tool, which is why the laser
+// group carries a forced level -- an air assist, usually -- and that property is the answer there. A
+// walk that read tool.coolant alone would call every laser job dry. PV-12.
+function requestedCoolant(t) {
+  if (t.isJetTool()) {
+    return getProperty(properties.laserCoolant);
+  }
+  return (t.coolant < coolantLevels.length) ? coolantLevels[t.coolant] : eCoolant.Off;
+}
 
 function setCoolant(coolant) {
   writeComment(eComment.Debug, " ---- Coolant: " + coolant  + " cur: " + curCoolant + " A: " + coolantChannelA + " B: " + coolantChannelB);
@@ -1339,9 +1357,13 @@ function setCoolant(coolant) {
     }
 
     if (warn) {
-      // TWIN: owed -- and this is the one that cuts dry. The coolant each section asks for is on its
-      // own tool, so a walk at onOpen() can compare every requested level against the two channel
-      // modes; nothing in the dialog says a job requests a coolant neither channel is set to. PV-12.
+      // TWIN: paired -- validateJob()'s "asks for X coolant and neither channel is set to it", off
+      // unmatchedCoolantRequests(), which reads the same requestedCoolant() this block's caller does.
+      // AND THE TWO DIFFER IN ONE STATED WAY, which is why it is written at both ends: the pre-flight
+      // is SILENT where both channel Modes are Off and this line is not. That is not drift. Both Modes
+      // Off is the operator declaring the machine has no coolant, and Fusion's tools carry Flood
+      // whether or not anyone wanted it -- the dialog would complain on nearly every hobbyist job. The
+      // file is exact and per-occurrence either way, and this is the exact half. PV-12.
       writeWarning("No matching Coolant channel : " + ((coolantLevels.indexOf(coolant) != -1 ) ? coolant : "unknown") + " requested");
     }
   }
@@ -1432,6 +1454,45 @@ function countDistinctTools() {
     if (!seen[t]) { seen[t] = true; ++count; }
   }
   return count;
+}
+
+// Every coolant level this job asks for that NEITHER channel Mode carries, with the operations that
+// asked -- [{level, names}], or empty. setCoolant()'s own warning is exact and per-occurrence; this is
+// the pre-flight half, and it exists because the file is not the channel an operator reads before they
+// press post. The requested level is requestedCoolant()'s answer on both sides, so the two cannot come
+// to disagree about what this job asks for.
+//
+// GATED ON A CONFIGURED CHANNEL, and this is the one place the two halves deliberately differ. Both
+// Modes Off is not a misconfiguration -- it is the operator declaring this machine has NO coolant, which
+// is the shipped default and true of most of them. Fusion's tools carry Flood whether or not anyone
+// wanted it, so an ungated pre-flight would fire on nearly every hobbyist job and say nothing about that
+// job; a dialog that always complains is one nobody reads. What it costs is real and bounded: with no
+// channel configured the dialog is silent, and the FILE still says it at every occurrence, unchanged.
+// The condition worth a pre-flight is the other one -- the machine HAS coolant and this job asks for a
+// level it does not carry, so the operator expects wet and the part is cut dry. CR-24, PV-12.
+function unmatchedCoolantRequests() {
+  var modeA = getProperty(properties.coolantChannelAMode);
+  var modeB = getProperty(properties.coolantChannelBMode);
+  if (modeA == eCoolant.Off && modeB == eCoolant.Off) {
+    return [];
+  }
+
+  var out = [];
+  var seen = {};
+  var n = getNumberOfSections();
+  for (var i = 0; i < n; ++i) {
+    var s = getSection(i);
+    var level = requestedCoolant(s.getTool());
+    if (level == eCoolant.Off || level == modeA || level == modeB) {
+      continue;
+    }
+    if (seen[level] == undefined) {
+      seen[level] = out.length;
+      out.push({ level: level, names: [] });
+    }
+    out[seen[level]].names.push(operationName(s, i));
+  }
+  return out;
 }
 
 // Post-time validation guards. Runs once from onOpen(), before any output, so a misconfiguration
@@ -1963,6 +2024,27 @@ function validateJob() {
     }
   }
 
+  // CR-24's OUTCOME REACHED BY THE OTHER ROUTE, and this one the post CAN see. Above, the codes are
+  // right and the build may not carry them; here the channels carry codes for a coolant this job never
+  // asks for, and the level it does ask for reaches neither. Same result at the machine -- the part is
+  // cut dry -- and until now the only place that said so was the file. PV-12.
+  //
+  // NAMES THE OPERATIONS AND THE LEVEL, both. The level alone leaves the operator hunting a tool setting
+  // across every operation in the job; the operations alone do not say which channel to set. One warning
+  // per unmatched level, because the remedy is per level -- a job asking for Flood and Mist with one
+  // channel free is two different decisions, not one.
+  var dryRequests = unmatchedCoolantRequests();
+  for (var d = 0; d < dryRequests.length; ++d) {
+    warning(localize("This job asks for \"" + dryRequests[d].level + "\" coolant and neither channel is "
+      + "set to it -- \"Channel A Mode\" is \"" + getProperty(properties.coolantChannelAMode) + "\" and "
+      + "\"Channel B Mode\" is \"" + getProperty(properties.coolantChannelBMode) + "\". "
+      + (dryRequests[d].names.length == 1 ? "The operation that asks" : "The operations that ask")
+      + " for it: " + dryRequests[d].names.join(", ") + ". The post emits no coolant code for them and "
+      + "the job runs them DRY, which is a burnt cutter or a scorched edge in the materials coolant is "
+      + "there for. Set one channel's Mode to \"" + dryRequests[d].level + "\" in \"9 - Coolant\", or "
+      + "change what those operations ask for in Fusion."));
+  }
+
   // --- Guards -----------------------------------------------------------------------------------
   // Every guard below applies on every firmware. Guard C used to return early on Marlin, which made
   // everything after it unreachable on exactly the firmware it excluded; with that gone, order here is
@@ -2084,6 +2166,12 @@ function validateJob() {
   // are gated on the mode that loads them. An EMPTY field is still not an error: the loop below skips it
   // and writeCustomCoolantFile() warns and emits nothing, which is the answer "no custom file". HB-7
   // scoped these out; CR-22 is that scope closing.
+  //
+  // AND AN EMPTY FIELD NOW WARNS, which is what CR-22 left owing. It settled the SEVERITY -- not an error
+  // -- and said nothing about the channel, so the statement went to the file alone and the operator who
+  // reads the dialog never met it. Same gate as the existence check beside it, on the enum and nothing
+  // else: the operator set that channel to read a file and named none, and that is worth saying whether
+  // or not THIS job happens to drive the channel. PV-12.
   var coolantCustom = [
     { code: properties.coolantChannelAOn,  file: properties.coolantChannelAOnCustom },
     { code: properties.coolantChannelAOff, file: properties.coolantChannelAOffCustom },
@@ -2091,9 +2179,17 @@ function validateJob() {
     { code: properties.coolantChannelBOff, file: properties.coolantChannelBOffCustom }
   ];
   for (var c = 0; c < coolantCustom.length; ++c) {
-    if (getProperty(coolantCustom[c].code) == "Use custom") {
-      includeFileProps.push(coolantCustom[c].file);
+    if (getProperty(coolantCustom[c].code) != "Use custom") {
+      continue;
     }
+    if (getProperty(coolantCustom[c].file) == "") {
+      warning(localize("\"" + coolantCustom[c].code.title + "\" is \"Use custom\", which takes that "
+        + "code from the file named in \"" + coolantCustom[c].file.title + "\" -- and that field is "
+        + "empty. Nothing at all is emitted for it, so this channel never switches by that route. Name "
+        + "the file, or choose one of the g-codes in the dropdown."));
+      continue;
+    }
+    includeFileProps.push(coolantCustom[c].file);
   }
   for (var i = 0; i < includeFileProps.length; ++i) {
     var includeName = getProperty(includeFileProps[i]);
@@ -3434,18 +3530,22 @@ function onCommand(command) {
       }
       return;
     case COMMAND_COOLANT_ON:
+      // THE LEVEL COMES FROM requestedCoolant(), which validateJob()'s pre-flight also reads. THE TWO
+      // ARMS STAY SEPARATE, and that is not tidying left undone: the milling arm calls setCoolant() even
+      // with the answer Off, because that call is what turns a RUNNING channel off, and the jet arm must
+      // not -- F360 defines no coolant for a jet tool, so Off there means "the laser group forced none"
+      // and says nothing about what is running. Folding them would switch coolant off at every laser
+      // section. PV-12.
       if (tool.isJetTool()) {
-        // F360 doesn't support coolant with jet tools, but the laser group can force one. tool.coolant
-        // is not consulted -- F360 doesn't define it for a jet tool.
-        if (getProperty(properties.laserCoolant) != eCoolant.Off) {
-          setCoolant(getProperty(properties.laserCoolant));
+        var jetCoolant = requestedCoolant(tool);
+        if (jetCoolant != eCoolant.Off) {
+          setCoolant(jetCoolant);
         }
       }
       else {
-        //Convert numeric coolant code to string
-        var strCoolant = (tool.coolant < coolantLevels.length ? (coolantLevels[tool.coolant]) : eCoolant.Off);
+        var strCoolant = requestedCoolant(tool);
         writeComment(eComment.Debug, "   tool.coolant = " + tool.coolant + " strCoolant = " + strCoolant);
-  
+
         setCoolant(strCoolant);
       }
       return;
@@ -3976,6 +4076,16 @@ function sectionCutsProbePoint(section, px, py) {
       && (py >= yr.getMinimum()) && (py <= yr.getMaximum());
 }
 
+// HOW A WARNING NAMES AN OPERATION, in one place. Fusion sends no operation-comment for an UNNAMED
+// operation, so the index is the fallback -- 1-based, because that is what the operator counts down the
+// browser tree. Two walks name operations now, PV-7's machined-datum one and PV-12's coolant one, and a
+// second spelling would have the same job described two ways in two warnings the same dialog shows.
+function operationName(section, i) {
+  return section.hasParameter("operation-comment")
+    ? ("\"" + section.getParameter("operation-comment") + "\"")
+    : ("operation " + (i + 1));
+}
+
 // The sections before index `upto` that share `workOffset` and have cut through that part's probe point
 // -- {names, zMin}, or undefined where there are none. ONE STATEMENT OF THE HAZARD, read by partProbe()
 // for the file and by validateJob() for the dialog, so the two channels cannot come to disagree about
@@ -3995,9 +4105,7 @@ function probePointMachinedBefore(upto, workOffset) {
     if (wo != workOffset || !sectionCutsProbePoint(s, px, py)) {
       continue;
     }
-    names.push(s.hasParameter("operation-comment")
-      ? ("\"" + s.getParameter("operation-comment") + "\"")
-      : ("operation " + (i + 1)));
+    names.push(operationName(s, i));
     var z = s.getGlobalZRange().getMinimum();
     if (zMin == undefined || z < zMin) {
       zMin = z;

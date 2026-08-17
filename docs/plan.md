@@ -12,8 +12,8 @@ the file that computes it is named instead.
 ## Checkpoint
 
 **Next: Step 6.** Step W is done: the audit ran, `PV-9` closed on it, and the class it bounded is now
-a verdict beside every `writeWarning()` call — `grep -n "// TWIN:"`. **The audit found one finding
-while closing another**, and `findings.md` §2 holds it.
+a verdict beside every `writeWarning()` call — `grep -n "// TWIN:"`. The finding the audit found while
+closing another has closed too, so **`findings.md` §2 is empty**.
 
 **Live risk: `HR-6 (B)`** — the orientation guard may be a no-op on exactly the case it exists to
 catch, and the failure mode is a part cut in the wrong plane, silently. `findings.md` §7 has it.
@@ -32,9 +32,6 @@ version — never from a sender console, a dry run or a non-GRBL controller.
 |---|---|---|
 | **6** | Clarity | — |
 | **7** | Documents, once | 6 |
-
-**`PV-12` is not a row here.** It is one open finding with its remedy already argued in its own row,
-and `findings.md` is where it lives — this file lists steps, not findings.
 
 **Worth one post of its own, and it is not a row here:** `HR-6 (B)`'s rotated Setup. Five rotated
 Setups are on disk already, so it is a `utility` row to write rather than a job to build —

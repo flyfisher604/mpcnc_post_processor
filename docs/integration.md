@@ -88,7 +88,7 @@ node tools/wcs-matrix.js          "$POST" MPCNC_v4.0_Beta2.cps tools/wcs-jobs ou
 node tools/personal-matrix.js     "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/personal
 ```
 
-**107 cases — 29 hobbyist, 33 professional, 34 WCS, 11 personal — over 19 job files, and all 107
+**110 cases — 32 hobbyist, 33 professional, 34 WCS, 11 personal — over 19 job files, and all 110
 pass as of 2026-08-17.** The whole run is about two minutes.
 
 **The four are independent by design and stay that way.** The personas they encode disagree about

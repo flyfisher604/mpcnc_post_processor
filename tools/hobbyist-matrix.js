@@ -4,6 +4,11 @@
   P1/P2 hand-zeroed on a personal licence (GRBL, Marlin), P3/P4 homed with a Z probe and
   several tools.
 
+  Three channels, as in the other three matrices -- this was the last one reading only the
+  file, so a hobbyist-facing dialog warning had nowhere to be asserted at all:
+    must / mustNot        the emitted g-code
+    mustLog / mustNotLog  the post-time channel -- warning(), which reaches the dialog
+
   Each case states what the file MUST contain and MUST NOT, before it is posted. That
   order matters more than it looks: six of these cases failed on the first run and every
   one of them was a wrong expectation of mine, two of them wrong because a registered
@@ -169,6 +174,40 @@ const cases = [
     return (on===30 && off===30 && fire===30 && den===0)
       ? [true,'30 power changes each way, 30 control blocks, 0 denials - 60 lines left the file']
       : [false,`on=${on} off=${off} M4=${fire} denials=${den}, expected 30/30/30/0`]; } },
+
+// --- PV-12, the coolant a channel cannot deliver --------------------------------------
+// ON A LASER JOB, and that is not a detour: "Laser: Coolant" makes the requested level a PROPERTY,
+// so both branches of the ruling are reachable over a job file already on disk. A milling job would
+// need one whose tool carries the level, and no shipped .cnc carries a chosen one.
+{ id:'H30', desc:'PV-12 - a level neither channel carries: the file said so, and now the dialog names it',
+  cnc:'Cutting/Laser/center.cnc',
+  props:{laserCoolant:S('Mist'), coolantChannelAMode:S('Flood')},
+  must:[[/No matching Coolant channel : Mist requested/,'the emitter still says it, unchanged']],
+  // NAMED, NOT COUNTED. The second check reads a real operation-comment out of the job file, which is
+  // what proves the walk resolved names rather than falling back to "operation N" - the fallback would
+  // satisfy a looser pattern and prove nothing about the ruling this row carries.
+  mustLog:[[/asks for "Mist" coolant and neither channel is set to it/,'the dialog names the level'],
+           [/The operations that ask for it: "Through-Auto_Center[^"]*", "/,
+            'and names the operations that asked, from their own comments - the open ruling']],
+  mustNot:[[/^M7$/m,'nothing switches: channel A is set to Flood and this job wants Mist']] },
+
+// THE OTHER BRANCH OF THE RULING, and the only case that distinguishes it from warning always. Both
+// Modes Off is the operator declaring the machine has no coolant; Fusion's tools carry Flood whether
+// or not anyone wanted it, so an ungated pre-flight would fire on nearly every job in this matrix.
+{ id:'H31', desc:'PV-12 - ... and with NO channel configured the dialog stays quiet, the file does not',
+  cnc:'Cutting/Laser/center.cnc',
+  props:{laserCoolant:S('Mist')},
+  must:[[/No matching Coolant channel : Mist requested/,'the file is exact and per-occurrence either way']],
+  mustNotLog:[[/asks for "Mist" coolant/,'no channel configured is a declaration, not a misconfiguration']] },
+
+{ id:'H32', desc:'PV-12 - Use custom with no file named: emits nothing, and now says so in both channels',
+  cnc:'Cutting/Laser/center.cnc',
+  props:{laserCoolant:S('Mist'), coolantChannelAMode:S('Mist'), coolantChannelAOn:S('Use custom')},
+  must:[[/coolant channel A is set to "Use custom" but no custom file is named -- nothing emitted/,
+         'the emitter still says it, unchanged']],
+  mustLog:[[/"Turn Channel A On" is "Use custom".*"Channel A On Custom".*is\s+empty/s,
+            'the dialog names the channel AND the field to fill']],
+  mustNotLog:[[/asks for "Mist" coolant/,'the level IS matched here - only the file behind it is missing']] },
 ];
 
 const results = [];
@@ -192,14 +231,20 @@ for (const c of cases) {
   }
   const ok = r.status === 0 && fs.existsSync(gcode);
   const text = ok ? fs.readFileSync(gcode,'utf8') : '';
+  // Read the same way wcs-matrix.js reads it, and for the same reason: the post's warning() stream
+  // reaches the log, and --log does not capture what the harness itself prints on the way past.
+  const logText = (fs.existsSync(log) ? fs.readFileSync(log,'utf8') : '')
+                + (r.stdout || '') + (r.stderr || '');
   if (c.id === 'H1') reference = text;
 
   const checks = [];
   if (!ok) {
     checks.push([false, `post refused (exit ${r.status})`]);
   } else {
-    for (const [re,what] of (c.must||[]))     checks.push([re.test(text), `must: ${what}`]);
-    for (const [re,what] of (c.mustNot||[]))  checks.push([!re.test(text), `must not: ${what}`]);
+    for (const [re,what] of (c.must||[]))       checks.push([re.test(text), `must: ${what}`]);
+    for (const [re,what] of (c.mustNot||[]))    checks.push([!re.test(text), `must not: ${what}`]);
+    for (const [re,what] of (c.mustLog||[]))    checks.push([re.test(logText),  `must warn: ${what}`]);
+    for (const [re,what] of (c.mustNotLog||[])) checks.push([!re.test(logText), `must not warn: ${what}`]);
     if (c.custom) checks.push(c.custom(text, reference));
   }
   const pass = checks.every(x=>x[0]);
