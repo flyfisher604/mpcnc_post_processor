@@ -281,6 +281,27 @@ properties = {
     scope      : "post"
   },
 
+  // THE ONE TEST HOOK IN THIS FILE, and it exists because group 3 is otherwise unreachable by any
+  // automated run: a paid licence delivers every link, retract and traverse to onRapid(), so
+  // isSafeToRapid() is never consulted and nothing above can be exercised. The Personal edition
+  // delivers those same moves as FEED moves; onRapid() below reproduces that when this is set.
+  //
+  // NO "group" KEY, DELIBERATELY, and it is doing two jobs. writeAllProperties() skips a property
+  // with no group -- "not a dialog property" -- so a normal job's property dump is unchanged to the
+  // byte, and "visible: false" keeps it out of the dialog. Autodesk ship the same idiom for the same
+  // purpose: Data/Posts/tormach.cps, "Allow all tool numbers for probes", post kernel 5.388.0.
+  //
+  // Being out of the dump would otherwise cost the file its record of what produced it, so
+  // validateJob() announces this one in BOTH channels instead. It cannot be on in silence.
+  mapRapidsTestPersonalLicence: {
+    title      : "TEST ONLY -- deliver rapids as feed moves",
+    description: "FOR TESTING PURPOSES ONLY. DO NOT ENABLE.",
+    type       : "boolean",
+    value      : false,
+    scope      : "post",
+    visible    : false
+  },
+
   machineHomedAxes: {
     title      : "Axes Homed and Trusted",
     description: "Which axes your machine homes to endstops. It homes nothing itself -- that is Home at Job Start below. Z is required by Machine Travel Z; X and Y by a multi-part job and by At End Park At = Machine X0 Y0. Your cutting Z0 always comes from the touch-off, never from here.",
@@ -1389,6 +1410,19 @@ function countDistinctTools() {
 function validateJob() {
   // --- Warnings ---------------------------------------------------------------------------------
   // Configurations that post a valid file which then does the wrong thing at the machine.
+
+  // THE TEST HOOK ANNOUNCES ITSELF, IN BOTH CHANNELS, AND IT IS FIRST. It is the one property with no
+  // group, so writeAllProperties() does not dump it and the file would otherwise carry no record that
+  // it was posted under a simulated Personal licence -- with travel moves the operator's own licence
+  // would never have produced. This runs before any output, so the in-file half lands ahead of every
+  // other line, CR-01's "$110" first line included; that ordering only ever occurs in a test artifact.
+  if (getProperty(properties.mapRapidsTestPersonalLicence)) {
+    writeWarning("TEST HOOK IS ON -- rapids are being delivered as feed moves to exercise group 3. "
+      + "THIS FILE IS A TEST ARTIFACT. DO NOT CUT FROM IT.");
+    warning(localize("\"TEST ONLY -- deliver rapids as feed moves\" is enabled. Fusion's rapids are "
+      + "being delivered to the post as feed moves, which no licence you are running does. The output "
+      + "is a test artifact and must not be cut."));
+  }
 
   // Homing MOVES the tool, and the "Set ... to Current Pos" modes record wherever it ends up. Homing
   // is step 2 of writeFirstSection() and the origin write step 6, so a pre-jog dies in between.
@@ -2908,11 +2942,31 @@ function onRadiusCompensation() {
   }
 }
 
-// Rapid movements
-function onRapid(x, y, z) {
+// Emit a rapid. EVERY place in the post that means "make a rapid move" calls this, never onRapid(),
+// so the test hook below can only ever capture moves FUSION delivered -- not moves the post makes on
+// its own behalf, which must stay rapids whatever the hook is set to.
+function emitRapid(x, y, z) {
   forceSectionToStartWithRapid = false;
 
   rapidMovements(x, y, z);
+}
+
+// Rapid movements -- Fusion's, delivered here.
+function onRapid(x, y, z) {
+  // THE TEST HOOK. Under a Personal licence Fusion delivers these same moves to onLinear() as feed
+  // moves, which is the only condition under which group 3 runs at all. Forwarding here reproduces
+  // that, so onLinear() decides whether each one converts back -- the code under test. The property
+  // is invisible and defaults off; see its declaration for why it has no group.
+  //
+  // The feed handed over is Travel Speed X/Y purely so linearMovements() has something to print for
+  // a move that is REFUSED conversion. A refused move printing a travel feed is the hook showing its
+  // hand, not a defect -- which is one reason a file posted this way says so at the top.
+  if (getProperty(properties.mapRapidsTestPersonalLicence)) {
+    onLinear(x, y, z, propertyMmToUnit(getProperty(properties.feedsTravelSpeedXY)));
+    return;
+  }
+
+  emitRapid(x, y, z);
 }
 
 // Feed movements
@@ -2923,12 +2977,14 @@ function onLinear(x, y, z, feed) {
     writeComment(eComment.Important, " First G1 --> G0");
 
     forceSectionToStartWithRapid = false;
-    onRapid(x, y, z);
+    // emitRapid(), NOT onRapid(): with the test hook on, onRapid() forwards back into this function
+    // and the conversion would recurse until the stack blew.
+    emitRapid(x, y, z);
   }
   else if (isSafeToRapid(x, y, z)) {
     writeComment(eComment.Important, " Safe G1 --> G0");
 
-    onRapid(x, y, z);
+    emitRapid(x, y, z);
   }
   else {
     linearMovements(x, y, z, feed);

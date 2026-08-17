@@ -11,13 +11,19 @@ bounds, and this file is the how.
 
 ## 1. What an integration run is
 
-Three layers, and none of them is Fusion.
+Four layers, and none of them is Fusion.
 
 | Layer | What it is | Where |
 |---|---|---|
 | **The engine** | `post.exe`, the same executable Fusion drives when it posts | Autodesk's webdeploy tree |
 | **The job** | an intermediate `.cnc` file — one CAM job, serialised: sections, tools, work offsets, motion | Autodesk's shipped library, and `tools/wcs-jobs/` |
+| **The licence** | how Fusion *delivers* that job's rapids — as rapids, or as feed moves | one invisible post property — §6.5 |
 | **The matrix** | a Node script that posts one job under one property set and asserts what the result must and must not contain | `tools/*-matrix.js` |
+
+The third is the newest and the least obvious. Two of the post's ten property groups exist because a
+**Personal** licence emits no rapids at all, and that fact lives in neither the engine nor the job —
+it is a property of the Fusion that produced the job, which no `.cnc` file records and no fixture can
+splice in. It is varied here instead.
 
 **The engine is not a stand-in.** `post.exe` is what Fusion invokes; the `.cnc` file is the same
 intermediate Fusion hands it. So an integration run is the real post, on real toolpath data, through
@@ -46,7 +52,19 @@ so it is kept for exactly those, and everything else runs here.
 
 ## 2. Running one
 
-All three matrices take the same four arguments, in the same order:
+**One command runs everything**, and that is the form to use:
+
+```
+node tools/integration-run.js  <post.exe>  <post.cps>  "<CNC files dir>"  <output dir>
+```
+
+It exits 0 only when every case in every matrix passes, so it is usable as a gate. It **sequences**
+the matrices; it does not unify them — each keeps its own baseline, for the reason below. What it
+buys is that none can be forgotten, and that is not hypothetical: group 3 was reachable for a long
+time before anything reached it, and a suite you have to remember to run in four parts is a suite
+that gets run in three.
+
+All four matrices also run alone, and take the same four arguments in the same order:
 
 ```
 node tools/<name>-matrix.js  <post.exe>  <post.cps>  <job root>  <output dir>
@@ -55,8 +73,8 @@ node tools/<name>-matrix.js  <post.exe>  <post.cps>  <job root>  <output dir>
 - **`<post.exe>`** — under `%LOCALAPPDATA%\Autodesk\webdeploy\production\<hash>\Applications\CAM360\`.
   `post-run.ps1` locates it by search rather than by a pinned path; a matrix is handed it.
 - **`<post.cps>`** — `MPCNC_v4.0_Beta2.cps`, the deliverable.
-- **`<job root>`** — for the first two, the `res\CNC files` directory inside the installed
-  **Autodesk HSM Post Processor** VS Code extension; for `wcs-matrix.js`, `tools/wcs-jobs`.
+- **`<job root>`** — the `res\CNC files` directory inside the installed **Autodesk HSM Post
+  Processor** VS Code extension, except for `wcs-matrix.js`, which takes `tools/wcs-jobs`.
 - **`<output dir>`** — anywhere outside the repo. Each case writes `<id>.gcode` and `<id>.log` there,
   so a failure can be read after the run rather than only during it.
 
@@ -67,12 +85,22 @@ print, and the last line is the tally.
 node tools/hobbyist-matrix.js     "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/hobbyist
 node tools/professional-matrix.js "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/professional
 node tools/wcs-matrix.js          "$POST" MPCNC_v4.0_Beta2.cps tools/wcs-jobs out/wcs
+node tools/personal-matrix.js     "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/personal
 ```
 
-**90 cases — 28 hobbyist, 31 professional, 31 WCS — over 19 job files, and all 90 pass as of
-2026-08-17.** The whole run is about ninety seconds. There is no runner above the three; they are
-independent by design, because the personas they encode disagree about what the factory defaults
-should do and a shared baseline would have to pick one.
+**101 cases — 28 hobbyist, 31 professional, 31 WCS, 11 personal — over 19 job files, and all 101
+pass as of 2026-08-17.** The whole run is about two minutes.
+
+**The four are independent by design and stay that way.** The personas they encode disagree about
+what the factory defaults should do, so a shared baseline would have to pick one; `integration-run.js`
+picks none, it only refuses to let a matrix be skipped.
+
+| Matrix | Persona | Baseline |
+|---|---|---|
+| `hobbyist-matrix.js` | P1/P2 — hand-zeroed, one tool | none: the factory defaults **are** the persona |
+| `professional-matrix.js` | P3/P4 — homed, probed, several tools | homed XYZ, a machine-frame travel height, home at start, park at the corner |
+| `wcs-matrix.js` | P7 — several parts in one job | homed XY and a Z frame, **because Guard B refuses these jobs without them** |
+| `personal-matrix.js` | the Fusion **Personal** licence | every rapid delivered as a feed move — §6.5 |
 
 **One case at a time, by hand:** `tools/post-run.ps1` posts a single `.cnc` under a named property
 set — a profile in `tools/profiles/*.json`, or `-Set @{...}` — and prints the exit code, the line
@@ -94,7 +122,8 @@ post.exe --noeditor --nointeraction --noheader --noprogress tools/census.cps <jo
 ## 3. How a case is written, and why in that order
 
 A case is a row of data: the job file, the property overrides, and the assertions. The runner is
-forty lines and identical in all three matrices.
+forty lines and identical in all four matrices, except that `personal-matrix.js` runs each case TWICE --
+once as written and once as its reference -- because every claim it makes is a difference (§6.3).
 
 ```js
 { id:'W2', desc:'Probe Z0 Once per Part: the added part is probed, into ITS OWN register',
@@ -137,14 +166,32 @@ mistake has been made here twice — see §5.
 This is the whole discipline and it is worth stating plainly, because the alternative looks
 identical afterwards and proves nothing.
 
-**Nineteen cases across the three matrices failed on their first run, and every one was the
+**Twenty-one cases across the four matrices failed on their first run, and every one was the
 harness's error, not the post's.** A wrong regex; a warning asserted in the channel it does not use;
 a job file that refuses for a reason unrelated to the case; an ordering helper that cannot see a
 second occurrence of a block because it searches for the first. Two of the hobbyist failures were
 wrong because a registered finding had already changed the answer — `CR-12`'s provisional Z0, and
 `CR-15` dropping the first-tool prompt on a mode that implies a tool is already fitted.
 
-The last two are the cleanest examples, and they fail in opposite directions.
+**The twentieth and twenty-first are both about the INSTRUMENT rather than the claim**, and they are
+the ones worth copying out, because each was a true claim measured with the wrong tool.
+
+The **twentieth** asserted that switching group 3 on changes nothing but the property-dump line, and
+reported **1107 differing lines** where `diff` finds three. Switching the group on *inserts* a
+comment — `( SafeZ retract level: 5)` — and a positional line-by-line compare shifts by one at that
+point and calls the rest of the file changed. Comments are now stripped before the compare, which
+makes the claim both survivable and sharper: not "the files are identical" but **"not one of the
+1094 emitted g-code blocks moves."**
+
+The **twenty-first** asserted that turning feed scaling off makes the fastest cut faster, and it
+does not: `bore.cnc` asks for `F1000` throughout and `Max Toolpath Speed` ships at `1000`, so the
+**maximum is 1000 either way** while scaling still slows 615 moves and drops the plunge from 1000 to
+180. A maximum was the wrong instrument for a claim about a distribution. The case now compares
+**block for block** — same job, same move count, so the two runs line up one to one — and asserts
+the invariant the post states for itself: *never RAISE a feed*.
+
+The two before those are the cleanest examples of the earlier kind, and they fail in opposite
+directions.
 
 The **eighteenth** asserted the trace `probe skipped (tool 0 or jet tool)` exactly as
 `writeWcsEstablish()` writes it — and the file says `probe skipped tool 0 or jet tool`, parentheses
@@ -242,7 +289,7 @@ so every section arrives as offset 0. Verified by editing that attribute in Auto
 
 ### 4.3 Every `.cnc` file the suite uses
 
-**19 files, 90 cases.** Five are Autodesk's; fourteen are generated. `A` = 2D-Face tool 1 (which cuts
+**19 files, 101 cases.** Five are Autodesk's; fourteen are generated. `A` = 2D-Face tool 1 (which cuts
 **across** the part origin, so it is the block that puts a machined surface under a later probe);
 `B` = 2D-Contour tool 2; `J` = a Through-medium laser operation, tool 2; `K` = an Etch laser
 operation, tool 2.
@@ -251,9 +298,9 @@ operation, tool 2.
 
 | File | Blocks | Cases | What it covers |
 |---|---|---|---|
-| `Milling/2D/face.cnc` | 1 section, T1 | **37** | the workhorse: preamble, all six `First WCS / Part` modes, probe geometry, comment levels, sequence numbers, feeds, the frame, homing, the park, and every refusal that needs only a plain job |
+| `Milling/2D/face.cnc` | 1 section, T1 | **38** | the workhorse: preamble, all six `First WCS / Part` modes, probe geometry, comment levels, sequence numbers, travel speeds, the frame, homing, the park, and every refusal that needs only a plain job |
 | `Milling/2D/toolchange.cnc` | 2 sections, T1→T2 | **17** | both tool-change flows, the sender tokens, the change position and its three refusals, the re-probe and its absence |
-| `Milling/2D/bore.cnc` | 1 section, arcs | 3 | arcs on and off, the cut-speed ceiling, the feedrate-enforcement count |
+| `Milling/2D/bore.cnc` | 1 section, 1067 cutting moves, arcs | **13** | arcs on and off, and **the whole of groups 2 and 3**: it is the only job with enough motion for a feed *distribution* to be read, and its arcs are what put `limitArcFeed()` under the same ceiling as the linear path |
 | `Cutting/Laser/center.cnc` | 7 sections, T2 laser | 1 | a jet tool withholding the provisional Z0 a milling tool receives |
 | `Milling/2D/full program.cnc` | 4 sections, 2 tools | 1 | compensation **in the control**, which all three firmwares refuse |
 
@@ -314,7 +361,7 @@ evaluated as a JavaScript literal**, which is the whole trick and the whole trap
 | number | `-5` | bare |
 | boolean | `true` / `false` | bare |
 
-All 62 properties are reachable this way. Getting it wrong fails in three ways and **only the first
+All 63 properties are reachable this way, the invisible test hook of §6.5 included. Getting it wrong fails in three ways and **only the first
 is loud**:
 
 - `jobSelectedFirmware Marlin` → *"Failed to set property"*. This is the utility reporting an
@@ -344,13 +391,21 @@ the quoting Node's problem; anything else driving `post.exe` has to solve it one
 
 ### 6.2 What is covered today
 
-Measured against that schema, across all three matrices:
+Measured against that schema, across all four matrices:
 
 | Measure | Reached | Total |
 |---|---|---|
-| Properties **varied** by at least one case | **35** | 62 |
+| Properties **varied** by at least one case | **37** | 62 |
 | Enum **values** reached, counting the factory default as reached | **44** | 87 |
-| Boolean **states** reached, both ways | **16** | 20 |
+| Boolean **states** reached, both ways | **18** | 20 |
+
+**The denominator is 62 and the schema now reports 63.** The extra one is the test hook of §6.5,
+which is not a coverage target: it is part of the harness that reaches the others. Counting it would
+inflate the number with the instrument.
+
+**Groups 2 and 3 are at 100%** — all seven feed properties and both rapid-mapping properties are
+varied and asserted, which they were not before `personal-matrix.js`. Group 2 was the sharper of the
+two gaps: six of its seven were *set* by earlier cases, but only as scenery.
 
 **Every enum that decides behaviour is at 100%:** `probeOnStart` 6/6, `probeOnChange` 4/4,
 `toolChangeMode` 3/3, `toolChangeSender` 4/4, `jobSelectedFirmware` 3/3, `machineHomedAxes` 4/4,
@@ -367,14 +422,24 @@ and `probePause` = `Before`.
 Three distinctions, because the number above is easy to over-read.
 
 **Reached is not the same as varied.** A property left alone still runs — at its factory default, in
-every case. So the default path of all 62 is exercised on every run, and the 27 that no case *varies*
-are 27 whose **alternative** values have never been posted. That is the real gap, and it is what
+every case. So the default path of all 62 is exercised on every run, and the 25 that no case *varies*
+are 25 whose **alternative** values have never been posted. That is the real gap, and it is what
 §7 lists.
 
-**Varied is not the same as asserted.** `machineHomedAxes` is set in almost every professional and
-WCS case as part of the baseline, but only two cases assert what it decides. A property is genuinely
-covered when a case sets it *as its subject* and asserts the difference it makes — which is why the
-tables in §7 name the assertion, not just the property.
+**Varied is not the same as asserted, and group 2 is the case that proves it.** `machineHomedAxes`
+is set in almost every professional and WCS case as part of the baseline, but only two cases assert
+what it decides. Six of the seven feed properties were in the same position: `H9` set three cut
+ceilings at once and asserted only that the *result* stayed under one of them, so no case could have
+told you which of the three did the work — or whether any of them did. Each now has a case that
+varies it **alone** and reads the difference it alone makes. A property is genuinely covered when a
+case sets it *as its subject*, which is why the tables in §7 name the assertion, not the property.
+
+**And a difference observed is not a formula reproduced.** No case in `personal-matrix.js` computes
+what a feedrate should be. Each one posts the same job twice and reads what moved: a rate that
+appears while the shipped one leaves, a maximum that falls, a count that drops while the distinct
+values stay put, a block that is slower and none that is faster. A test that re-derived the
+projection in `limitFeedByXYZComponents()` would agree with a post that scaled consistently wrongly,
+because it would be the same arithmetic checking itself.
 
 **Asserted is not the same as correct.** §5 is the standing caveat: two cases were passing while
 asserting nothing useful. Coverage counts questions asked.
@@ -391,28 +456,79 @@ const pro = (extra) => Object.assign({}, PRO, extra);
 ```
 
 - **Hobbyist** — *no* baseline: the factory defaults are the persona. P1/P2 hand-zero on a personal
-  licence, so a case that overrides nothing is the shipped experience.
+  licence, so a case that overrides nothing is the shipped experience. **What it does not vary is the
+  licence itself**, which is why the group those users depend on needed a matrix of its own.
 - **Professional** — a machine that homes all three axes, a declared travel height in the machine's
   own frame, homing at job start, a park at the homing corner.
 - **WCS** — `machineHomedAxes` `XYZ`, `machineTravelZ` `-5`, `machineHomeAtStart` `Home`. **This one
   is not a preference:** Guard B refuses any job with more than one work offset unless X/Y are
   declared homed, and the traverse retract needs the Z frame. It is the minimum configuration in
   which those job files post at all.
+- **Personal** — the test hook on, and nothing else. **The baseline is a delivery mode, not a machine:**
+  it says how Fusion hands the job over, so every other property is at its factory value unless the case
+  is about it. **Only four of the eleven cases turn it on** — the six group-2 cases and `R1` run under a
+  full licence, because a feed ceiling is not a licence question and the bound must be measured where
+  the operator actually is. A case that varied the hook itself would be comparing licences, not
+  configurations.
 
 `findings.md` §4 states the same idea for hand-run rows — a standing configuration, and a row names
 only what it changes from it.
+
+### 6.5 The one property that exists for this file
+
+**`mapRapidsTestPersonalLicence`.** It makes `onRapid()` forward to `onLinear()`, which is what
+Fusion's **Personal** edition does on its own, and it is the only reason group 3 can be tested at
+all.
+
+**Why nothing else would do.** Group 3 restores a `G1` to a `G0` from inside `onLinear()`. Under a
+paid licence every link, retract and traverse arrives at `onRapid()` instead, so `isSafeToRapid()` is
+never consulted and the group cannot run — and Autodesk's library is **full-licence output**. A
+spliced fixture cannot supply one either: `make-wcs-jobs.js` copies motion records as **opaque
+bytes** and authors none, which is the property that makes its fixtures trustworthy (§4.2) and the
+same property that puts this out of reach. The condition is not in the job. It is in the licence that
+produced the job, and there is no licence to vary.
+
+**Why it is in the post rather than in a copy of the post.** Until 2026-08-17 this was a hand-held
+file, `Personal.cps`, carrying the same edits. It went stale — it still read `A_Feeds_TravelSpeedXY`
+and `A_MapRapids_RestoreFirstRapids`, property names deleted in Step 2 — and **a stale harness does
+not fail loudly.** It posts. It answers a question about a post that no longer exists. Worse, its own
+banner had to say its evidence was about *logic, never about what the post emits*, because what it
+emitted was a copy's output. The hook removes both problems at once: the suite runs **the
+deliverable**, so what it reads is what the operator would get.
+
+**Four things keep it from being a liability**, and each is asserted by a case rather than promised:
+
+| Guard | How | Asserted by |
+|---|---|---|
+| No operator can reach it | `visible: false` — Autodesk's own idiom, and their `tormach.cps` uses it for a test-only switch in the same words: *"FOR TESTING PURPOSES ONLY. DO NOT ENABLE."* | — |
+| It cannot be on in silence | `validateJob()` announces it **in both channels** — the dialog, and the first line of the file | `R2` |
+| It changes nothing when off | it has **no `group`**, so `writeAllProperties()` skips it as *"not a dialog property"* and a normal job's dump is unchanged to the byte | `R1` |
+| It captures only Fusion's rapids | every post-injected rapid goes through `emitRapid()`, never `onRapid()`, so a move the post makes **on its own behalf** stays a rapid whatever the hook is set to | the split itself |
+
+That last row is the one that took thought. `onRapid()` is now two functions: the entry point Fusion
+calls, and `emitRapid()`, which is what everything inside the post calls when it means *make a rapid
+move*. Without the split, enabling the hook would have offered the post's own retracts and park to
+`isSafeToRapid()` — and a test hook that alters the moves the post makes for itself is not measuring
+the post, it is replacing it.
+
+**The bound this does not lift.** The hook reproduces the *delivery* of rapids as feed moves. It does
+not reproduce a Personal-licence toolpath in any other respect, and no claim here rests on it doing
+so. `R1` is what holds that line: with the hook off, group 3 alters not one of `bore.cnc`'s 1094
+emitted blocks — so the hook is the only thing standing between §7.7's old *"out of reach"* and the
+eleven cases that now reach it.
 
 ---
 
 ## 7. What full coverage would take, and how much of it is a job file
 
-The 27 properties no case varies (§6.3) look like one debt and are five different ones. **The
-job-file half of it is built** — §7.5 — and what remains is cases, fixture files, rulings and two
-stated bounds. Everything below was run rather than reasoned, except where it says otherwise.
+The 25 properties no case varies (§6.3) look like one debt and are four different ones. **The
+job-file half is built** (§7.5) **and the group-3 half is reached** (§6.5); what remains is cases,
+fixture files, rulings and one stated bound. Everything below was run rather than reasoned, except
+where it says otherwise.
 
 ### 7.1 Needs a case, not a file — the jobs already exist
 
-Six residues, all reachable today with `Milling/2D/face.cnc`, `bore.cnc` or `toolchange.cnc`.
+Five residues, all reachable today with `Milling/2D/face.cnc`, `bore.cnc` or `toolchange.cnc`.
 
 | Residue | Needs | What a case would assert |
 |---|---|---|
@@ -421,7 +537,11 @@ Six residues, all reachable today with `Milling/2D/face.cnc`, `bore.cnc` or `too
 | `duetMillingMode`, `duetLaserMode` | any job, RepRap | the mode token reaches the file. Verified: `T0` |
 | `machineHomeAtStart` = `Pause & Home` | any job | the stop that precedes the homing cycle — one of only two unreached values outside coolant and laser |
 | `probePause` = `Before` | any probing job | the fit prompt without the removal prompt. `H15` covers `No`, the default covers `Before & After` |
-| `feedsScaleFeedrate` = `false` | `bore.cnc` | feeds pass through **unscaled**. `H9` asserts the ceiling holds when it is on; nothing asserts what happens when it is off, so the property's effect is only half witnessed |
+
+*(A sixth residue, `feedsScaleFeedrate` = `false`, closed on 2026-08-17 with `F2` — and it did not
+close the way this table expected. The claim written here was that unscaled feeds are faster; the
+fastest cut is `F1000` either way, and what scaling actually does to this job is slow 615 of 1067
+moves and drop the plunge from 1000 to 180. §3's twenty-first failure.)*
 
 ### 7.2 Needs fixture files, not job files
 
@@ -544,43 +664,60 @@ that one is editable. Reaching it needs a Fusion job authored in vaporize mode.
 
 Group 8 is blocked on laser detail in any case, so this is recorded as a bound rather than pursued.
 
-### 7.7 Out of reach, and not a gap to close
+### 7.7 Group 3 — **reached, 2026-08-17**
 
-**Group 3 — `mapRapidsRestoreRapids` and `mapRapidsSafeZ` — cannot be exercised by any `.cnc` file,
-shipped or built.**
+**No `.cnc` file, shipped or built, can exercise group 3**, and that has not changed. What changed is
+that the condition it needs is not a property of the job at all, so it stopped being looked for
+there. §6.5 is the mechanism; this is what the eleven cases establish.
 
-The feature restores a `G1` to a `G0`, from two places in `onLinear()`: a section's first cut move,
-and any move `isSafeToRapid()` clears. `onRapid()` clears `forceSectionToStartWithRapid`, and
-`isSafeToRapid()` is reached from `onLinear()` alone. **Autodesk's library is full-licence output**,
-where every rapid arrives as `onRapid` — so there is nothing to restore, and setting `mapRapidsSafeZ`
-on `face.cnc` changes **nothing but the property-dump line**. Verified: zero differing g-code lines.
+**The bound, restated as a measurement.** With the hook off, switching `mapRapidsRestoreRapids` on
+alters **not one of `bore.cnc`'s 1094 emitted g-code blocks** — it adds a single comment naming the
+safe height it resolved, and converts nothing. That is `R1`, and it is a stronger statement than the
+one this section used to carry, which was measured on `face.cnc` with a positional line compare that
+would have reported any inserted comment as a whole-file change (§3, the twentieth failure).
 
-A spliced job cannot fix it either. The generator copies motion records as **opaque bytes** and never
-authors them, which is the property that makes its fixtures trustworthy (§4.2) and the same property
-that puts this out of reach.
+**What the four group-3 cases settle:**
 
-The feature exists for a **personal-licence** toolpath, where Fusion emits rapids as feed moves. So it
-is reachable only from a personal-licence job posted from Fusion, or from `Personal.cps` — and
-`design.md` is explicit that `Personal.cps`'s evidence is about *logic*, never about what the post
-emits. **This is a bound to state, not a gap to close**, and it should not be counted against the
-coverage number.
+| Case | Establishes |
+|---|---|
+| `R1` | the bound above — on full-licence output the group is inert, so nothing below can be an artefact of the hook |
+| `R2` | the conversions run: one first-move conversion in a one-section job, and three safe-move conversions — **and the file and the dialog both say the hook is on** |
+| `R3` | `mapRapidsRestoreRapids` is the master switch: with the hook on and the group off, nothing converts and the Z travel speed reaches one move instead of four |
+| `R4` | `mapRapidsSafeZ` decides **how many** moves convert — five at `0`, none at `100` — read on the safe-move count alone, because the first-move conversion is not gated on safe Z and would have masked it |
+
+**And `R7` is why the group exists**, which none of the above shows on its own. With rapids arriving
+as feed moves and the group off, every Z traverse leaves at the **Z cutting ceiling or below** — 180,
+not the 321 it was told to travel at. Turn the group on and four of them leave as rapids at 321. That
+is the post's own stated reason for the feature, in its own words at `onLinear()`, witnessed for the
+first time: *"the first move to the start of a section will be at the slowest cutting feedrate."*
+
+**This is no longer a bound, so it is no longer excluded from the coverage number** — both properties
+count as varied, and §6.2's 37 includes them.
 
 ### 7.8 The answer, by persona
 
 | | Hobbyist | Professional |
 |---|---|---|
 | **New job files** | ✅ none were needed | ✅ **built** — `jet-two-parts`, `mill-then-jet`, `mid-offsets` |
-| **Needs a case only** | manual spindle control, `probePause` = `Before`, unscaled feeds | `G28` probing on Marlin/RRF, the Duet modes, `Pause & Home`, and item 6's last three residues |
+| **Groups 2 and 3** | ✅ **reached** — the feeds a slow-Z machine depends on, and the rapids a Personal licence turns into cuts | ✅ the same eleven cases; group 3 is off for this persona and `R1` is what says so |
+| **Needs a case only** | manual spindle control, `probePause` = `Before` | `G28` probing on Marlin/RRF, the Duet modes, `Pause & Home`, and item 6's last three residues |
 | **Needs fixtures** | — | the four include files, the four custom coolant files |
 | **Needs a ruling, not an artifact** | coolant (a persona), laser (group 8 detail) | the same |
-| **Unreachable** | group 3 — personal-licence rapids | group 3 · `laserOnVaporize` |
+| **Unreachable** | — | `laserOnVaporize` |
 
-**The job-file debt is closed.** Every path the post has that a `.cnc` file can reach now has one,
-and the two that no file can reach — group 3's restored rapids and the vaporize power level — are
-stated as bounds with the reason, so neither is mistaken for a gap someone forgot.
+**The job-file debt is closed and the licence debt with it.** Every path the post has that a `.cnc`
+file can reach now has one; the one path no file could reach is reached by the post's own test hook;
+and the single thing still out of reach — the vaporize power level — is stated as a bound with the
+reason, so it is not mistaken for a gap someone forgot.
 
-What is left is cheaper than what was built: **six cases, eight fixture files, and two rulings the
-author owns.** None of it needs a new job file, and none of it needs Fusion.
+The hobbyist column is now empty of artifacts. **Groups 2 and 3 are the two the hobbyist persona
+depends on most** — a machine whose Z is far slower than its XY, driven from a licence that emits no
+rapids — and both were the least witnessed in the suite until now: one unreachable, the other set as
+scenery by cases about something else.
+
+What is left is cheaper than what was built: **five cases, eight fixture files, and two rulings the
+author owns.** None of it needs a new job file, none of it needs Fusion, and none of it is a
+hobbyist's.
 
 ---
 

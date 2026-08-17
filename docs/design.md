@@ -494,12 +494,21 @@ leaves on disk: `onOpen()` refuses before any output, so the job writes **no fil
 
 **Properties** use the combined-inline `properties = {}` form, read with `getProperty(properties.key)`.
 
-**`Personal.cps`** (repo root, git-excluded) is the post with `onRapid()` rerouted into `onLinear()` — the
-only way to reach the group-3 code, since a paid licence emits real `G0`s. Re-create it from the current
-`.cps`; its evidence is about *logic*, never about what the post emits.
+**One test hook lives in the post, and it is `mapRapidsTestPersonalLicence`.** It reroutes `onRapid()`
+into `onLinear()`, which is the only way to reach the group-3 code: a paid licence emits real `G0`s, so
+`isSafeToRapid()` is never consulted. It is `visible: false` and has **no `group`**, so no dialog offers
+it and the property dump ignores it — and because the dump is how a file records what produced it,
+`validateJob()` announces the hook in both channels instead. **The design rule it carries:** every rapid
+the post makes on its own behalf goes through `emitRapid()`, never `onRapid()`, so the hook can capture
+only what Fusion delivered. `integration.md` §6.5 is the mechanism and the guards.
+
+*(It replaces `Personal.cps`, a git-excluded copy of the post carrying the same edits by hand. That copy
+went stale unnoticed — a harness that is a duplicate does not fail loudly, it answers questions about a
+post that no longer exists — and its evidence could only ever be about *logic*, never about what the post
+emits. The hook tests the deliverable, so that limit is gone. Any `Personal.cps` still on disk is dead.)*
 
 **The post runs without Fusion, and `integration.md` is how.** `post.exe` over the intermediate `.cnc`
-files, driven by `tools/post-run.ps1` for one job or by the three matrices in `tools/` for many — that
+files, driven by `tools/post-run.ps1` for one job or by the four matrices in `tools/` for many — that
 file owns the machinery, the property-coverage measure and the bounds. What a row settled that way may
 claim is `findings.md` §4's `utility` method. Three facts about it are design's rather than the
 harness's, and only these are stated here:
