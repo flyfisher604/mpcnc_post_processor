@@ -2074,15 +2074,17 @@ function resetPostState() {
   gFeedModeModal.reset();
 
   // The same suppression one axis word at a time: a second file whose first move shares an axis value
-  // with the last move of the first omits that word, and on the circular pair an I/J/K the arc needs.
+  // with the last move of the first omits that word. THE CIRCULAR PAIR IS NOT ONE OF THESE, and calling
+  // reset() on it threw out of onOpen() on every post: createReferenceVariable returns an object the
+  // kernel gives no reset() at all -- engine 5.388.0, typeof iOutput.reset === "undefined", where
+  // createVariable's is "function" -- and it needs none, being non-modal. It emits its value on every
+  // call and suppresses only when that value equals the reference it is handed, which for an arc means
+  // a zero offset and never a stale belief. PV-1. CR-21.
   // sOutput and fOutput need no reset here -- sOutput is created force:true and onOpen() rebuilds
   // fOutput from the properties on both branches, which IS its reset. CR-21.
   xOutput.reset();
   yOutput.reset();
   zOutput.reset();
-  iOutput.reset();
-  jOutput.reset();
-  kOutput.reset();
 }
 
 function onOpen() {

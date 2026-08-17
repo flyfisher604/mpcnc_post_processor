@@ -1,6 +1,6 @@
 # Findings — `MPCNC_v4.0_Beta2.cps`
 
-Every logged issue and the tests that confirm it. **73 findings — 63 fixed ·
+Every logged issue and the tests that confirm it. **74 findings — 64 fixed ·
 9 closed by design · 1 withdrawn · 0 open.** Test registers in §4 and §5.
 
 > **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
@@ -21,6 +21,7 @@ because commit messages cite them and must still resolve.
 | `CR-` | Pre-Beta coverage review, 2026-08-09 | `CR-01` … `CR-24` |
 | `FCR-` | 2026-08-01 whole-file review. **All findings closed**; three test rows survive, renamed here | `FCR-4` … `FCR-13` |
 | `WR-` | Walk review, 2026-08-16 — the open register re-executed against the source | `WR-1` … `WR-2` |
+| `PV-` | Post-verify pass, 2026-08-16 — the post **run**, by the post utility over Autodesk's own intermediate files | `PV-1` |
 
 > **The `CR-` prefix once meant two things.** The 2026-08-01 whole-file review filed
 > `CR-1 … CR-17`, dissolved into the hobbyist register at `c73726c` / `a68dd11` / `1232929`
@@ -55,7 +56,7 @@ owes is **artifacts, not diagnoses** — §4's four jet rows and §7's posted fi
 
 ## 3. Closed findings
 
-**63 fixed · 9 closed by design · 1 withdrawn — 73 rows.** Permanent: commit messages and
+**64 fixed · 9 closed by design · 1 withdrawn — 74 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -134,6 +135,7 @@ diagnosis, the diff and the argument.
 | **CR-23** | A Safe-Z expression of `0` is accepted, making every non-negative Z "safe air" | Machine damage | **Closed by design — the parser functions as designed**, by the author's ruling 2026-08-16, and no code changed. `0` is a legal Safe-Z and not a malformed one: the CONST regex takes no sign, so the accepted range starts at zero, and `isSafeToRapid()`'s `zr >= safeZHeight` then reads every Z at or above the stock top as air — which is what typing `0` asks for. **Same ground as `CR-03`**: the mapper is the operator's assertion about their own toolpaths, not a claim the post can second-guess | ➖ |
 | **CR-24** | The default channel-B coolant code is behind a default-off GRBL build option | Wrong output | **Named, not checked — `$1`, `$27` and `$110`'s precedent — and the two GRBL dialects fail in opposite directions.** Stock Grbl 1.1 compiles `case 7:` only under `ENABLE_M7`, shipped commented out (`// #define ENABLE_M7 // Disabled by default.`, `grbl/config.h`; the `#ifdef` wraps both the modal-group arm and the assignment, `grbl/gcode.c`, gnea/grbl v1.1h), so `M7` falls to `default: FAIL(STATUS_GCODE_UNSUPPORTED_COMMAND)` — `error:20`, mid-section, tool in the cut. **FluidNC has no build option and never errors**: `case 7:` sets the mist state only `if (config->_coolant->hasMist())` and otherwise leaves the block inert (`FluidNC/src/GCode.cpp`, 3.9.1; `hasMist()` is `_mist.defined()`, `CoolantControl.h`), so the job cuts dry and nothing says so. **`M8` is pin-gated there the same way**, which is the half the row did not have — it is unconditional on stock grbl alone — so one post-time warning names both codes, gated on a channel `Mode` other than `Off`: the operator's own opt-in, and the property the emission itself reads. **V1 Engineering's shipped configs are named in the dialog**, `CR-09`'s precedent: `flood_pin: gpio.2` / `mist_pin: gpio.16` on Jackpot 1, `NO_PIN` for both on Jackpot 2 and Jackpot 3 (`V1EngineeringInc/FluidNC_Configs`, `1384b17`, read 2026-08-16) — so on that hardware the failure is silence, not the halt | ✅ |
 | **PR-25** | Whether RepRapFirmware applies a tool-length offset to a `G53` move is unsettled | Low-Med | **Settled from source: it does not, and the hedged warning went with the question.** `G53` drops the tool offset as well as the workplace offset — `currentUserPosition[axis] = moveArg + GetCurrentToolOffset(axis)` in the `g53Active` arm, whose own comment reads *"g53 ignores tool offsets as well as workplace coordinates"*, and that pre-added offset is exactly what `ToolOffsetTransform()` subtracts again on the way to machine coordinates. `src/GCodes/GCodes.cpp`, `DoStraightMove()` and `DoArcMove()`, **the same at 2.05, 3.0, 3.5.4 and 3.6.0**. So `Machine Travel Z` is a **carriage** height on RRF exactly as on GRBL, whatever `tpost<n>.g` applied, and the axis-limit hazard the warning hedged against does not exist. The warning is deleted, four lines of comment stand where it was so it is not re-invented, and the read is in `design.md`'s firmware table | ➖ |
+| **PV-1** | `CR-21`'s reset threw out of `onOpen()`, so the post could produce no file at all | Post refuses | **A `createReferenceVariable` has no `reset()`, and needs none.** `iOutput`/`jOutput`/`kOutput` are reference variables; the kernel gives that object no `reset` method — engine 5.388.0, `typeof iOutput.reset === "undefined"` where `createVariable`'s is `"function"` — so `resetPostState()` raised *iOutput.reset is not a function* on the **first statement of every post**, and every job on every firmware ended in `Failed while processing onOpen()` with a `.failed` stub. The three calls are deleted; `xOutput`/`yOutput`/`zOutput` are `createVariable` and stay. **They were never needed**: a reference variable is not modal — it emits its value on every call and suppresses only when that value equals the reference it is handed, which on an arc means a zero offset, not a stale belief — so `CR-21`'s *"an I/J/K the arc needs"* was the one clause of that finding with no defect under it. **What the row is really about is the blind spot, not the typo**: `9ef669c` landed it, and everything after it was closed by walk against a post that could not run, `node --check` passing on it throughout because the file is valid JavaScript. `PV-1a` is the first row in this register settled by **running** the post | ✅ |
 
 ---
 
@@ -153,12 +155,21 @@ speed `F30`, probe thickness `Z0.8`. **A row names only what it changes from tha
 Output goes to `Documents\Fusion 360\NC Programs\`, is not in the repo, and a reused
 filename destroys evidence.
 
-**Three methods.** `posted` — the job is run from Fusion and the g-code read. `dialog` — settled by
+**Four methods.** `posted` — the job is run from Fusion and the g-code read. `dialog` — settled by
 opening the Fusion dialog, and no posted file can show it. `walk` — settled by reading the code that
 would emit it. **A walk is admissible only where the emission is fully determined by the post**: it
 proves what the post writes given a configuration, and never what Fusion feeds it, what the dialog
 renders, or what a controller does with the result. Where a row's every emitted line is separately
 witnessed in an existing artifact, say which one.
+
+`utility` — the post run by Autodesk's own `post.exe` over one of the intermediate `.cnc` files that
+ship with the HSM VS Code extension. **It is the same engine Fusion uses and the same toolpath data**,
+so it settles everything a `walk` settles *and* whether the post runs at all, which is what `PV-1`
+cost. Two bounds, and both are real: **the dialog is not exercised** — properties are set by an
+appended `properties.<id>.value` block, because `post.exe --property` cannot set an enum on any post,
+Autodesk's `haas.cps` included — and **the job is Autodesk's, not the operator's**, so a row needing a
+particular Setup, work offset or tool list still wants a `posted` file. A `utility` row names the
+`.cnc` file it ran, as a `posted` row names its `.gcode`.
 
 | Test | Proves | Setup (delta) | Method | Expansion | State |
 |---|---|---|---|---|---|
@@ -171,7 +182,7 @@ witnessed in an existing artifact, say which one.
 
 ## 5. Passed tests
 
-**✅ 136 PASS · ❌ 0 FAIL · ➖ 17 n/a — 153 tests in 146 rows** (an `(A)`/`(B)` pair shares a
+**✅ 137 PASS · ❌ 0 FAIL · ➖ 17 n/a — 154 tests in 147 rows** (an `(A)`/`(B)` pair shares a
 row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
 `PR-2g`, `PR-2h`, `PR-14a`, `PR-14b`, `PB1`, `PB2`, `M2`, `PBV1`, `PBV2`, `PBV3`, `M1` and `M4`
@@ -217,6 +228,7 @@ warning the fix deletes; `CR-23` retires beside them, closed on a ruling that ch
 
 | Test | Result |
 |---|---|
+| **PV-1a** | ✅ `utility`, 2026-08-16 — **the whole of `Milling/2D`, six files, at the standing configuration.** Three post: `bore.cnc` 1240 lines, `face.cnc` 166, `optional stop.cnc` 229. Three refuse, and **each refusal is one the post is supposed to make**: `compensation.cnc` on cutter radius compensation in the control, mid-stream at `onLinear` record 463; `full program.cnc`, `optional stop.cnc` and `toolchange.cnc` on two tools against `At a Tool Change` = `Refuse to post`, at `onOpen()` before a byte is written. **`toolChangeMode` = `Pause` is the whole delta that turns the last three into files** — `optional stop` and `toolchange` then post, `full program` refusing again on the compensation operation it also contains. **Two things a walk could not have said.** Every refusal leaves `<name>.gcode.failed` and no `.gcode`, the mid-stream one included at 5039 bytes — `PR-2c`'s falsifier, witnessed in an artifact rather than assumed. And `toolchange__manual-change.gcode`:169-187 is the **two-tool boundary §7.4 is owed**, in the order the design states: spindle stop, `Change to Tool #2`, the no-fixed-Z warning, provisional `G10 L20 P1 Z0`, `Attach ZProbe`, `G38.2 F30 Z-10`, `G10 L20 P1 Z0.8`, detach — **no `M6`, no `T` word, and the spindle stop ahead of the prompt** (`PR-22`). **Bound: it is Autodesk's job, not the operator's** — one work offset, no rotated Setup, no jet tool — so §4's four rows and `HR-6 (B)` are untouched by it |
 | **HB-1 (A)/(B)** | ➖ Retired with HB-1 — no warning was added, so there was nothing to post |
 | **HB-2 (A)/(B)** | `HB-2 (A).gcode`, the baseline every other row diffs against. `grep -c '%'` = 0. **Trap: `M30` is the last g-code *block*; `( *** STOP end ***)` is the last *line*** |
 | **HB-3 (A)/(B)** | `HB-3 (A).gcode`:114 carries the nothing-was-homed warning with no `$H`/`G28`/`G53`; (B) has `$H` in its place. **Trap: (B)'s criterion is the absence of HB-3's own text, not a clean dialog** |
@@ -481,7 +493,9 @@ None is a defect; none is scheduled.
    artifact debt and no longer a coverage one — but the whole of both flows still stands on the
    source alone. **`TC-4` first** — the walk proves the ordering from `onSection()`'s call order
    and `probeTool()`'s `targetWcs`, and a file would prove Fusion presents the boundary that walk
-   assumes. **`PR-23a` wants the same job and asserts an absence in it**, so one post settles both.
+   assumes. **`PV-1a` discharges the boundary half of it** — a two-tool file exists and the change block
+   is in it — leaving what only a Fusion post can add: the operator's own Setup, and `PR-23a`'s absence
+   asserted against a job that is also a WCS change. **`PR-23a` wants that job**, so one post settles both.
 5. **The one live risk that could still hide a real defect: `HR-6 (B)`.** The orientation
    guard may be a no-op on exactly the case it exists to catch, and the failure mode is a part
    cut in the wrong plane, silently. It needs a rotated Setup, and **`PR-2c` closed on a ruling
