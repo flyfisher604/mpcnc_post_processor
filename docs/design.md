@@ -212,6 +212,11 @@ number a copied Setup or a shared design makes **wrong** rather than merely diff
 Settled by reading each firmware's own source and changelog rather than by testing on a machine. Cite the
 file and version when adding here.
 
+**None of it can be re-derived from Fusion.** F360 knows nothing about GRBL's axis-limit rapids, Marlin's
+build options or RRF's `G53`, and this project has no controller to ask instead — so every row here cost a
+source read and a row deleted costs another one to replace. **These tables are load-bearing, not
+informative**, and a claim about firmware that cites nothing is the one to distrust.
+
 - Marlin — `MarlinFirmware/Marlin`, `Marlin/src/gcode/gcode.h` + `gcode.cpp`
 - RepRapFirmware — `Duet3D/RepRapFirmware`, `src/GCodes/GCodes2.cpp`, plus the RRF wiki changelog
 - GRBL — `gnea/grbl` wiki; FluidNC — `wiki.fluidnc.com`
