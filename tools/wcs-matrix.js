@@ -142,10 +142,13 @@ const cases = [
         [/^G10 L20 P1 Z0\.8$/m,"the re-probe lands in the returned-to part's register"]],
   mustNot:[[/^G10 L20 P1 X0 Y0/m,'X0 Y0 is never re-established on a return - it is what nothing moves']] },
 
-{ id:'W10', desc:'... and with re-probing turned off the return is silent about nothing',
+{ id:'W10', desc:'... and corrected by hand at the pause the return is silent about nothing',
   job:'change-then-return.cnc',
   props:mp({ probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z'),
-             toolChangeMode:S('Pause'), toolChangeProbeAfterChange:B(false) }),
+             toolChangeMode:S('Pause'), toolChangeZ0Correction:S('Manual') }),
+  // THE RETURNING OFFSET IS THE ONE THE CHANGE STOOD ON -- the plan is [A@1, A@2, B@1], so the hand-zero
+  // at the pause reaches the very register section 3 goes on to cut. It keeps its trust and the return
+  // must not re-measure it. PV-10 is the OTHER shape, where the change stands somewhere else (W22).
   must:[[/work Z0 was NOT re-established/,'the change says what it did not do']],
   mustNot:[[/a tool change since means Z0 is re-probed/,'and the return does not claim otherwise']] },
 
@@ -271,16 +274,64 @@ const cases = [
   must:[[/^G59\.1$/m,'offset 7'], [/^G59\.3$/m,'offset 9']] },
 
 // === G. what the operator is told to do about it =====================================
-{ id:'W22', desc:'re-probing Off on the MANUAL flow: the remedy the file offers reaches one part - PV-10',
+{ id:'W22', desc:'PV-10 - the hand-zero corrects one part, and the parts it strands are re-measured on return',
   job:'tools-across-parts.cnc',
   props:mp({ probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z'),
-             toolChangeMode:S('Pause'), toolChangeProbeAfterChange:B(false) }),
-  must:[[/Re-zero Z by hand at the pause above/,'the change tells the operator what to do']],
-  // ASSERTS THE GAP -- see PV-10. The instruction is correct for the offset active at the pause and
-  // silently insufficient for every other part this job returns to, and the return says nothing.
-  mustNot:[[/since been changed/,'and the return to the OTHER part warns about nothing -- PV-10']],
+             toolChangeMode:S('Pause'), toolChangeZ0Correction:S('Manual') }),
+  // THE CASE THAT CARRIES THE RULING. The plan is [A@1, A@2, B@1, B@2]: the change at section 3 stands
+  // on offset 1, so the hand-zero at its pause reaches THAT register and offset 2 is left measured by
+  // the tool being removed. Before PV-10 nothing marked it stale, so section 4 cut it on the old tool's
+  // Z0 in silence. The remedy's SCOPE is the finding, which is why the sentence is asserted and not
+  // just the instruction.
+  must:[[/Re-zero Z by hand at the pause above, which corrects THIS part and no other/,
+         'the change states the scope of the remedy it offers'],
+        [/the remaining 1 part is marked stale here/,'and how many parts that remedy does not reach'],
+        [/a tool change since means Z0 is re-probed/,
+         'and the stranded part IS re-measured when the job returns to it']],
+  mustNot:[[/since been changed/,
+            'and so nothing is left to warn about - the mode could re-measure, so it did']],
+  // THE REGIME REACHES THE DIALOG, which is what keeps this change from widening PV-9. It is NOT a twin
+  // of the per-return writeWarning() -- that one-channel question is PV-9's, and W11b, W25b and W27
+  // still assert it. This says the operator was told BEFORE posting that a hand-zero at one pause does
+  // not cover a multi-part job.
+  mustLog:[[/corrects the ONE part whose work offset is active there/,
+            'and the dialog says so before a block is emitted']],
+  custom:t => counts(t, /^G38\.2/gm, 3,
+    'three probes: two first visits, then the return to the part the change stranded - PV-10') },
+
+{ id:'W22b', desc:'PV-10 - a tool-length offset corrects the FRAME, so no part is stranded and none is re-probed',
+  job:'tools-across-parts.cnc',
+  props:mp({ probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z'),
+             toolChangeMode:S('Macro'), toolChangeSender:S('gSender'),
+             toolChangeZ0Correction:S('Offset') }),
+  // THE OTHER HALF OF THE BOOLEAN THAT PV-10 SPLIT, and the whole difference from W22 is reach: G43
+  // shifts the Z frame once, so every stored Z0 stays valid at the same instant. Nothing is cleared,
+  // nothing is re-measured, and the file states the condition rather than asserting a defect it cannot
+  // see. Run on the MACRO flow because that is where the assertion has a party who can satisfy it.
+  must:[[/An offset shifts the whole Z frame, so every part in this job stays measured correctly/,
+         'the file names why no correction is owed'],
+        [/that is right only because a tool-length offset was applied by "gSender/,
+         'and whose offset it is trusting']],
+  mustNot:[[/since been changed/,'no part is stale, so no return warns'],
+           [/a tool change since means Z0 is re-probed/,'and no return re-measures']],
   custom:t => counts(t, /^G38\.2/gm, 2,
-    'two probes, both first visits: no return re-measures, because the change never marked any part stale') },
+    'two probes, both first visits: the change strands nothing, so no return re-measures') },
+
+{ id:'W22c', desc:'PV-10 - "the tool change applies an offset" on a manual pause names a party that does not exist',
+  job:'tools-across-parts.cnc',
+  props:mp({ probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z'),
+             toolChangeMode:S('Pause'), toolChangeZ0Correction:S('Offset') }),
+  // NOT REFUSED, and the reason is the one the post cannot see: the operator may apply G43.1 through
+  // their sender by hand while the job waits at the M0. So the pre-flight states the condition instead
+  // of forbidding the configuration - the rule every Flow 2 assurance already follows.
+  mustLog:[[/A manual pause hands over to nothing/,'the dialog says the assertion has no party on this flow']],
+  must:[[/An offset shifts the whole Z frame/,'and the file still states what it is trusting']],
+  mustNot:[[/applied by "/,'the file names no handler, there being none on this flow']],
+  // TWO, AND BOTH ARE FIRST VISITS. The count is not "no probes anywhere" -- Each New WCS / Part is a
+  // probing mode here, so sections 1 and 2 measure their own parts. What this answer suppresses is the
+  // CHANGE's probe, and the third one W22 produces.
+  custom:t => counts(t, /^G38\.2/gm, 2,
+    'two probes, both first visits - the change measures nothing and strands nothing') },
 
 // === H. the registers no other job selects ===========================================
 { id:'W23', desc:'offset 8 is past what GRBL has, and a job whose FIRST offset is not 1 is still refused for it',

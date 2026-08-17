@@ -144,8 +144,8 @@ const cases = [
     if (n!==1) return [false,`${n} probes, expected exactly 1 (the change re-probe)`];
     return ordered(t,[['tool change',/Change to Tool #2/],['re-probe',/^G38\.2 /m]]); } },
 
-{ id:'PRO9', desc:'the same job with Re-probe Z0 After a Change off - no probe at all, and the file says why',
-  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause'), toolChangeProbeAfterChange:B(false) }),
+{ id:'PRO9', desc:'the same job corrected by hand at the pause - no probe at all, and the file says why',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause'), toolChangeZ0Correction:S('Manual') }),
   must:[[/work Z0 was NOT re-established after this tool change/,'names the tool-length error it leaves']],
   mustNot:[[/^G38\.2/m,'nothing measures anything in this job']] },
 

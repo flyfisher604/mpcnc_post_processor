@@ -277,6 +277,31 @@ not learn until the operator swaps the tool, hours after posting, and it can nev
 and resume correctly** — never to perform the change. Everything the old design did beyond that was the
 error.
 
+### A re-probe corrects one register; a tool-length offset corrects the frame
+
+**That difference decides what a change leaves behind**, and it is why the dialog asks *who* corrects
+rather than *whether to probe*. A work Z0 lives in a WCS register as a machine-Z coordinate, so
+measuring it writes **one** register and leaves every other part still measured by the tool just
+removed. `G43`/`G43.1` writes no register at all — it shifts the **Z frame** — so every part's stored
+Z0 becomes correct at the same instant, none of them touched. Read against *Frames*: **there is no
+tool-length system here**, which is exactly why the substitute the post reaches for corrects less than
+the thing it substitutes for.
+
+**Three answers, and only one of them leaves the other parts alone.** `Tool Length Correction By`:
+
+| Answer | Reach | What the post does |
+|---|---|---|
+| **This post** | one register | re-probes the active offset, and marks **every other** part stale so its own return re-measures it |
+| **The tool change** | the frame | nothing — no probe, nothing marked stale, and the file states the condition it is trusting |
+| **Me, by hand** | one register | nothing measured; every part **but the one active at the pause** is marked stale |
+
+**It was a boolean until `findings.md` `PV-10`**, whose Off carried *"the handler applied an offset"*
+and *"I will re-zero at the pause"* as one answer. Those reach different numbers of parts, so a
+hand-zero was booked as though it had corrected the whole job: the operator did exactly as the file
+told them and the next part was cut deep by a tool length. **The post can verify none of the three** —
+same standing as every other clause of the Flow 2 contract — so each is an operator assertion, and the
+two whose stated party may not exist are warned about at `onOpen()`.
+
 ### Flow 1 — the manual change, at the end of a file
 
 **The hobbyist answer, and for a Personal licence the only one:** Fusion Personal does not emit tool changes

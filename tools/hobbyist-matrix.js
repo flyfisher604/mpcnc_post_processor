@@ -112,14 +112,14 @@ const cases = [
 
 // --- group 6, several tools by hand (P3) ---------------------------------------------
 { id:'H21', desc:'Two tools, manual change, first tool prompted, Z re-probed after', cnc:'Milling/2D/toolchange.cnc',
-  props:{toolChangeMode:S('Pause'), toolChangeFirstLoad:B(true), toolChangeProbeAfterChange:B(true)},
+  props:{toolChangeMode:S('Pause'), toolChangeFirstLoad:B(true), toolChangeZ0Correction:S('Probe')},
   must:[[/M0 \(MSG,[^)]*Change to Tool #2[^)]*\)/,'prompts at the change'],
         [/^M0 \(MSG,Turn OFF spindle\)$/m,'spindle stopped before the operator reaches in']],
   mustNot:[[/^M6/m,'no M6 - GRBL answers error:20'],[/^T\d/m,'no T word']],
   custom:(t)=>{ const n=(t.match(/^G38\.2 /gm)||[]).length;
     return n===2? [true,'two probes: the part, then again after the change'] : [false,`${n} probes, expected 2`]; } },
-{ id:'H22', desc:'Re-probe after change off - the operator asserts a tool-length offset', cnc:'Milling/2D/toolchange.cnc',
-  props:{toolChangeMode:S('Pause'), toolChangeProbeAfterChange:B(false)},
+{ id:'H22', desc:'Correction by the tool change - the operator asserts a tool-length offset', cnc:'Milling/2D/toolchange.cnc',
+  props:{toolChangeMode:S('Pause'), toolChangeZ0Correction:S('Offset')},
   must:[[/M0 \(MSG,[^)]*Change to Tool #2[^)]*\)/,'still stops for the change']],
   custom:(t)=>{ const n=(t.match(/^G38\.2 /gm)||[]).length;
     return n===1? [true,'one probe only - the change does not re-probe'] : [false,`${n} probes, expected 1`]; } },

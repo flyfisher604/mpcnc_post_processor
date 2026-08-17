@@ -479,7 +479,7 @@ properties = {
   // correctly, hand over, and resume correctly. design.md -> Tool changes.
   toolChangeMode: {
     title      : "At a Tool Change",
-    description: "What the job does when the tool number changes. The post never changes the tool itself. Refuse to post: a job with more than one tool does not post -- split it into one file per tool. Pause for a manual change: the tool retracts, moves to the Tool Change Position if set, the spindle and coolant stop, and the program stops (M0) for you to change the tool. Do not jog at that pause. Hand over to the sender/firmware macro: the same retract and stops, then the token named by Tool Change Handled By below. Test that on air -- the post cannot check anything is listening, and an ignored token cuts on with the wrong tool. Hand-over needs Machine Travel Z, and is not available on Marlin.",
+    description: "What the job does when the tool number changes. The post never changes the tool itself. Refuse to post: a job with more than one tool does not post -- split it into one file per tool. Pause for a manual change: the tool retracts, moves to the Manual Change Position if set, the spindle and coolant stop, and the program stops (M0) for you to change the tool. Do not jog at that pause. Hand over to the sender/firmware macro: the same retract and stops, then the token named by Tool Change Handled By below. Test that on air -- the post cannot check anything is listening, and an ignored token cuts on with the wrong tool. Hand-over needs Machine Travel Z, and is not available on Marlin.",
     group      : "toolChange",
     order      : 10,
     type       : "enum",
@@ -523,7 +523,7 @@ properties = {
   // were plain G0 words the dialog presented as absolute while the machine read them in whichever WCS
   // happened to be active, so the "fixed" change spot moved with every part origin. These are G53.
   toolChangePositionX: {
-    title      : "Tool Change Position X",
+    title      : "Manual Change Position X",
     description: "Where the tool goes in X for a manual tool change -- an absolute machine coordinate in mm. Empty: it does not move in X or Y, and the change happens above the last cut. Fill both X and Y or neither. Needs X and Y declared homed and Machine Travel Z set, and is read only on Pause for a manual change. The tool does not return to the point it left; it returns to Machine Travel Z.",
     group      : "toolChange",
     order      : 40,
@@ -532,7 +532,7 @@ properties = {
     scope      : "post"
   },
   toolChangePositionY: {
-    title      : "Tool Change Position Y",
+    title      : "Manual Change Position Y",
     description: "Where the tool goes in Y for a manual tool change -- an absolute machine coordinate in mm. Fill it with X or not at all. Bringing Y forward is usually what puts the spindle where you can reach it.",
     group      : "toolChange",
     order      : 50,
@@ -541,7 +541,7 @@ properties = {
     scope      : "post"
   },
   toolChangePositionZ: {
-    title      : "Tool Change Position Z",
+    title      : "Manual Change Position Z",
     description: "The height the tool holds during a manual tool change -- an absolute machine coordinate in mm. Empty: the change happens at Machine Travel Z. Fill it only to get a spanner on the collet; the post moves there after the X/Y move and returns to Machine Travel Z afterwards. Below Machine Travel Z the tool sits lower than the height you declared clears your fixtures, so the post warns. May be filled without X and Y.",
     group      : "toolChange",
     order      : 60,
@@ -558,14 +558,35 @@ properties = {
     value      : false,
     scope      : "post"
   },
-  toolChangeProbeAfterChange: {
-    title      : "Re-probe Z0 After a Change",
-    description: "Re-probe the work Z0 after each tool change, the new tool being a different length from the one that set it. Off: no probe -- for a sender or macro that already re-zeroes or applies a tool offset. The probe searches down from Machine Travel Z, so G38 Target must reach the stock from there. Ignored for tool 0 and laser tools.",
+  // THREE ANSWERS AND NOT TWO, which is the whole of PV-10. This was a boolean whose Off carried two
+  // incompatible assertions -- its own description said "for a sender or macro that already re-zeroes
+  // OR applies a tool offset" -- and they differ in exactly the thing that matters to a multi-part job:
+  //
+  //   A TOOL-LENGTH OFFSET CORRECTS THE FRAME. G43/G43.1 shifts Z once, so EVERY work offset's stored
+  //   Z0 stays valid at the same instant and none of them is touched.
+  //
+  //   A RE-PROBE, OR A HAND-ZERO, CORRECTS ONE REGISTER. The part it stands on is right afterwards and
+  //   every other part is still measured by the tool just removed.
+  //
+  // The boolean could not tell those apart, so it treated a hand-zero as though it had corrected the
+  // whole job -- one part fixed, the rest stranded silently. design.md -> Tool changes.
+  //
+  // THE KEY CHANGED WITH THE TYPE. A saved boolean cannot be coerced into an enum id by any rule this
+  // project can verify without Fusion, so the rename makes the reset explicit and total: an operator
+  // who had the old field Off gets "Probe" until they answer this one.
+  toolChangeZ0Correction: {
+    title      : "Tool Length Correction By",
+    description: "Who corrects the work Z0 for the new tool's length. This machine has no tool-length system, so something must. This post: re-probe Z0 at every change, and mark every OTHER part's Z0 stale so a return to it is re-measured too. The tool change: your sender or macro applies a tool-length offset, which shifts the whole Z frame -- every part's stored Z0 stays valid and this post probes nothing. Me: you re-zero Z by hand at the pause, which corrects the part active at that pause and no other -- every other part is marked stale and is re-measured, or warned about, when the job returns to it. The probe searches down from Machine Travel Z, so G38 Target must reach the stock from there. No probe is written for tool 0 or a laser tool.",
     group      : "toolChange",
     order      : 80,
-    type       : "boolean",
-    value      : true,
-    scope      : "post"
+    type       : "enum",
+    values: [
+      { title: "This post -- re-probe Z0 after each change",  id: "Probe"  },
+      { title: "The tool change -- it applies a tool offset", id: "Offset" },
+      { title: "Me -- I re-zero Z by hand at the pause",      id: "Manual" }
+    ],
+    value: "Probe",
+    scope: "post"
   },
   // THESE TWO USED TO SIT IN GROUP 7 and were the only tool-change settings outside this group. They
   // ADD to the hand-over sequence, where group 7's two REPLACE the post's header and footer, so they
@@ -1642,8 +1663,8 @@ function validateJob() {
   // live state: at output time partProbe() knows a probe IS happening, and here the post has to decide
   // where one CAN happen. Two triggers, both read off the sections alone:
   //
-  //   A TOOL CHANGE with "Re-probe Z0 After a Change" on -- PV-7's own site, and the one that reaches a
-  //   SINGLE-part job, where nothing else in the post re-probes at all.
+  //   A TOOL CHANGE with "Tool Length Correction By" = this post -- PV-7's own site, and the one that
+  //   reaches a SINGLE-part job, where nothing else in the post re-probes at all.
   //
   //   A WCS CHANGE under a probing "Each New WCS / Part" -- writeWcsOnReturn()'s re-probe of a part this
   //   job has already cut, which is the same hazard one path over.
@@ -1655,7 +1676,7 @@ function validateJob() {
   // TOOL 0 AND JET TOOLS ARE SKIPPED because neither can probe, so no arm of either dispatch touches
   // the part at all; those sections carry their own warning about a Z0 nobody established.
   if (getProperty(properties.toolChangeMode) != "Refuse") {
-    var changeReprobes = getProperty(properties.toolChangeProbeAfterChange);
+    var changeReprobes = changeReprobesZ0();
     var returnReprobes = (changeMode == "Probe Z" || changeMode == "Jog XY & Probe Z");
     var hazardBoundaries = 0;
     var hazardCutters = [];
@@ -1700,9 +1721,10 @@ function validateJob() {
         + " the post re-probes Z0 there: where the tool lands on that machined surface instead of the "
         + "original stock top it writes the machined depth as Z0, and every cut after it goes that much "
         + "deeper -- Fusion computed those depths against the original datum. Move the touch-point onto "
-        + "uncut material with \"Probe X/Y Offset\" in \"5 - Part Origins\", or turn \"Re-probe Z0 After "
-        + "a Change\" off and re-zero Z by hand at each change. This pass reports every boundary where a "
-        + "re-probe CAN happen; the file itself warns only at the probes that are actually written."));
+        + "uncut material with \"Probe X/Y Offset\" in \"5 - Part Origins\", or set \"Tool Length "
+        + "Correction By\" to \"Me -- I re-zero Z by hand at the pause\". This pass reports every "
+        + "boundary where a re-probe CAN happen; the file itself warns only at the probes that are "
+        + "actually written."));
     }
   }
 
@@ -1734,13 +1756,46 @@ function validateJob() {
       // same at 2.05 through 3.6.0. design.md's firmware table carries the read.
     }
 
-    if (getProperty(properties.toolChangeProbeAfterChange)) {
-      warning(localize("\"Re-probe Z0 After a Change\" is On while changes are handed to \""
+    if (changeReprobesZ0()) {
+      warning(localize("\"Tool Length Correction By\" is this post while changes are handed to \""
         + toolChangeSenderTitle() + "\", so the post probes Z again after the macro returns and "
         + "overwrites whatever the macro measured. That is right for a handler that only pauses and "
         + "wrong for one that re-zeroes or applies a tool offset -- there it asks you to fit the touch "
-        + "plate at every change for a measurement already made. Turn it Off if the macro establishes "
-        + "Z0."));
+        + "plate at every change for a measurement already made. Set it to \"The tool change -- it "
+        + "applies a tool offset\" if the macro establishes Z0."));
+    }
+  }
+
+  // PV-10's TWO REGIME WARNINGS, and neither is a twin of anything the file writes. Each names a
+  // condition that is true of the WHOLE JOB and is knowable at onOpen() -- the correction answer, the
+  // change flow, the offset count and the tool count -- which is what separates them from the
+  // per-return warnings writeWcsOnReturn() writes at the moment a specific part is reached. Those are
+  // PV-9's question and are deliberately left alone here.
+  if (countDistinctTools() > 1) {
+    // A MANUAL PAUSE HANDS OVER TO NOTHING, so "the tool change applies a tool offset" names a party
+    // that does not exist on this flow: the post emits M0 and no handler runs. NOT refused, because
+    // the operator may apply G43.1 through their sender by hand while the job waits, and the post can
+    // no more see that than it can see a macro's tool table.
+    if (toolLengthCorrection() == "Offset" && getProperty(properties.toolChangeMode) == "Pause") {
+      warning(localize("\"Tool Length Correction By\" is \"The tool change -- it applies a tool "
+        + "offset\" while \"At a Tool Change\" is \"Pause for a manual change\". A manual pause hands "
+        + "over to nothing -- the post stops the program and waits -- so unless YOU apply a "
+        + "tool-length offset at that pause, no offset is applied and every part's stored Z0 still "
+        + "measures from the tool just removed. Choose \"Me -- I re-zero Z by hand at the pause\" if "
+        + "that is what you do, or \"This post\" to have it measured."));
+    }
+
+    // THE HAND-ZERO REACHES ONE PART, and on a multi-part job that is the thing the operator has to
+    // know BEFORE they post. The file says it too, at each change and at each return, but a person who
+    // reads the dialog and sends the job would otherwise meet it only in a place they had no reason to
+    // open -- and it is this value that puts the other parts in that position. PV-10.
+    if (toolLengthCorrection() == "Manual" && collectDistinctOffsets().length > 1) {
+      warning(localize("\"Tool Length Correction By\" is \"Me -- I re-zero Z by hand at the pause\" "
+        + "and this job cuts " + collectDistinctOffsets().length + " parts. Re-zeroing at the pause "
+        + "corrects the ONE part whose work offset is active there; every other part's stored Z0 was "
+        + "measured by the tool being removed. The post marks those parts stale, so a return to one "
+        + "re-probes it where the mode can and says so in the file where it cannot -- but nothing "
+        + "corrects them at the pause itself, and no hand-zero there reaches them."));
     }
   }
 
@@ -1756,7 +1811,7 @@ function validateJob() {
     // but the tool holds this Z with hands on it, so the condition is worth stating once.
     if (tcz != undefined && getProperty(properties.toolChangeMode) == "Pause"
         && fixedZEstablishedInFile() && tcz < parseMachineTravelZ()) {
-      warning(localize("\"Tool Change Position Z\" is " + tcz + ", below the \"Machine Travel Z\" of "
+      warning(localize("\"Manual Change Position Z\" is " + tcz + ", below the \"Machine Travel Z\" of "
         + parseMachineTravelZ() + " -- the tool is held LOWER during the change than the height you "
         + "declared clears your fixtures. That is right only if the change position itself is clear of "
         + "everything on the bed at that height; the post crosses the bed at the travel height and "
@@ -1972,7 +2027,7 @@ function validateJob() {
     // "hold the other axis" and "use 0" are both moves nobody asked for.
     if ((getProperty(properties.toolChangePositionX) != "" || getProperty(properties.toolChangePositionY) != "")
         && (posX == undefined || posY == undefined)) {
-      error("\"Tool Change Position X\" and \"Tool Change Position Y\" are read as one point, and this"
+      error("\"Manual Change Position X\" and \"Manual Change Position Y\" are read as one point, and this"
         + " job sets one of them without the other -- or sets one to something that is not a signed"
         + " decimal number of millimetres. Fill both, or empty both to change the tool where the cut"
         + " ended.");
@@ -2292,11 +2347,31 @@ var currentWorkOffset;   // last work offset (WCS) emitted, to suppress redundan
 //
 // TWO RECORDS, BECAUSE ONLY Z GOES STALE. Nothing in a job moves a register's X0 Y0 once it is set,
 // so a return never re-jogs and never re-writes XY. Z is the other question: this machine has no
-// tool-length system at all (design.md), a work Z0 measures from the tool that probed it, and a tool
-// change re-probes the ACTIVE offset alone -- which leaves every other one measuring from the tool
-// just removed. So a change clears the Z half and nothing else clears either. CR-17.
+// tool-length system at all (design.md), a work Z0 measures from the tool that probed it, and a
+// correction that measures ONE part corrects that part alone -- which leaves every other one measuring
+// from the tool just removed. So a change clears the Z half and nothing else clears either. CR-17.
+//
+// HOW MUCH OF IT A CHANGE CLEARS IS THE OPERATOR'S ANSWER, not a constant: a tool-length offset shifts
+// the frame and strands nothing, a re-probe corrects the register it stands on, and a hand-zero
+// corrects that same one register by a different hand. PV-10, and toolLengthCorrection() below is the
+// one place the three are read.
 var wcsVisited = {};     // work offset -> this job has entered it and established its origin
 var wcsZ0Trusted = {};   // work offset -> its stored Z0 was established under the tool now loaded
+
+// WHO CORRECTS THE WORK Z0 FOR THE NEW TOOL -- "Probe", "Offset" or "Manual". ONE READER of the
+// property, because five sites act on the answer and they must not be able to disagree about it; that
+// is the rule wcsOriginEstablishesZ0() already states for itself, applied to the property instead of
+// to the state.
+function toolLengthCorrection() {
+  return getProperty(properties.toolChangeZ0Correction);
+}
+
+// DOES A TOOL CHANGE EMIT A G38.2? Exactly one of the three answers does, and every probe-shaped
+// question in the post -- PV-7's machined-datum pre-flight, the Flow 2 over-measurement warning, and
+// the change's own re-probe arm -- is asking this and not "is the correction the post's".
+function changeReprobesZ0() {
+  return toolLengthCorrection() == "Probe";
+}
 
 // HOW MANY SECTIONS HAVE FINISHED CUTTING. A count and not a section id: what PV-7 asks of it is
 // "which toolpaths have already removed material", and onSectionEnd() is the one callback that answers
@@ -2413,17 +2488,20 @@ function writeWCS(section) {
 // the correction and keeps its re-probe.
 //
 // A RETURN ANSWERS A SECOND HALF, because writeWcsOnReturn() re-establishes Z only where a change has
-// made it stale, and only "Re-probe Z0 After a Change" ever empties wcsZ0Trusted. Turned Off, a return
-// takes that function's non-establishing arm and this must not claim otherwise -- the change would drop
-// a correction nothing else makes. A FIRST VISIT runs the mode's full dispatch either way. Read before
-// toolChange(), which is the one call that could change the answer, and reads nothing that it writes.
-// PR-23.
+// made it stale, and THIS BOUNDARY'S OWN OFFSET is left trusted by two of the three correction answers:
+// "Offset" strands nothing at all, and "Manual" keeps the register the operator is about to re-zero at
+// the pause. Under either, a return takes that function's non-establishing arm and this must not claim
+// otherwise -- the change would drop a correction nothing else makes. So the test is changeReprobesZ0()
+// and not "is the correction the post's": only that answer clears the offset this plan is about. PV-10.
+//
+// A FIRST VISIT runs the mode's full dispatch either way. Read before toolChange(), which is the one
+// call that could change the answer, and reads nothing that it writes. PR-23.
 function wcsOriginEstablishesZ0(plan) {
   if (!(plan.mode == "Jog XYZ" ||
         (plan.canProbe && (plan.mode == "Probe Z" || plan.mode == "Jog XY & Probe Z")))) {
     return false;
   }
-  return !wcsVisited[plan.workOffset] || getProperty(properties.toolChangeProbeAfterChange);
+  return !wcsVisited[plan.workOffset] || changeReprobesZ0();
 }
 
 // NOTHING ESTABLISHED Z0, and the file is the only place that can say so at the moment it becomes true.
@@ -4862,14 +4940,31 @@ function toolChange(partOriginEstablishesZ0) {
   // origin work now runs AFTER this returns, so at a boundary that is both a change and a WCS change
   // the correction below is not owed at all, being about to be made by the establish. PR-23.
   //
-  // EVERY OTHER PART'S Z0 HAS JUST GONE STALE. A re-probe writes the ACTIVE offset alone and there is
-  // no tool-length system to correct the rest, so a return to any other part must re-probe rather than
-  // cut on a Z0 the removed tool measured. Cleared on the PROPERTY and not on the fact of a change: it
-  // is the post's one statement that a change invalidates Z0, and turned Off it is the operator
-  // asserting the handler applies a tool offset instead. CR-17. Hoisted above the arms below because it
-  // is true of the whole change and not of the route the correction takes. PR-23.
-  if (getProperty(properties.toolChangeProbeAfterChange)) {
+  // WHAT THIS CHANGE HAS JUST STRANDED, and it is the correction answer that decides -- not the fact of
+  // a change. THE POST'S ONE STATEMENT that a tool change invalidates Z0, and PV-10 is that it used to
+  // have only two settings for a three-way fact. CR-17 established the record; this is what it holds.
+  // Hoisted above the arms below because it is true of the whole change and not of the route the
+  // correction takes. PR-23.
+  //
+  //   Probe  -- the post re-probes the ACTIVE offset alone and there is no tool-length system to
+  //             correct the rest, so every other part must be re-measured before it is cut.
+  //
+  //   Offset -- a tool-length offset shifts the Z FRAME, not a register. Every stored Z0 stays valid at
+  //             the same instant, so nothing is stranded and nothing is cleared.
+  //
+  //   Manual -- the operator re-zeroes at the pause, which corrects the ONE register active there by a
+  //             different hand from the probe's. Identical reach, so identical bookkeeping: strand
+  //             every other offset and keep this one. That is PV-10's ruling, and it is what makes the
+  //             return to any other part say something rather than cut on a Z0 the removed tool set.
+  var correction = toolLengthCorrection();
+  if (correction == "Probe") {
     wcsZ0Trusted = {};
+  } else if (correction == "Manual") {
+    // currentWorkOffset AND NOT THE SECTION'S: onSection() selects the WCS before calling here, which
+    // is the ordering PR-23 established, so the register active at the pause is already this one.
+    var zeroedByHand = currentWorkOffset;
+    wcsZ0Trusted = {};
+    wcsZ0Trusted[zeroedByHand] = true;
   }
 
   if (partOriginEstablishesZ0) {
@@ -4881,7 +4976,7 @@ function toolChange(partOriginEstablishesZ0) {
     // is deliberately NOT set here -- the establish sets it, being what did the work.
     writeComment(eComment.Important, " Work Z0 for this part is established below, with the tool fitted"
       + " at this change -- anything measured during the change above is overwritten there");
-  } else if (getProperty(properties.toolChangeProbeAfterChange)) {
+  } else if (correction == "Probe") {
     if (tool.number != 0 && !tool.isJetTool()) {
       if (toolChangeIsMacro()) {
         // Stated, not warned. Probing after a macro is legitimate -- a sender that only pauses leaves
@@ -4901,19 +4996,34 @@ function toolChange(partOriginEstablishesZ0) {
         + " from the tool just removed -- set Z0 by hand at the pause above before the next operation"
         + " cuts or fires");
     }
-  } else if (toolChangeIsMacro()) {
-    // A DIFFERENT STATEMENT FROM THE MANUAL ONE, because a different thing is true. On the manual flow
-    // nothing measured, so nothing can have corrected Z0. Here something may well have, and the post
-    // cannot see it -- so the file states the condition the operator has to have satisfied rather than
-    // asserting a defect that may not exist.
-    writeWarning("this post re-established nothing after the tool change above -- the work Z0 every"
-      + " depth below is measured from is whatever \"" + toolChangeSenderTitle() + "\" left behind."
-      + " That is correct only if it measured the new tool or applied a tool-length offset; if it only"
-      + " paused, re-zero Z by hand before resuming, or turn on \"Re-probe Z0 After a Change\"");
+  } else if (correction == "Offset") {
+    // A DIFFERENT STATEMENT FROM THE HAND-ZERO ONE, because a different thing is true -- and the SPLIT
+    // IS NOW THE OPERATOR'S ANSWER rather than toolChangeIsMacro(). Inferring it from the flow was what
+    // made one sentence serve two assertions: this arm's whole content is that an offset corrects the
+    // FRAME, which is the one correction that leaves every other part valid too and the reason nothing
+    // was stranded above. The post cannot see whether one was applied, so it states the condition the
+    // operator has to have satisfied rather than asserting a defect that may not exist. PV-10.
+    writeWarning("this post re-established nothing after the tool change above -- every depth below is"
+      + " measured from the work Z0 already stored, and that is right only because a tool-length offset"
+      + " was applied" + (toolChangeIsMacro() ? " by \"" + toolChangeSenderTitle() + "\"" : "")
+      + ". An offset shifts the whole Z frame, so every part in this job stays measured correctly. If"
+      + " nothing applied one, STOP: re-zero Z by hand and set \"Tool Length Correction By\" to match"
+      + " what actually happens at your changes");
   } else {
+    // "Manual", and the scope clause is the whole of PV-10. The instruction "re-zero at the pause" is
+    // correct and was silently insufficient: it reaches the register active at that pause and no other,
+    // and the operator who did exactly as told then cut the next part deep by a tool length. What makes
+    // saying so honest rather than alarming is the clearing above -- every other part IS handled, at
+    // its own return, and this names that rather than leaving the pause to look like it covered the job.
+    var strandedParts = collectDistinctOffsets().length - 1;
     writeWarning("work Z0 was NOT re-established after this tool change, so it still measures from the"
       + " PREVIOUS tool's length and every depth below is out by the difference between the two."
-      + " Re-zero Z by hand at the pause above, or turn on \"Re-probe Z0 After a Change\"");
+      + " Re-zero Z by hand at the pause above"
+      + (strandedParts > 0
+          ? ", which corrects THIS part and no other -- the remaining " + strandedParts + " part"
+            + (strandedParts == 1 ? " is" : "s are") + " marked stale here, and re-measured, or"
+            + " warned about, at the return to each"
+          : ", or set \"Tool Length Correction By\" to \"This post\" to have it probed"));
   }
 
   if (getProperty(properties.includeToolFile2) != "") {
