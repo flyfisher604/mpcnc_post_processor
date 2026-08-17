@@ -88,7 +88,7 @@ node tools/wcs-matrix.js          "$POST" MPCNC_v4.0_Beta2.cps tools/wcs-jobs ou
 node tools/personal-matrix.js     "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/personal
 ```
 
-**103 cases — 28 hobbyist, 33 professional, 31 WCS, 11 personal — over 19 job files, and all 103
+**104 cases — 29 hobbyist, 33 professional, 31 WCS, 11 personal — over 19 job files, and all 104
 pass as of 2026-08-17.** The whole run is about two minutes.
 
 **The four are independent by design and stay that way.** The personas they encode disagree about
@@ -289,7 +289,7 @@ so every section arrives as offset 0. Verified by editing that attribute in Auto
 
 ### 4.3 Every `.cnc` file the suite uses
 
-**19 files, 103 cases.** Five are Autodesk's; fourteen are generated. `A` = 2D-Face tool 1 (which cuts
+**19 files, 104 cases.** Five are Autodesk's; fourteen are generated. `A` = 2D-Face tool 1 (which cuts
 **across** the part origin, so it is the block that puts a machined surface under a later probe);
 `B` = 2D-Contour tool 2; `J` = a Through-medium laser operation, tool 2; `K` = an Etch laser
 operation, tool 2.

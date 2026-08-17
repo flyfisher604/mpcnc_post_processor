@@ -3353,6 +3353,19 @@ function onCommand(command) {
       writeBlock(mFormat.format(0));
       return;
 
+    // ONE EVENT, TWO CALLBACKS. The kernel raises COMMAND_POWER_ON/OFF beside onPower(), which is what
+    // emits the laser control -- the ">>> LASER Power ON" comment and the M3/M4 S<n> two lines above
+    // this call. Named here so the fall-through below stops reporting that emission as a no-op:
+    // onPower() owns it, and there is nothing left for this callback to do.
+    //
+    // THE FALL-THROUGH IS NOT SOFTENED. HR-13's rule is right and this was a missing case, not a wrong
+    // channel -- a warning that outlives Comment Level Off is what a vanished Manual NC instruction
+    // needs, and it reached the operator here on every power change of every jet job: 60 of the 975
+    // lines of Cutting/Laser/center.cnc, each one denying the two lines above it. PV-2.
+    case COMMAND_POWER_ON:
+    case COMMAND_POWER_OFF:
+      return;
+
     // AN OPTIONAL STOP IS TAKEN, ALWAYS. No supported firmware has a working "stop only if the operator
     // asked for it", so the choice is between a stop that cannot be skipped and a command that vanishes
     // -- and HR-13's own registered diff proposed M1 on the premise that "M1 is supported by all three

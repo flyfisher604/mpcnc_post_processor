@@ -148,6 +148,27 @@ const cases = [
   props:{machineHomedAxes:S('XYZ'), machineHomeAtStart:S('Off'), probeOnStart:S('Current XY & Probe Z')},
   must:[[/^G10 L20 P1 X0 Y0 Z0$/m,'records the pre-jogged origin']],
   mustNot:[[/the homing below runs BEFORE/,'no warning - nothing homes'],[/^\$H$/m,'no homing']] },
+
+// --- PV-2, the emission and the callback that denied it -------------------------------
+// THE FINDING WAS THE PAIR, not either line alone. The kernel raises COMMAND_POWER_ON/OFF beside
+// onPower(), and onPower() is what emits the control -- so onCommand()'s fall-through reported the
+// two lines directly above it as a no-op, 60 times in this one file. J4 posted this job five times
+// and read the S words; nothing read what the file said about them.
+{ id:'H29', desc:'PV-2 - a laser power change is emitted once and denied never', cnc:'Cutting/Laser/center.cnc',
+  props:{},
+  must:[[/>>> LASER Power ON/,'onPower() announces the control'],[/^M4 S\d+$/m,'and the laser actually fires']],
+  // SCOPED TO THE TWO COMMANDS, not to the fall-through text: a Manual NC instruction that genuinely
+  // vanishes must still warn, and HR-13's rule is what puts it there. An unscoped "no denial in this
+  // file" would go red for exactly the behaviour the post is supposed to keep -- W27's lesson.
+  mustNot:[[/command COMMAND_POWER_(ON|OFF) is not supported by this post/,'onCommand() no longer denies it']],
+  custom:(t)=>{
+    const on   = (t.match(/>>> LASER Power ON/g)||[]).length;
+    const off  = (t.match(/>>> LASER Power OFF/g)||[]).length;
+    const fire = (t.match(/^M4 S\d+$/gm)||[]).length;
+    const den  = (t.match(/command COMMAND_POWER_(?:ON|OFF) is not supported/g)||[]).length;
+    return (on===30 && off===30 && fire===30 && den===0)
+      ? [true,'30 power changes each way, 30 control blocks, 0 denials - 60 lines left the file']
+      : [false,`on=${on} off=${off} M4=${fire} denials=${den}, expected 30/30/30/0`]; } },
 ];
 
 const results = [];
