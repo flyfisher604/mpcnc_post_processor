@@ -498,6 +498,31 @@ leaves on disk: `onOpen()` refuses before any output, so the job writes **no fil
 only way to reach the group-3 code, since a paid licence emits real `G0`s. Re-create it from the current
 `.cps`; its evidence is about *logic*, never about what the post emits.
 
+**`tools/post-run.ps1` runs the post without Fusion**, over the intermediate `.cnc` files that ship with
+the Autodesk HSM Post Processor VS Code extension, through the same `post.exe` Fusion posts with. It is
+the only check that answers *does the post run at all* — `PV-1` was a crash in the first statement of
+`onOpen()` that `node --check` passes and a code walk had no way to see, and it stood for four commits.
+What a row settled this way may claim is `findings.md` §4's `utility` method; `tools/census.cps` reports
+a `.cnc` file's sections, work offsets and tools without posting it, the format being binary.
+
+**A `--property` value is a JavaScript literal, and this is the trap.** A string or an enum carries its
+own quotes — `--property jobSelectedFirmware '"Marlin"'` — while numbers and booleans go bare. Bare
+`Marlin` is an undefined identifier, and *"Failed to set property"* is the utility saying so rather than
+refusing enums, which is the wrong conclusion this project drew first. **The two ways past it are
+silent.** Nothing validates the value, so `'"Klipper"'` sets as readily as `'"Marlin"'`; and an unquoted
+value that still parses is stored as the wrong *type*, where `machineTravelZ -2` becomes the **number**
+`-2`, `parseMachineCoordinate()` reads the field as empty, and the machine frame switches off with only
+`WR-2`'s warning to show for it. `post-run.ps1` builds the literal from the property's declared type and
+checks every name and enum id against `post.exe --interrogate` first. **Two bounds it does not reach**:
+the dialog, and the job — the shipped `.cnc` files were censused 2026-08-16 and **not one uses more than
+a single work offset**, so Guard B, `writeWcsOnReturn()` and the whole multi-part register still want a
+job posted from Fusion.
+
+**PowerShell 5.1 will not quote a native argument that already contains a quote**, so `"Probe Z"` reaches
+the CRT bare, splits at the space, and shifts every following `--property` by one position —
+*"Expected property but got &lt;output path&gt;"*. `post-run.ps1` builds the command line to the CRT's rules
+itself; anything else driving `post.exe` has to do the same.
+
 **`git commit -m` with a PowerShell here-string mangles messages containing double quotes.** Write the
 message to a file and use `git commit -F`, or pipe it in.
 
