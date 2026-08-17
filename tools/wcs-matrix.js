@@ -444,6 +444,21 @@ const cases = [
   // the pair of them proves warnBothChannels() reaches the dialog from both.
   mustLog:[[/stored Z0 was measured with a tool that has since been changed/,
             'and the dialog hears it on the tool side too -- PV-9']] },
+
+// === PV-13 -- the first tool a changer cannot fit ====================================
+// jet-two-parts.cnc opens on a jet tool, which is the one shape that reaches this arm from a job
+// file: no handler in the list acts on "T0 M6" and a laser is not in a changer. The M0 routes are
+// deliberately unaffected -- asking a person to fit a laser is a sensible thing to do -- so the
+// suppression is the hand-over's alone.
+{ id:'W29', desc:'PV-13 - a first tool no changer can fit is not handed over, and both channels say so',
+  job:'jet-two-parts.cnc',
+  props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip'), toolChangeMode:S('Macro'),
+             toolChangeSender:S('gSender'), toolChangeFirstToolCorrect:B(false) }),
+  must:[[/a jet tool or tool 0, which no tool changer can fit/,'the file names why nothing was emitted']],
+  mustNot:[[/^T\d+ M6$/m,'no token: the handler could not act on this one'],
+           [/MSG,Load Tool #/,'and the M0 is NOT the fallback -- this mode was chosen to avoid one']],
+  mustLog:[[/no tool changer can fit and no supported handler can act on/,
+            'and the operator hears it before posting, not only in the file']] },
 ];
 
 // ---- run ------------------------------------------------------------------------------

@@ -302,6 +302,39 @@ told them and the next part was cut deep by a tool length. **The post can verify
 same standing as every other clause of the Flow 2 contract — so each is an operator assertion, and the
 two whose stated party may not exist are warned about at `onOpen()`.
 
+### The first tool is loaded, not changed — and by whichever flow the job selected
+
+**The first tool is a special case of neither flow and of both.** Nothing is running, no Z0 exists yet to
+invalidate, and the tool stands where the last preamble step left it — so **none of a change's arrive-and-
+resume work is owed**: no retract to repeat, no spindle or coolant to stop, no `Manual Position`
+excursion, and no re-probe, because the origin write a few blocks below establishes Z0 with the tool just
+fitted. That last point is the ordering the whole thing exists for: **load before the origin work**, or Z0
+is measured with the tool the load was there to replace.
+
+**What is NOT special is who does it.** `First Tool is Correct` is a declaration — the tool in the spindle
+either is the one this job starts with or is not — and where it is not, **`At a Tool Change` decides who
+fits it**, exactly as at every other boundary. A job that hands every change to a sender or a changer must
+not stop and ask a human for the one tool the changer already holds; that was the defect (`findings.md`
+`PV-13`), and it followed from the setting being *a prompt* rather than *a fact about the spindle*.
+
+**Refuse and Manual emit the same bytes here, and that is correct rather than an omission.** The two modes
+differ at a *change*, and this is not one. Refuse means one tool per file, so on such a file there is no
+second boundary for them to differ at.
+
+**Three conditions suppress the load, and each says so in the file:**
+
+- **A pre-jogged origin.** The two `Set … to Current Pos` modes take the origin from a jog made before
+  line 1, with a tool already fitted — so declaring that tool incorrect contradicts the mode, and on the
+  hand-over route the macro would move the tool **off the position about to be recorded**.
+- **A first tool no changer can fit** — tool 0 or a jet tool. `T0 M6` names no tool to any handler in the
+  list and a laser is not in a changer. The `M0` routes are unaffected: asking a *person* to fit a laser
+  is a sensible thing to do.
+- **The declaration itself**, which is the default and emits nothing at all.
+
+**Every Flow 2 guard had to widen with this.** They were keyed on more than one tool in the job, because
+until this existed a one-tool job could not reach a hand-over at all. It now can, and it owes the same
+refusals — Marlin has no tool-length register whether the hand-over is the first tool's or the fourth's.
+
 ### Flow 1 — the manual change, at the end of a file
 
 **The hobbyist answer, and for a Personal licence the only one:** Fusion Personal does not emit tool changes

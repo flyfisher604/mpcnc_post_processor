@@ -88,7 +88,7 @@ node tools/wcs-matrix.js          "$POST" MPCNC_v4.0_Beta2.cps tools/wcs-jobs ou
 node tools/personal-matrix.js     "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/personal
 ```
 
-**110 cases — 32 hobbyist, 33 professional, 34 WCS, 11 personal — over 19 job files, and all 110
+**115 cases — 32 hobbyist, 37 professional, 35 WCS, 11 personal — over 19 job files, and all 115
 pass as of 2026-08-17.** The whole run is about two minutes.
 
 **The four are independent by design and stay that way.** The personas they encode disagree about
@@ -142,10 +142,14 @@ once as written and once as its reference -- because every claim it makes is a d
 | `refuse` | the same stream, plus the absence of a file | `error()` — where the right answer is **no output at all** |
 
 The second pair is the point. `HB-5`'s rule is that **a property which fails one way fails in both
-channels**, and a matrix that reads only the file cannot see half of what the post promises. Two of
-the three findings this machinery has returned — `PV-9` and `PV-10` — are exactly that asymmetry:
+channels**, and a matrix that reads only the file cannot see half of what the post promises. Three of
+the findings this machinery has returned — `PV-9`, `PV-10` and `PV-12` — are exactly that asymmetry:
 a condition the post detects and states somewhere the operator will not be. **`PV-9` closed by making
 the two channels one statement**, and `mustLog` is what witnesses it: the file half was never in doubt.
+
+**`hobbyist-matrix.js` had only the first pair until 2026-08-17**, which is why the runners were not in
+fact identical and why no hobbyist-facing dialog warning had ever been asserted. `PV-12` is what needed
+it. Read that as the general case: a channel a matrix does not have is not a channel the post lacks.
 
 A refusal is asserted as *two* things, not one: the pattern in the stream **and** that no `.gcode`
 was produced. A guard that names the right problem but leaves a truncated file behind is a different

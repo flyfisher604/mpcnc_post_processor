@@ -558,13 +558,24 @@ properties = {
     value      : "",
     scope      : "post"
   },
-  toolChangeFirstLoad: {
-    title      : "Prompt for the First Tool",
-    description: "Stop (M0) for you to fit the first tool, after homing but before any origin is recorded or probed -- so Z0 is measured with the tool that will cut. Off: the job assumes the right tool is already in the spindle.",
+  // A DECLARATION, NOT A PROMPT, and that is the whole of PV-13. This was "Prompt for the First Tool",
+  // a boolean whose On emitted one M0 saying "Load Tool #n" -- on EVERY mode, because it never read
+  // "At a Tool Change" at all. So a job set up to hand every change to a sender or an ATC still stopped
+  // and asked a human to fit the one tool the changer already holds. What the operator actually knows is
+  // whether the tool in the spindle is the one this job starts with; who fits it if it is not is a
+  // question they have already answered one field above.
+  //
+  // THE KEY CHANGED WITH THE SENSE. A saved `true` under the old key meant "prompt me" and under this
+  // one would mean "no action" -- the exact inversion, silently. Renaming resets the setting to its
+  // default, which is the cost stated at the head of this block, and the new default reproduces the old
+  // shipped behaviour: no prompt, nothing emitted. PV-10 paid the same cost for the same reason.
+  toolChangeFirstToolCorrect: {
+    title      : "First Tool is Correct",
+    description: "On: the tool in the spindle is the one this job starts with, and nothing is emitted for it. Off: the first tool is loaded before any origin is recorded or probed -- so Z0 is measured with the tool that will cut -- by whatever At a Tool Change says. Manual change at a pause, or Refuse a multi-tool job: a stop (M0) for you to fit it. Sender or firmware macro changes it: the same token every other change uses, so a changer loads it and no one is asked to. Ignored on the two Set ... to Current Pos origin modes, which take the origin from a jog you made with a tool already fitted.",
     group      : "toolChange",
     order      : 70,
     type       : "boolean",
-    value      : false,
+    value      : true,
     scope      : "post"
   },
   // THREE ANSWERS AND NOT TWO, which is the whole of PV-10. This was a boolean whose Off carried two
@@ -1649,8 +1660,13 @@ function validateJob() {
     // NOT ON A PRE-JOGGED ORIGIN, where toolChangeFirstLoad() writes no prompt at all: this list names
     // lines gSender may delete, so naming one the file does not contain sends the operator looking for
     // it. The suppression has its own warning and does not need this one to repeat it.
-    if (getProperty(properties.toolChangeFirstLoad) && !originIsPreJogged()) {
-      earlyPrompts.push("the \"Prompt for the First Tool\" stop, which stands before the first part's origin is set");
+    //
+    // AND NOT ON THE HAND-OVER, which is the same rule reaching PV-13's new arm: that route emits T/M6
+    // and no M0 at all, so gSender's M0 threshold has nothing to delete. This list NARROWS here where
+    // the guards below widen -- both because the first load is now three different emissions and this
+    // one is about the M0 alone.
+    if (!getProperty(properties.toolChangeFirstToolCorrect) && !originIsPreJogged() && !toolChangeIsMacro()) {
+      earlyPrompts.push("the \"First Tool is Correct\" stop, which stands before the first part's origin is set");
     }
     if (startMode == "Jog XY & Probe Z" || startMode == "Jog XYZ") {
       earlyPrompts.push("the \"First WCS / Part\" jog prompt");
@@ -1676,13 +1692,15 @@ function validateJob() {
   // for a stop that is not written, and the reason is that these modes take the origin from a jog made
   // before the file started -- with a tool already fitted, and by a tip every depth then measures from.
   // Not gated on the frame: the contradiction is the mode's, and it holds with no frame at all.
-  if (getProperty(properties.toolChangeFirstLoad) && originIsPreJogged()) {
-    warning(localize("\"Prompt for the First Tool\" is on, but \"First WCS / Part\" is a \"Set ... to "
+  if (!getProperty(properties.toolChangeFirstToolCorrect) && originIsPreJogged()) {
+    warning(localize("\"First Tool is Correct\" is Off, but \"First WCS / Part\" is a \"Set ... to "
       + "Current Pos\" mode, which takes this part's origin from where you jog the tool BEFORE "
-      + "starting the file -- so the tool is already fitted by then, and the stop is not written. "
-      + "Fitting a different tool at it would put every depth out by the difference in tool length. "
-      + "To fit the tool during the run, use \"Jog to X0 Y0, Probe Z0\" or \"Jog to X0 Y0 Z0\", which "
-      + "prompt first and position afterwards; otherwise turn \"Prompt for the First Tool\" off."));
+      + "starting the file -- so a tool is already fitted by then, and nothing is emitted to load one. "
+      + "Fitting a different tool would put every depth out by the difference in tool length, and on "
+      + "\"Sender or firmware macro changes it\" the hand-over would move the tool off the position "
+      + "about to be recorded. To load the tool during the run, use \"Jog to X0 Y0, Probe Z0\" or "
+      + "\"Jog to X0 Y0 Z0\", which load first and position afterwards; otherwise turn \"First Tool is "
+      + "Correct\" on."));
   }
 
   // The same boundary from the other side: this fires when no fixed Z reference is established and the
@@ -1726,7 +1744,12 @@ function validateJob() {
   // the pause needs: a manual change is the one pause where the operator's hands go to the cutter, and
   // a macro change costs the RETURN as well -- with no frame the post has no height to lift the tool to
   // before the macro runs and none to bring it back to afterwards.
-  if (getProperty(properties.toolChangeMode) != "Refuse" && countDistinctTools() > 1
+  //
+  // OR THE FIRST TOOL IS HANDED OVER, which a one-tool job reaches and countDistinctTools() > 1 does
+  // not: toolChangeMacroResume() owes the same return there and warns in the file when it cannot make
+  // it. PV-13.
+  if (getProperty(properties.toolChangeMode) != "Refuse"
+      && (countDistinctTools() > 1 || firstToolChangeIsHandedOver())
       && !fixedZEstablishedInFile()) {
     warning(localize("\"At a Tool Change\" is \"" + (toolChangeIsMacro()
       ? "Sender or firmware macro changes it\", but this job establishes no fixed Z reference, so the "
@@ -2077,7 +2100,13 @@ function validateJob() {
   // FLOW 2's GUARDS. Refused rather than warned, because each is a hand-over to something that is not
   // there: the file would emit a token nothing acts on, and the job would carry on cutting with the
   // wrong tool -- the exact failure the Refuse default exists to prevent.
-  if (toolChangeIsMacro() && countDistinctTools() > 1) {
+  //
+  // OR THE FIRST TOOL IS HANDED OVER. Every one of these was keyed on countDistinctTools() > 1 because
+  // until PV-13 a one-tool job could not reach Flow 2 at all -- there was no boundary to hand over at.
+  // Now the first LOAD is one, and it is the same token to the same handler, so it owes the same three
+  // refusals: a one-tool Marlin job would otherwise hand over to a firmware with no tool-length register
+  // and no M6, and a bare T to a GRBL sender, and an empty macro file to nothing. PV-13.
+  if (toolChangeIsMacro() && (countDistinctTools() > 1 || firstToolChangeIsHandedOver())) {
     // MARLIN HAS NO TOOL-LENGTH REGISTER AT ALL, so there is nothing for a macro to write an offset
     // into and no sender in the list that speaks to it. The operator is the only route, and the post
     // already has one: the manual pause. design.md -> Tool changes, the who-can-subtract table.
@@ -3980,9 +4009,11 @@ function writeFirstSection() {
   // travel height as Z0 with no probe anywhere to correct it, and the shipped default's probe searched
   // "G38 Target" down from travel height rather than from a millimetre over the stock. CR-15.
   //
-  // THE LOAD PROMPT IS NOT REORDERED, IT IS DROPPED, and toolChangeFirstLoad() drops it -- these modes
+  // THE FIRST LOAD IS NOT REORDERED, IT IS DROPPED, and toolChangeFirstLoad() drops it -- these modes
   // already assert the cutting tool was fitted, the operator having jogged it to the origin by hand.
-  // The "Jog to ..." modes are what prompt and THEN position, and the warning there names them.
+  // The "Jog to ..." modes are what load and THEN position, and the warning there names them. On the
+  // hand-over route it is not merely redundant: the macro would move the tool off the position the
+  // origin write below is about to record. PV-13.
   if (originIsPreJogged()) {
     toolChangeFirstLoad();
     writeWcsOnStart();
@@ -4140,9 +4171,10 @@ function probePointDescription() {
 //   NOTHING EMITTED BEFORE writeWcsOnStart() MAY MOVE THE TOOL. writeFirstSection() therefore defers
 //   the fixed Z reference on these modes, the G53 establish being the one preamble step that does.
 //
-//   THE TOOL THAT MADE THAT JOG IS THE TOOL THE JOB ASSUMES, so toolChangeFirstLoad()'s prompt has
-//   nothing left to ask: fitting a DIFFERENT tool at it puts the recorded Z0 out by the difference
-//   in length, which is the failure the prompt exists to prevent, arriving by the other route.
+//   THE TOOL THAT MADE THAT JOG IS THE TOOL THE JOB ASSUMES, so toolChangeFirstLoad() has nothing left
+//   to load: fitting a DIFFERENT tool puts the recorded Z0 out by the difference in length, which is
+//   the failure the load exists to prevent, arriving by the other route -- and a hand-over would move
+//   the tool off the recorded position as well.
 //
 // Read by the emission and by validateJob() alike so the file and the dialog cannot come to differ
 // about which modes these are -- the pair was spelled out inline three times before.
@@ -4868,44 +4900,114 @@ function askUser(text, title, allowJog) {
 
 // The first tool is LOADED, not changed: nothing is running, no Z0 exists yet to invalidate, and the
 // tool stands where the operator left it -- at the fixed Z reference on the order that establishes it
-// first, and at their own pre-jog on the order that does not. So this is a prompt and nothing else --
-// no retract to repeat, no spindle to stop, and no re-probe, because writeWcsOnStart() establishes the
-// origin a few blocks below with the tool this prompt just asked for. Called unconditionally so the
-// ordering rule lives in one place; the property is read here, and so is the one mode condition that
-// makes the question unaskable.
+// first, and at their own pre-jog on the order that does not. So NONE of a mid-job change's arrive-and-
+// resume work is owed here: no retract to repeat, no spindle to stop, no coolant to shut off and no
+// re-probe, writeWcsOnStart() establishing the origin a few blocks below with the tool this just asked
+// for. That is why this is not toolChange() with a flag; what it reuses is the two macro helpers that
+// function itself calls. Called unconditionally so the ordering rule lives in one place.
+//
+// BUT WHO LOADS IT IS "At a Tool Change"'s ANSWER, and it used not to be -- this emitted one M0 on every
+// mode, so a job handing every change to a sender or an ATC still stopped and asked a human to fit the
+// tool the changer already holds. PV-13.
+//
+//   Refuse -- the M0. The post changes no tool on this mode and the operator does, which is what the
+//             mode means; it refuses a multi-tool JOB, and a one-tool job posts on it. It is also the
+//             shipped default, so this is the commonest path there is.
+//   Pause  -- the M0, unchanged. IDENTICAL BYTES TO Refuse, and that is the point rather than an
+//             oversight: the two modes differ at a CHANGE, and the first tool is not one. Every step
+//             that distinguishes them -- the retract, the Manual Position excursion, the stops, the Z0
+//             correction -- is a step neither owes here. The excursion is the one that could arguably
+//             be added and deliberately is not: that field's own description scopes it to a change, and
+//             adding it would send the tool across the bed on a path that has never made such a move.
+//   Macro  -- the hand-over, so the changer loads it and nobody is asked to.
 function toolChangeFirstLoad() {
-  if (!getProperty(properties.toolChangeFirstLoad)) {
+  if (getProperty(properties.toolChangeFirstToolCorrect)) {
     return;
   }
 
-  // NOTHING LEFT TO ASK ON A PRE-JOGGED ORIGIN. These modes record the position the operator jogged to
-  // before the file started, which they could only do with a tool already fitted -- so the prompt is
-  // redundant at best, and answering it with a DIFFERENT tool is the very defect it exists to prevent:
-  // the recorded Z0 measures from the tip that made the jog. No reordering rescues it, the jog having
-  // happened before line 1 of the file.
+  // NOTHING LEFT TO ASK ON A PRE-JOGGED ORIGIN, and under PV-13 it is worse than redundant. These modes
+  // record the position the operator jogged to before the file started, which they could only do with a
+  // tool already fitted -- so declaring that tool incorrect contradicts the mode, and fitting a DIFFERENT
+  // one is the very defect the load exists to prevent: the recorded Z0 measures from the tip that made
+  // the jog. No reordering rescues it, the jog having happened before line 1 of the file. AND ON THE
+  // MACRO ARM IT WOULD DESTROY THE ORIGIN OUTRIGHT -- this runs BEFORE writeWcsOnStart() on that order,
+  // so the hand-over would move the tool off the very position about to be recorded.
   //
   // UNGATED ON THE FRAME. The contradiction is the mode's and not "Machine Travel Z"'s -- it is the
-  // same with no frame at all, where nothing moves the tool and the prompt still lands between the jog
+  // same with no frame at all, where nothing moves the tool and the load still lands between the jog
   // and the origin write.
   //
   // A WARNING AND NOT A REFUSAL: the setting is inert here rather than dangerous, and the post says so
   // in the file, which is the channel the operator running the job actually has. The remedy is a mode,
-  // and the two that prompt and THEN position are named.
+  // and the two that load and THEN position are named.
   if (originIsPreJogged()) {
     writeComment(eComment.Debug, " toolChangeFirstLoad: suppressed -- \"First WCS / Part\" records a pre-jogged origin");
-    // TWIN: paired -- validateJob()'s "Prompt for the First Tool is on, but First WCS / Part is a
+    // TWIN: paired -- validateJob()'s "First Tool is Correct is Off, but First WCS / Part is a
     // Set ... to Current Pos mode", on the same originIsPreJogged() this arm reads.
-    writeWarning("\"Prompt for the First Tool\" is on and no prompt was written -- \"First WCS / Part\""
-      + " takes this part's origin from where you jogged the tool before starting this file, so the"
-      + " tool that made that jog is the one this job assumes and measures from. Fitting a different"
-      + " one here would put every depth out by the difference in tool length. To fit the tool during"
-      + " the run instead, use \"Jog to X0 Y0, Probe Z0\" or \"Jog to X0 Y0 Z0\", which prompt first"
-      + " and position afterwards.");
+    writeWarning("\"First Tool is Correct\" is Off and nothing was emitted to load one -- \"First WCS /"
+      + " Part\" takes this part's origin from where you jogged the tool before starting this file, so"
+      + " the tool that made that jog is the one this job assumes and measures from. Fitting a different"
+      + " one here would put every depth out by the difference in tool length, and on a hand-over it"
+      + " would move the tool off the position about to be recorded. To load the tool during the run"
+      + " instead, use \"Jog to X0 Y0, Probe Z0\" or \"Jog to X0 Y0 Z0\", which load first and position"
+      + " afterwards.");
     return;
   }
+
+  // NOTHING A CHANGER CAN ACT ON. A hand-over is a tool NUMBER handed to a handler: gSender and CNCjs
+  // read the T beside the M6, RepRapFirmware runs tfree/tpre/tpost for T<n>, and "T0 M6" names no tool
+  // in any of them. A laser is not in a changer at all. The M0 arms are unaffected -- asking a person to
+  // fit a laser is a perfectly sensible thing to do -- so this is the macro arm's condition alone.
+  // BOTH CHANNELS, because the operator can act on it before posting: it is fixed by the properties and
+  // by which tool the job's first section carries. PV-13.
+  if (toolChangeIsMacro() && (tool.number == 0 || tool.isJetTool())) {
+    writeComment(eComment.Debug, " toolChangeFirstLoad: suppressed -- tool 0 or a jet tool cannot be handed over");
+    warnBothChannels("\"First Tool is Correct\" is Off and the first tool is a jet tool or tool 0, which"
+      + " no tool changer can fit and no supported handler can act on -- \"T0 M6\" names no tool. Nothing"
+      + " was emitted to load it, so this job assumes whatever is in the spindle now. Fit it before"
+      + " starting the file, or set \"At a Tool Change\" to \"Manual change at a pause\" to be asked"
+      + " during the run.");
+    return;
+  }
+
+  if (toolChangeIsMacro()) {
+    // THE SAME HAND-OVER EVERY OTHER CHANGE USES, and the resume with it. Both are meaningful here
+    // rather than mid-job leftovers: writeWCS() has already selected the offset, so the re-select is a
+    // real block; Start() has set the modals, and re-asserting them is what the resume is FOR, the post
+    // being unable to read a macro it did not write; and the tool comes back to Machine Travel Z, which
+    // is where writeFixedZReference() left it and where writeWcsOnStart() expects it. The include files
+    // are NOT loaded -- "Tool Change Start" says it runs "where the cut ended, at cutting height", and
+    // at job start there is no cut.
+    writeComment(eComment.Important, " Load the first tool -- handed over, not prompted");
+    writeComment(eComment.Info, "   Before this part's origin is set, so Z0 is established with the tool that cuts it");
+    toolChangeMacroCall();
+    toolChangeMacroResume();
+    return;
+  }
+
   writeComment(eComment.Important, " Load the first tool");
   writeComment(eComment.Info, "   Before this part's origin is set, so Z0 is established with the tool that cuts it");
   askUser("Load Tool #" + tool.number + " " + tool.comment, "Tool change", false);
+}
+
+// True where the FIRST tool is loaded by the HAND-OVER rather than by a prompt or not at all -- one
+// definition, because three validateJob() guards read it and the emitter must not be able to disagree
+// with them. Every Flow 2 guard was keyed on countDistinctTools() > 1, which a one-tool job walks
+// straight past; before PV-13 no such job could ever hand over, and now it can.
+//
+// IT CARRIES BOTH SUPPRESSIONS, so it answers the outcome and not the intent. A pre-jogged origin and a
+// first tool a changer cannot fit each emit nothing, and a guard that fired on them would complain about
+// a hand-over that never happens. getSection(0)'s tool is the SAME tool the emitter reads as `tool`,
+// writeFirstSection() running inside the first section. PV-13.
+function firstToolChangeIsHandedOver() {
+  if (!toolChangeIsMacro() || getProperty(properties.toolChangeFirstToolCorrect) || originIsPreJogged()) {
+    return false;
+  }
+  if (getNumberOfSections() < 1) {
+    return false;
+  }
+  var firstTool = getSection(0).getTool();
+  return firstTool.number != 0 && !firstTool.isJetTool();
 }
 
 // True when the job is set to hand a change to something outside the post. One definition, because

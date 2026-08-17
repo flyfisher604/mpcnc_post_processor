@@ -116,8 +116,11 @@ const cases = [
   must:[[/^M30$/m,'still ends cleanly']], mustNot:[[/^X0 Y0 F/m,'no return move']] },
 
 // --- group 6, several tools by hand (P3) ---------------------------------------------
-{ id:'H21', desc:'Two tools, manual change, first tool prompted, Z re-probed after', cnc:'Milling/2D/toolchange.cnc',
-  props:{toolChangeMode:S('Pause'), toolChangeFirstLoad:B(true), toolChangeZ0Correction:S('Probe')},
+// PV-13 INVERTED THE SENSE AND MOVED THE KEY, so B(true) below became B(false) here. An unknown key is
+// not an error to post.exe -- it posts at the default -- so these three would have gone quietly wrong
+// rather than red, which is why the sweep for the old name matters more than the edit does.
+{ id:'H21', desc:'Two tools, manual change, first tool loaded, Z re-probed after', cnc:'Milling/2D/toolchange.cnc',
+  props:{toolChangeMode:S('Pause'), toolChangeFirstToolCorrect:B(false), toolChangeZ0Correction:S('Probe')},
   must:[[/M0 \(MSG,[^)]*Change to Tool #2[^)]*\)/,'prompts at the change'],
         [/^M0 \(MSG,Turn OFF spindle\)$/m,'spindle stopped before the operator reaches in']],
   mustNot:[[/^M6/m,'no M6 - GRBL answers error:20'],[/^T\d/m,'no T word']],
@@ -128,12 +131,13 @@ const cases = [
   must:[[/M0 \(MSG,[^)]*Change to Tool #2[^)]*\)/,'still stops for the change']],
   custom:(t)=>{ const n=(t.match(/^G38\.2 /gm)||[]).length;
     return n===1? [true,'one probe only - the change does not re-probe'] : [false,`${n} probes, expected 1`]; } },
-{ id:'H23', desc:'First tool IS prompted where the mode does not imply one fitted', cnc:'Milling/2D/toolchange.cnc',
-  props:{toolChangeMode:S('Pause'), toolChangeFirstLoad:B(true), probeOnStart:S('Probe Z')},
+{ id:'H23', desc:'First tool IS loaded where the mode does not imply one fitted', cnc:'Milling/2D/toolchange.cnc',
+  props:{toolChangeMode:S('Pause'), toolChangeFirstToolCorrect:B(false), probeOnStart:S('Probe Z')},
   must:[[/M0 \(MSG,[^)]*Tool #1[^)]*\)/,'prompts for the first tool']], mustNot:[] },
-{ id:'H24', desc:'CR-15 - the dropped first-tool prompt is stated, not silent', cnc:'Milling/2D/toolchange.cnc',
-  props:{toolChangeMode:S('Pause'), toolChangeFirstLoad:B(true)},
-  must:[[/WARNING[^)]*([Ff]irst [Tt]ool)/,'the file says the prompt was dropped']], mustNot:[] },
+{ id:'H24', desc:'CR-15 - the dropped first-tool load is stated, not silent', cnc:'Milling/2D/toolchange.cnc',
+  props:{toolChangeMode:S('Pause'), toolChangeFirstToolCorrect:B(false)},
+  must:[[/WARNING[^)]*([Ff]irst [Tt]ool)/,'the file says nothing was emitted to load one']],
+  mustLog:[[/"First Tool is Correct" is Off, but "First WCS \/ Part"/,'and PV-13 gave it the dialog half too']] },
 { id:'H25', desc:'A jet tool withholds the provisional Z0 a milling tool gets', cnc:'Cutting/Laser/center.cnc', props:{},
   must:[[/^G10 L20 P1 X0 Y0$/m,'no Z word - a fake Z0 would silently become Set X0 Y0 Z0']],
   mustNot:[[/^G10 L20 P1 X0 Y0 Z0$/m,'the milling form must not appear']] },

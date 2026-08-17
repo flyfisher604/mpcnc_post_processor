@@ -331,6 +331,54 @@ const cases = [
   custom:(t)=>{ const n=countOf(t,/^G38\.2 /gm);
     return n===1? [true,'the probe itself is untouched - one re-probe, as PRO8 has']
                 : [false,`${n} probes, expected 1 -- the offset must move the point, not the probe`]; } },
+
+// === H. PV-13 -- who loads the FIRST tool ============================================
+// The property declares whether the tool in the spindle is the one this job starts with; when it
+// is not, "At a Tool Change" decides who fits it. Before PV-13 the answer was always one M0, on
+// every mode, so a job handing every change to a changer still stopped and asked a human.
+{ id:'PRO34', desc:'PV-13 - a manual first load stops BEFORE the origin is written, not after',
+  cnc:change, props:pro({ probeOnStart:S('Probe Z'), toolChangeMode:S('Pause'),
+                          toolChangeFirstToolCorrect:B(false) }),
+  must:[[/M0 \(MSG,[^)]*Tool #1[^)]*\)/,'the operator is asked for the first tool']],
+  // ORDER, NOT PRESENCE. The whole reason the load precedes the origin work is that Z0 must be
+  // measured with the tool that cuts; a load written after the probe measures the tool it replaces.
+  // The provisional Z0 is Z-ONLY here -- "Use WCS X0 Y0, Probe Z0" takes X0 Y0 from the register and
+  // writes no X or Y word, which is the CR-12 shape for this mode and not the X0 Y0 Z0 one.
+  custom:(t)=>ordered(t,[['load the first tool',/MSG,Load Tool #1/],
+                         ['provisional Z0',/^G10 L20 P1 Z0$/m],
+                         ['probe',/^G38\.2 /m]]) },
+
+{ id:'PRO35', desc:'PV-13 - ... and on a hand-over the CHANGER loads it: no M0, the same token as any change',
+  cnc:change, props:pro({ probeOnStart:S('Probe Z'), toolChangeMode:S('Macro'),
+                          toolChangeSender:S('gSender'), toolChangeFirstToolCorrect:B(false) }),
+  must:[[/^T1 M6$/m,'the first tool is handed over with the token the sender intercepts'],
+        [/handed over, not prompted/,'and the file says which route it took']],
+  // THE ABSENCE IS THE FINDING. Presence of T1 M6 alone would pass with the M0 emitted as well,
+  // which is exactly the behaviour this closes -- a changer job that still stops for a human.
+  mustNot:[[/MSG,Load Tool #1/,'nobody is asked to fit a tool the changer already holds']],
+  // READ FROM THE HAND-OVER DOWN. The fixed-Z establish emits its own G53 retract BEFORE the load, so
+  // a whole-file ordered() matches that one and fails a correct post -- the trap PV-7 and PV-8 both
+  // met. Scoped, the claim is the one that matters: the macro runs, the post brings the tool back to a
+  // known height, and only then is this part's Z0 measured, with the tool the changer just fitted.
+  custom:(t)=>{ const after = t.slice(t.search(/^T1 M6$/m));
+    return ordered(after,[['resume to travel height',/^G53 G0 Z-5 F/m],
+                          ['provisional Z0',/^G10 L20 P1 Z0$/m],
+                          ['probe',/^G38\.2 /m]]); } },
+
+// THE WIDENED GUARD, on a job with ONE tool -- which is the case every Flow 2 guard used to miss,
+// countDistinctTools() > 1 being false. Before PV-13 such a job could not hand over at all; now it
+// can, and Marlin has no register for a macro to write into and no M6 to reach it.
+{ id:'PRO36', desc:'PV-13 - a one-tool Marlin job that hands over its FIRST tool is refused, as any other would be',
+  cnc:face, props:pro({ jobSelectedFirmware:S('Marlin'), machineTravelZ:S('-5'), probeOnStart:S('Skip'),
+                        toolChangeMode:S('Macro'), toolChangeSender:S('gSender'),
+                        toolChangeFirstToolCorrect:B(false) }),
+  refuse:[/no tool-length offset register/,'the Marlin refusal reaches a one-tool job at last'] },
+
+{ id:'PRO37', desc:'PV-13 - and with the first tool declared correct that same job posts, guard and all',
+  cnc:face, props:pro({ jobSelectedFirmware:S('Marlin'), machineTravelZ:S('-5'), probeOnStart:S('Skip'),
+                        toolChangeMode:S('Macro'), toolChangeSender:S('gSender') }),
+  must:[[/^G28 X$/m,'the job posts - nothing hands over, so no guard has anything to refuse']],
+  mustNot:[[/^T\d+ M6$/m,'and no token is emitted for a tool nobody is changing']] },
 ];
 
 // ---- run ------------------------------------------------------------------------------
