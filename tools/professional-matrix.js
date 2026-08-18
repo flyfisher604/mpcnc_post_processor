@@ -464,6 +464,32 @@ const cases = [
   mustNotLog:[[/searches DOWN FROM THAT SAME HEIGHT/,'nor does the dialog']],
   mustLog:[[/set the target deep enough to reach the stock from where you leave the tool/,
             'the general text is what a hand-over gets']] },
+
+// --- PV-20: the $1 idle-delay warning described a pause the hand-over never writes -------------
+// THE GATE IS UNCHANGED and right: the segment buffer drains whether the post stopped the stream or a
+// sender did, so the hazard is the same on both flows. What forked is the sentence about what this job
+// DOES. These two cases are the same job at the same tool count differing in one dropdown, and each must
+// carry its own sentence and NOT the other's -- which is what a single shared text could not do.
+{ id:'PRO45', desc:'PV-20 - the manual pause names its M0, and never the hand-over sentence',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause') }),
+  must:[[/^M0 \(MSG,Change to Tool #2/m,'the pause this arm is entitled to describe']],
+  mustLog:[[/This job stops the program \(M0\) for a manual tool change\. On GRBL the steppers de-energise/,
+            'the forked clause and the shared hazard clause, in one sentence']],
+  mustNotLog:[[/hands each tool change to/,'a manual change is not a hand-over'],
+              [/This job pauses for a tool change on GRBL/,
+               'and the old text, which said the same thing on both flows, is gone']] },
+
+{ id:'PRO46', desc:'PV-20 - ... and the hand-over says the post wrote no pause, naming the handler',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Macro'), toolChangeSender:S('UGS') }),
+  mustLog:[[/hands each tool change to "UGS \(Universal Gcode Sender\) -- T \+ M6", and the post writes no pause for it/,
+            'the handler by its own dialog title, and the only claim about the file that is true here'],
+           [/the steppers de-energise once the machine has been idle for \$1 milliseconds/,
+            'the hazard clause is SHARED, not forked - the gate was never the defect']],
+  mustNotLog:[[/This job stops the program \(M0\) for a manual tool change/,
+               'nothing claims a stop this file does not contain'],
+              [/This job pauses for a tool change on GRBL/,'nor the old text']],
+  mustNot:[[/^M0 \(MSG,Change to Tool/m,
+            'and the file really has no change pause: PRO45 has one, this has none, one dropdown apart']] },
 ];
 
 // ---- run ------------------------------------------------------------------------------

@@ -1672,6 +1672,27 @@ function validateJob() {
     }
   }
 
+  // A PRE-JOGGED FIRST PART ON A MULTI-PART JOB, and the SHIPPED DEFAULT is what gets there. Guard B
+  // has already refused this job unless X/Y are declared homed, on the grounds that it traverses between
+  // STORED work offsets -- and then these two modes write part one's register from wherever the tool
+  // stands when the file starts. The two "Jog to ..." modes write a register too and "Each New WCS /
+  // Part" offers them, so a jogged origin is not the complaint: THE SILENCE IS. Those stop at an M0 and
+  // ask, and a probe writes Z alone. This is the one route that replaces a stored X0 Y0 with no prompt.
+  //
+  // ADVICE AND NOT A REFUSAL, CR-16's reason: loose stock for the first part beside fixtured ones is a
+  // real workflow and the post cannot tell it from the mistake. What is not defensible is the operator
+  // meeting it afterwards, when the register has already been overwritten.
+  if (multiWcs && originIsPreJogged()) {
+    warning(localize("\"First WCS / Part\" is a \"Set ... to Current Pos\" mode and this job cuts "
+      + collectDistinctOffsets().length + " parts. That mode takes the first part's origin from where "
+      + "you jog the tool BEFORE the file starts and writes it into that part's work offset register, "
+      + "with no prompt -- while every other part is cut at the origin already stored in its own "
+      + "register. So one part is cut where you parked the tool and the rest at their fixtures, and the "
+      + "offset you set for the first part at the machine is overwritten. The two \"Jog to ...\" modes "
+      + "write the register too but stop and ask first; \"Use WCS X0 Y0, Probe Z0\" and \"Use WCS X0 "
+      + "Y0 Z0\" leave it alone. If every part in this job is fixtured, use one of those two."));
+  }
+
   // TWO LABELS ON ONE REGISTER, and the dialog is the only channel that can say so in time. The post
   // resolves work offset 0 to WCS 1 and always has -- that alias is correct and is not what is warned
   // about. What is warned about is a job that carries BOTH labels, because the operator who typed them
@@ -2086,12 +2107,31 @@ function validateJob() {
   // is 255. The stock default is 25 (defaults.h, Grbl 1.1). The position COUNTER survives; what does
   // not survive is the axis holding against a hand.
   //
+  // AND AN M0 IS NOT THE ONLY THING THAT DRAINS IT, which is what the text got wrong. A sender that
+  // stops sending while its own tool-change routine runs drains the buffer exactly as a pause does, so
+  // the hazard is identical on both flows and this GATE is right. But "This job pauses for a tool
+  // change" is an assertion about the FILE, and on the hand-over the file contains no pause at all: the
+  // block is a retract, an M5, the token and the resume. It read true only because "Manual Spindle
+  // On/Off" ships on and puts an M0 two lines above the token -- turn that off and the sentence
+  // describes a stop nothing wrote, directly beneath Flow 2's own warning describing the same change as
+  // a hand-over. One change, two incompatible accounts, in one dialog.
+  //
+  // TWO ARMS, PR-16's SHAPE: the hazard clause is shared and only the sentence about what this job DOES
+  // forks. The macro arm claims nothing about who holds the stream -- with "Other" that is a file the
+  // post has not read -- only that the post wrote no pause and cannot bound the interval.
+  //
   // GATED ON THE TOOL CHANGE rather than on every pause. The same setting protects the spindle prompts
   // and the probe's attach/detach stops, but this is the one that runs to minutes with a spanner on the
   // collet, and a warning on every job that contains a prompt would be read by nobody.
   if (fw == eFirmware.GRBL && getProperty(properties.toolChangeMode) != "Refuse"
       && countDistinctTools() > 1) {
-    warning(localize("This job pauses for a tool change on GRBL, where the steppers de-energise once "
+    warning(localize((toolChangeIsMacro()
+        ? "This job hands each tool change to \"" + toolChangeSenderTitle() + "\", and the post writes "
+          + "no pause for it -- but the machine still stands idle from the moment the tool stops moving "
+          + "until whatever performs the change lets the job resume, and that interval is not the post's "
+          + "to bound"
+        : "This job stops the program (M0) for a manual tool change")
+      + ". On GRBL the steppers de-energise once "
       + "the machine has been idle for $1 milliseconds -- 25 on a stock build. GRBL keeps counting "
       + "position, so nothing is lost unless an axis actually moves; a gantry nudged while the collet "
       + "is loosened, or a Z that back-drives with no holding torque, is enough, and every cut after "
@@ -4524,6 +4564,23 @@ function writeWcsOnStart() {
   var mode = getProperty(properties.probeOnStart);
   var canProbe = (tool.number != 0 && !tool.isJetTool());
   writeComment(eComment.Debug, " writeWcsOnStart: probeOnStart: " + mode + " wcs: " + currentWorkOffset);
+
+  // ONE STATEMENT, ABOVE BOTH ARMS. "Current XYZ" and "Current XY & Probe Z" write the origin at two
+  // different sites and share both with the "Jog to ..." modes, so this goes where the MODE is read
+  // rather than where the G10 is written. originIsPreJogged() keeps the Jog modes out: a register the
+  // operator was asked to set is not one that changed behind them.
+  //
+  // BOTH CHANNELS, PV-4's ruling on the neighbouring pre-jog collision: the person about to run this
+  // file is the one who can write the old offset down first, and by the G10 it is too late.
+  if (originIsPreJogged() && collectDistinctOffsets().length > 1) {
+    // TWIN: paired -- validateJob()'s "First WCS / Part is a Set ... to Current Pos mode and this job
+    // cuts N parts", on the same two predicates.
+    writeWarning("this file REPLACES the stored X0 Y0 of the part it starts on -- \"First WCS / Part\""
+      + " is a \"Set ... to Current Pos\" mode, so the G10 below writes wherever the tool is standing"
+      + " when this file starts into that part's work offset register. Every other part in this job is"
+      + " cut at the origin already stored in its own register, untouched. Put the tool on this part's"
+      + " origin before starting, and expect the offset you set for it at the machine to be gone.");
+  }
 
   if (mode == "Skip") {
     // "Use WCS X0 Y0 Z0": trust the stored origin, so probeSafeZ() is meaningful in that frame.

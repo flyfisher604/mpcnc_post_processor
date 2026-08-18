@@ -91,8 +91,8 @@ node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/cor
 node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/gcode-structure
 ```
 
-**186 cases — 37 hobbyist, 44 professional, 37 WCS, 11 personal, 41 CorrectGcode, 16 GCodeStructure —
-over 42 job files, and all 186 pass as of 2026-08-17.** The whole run is under a minute.
+**190 cases — 37 hobbyist, 46 professional, 39 WCS, 11 personal, 41 CorrectGcode, 16 GCodeStructure —
+over 42 job files, and all 190 pass as of 2026-08-17.** The whole run is under a minute.
 
 **The six are independent by design and stay that way.** The first four encode personas that disagree
 about what the factory defaults should do, so a shared baseline would have to pick one; the last two
@@ -371,7 +371,7 @@ operation, tool 2.
 | File | Blocks | Cases | What it covers |
 |---|---|---|---|
 | `Milling/2D/face.cnc` | 1 section, T1 | **44** | the workhorse: preamble, all six `First WCS / Part` modes, probe geometry, comment levels, sequence numbers, travel speeds, the frame, homing, the park, and every refusal that needs only a plain job |
-| `Milling/2D/toolchange.cnc` | 2 sections, T1→T2 | **19** | both tool-change flows, the sender tokens, the change position and its three refusals, the re-probe and its absence — and, because `A` cuts across the origin `B`'s re-probe touches off on, `PV-7`'s machined-datum warning in both its branches |
+| `Milling/2D/toolchange.cnc` | 2 sections, T1→T2 | **21** | both tool-change flows, the sender tokens, the change position and its three refusals, the re-probe and its absence — and, because `A` cuts across the origin `B`'s re-probe touches off on, `PV-7`'s machined-datum warning in both its branches |
 | `Milling/2D/bore.cnc` | 1 section, 1067 cutting moves, arcs | **13** | arcs on and off, and **the whole of groups 2 and 3**: it is the only job with enough motion for a feed *distribution* to be read, and its arcs are what put `limitArcFeed()` under the same ceiling as the linear path |
 | `Cutting/Laser/center.cnc` | 7 sections, T2 laser | 2 | a jet tool withholding the provisional Z0 a milling tool receives — and, on `HR-26`, receiving the **clearance lift** a milling tool always got, which is not the probe's to gate |
 | `Milling/2D/full program.cnc` | 4 sections, 2 tools | 1 | compensation **in the control**, which all three firmwares refuse |
@@ -380,7 +380,7 @@ operation, tool 2.
 
 | File | Blocks (`tool@offset`) | Cases | What it covers |
 |---|---|---|---|
-| `two-parts.cnc` | T1@1, T1@2 | **7** | a part this job has never seen — the whole of `Subsequent WCS / Part`, the traverse retract, Guard B's refusal, and Marlin's multi-offset dialect |
+| `two-parts.cnc` | T1@1, T1@2 | **9** | a part this job has never seen — the whole of `Subsequent WCS / Part`, the traverse retract, Guard B's refusal, and Marlin's multi-offset dialect |
 | `tools-across-parts.cnc` | T1@1, T1@2, T2@1, T2@2 | 3 | one change then two returns, both stale — `PV-9` and `PV-10`'s job |
 | `change-then-return.cnc` | T1@1, T1@2, T2@1 | 3 | a return whose Z0 a tool change invalidated, and the same with re-probing off |
 | `high-offsets.cnc` | T1@7, T1@9 | 3 | past `G59`: refused on GRBL, `G59.1`/`G59.3` on Marlin and RepRap |
