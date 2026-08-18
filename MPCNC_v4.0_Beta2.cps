@@ -4567,21 +4567,16 @@ function writeWarning(text) {
   writeCommentLine(" >>> WARNING: " + text);
 }
 
-// BOTH CHANNELS FROM ONE STATEMENT. A condition fixed by the properties and the job's shape is
-// actionable by someone who never opens the g-code, and every one of those used to reach the file
-// alone -- writeWarning() is writeCommentLine() and nothing else. Pairing it by hand in validateJob()
-// is the other route and it needs a SECOND predicate, computed from the sections at onOpen() to
-// predict what the emitter will decide later; PV-7 has one such pair and says in both halves that they
-// must not drift. This route cannot drift, because there is no second predicate and no second text.
-//
-// A PRE-FLIGHT IS NOT INHERENTLY EARLIER. The post dialog is read AFTER the post has run, so both
-// channels arrive at the same moment; what a pre-flight buys is one statement about the whole job
-// where this buys one per occurrence, which for a stranded part is the right count. PV-9.
+// Both channels from one statement, so the two texts cannot drift -- pairing them by hand in
+// validateJob() needs a second predicate over the sections and a second string. The dialog is read
+// after the post runs, so neither channel is earlier: a pre-flight states the condition once per job,
+// this once per occurrence, which for a stranded part is the right count. PV-9.
 function warnBothChannels(text) {
   writeWarning(text);
   warning(localize(text));
 }
 
+// Write a comment only where the job's "Comment Level" is at or above the level it is filed under.
 function writeComment(level, text) {
   if (commentLevels.indexOf(level) <= commentLevels.indexOf(getProperty(properties.jobCommentLevel))) {
     writeCommentLine(text);
@@ -4594,25 +4589,19 @@ function writeComment(level, text) {
 // getCurrentPosition().z is not where the tool is and cannot correct it -- only refuse to read it.
 var forceRapidXYBeforeZ = false;
 
-// TELL THE KERNEL WHERE THE TOOL IS. getCurrentPosition() reports the TOOLPATH's position -- the kernel
-// advances it from the movements it feeds to onRapid/onLinear, and it is blind to every move the post
-// emits on its own account: the probe traverses, the safe-Z retracts, the return to X0 Y0. Four places
-// read it and each was reading it stale after one of those -- rapidMovements() to order X/Y against Z,
-// isSafeToRapid() to decide whether a G1 may be restored to a G0, and linearMovements() and the arc
-// handler to project a feedrate onto the axes from the wrong start point.
+// Tell the kernel where the tool is. getCurrentPosition() reports the TOOLPATH's position -- the kernel
+// advances it from what it feeds to onRapid/onLinear, and it is blind to every move the post emits on
+// its own account: the probe traverses, the safe-Z retracts, the return to X0 Y0. Four readers depend
+// on it -- rapidMovements() to order X/Y against Z, isSafeToRapid(), and linearMovements() and the arc
+// handler to project a feedrate from the right start point. Undefined means unchanged, not zero.
 //
-// UNDEFINED MEANS UNCHANGED and not zero: an X/Y-only move must not claim a Z it did not command.
-//
-// WORK-FRAME POSITIONS ONLY, which is the whole limit of this. setCurrentPosition() takes a FRAME
-// position -- the space getCurrentPosition() reports and getFramePosition() produces -- so a G53 move
-// has nothing truthful to pass here: its work-frame value needs the WCS offset, and that offset is
+// Work-frame positions only, which is the whole limit of this. setCurrentPosition() takes a frame
+// position, so a G53 move has nothing truthful to pass: its work-frame value needs a WCS offset
 // established at runtime by a G10 L20 from a probe the post cannot read. Autodesk's own posts leave the
-// kernel stale across a machine-frame retract for exactly this reason, reporting that move only to the
-// machine simulator on a channel that accepts MACHINE coordinates (haas.cps, writeRetract(), G53 case).
-// So writeMachineFrameBlock() does not call this, and forceRapidXYBeforeZ still exists for the move that
-// follows a G53 the post has no work-frame number for -- a tool change at a machine-frame position, and
-// the pre-jog order's deferred fixed-Z establish. Passing a made-up number instead would order those
-// moves correctly and silently corrupt the three other readers, which is the worse trade.
+// kernel stale across a machine-frame retract for the same reason, reporting that move only to the
+// machine simulator, on a channel that accepts MACHINE coordinates (haas.cps, writeRetract(), G53
+// case). So writeMachineFrameBlock() does not call this, and forceRapidXYBeforeZ covers the move that
+// follows -- a made-up number would order that one move correctly and corrupt the other three readers.
 function noteCurrentPosition(_x, _y, _z) {
   var cur = getCurrentPosition();
   setCurrentPosition(new Vector(
@@ -4660,11 +4649,8 @@ function rapidMovementsZ(_z) {
 
   noteCurrentPosition(undefined, undefined, _z);
 
-  // A COMMANDED WORK-FRAME Z IS WHAT ENDS THE DEBT. Whatever set the flag did so because the tool was
-  // standing at a machine-frame height the work frame has no number for; the block above has just given
-  // it one, so rapidMovements() may go back to reading getCurrentPosition() to order itself. The
-  // re-probe after a relocated tool change is the path that clears it this way: it traverses X/Y with
-  // rapidMovementsXY() and then retracts here, and the section that follows starts from a known Z.
+  // A commanded work-frame Z ends the debt: whatever set the flag did so because the tool stood at a
+  // machine-frame height the work frame had no number for, and the block above has just given it one.
   forceRapidXYBeforeZ = false;
 }
 
@@ -4672,20 +4658,16 @@ function rapidMovementsZ(_z) {
 // never plunge into the part: when Z is descending, position XY first and then bring Z down; when Z is
 // rising or unchanged, retract Z first and then move XY.
 function rapidMovements(_x, _y, _z) {
-  // THE CASE THE COMPARISON BELOW CANNOT DECIDE, and it has TWO CALLERS that create it. Either way the
-  // tool stands at a machine-frame height the work frame has never named, while getCurrentPosition()
-  // still reports the last work-frame point the post told the kernel about. Reading it here would order
-  // this move against a height the tool is not at, and the branch it picks on a RISING or unchanged Z --
-  // retract first, then cross -- would send the tool across the bed at the section's own clearance height
-  // instead of the travel height it is already holding. So the order is forced: cross at the height the
-  // machine-frame move left, THEN descend.
+  // The case the comparison below cannot decide. The tool stands at a machine-frame height the work
+  // frame has never named, while getCurrentPosition() still reports the last work-frame point the post
+  // told the kernel about -- so on a rising or unchanged Z the branch below would retract first and
+  // cross the bed at the section's own clearance height instead of the travel height already held.
+  // Cross first, then descend. Two callers create it:
   //
-  //   writeToolChangeReturn() -- a relocated manual change. It costs no motion at all: there is no point
-  //   retracing the excursion when the next move is absolute.
-  //
-  //   writeFirstSection()'s pre-jog order -- the fixed Z reference is established AFTER the first part's
-  //   origin there, so the last preamble block is a G53 and not the probe retract that used to follow it.
-  //   CR-15.
+  //   writeToolChangeReturn() -- a relocated manual change; retracing the excursion buys nothing when
+  //   the next move is absolute.
+  //   writeFirstSection()'s pre-jog order -- the fixed Z reference is established AFTER the first
+  //   part's origin there, so the last preamble block is a G53. CR-15.
   if (forceRapidXYBeforeZ) {
     forceRapidXYBeforeZ = false;
     writeComment(eComment.Debug, " rapidMovements: X/Y before Z -- the tool holds a machine-frame height the work frame has not named");
@@ -4703,17 +4685,17 @@ function rapidMovements(_x, _y, _z) {
   }
 }
 
-// Calculate the feedX, feedY and feedZ components
-
+// Cap a G1 feed so no axis exceeds its configured maximum: project the move onto X, Y and Z, scale all
+// three down until every component is within its limit, then cap the result at the XYZ limit. Returns
+// the feed unchanged when "Scale Feedrate" is off, or when the change works out under 0.01.
 function limitFeedByXYZComponents(curPos, destPos, feed) {
   if (!getProperty(properties.feedsScaleFeedrate))
     return feed;
 
   var xyz = Vector.diff(destPos, curPos);       // Translate the cut so curPos is at 0,0,0
-  var dir = xyz.getNormalized();                // Normalize vector to get a direction vector
+  var dir = xyz.getNormalized();
   var xyzFeed = Vector.product(dir.abs, feed);  // Determine the effective x,y,z speed on each axis
 
-  // Get the max speed for each axis
   let xyLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedXY));
   let zLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedZ));
 
@@ -4727,7 +4709,6 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
     return (lesserFeed < feed) ? lesserFeed : feed;
   }
 
-  // Force the speed of each axis to be within limits
   if (xyzFeed.z > zLimit) {
     xyzFeed.multiply(zLimit / xyzFeed.z);
   }
@@ -4740,10 +4721,8 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
     xyzFeed.multiply(xyLimit / xyzFeed.y);
   }
 
-  // Calculate the new feedrate based on the speed allowed on each axis: feedrate = sqrt(x^2 + y^2 + z^2)
-  // xyzFeed.length is the same as Math.sqrt((xyzFeed.x * xyzFeed.x) + (xyzFeed.y * xyzFeed.y) + (xyzFeed.z * xyzFeed.z))
+  // xyzFeed.length is sqrt(x^2 + y^2 + z^2) -- the feedrate the scaled components add up to.
 
-  // Limit the new feedrate by the maximum allowable cut speed
 
   let xyzLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedXYZ));
   let newFeed = (xyzFeed.length > xyzLimit) ? xyzLimit : xyzFeed.length;
@@ -4783,12 +4762,10 @@ function limitArcFeed(feed) {
   return (feed > limit) ? limit : feed;
 }
 
+// Emit a cutting move as a G1, at a feed the axis limits have had their say in.
 function linearMovements(_x, _y, _z, _feed) {
-  // Control-side radius compensation is rejected up front in onRadiusCompensation, so
+  // Control-side radius compensation is rejected up front in onRadiusCompensation(), so
   // pendingRadiusCompensation is always OFF here.
-
-  // Scale the feedrate if enabled: it is projected onto each axis, and if any exceeds its defined max
-  // all three are scaled proportionately, then the result is capped at the maximum cut rate.
   let feed = limitFeedByXYZComponents(getCurrentPosition(), new Vector(_x, _y, _z), _feed);
 
   let x = xOutput.format(_x);
@@ -4813,7 +4790,9 @@ function includeFolder() {
   return FileSystem.getFolderPath(getOutputPath()) + PATH_SEPARATOR;
 }
 
-// Test if file exist/can read and load it
+// Include an operator's file in the stream, or error() out if it is not in the NC output folder. Every
+// group-8 include goes through here, so the missing-file error, the trailing-newline repair and the
+// modal reset that follows a program the post did not write are each written once.
 function loadFile(_file) {
   var folder = includeFolder();
   if (FileSystem.isFile(folder + _file)) {
@@ -4845,39 +4824,34 @@ function loadFile(_file) {
   }
 }
 
+// A property held in millimetres, in the units this job emits.
 function propertyMmToUnit(_v) {
   return (_v / (unit == IN ? 25.4 : 1));
 }
 
+// The preamble every job opens with, unless "Start File" replaces it: absolute positioning and units
+// on every firmware, the feed mode and plane select on GRBL, a disabled stepper timeout off it.
 function Start() {
-  // Common GCODE
-
-  // Set absolute positioning and units of measure
   writeComment(eComment.Info, "   Set Absolute Positioning");
   writeComment(eComment.Info, "   Units = " + (unit == IN ? "inch" : "mm"));
 
-  writeBlock(gAbsIncModal.format(90)); // Set to Absolute Positioning
-  writeBlock(gUnitModal.format(unit == IN ? 20 : 21)); // Set the units
+  writeBlock(gAbsIncModal.format(90));
+  writeBlock(gUnitModal.format(unit == IN ? 20 : 21));
 
-  // Is Grbl?
   if (fw == eFirmware.GRBL) {
-    // Set the feedrate mode to units per minute
     writeComment(eComment.Info, "   Set Feed Rate Mode to units per minute");
     writeBlock(gFeedModeModal.format(94));
 
-    // Select the workspace plane XY for circular motion
     writeComment(eComment.Info, "   Use the XY plane for circular motion");
     writeBlock(gPlaneModal.format(17));
   }
 
-  // Not GRBL
   else {
     // No G94/G17 here. Neither is a free no-op off GRBL: Marlin compiles G17 only under
     // CNC_WORKSPACE_PLANES and has no G93/G94 at all, and RRF gained G93/G94 only in 3.5.1.
 
-    // Disable stepper timeout
     writeComment(eComment.Info, "   Disable stepper timeout");
-    writeBlock(mFormat.format(84), sFormat.format(0)); // Disable steppers timeout
+    writeBlock(mFormat.format(84), sFormat.format(0));
   }
 }
 
@@ -4890,11 +4864,13 @@ var spindleEnabled = false;
 var lastPromptedSpeed = "";
 var lastPromptedClockwise = true;
 
+// Start the spindle, or -- under "Manual Spindle On/Off" -- ask the operator to, and only when the
+// speed or direction has changed since the last time they were asked.
 function spindleOn(_spindleSpeed, _clockwise) {
   if (getProperty(properties.jobManualSpindlePowerControl)) {
     var rpm = speedFormat.format(_spindleSpeed);
 
-    // For manual any positive input speed assumed as enabled. so it's just a flag
+    // Under manual control any positive speed just means "on": there is no S word to command.
     if (!spindleEnabled) {
       writeComment(eComment.Important, " >>> Spindle Speed: Manual");
       // Direction is named ONLY when counterclockwise: clockwise is the universal default for every
@@ -4922,6 +4898,7 @@ function spindleOn(_spindleSpeed, _clockwise) {
   spindleEnabled = true;
 }
 
+// Stop the spindle, or ask the operator to and beep where the firmware has M300.
 function spindleOff() {
   // Manual control describes the MACHINE -- a hand-switched router -- not the dialect, so the branch is
   // on the property first. GRBL used to emit a bare M5, which does nothing to a hand-switched router.
@@ -4941,38 +4918,33 @@ function spindleOff() {
 
 // Collapse newlines and any of `unsafeChars` into a single space, so user-supplied text embedded in a
 // G-code message or comment cannot break line syntax, comment syntax or quoted parameters. Runs become
-// a single space; leading/trailing whitespace is preserved so callers keep their own indentation. The
-// second pass squeezes the interior blanks the first creates, which otherwise showed as double gaps.
+// one space; leading and trailing whitespace is preserved so callers keep their own indentation.
 //
-// A BLACKLIST PER CALL SITE, AND DELIBERATELY NOT AUTODESK'S WHITELIST -- expect that to be
+// A blacklist per call site, and deliberately not Autodesk's whitelist -- expect that to be
 // re-proposed, and the answer is here. Their posts declare settings.comments.permittedCommentChars and
-// hand it to the kernel's filterText() inside their own formatComment(), so the whole of what the
-// declaration does is supply a whitelist to a call the post already makes itself: there is NO
-// kernel-side filtering to be had by declaring it (grbl.cps, Rev 45769, 2026-02-17, shipped with
-// Fusion). The two also differ in kind. A whitelist DELETES what it does not list, where this replaces
-// with a space -- which is what keeps a mangled operation name readable, HB-14 and HB-18's whole class.
-// And grbl.cps's own list is " abcdefghijklmnopqrstuvwxyz0123456789.,=_-*:", permitting neither ">"
-// nor "#" nor a quote, so adopting it would strip every ">>> WARNING:" this post writes down to
-// " WARNING:" and take "Tool #2" with it. The one thing a whitelist would bound and this does not is
-// non-ASCII arriving from an operation comment or a tool description; if that is ever wanted it belongs
-// HERE as one clause, not in a list built for another post's messages. PV-19.
+// hand it to the kernel's filterText() inside their own formatComment(), so declaring it buys no
+// kernel-side filtering at all (grbl.cps, Rev 45769, 2026-02-17, shipped with Fusion). The two differ
+// in kind as well: a whitelist DELETES what it does not list where this replaces with a space, which is
+// what keeps a mangled operation name readable -- HB-14 and HB-18's whole class. And grbl.cps's own
+// list permits neither ">" nor "#" nor a quote, so adopting it would strip every ">>> WARNING:" this
+// post writes down to " WARNING:" and take "Tool #2" with it. PV-19.
 function sanitizeMessageText(text, unsafeChars) {
   var sanitized = String(text).replace(new RegExp("[\\r\\n" + unsafeChars + "]+", "g"), " ");
   return sanitized.replace(/(\S) {2,}(?=\S)/g, "$1 ");
 }
 
+// Put a line on the machine's own display.
 function display_text(txt) {
-  // Firmware is Grbl
   if (fw == eFirmware.GRBL) {
-    // Don't display text
+    // GRBL has no display command, so it gets nothing.
   }
 
-  // Default
   else {
     writeBlock(mFormat.format(117), (getProperty(properties.jobSeparateWordsWithSpace) ? "" : " ") + sanitizeMessageText(txt, "();"));
   }
 }
 
+// Emit an arc as G2/G3, or linearize it where "Use Arcs" is off. Only planar partial arcs reach here.
 function circular(clockwise, cx, cy, cz, x, y, z, feed) {
   if (!getProperty(properties.jobUseArcs)) {
     linearize(tolerance);
@@ -4985,10 +4957,9 @@ function circular(clockwise, cx, cy, cz, x, y, z, feed) {
 
   var start = getCurrentPosition();
 
-  // Full circles never arrive here: maximumCircularSweep = 180 splits them into two arcs upstream, and
-  // helical moves are linearized by the kernel -- so only planar partial arcs reach this point.
+  // Full circles never arrive: maximumCircularSweep = 180 splits them into two arcs upstream, and
+  // helical moves are linearized by the kernel.
 
-  // Firmware is Grbl
   if (fw == eFirmware.GRBL) {
     switch (getCircularPlane()) {
         case PLANE_XY:
@@ -5005,7 +4976,6 @@ function circular(clockwise, cx, cy, cz, x, y, z, feed) {
     }
   }
 
-  // Default
   else {
     // Marlin supports arcs only on XY plane
     switch (getCircularPlane()) {
@@ -5018,13 +4988,12 @@ function circular(clockwise, cx, cy, cz, x, y, z, feed) {
   }
 }
 
-// WHETHER A "Jog to ..." MODE WORKS IS A CONDITION ON WHAT HOLDS THE PAUSE, NOT A FIRMWARE CAPABILITY,
-// and what stood here said GRBL could not do it at all. ONE STATEMENT OF THAT CONDITION, returned from
-// here and written by both channels -- the in-file warning below and validateJob()'s post-time twin --
-// so the two cannot come to differ, which is the same discipline the park and probe warnings follow.
-// Empty string means "no condition", which is RepRap and only RepRap.
+// Whether a "Jog to ..." mode works is a condition on what holds the pause, not a firmware capability
+// -- what stood here once said GRBL could not do it at all. One statement of that condition, returned
+// from here and written by both channels, so the two cannot come to differ. An empty string means "no
+// condition", which is RepRap and only RepRap.
 //
-//   RepRap -- a genuine firmware jog-at-pause. askUser()'s allowJog flag appends "X1 Y1 Z1" to M291,
+//   RepRap -- a genuine firmware jog-at-pause. askUser()'s allowJog flag appends "X1 Y1 Z1" to M291
 //   and nothing outside the controller has to cooperate.
 //
 //   GRBL -- the SENDER decides. "A jog command will only be accepted when Grbl is in either the 'Idle'
@@ -5036,7 +5005,7 @@ function circular(clockwise, cx, cy, cz, x, y, z, feed) {
 //
 //   Marlin -- neither. M0 calls wait_for_user_response(), which is "while (wait_for_user) idle();", and
 //   idle() reaches queue.get_available_commands() but never queue.advance() (MarlinCore.cpp, 2.1.2.5).
-//   Serial commands are ACCEPTED AND QUEUED at the pause and execute only after it, so a jog sent down
+//   Serial commands are accepted and QUEUED at the pause and execute only after it, so a jog sent down
 //   the wire runs late -- into the part, on a machine the operator believes is stopped. The panel's own
 //   move-axis UI is not gcode and is unaffected, which is why this is a condition and not a refusal.
 //
@@ -5056,6 +5025,7 @@ function jogAtPauseCondition() {
     + " until the pause is released and then runs late. MarlinCore.cpp, 2.1.2.5";
 }
 
+// Write the jog condition into the file, where there is one to write.
 function warnJogAtPauseNeedsSender() {
   var condition = jogAtPauseCondition();
   if (condition == "") {
