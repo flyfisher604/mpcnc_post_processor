@@ -181,6 +181,13 @@ const cases = [
     const seg = between(t, /WCS changed: 1 -> 2/, /2D-Face - Milling - Tool: 1/);
     const n = countOf(seg, /G38\.2/g);
     if (n !== 1) return [false, `${n} probes at the new-part-and-new-tool boundary, expected exactly 1`];
+    // PR-23a's OTHER HALF, which the register was owed and this case did not assert: the criterion is
+    // one probe AND one attach/detach pair. A probe count alone passes a post that asks for the plate
+    // twice for one measurement, and a duplicated establish is exactly what this ordering prevents.
+    const fit = countOf(seg, /MSG,Attach ZProbe/g), off = countOf(seg, /MSG,Detach ZProbe/g);
+    if (fit !== 1 || off !== 1) {
+      return [false, `${fit} attach and ${off} detach prompts at the boundary, expected one of each`];
+    }
     return ordered(seg, [['G55',/^G55$/m], ['tool change',/Tool Change Start/],
                          ['hand over',/MSG,Change to Tool #1/], ['change ends',/Tool Change End/],
                          ['establish',/^G10 L20 P2 Z0$/m], ['probe',/^G38\.2/m]]);
@@ -491,6 +498,36 @@ const cases = [
   must:[[/^G54$/m,'the default resolves to WCS 1'],[/^G55$/m,'and the second Setup is a second register']],
   mustNotLog:[[/names work offset 0 in one Setup and 1 in another/,
                'nothing ambiguous here - two labels, two registers']] },
+
+// === H. a pre-jogged FIRST part on a multi-part job (PV-21) ===========================
+// GUARD B HAS ALREADY MADE THIS JOB STORED-OFFSET BASED -- it refuses a multi-part job unless X/Y are
+// declared homed, on the grounds that it traverses between STORED work offsets. Then the SHIPPED
+// "First WCS / Part" writes part one's register from wherever the tool stands when the file starts. No
+// case in this matrix reached that: all 37 set the mode, and every one of them to "Skip" or "Probe Z".
+// The pair below is the mode that writes a register in SILENCE against the mode that asks first -- which
+// is the whole distinction, a jogged origin being a supported thing on both controls.
+{ id:'W32', desc:"PV-21 - the shipped first-part mode overwrites part one's register, and both channels say so",
+  job:'two-parts.cnc',
+  props:mp({ probeOnStart:S('Current XY & Probe Z'), probeOnChange:S('Probe Z') }),
+  must:[[/>>> WARNING: this file REPLACES the stored X0 Y0 of the part it starts on/,
+         'the file warns the operator who is about to run it']],
+  mustLog:[[/is a "Set \.\.\. to Current Pos" mode and this job cuts 2 parts/,
+            'and the dialog says it before posting, with the count the operator can check']],
+  // ABOVE THE WRITE IT DESCRIBES, not merely present: "the G10 below" is part of the claim, and a
+  // warning that landed after the register was written would be a true sentence in a useless place.
+  custom:t => { const w = at(t, /REPLACES the stored X0 Y0/), g = at(t, /^G10 L20 P1 X0 Y0 Z0$/m);
+    if (w < 0 || g < 0) return [false, `warning@${w} G10@${g} - both must be present`];
+    return w < g ? [true, `warning @${w} stands above the G10 @${g}`]
+                 : [false, `warning @${w} follows the write @${g} it describes`]; } },
+
+{ id:'W33', desc:'PV-21 - ... and a "Jog to ..." mode writes the same register having ASKED, so neither channel warns',
+  job:'two-parts.cnc',
+  props:mp({ probeOnStart:S('Jog XY & Probe Z'), probeOnChange:S('Probe Z') }),
+  must:[[/^G10 L20 P1 X0 Y0 Z0$/m,'the same register write, byte for byte'],
+        [/^M0 \(MSG,Jog to X0 Y0 above Z0, probe\)$/m,'reached through a prompt the operator answers']],
+  mustNot:[[/REPLACES the stored X0 Y0/,
+            'so the file says nothing: a register the operator was asked to set did not change behind them']],
+  mustNotLog:[[/is a "Set \.\.\. to Current Pos" mode and this job cuts/,'and nor does the dialog']] },
 ];
 
 // ---- run ------------------------------------------------------------------------------

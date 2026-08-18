@@ -15,7 +15,8 @@ the file that computes it is named instead.
 a verdict beside every `writeWarning()` call — `grep -n "// TWIN:"`. The finding the audit found while
 closing another has closed too, so **`findings.md` §2 is empty**.
 
-**No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §7.
+**No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §2, and `PV-14`
+is the row.
 
 **Nothing is pushed.** No work since the `Assessment` merge is on `origin`. Pushing is the
 author's call, not a session's.

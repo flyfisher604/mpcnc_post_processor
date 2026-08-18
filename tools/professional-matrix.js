@@ -399,6 +399,97 @@ const cases = [
 { id:'PRO39', desc:'PV-18 - ... and the GRBL-sender guard reaches it too: UGS on a RepRap job is refused',
   cnc:change, props:pro({ jobSelectedFirmware:S('RepRap'), toolChangeMode:S('Macro'), toolChangeSender:S('UGS') }),
   refuse:[/which is a GRBL sender/,'refused by the same guard that refuses gSender there'] },
+
+// --- PR-16 reopened: homing decides the height "Use WCS X0 Y0, Probe Z0" probes down from ------
+// PRO3 already posts this configuration and asserted only that BOTH CHANNELS SPEAK. What neither
+// channel said was WHO CHOSE THE HEIGHT, and both told the operator it was theirs -- "before the
+// program starts", "wherever you leave the tool" -- which homing makes false. The four cases below are
+// the two branches of each new condition, and PRO42/PRO43 are the pair that matters most: the firmware
+// split is not decoration, because "$H" homes Z on GRBL whatever "Axes Homed and Trusted" says and
+// "G28 Z" does not. Every one drops "Machine Travel Z", which is what leaves the job with no frame.
+{ id:'PRO40', desc:'PR-16 - GRBL declares X/Y ALONE and $H still homes Z, so both channels name homing',
+  cnc:face, props:{ machineHomedAxes:S('XY'), machineHomeAtStart:S('Home'),
+                    machineParkAtEnd:S('Work'), probeOnStart:S('Probe Z') },
+  must:[[/^\$H$/m,'one $H, the build cycle deciding the axes'],
+        [/>>> WARNING[^)]*on this job HOMING chose that height, not you/,
+         'the file says the start height is not the operator\'s']],
+  mustNot:[[/must be clear of the stock, clamps and fixtures before the program starts/,
+            'and the old text, which asked for something homing undoes, is gone']],
+  mustLog:[[/searches DOWN FROM THAT SAME HEIGHT/,'the dialog half - HB-5'],
+           [/declares only X and Y/,'naming the sharp claim: the declaration does not bound $H']],
+  mustNotLog:[[/set the target deep enough to reach the stock from where you leave the tool/,
+               'the unfollowable advice is not offered to a job that homes']] },
+
+{ id:'PRO41', desc:'PR-16 - the same job with homing OFF keeps the original advice, which is followable there',
+  cnc:face, props:{ machineHomedAxes:S('XY'), machineHomeAtStart:S('Off'),
+                    machineParkAtEnd:S('Work'), probeOnStart:S('Probe Z') },
+  must:[[/must be clear of the stock, clamps and fixtures before the program starts/,
+         'the file keeps the text the operator can act on']],
+  mustNot:[[/HOMING chose that height/,'and never blames homing on a job that does not home'],
+           [/^\$H$/m,'nothing homes']],
+  mustLog:[[/set the target deep enough to reach the stock from where you leave the tool/,
+            'and so does the dialog']],
+  mustNotLog:[[/searches DOWN FROM THAT SAME HEIGHT/,'the homing text stays off this branch']] },
+
+{ id:'PRO42', desc:'PR-16 - Marlin homes Z per axis, so the text names G28 Z rather than the $H cycle',
+  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), machineHomedAxes:S('XYZ'),
+                    machineHomeAtStart:S('Home'), machineParkAtEnd:S('Work'), probeOnStart:S('Probe Z') },
+  must:[[/^G28 Z$/m,'Z really is homed here'],
+        [/HOMING chose that height, not you/,'so the file names homing']],
+  mustLog:[[/The "G28 Z" this job emits leaves the tool at the Z endstop/,'the per-axis clause']],
+  mustNotLog:[[/runs the build's whole homing cycle/,'and not the GRBL one, which would be false here']] },
+
+{ id:'PRO43', desc:'PR-16 - ... and Marlin declaring X/Y alone emits no G28 Z, so nothing may blame homing',
+  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), machineHomedAxes:S('XY'),
+                    machineHomeAtStart:S('Home'), machineParkAtEnd:S('Work'), probeOnStart:S('Probe Z') },
+  // THE CASE THAT MAKES homingMovesZ() EARN ITS FIRMWARE SPLIT. Identical to PRO40 but for the
+  // firmware: there $H moves Z with the same declaration, here G28 X / G28 Y leave it alone, so the
+  // height IS the operator's and the original advice is the correct thing to print.
+  must:[[/^G28 X$/m,'X and Y home'],
+        [/must be clear of the stock, clamps and fixtures before the program starts/,
+         'and the height is still the operator\'s, so the original text stands']],
+  mustNot:[[/^G28 Z$/m,'Z is not homed - the declaration bounds the emission on this firmware'],
+           [/HOMING chose that height/,'so homing is not blamed for a height it never touched']],
+  mustNotLog:[[/searches DOWN FROM THAT SAME HEIGHT/,'and the dialog agrees, on the same predicate']] },
+
+{ id:'PRO44', desc:'PR-16 - a handed-over first tool moves the tool after homing, so homing is not what set the height',
+  cnc:face, props:{ machineHomedAxes:S('XY'), machineHomeAtStart:S('Home'), machineParkAtEnd:S('Work'),
+                    probeOnStart:S('Probe Z'), toolChangeMode:S('Macro'), toolChangeSender:S('gSender'),
+                    toolChangeFirstToolCorrect:B(false) },
+  // The third condition, and the one that keeps the claim honest: toolChangeFirstLoad() hands the tool
+  // over BETWEEN the homing and the probe on this arm, so the height is the macro's. Both halves read
+  // firstToolChangeIsHandedOver() rather than re-deriving it - PV-13's predicate, reused.
+  must:[[/^T1 M6$/m,'the first tool is handed over, so something moved the tool after $H']],
+  mustNot:[[/HOMING chose that height/,'and the file does not claim homing set the probe height']],
+  mustNotLog:[[/searches DOWN FROM THAT SAME HEIGHT/,'nor does the dialog']],
+  mustLog:[[/set the target deep enough to reach the stock from where you leave the tool/,
+            'the general text is what a hand-over gets']] },
+
+// --- PV-20: the $1 idle-delay warning described a pause the hand-over never writes -------------
+// THE GATE IS UNCHANGED and right: the segment buffer drains whether the post stopped the stream or a
+// sender did, so the hazard is the same on both flows. What forked is the sentence about what this job
+// DOES. These two cases are the same job at the same tool count differing in one dropdown, and each must
+// carry its own sentence and NOT the other's -- which is what a single shared text could not do.
+{ id:'PRO45', desc:'PV-20 - the manual pause names its M0, and never the hand-over sentence',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause') }),
+  must:[[/^M0 \(MSG,Change to Tool #2/m,'the pause this arm is entitled to describe']],
+  mustLog:[[/This job stops the program \(M0\) for a manual tool change\. On GRBL the steppers de-energise/,
+            'the forked clause and the shared hazard clause, in one sentence']],
+  mustNotLog:[[/hands each tool change to/,'a manual change is not a hand-over'],
+              [/This job pauses for a tool change on GRBL/,
+               'and the old text, which said the same thing on both flows, is gone']] },
+
+{ id:'PRO46', desc:'PV-20 - ... and the hand-over says the post wrote no pause, naming the handler',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Macro'), toolChangeSender:S('UGS') }),
+  mustLog:[[/hands each tool change to "UGS \(Universal Gcode Sender\) -- T \+ M6", and the post writes no pause for it/,
+            'the handler by its own dialog title, and the only claim about the file that is true here'],
+           [/the steppers de-energise once the machine has been idle for \$1 milliseconds/,
+            'the hazard clause is SHARED, not forked - the gate was never the defect']],
+  mustNotLog:[[/This job stops the program \(M0\) for a manual tool change/,
+               'nothing claims a stop this file does not contain'],
+              [/This job pauses for a tool change on GRBL/,'nor the old text']],
+  mustNot:[[/^M0 \(MSG,Change to Tool/m,
+            'and the file really has no change pause: PRO45 has one, this has none, one dropdown apart']] },
 ];
 
 // ---- run ------------------------------------------------------------------------------
