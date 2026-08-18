@@ -1042,8 +1042,7 @@ function parseSafeZProperty() {
 // the text: grbl 1.1 does not nest comments and ends one at the first ")" (grbl/gcode.c,
 // gc_execute_line()), so an inner bracket closes the comment and the rest is parsed as g-code.
 function writeSafeZFormatWarning(title, groupTitle, heightInUnit) {
-  // TWIN: paired -- validateJob()'s Safe-Z expression warning, which loops the same two properties
-  // through the same parseSafeZExpr() and names the same 15 mm fallback.
+  // TWIN #1
   writeWarning("\"" + title + "\" in \"" + groupTitle + "\" -- format error, falling back to "
     + xyzFormat.format(heightInUnit));
 }
@@ -1280,10 +1279,7 @@ function isSafeToRapid(x, y, z) {
 // missing-file error and its missing-trailing-newline repair.
 function writeCustomCoolantFile(channel, on, file) {
   if (file == "") {
-    // TWIN: paired -- validateJob()'s "is Use custom ... and that field is empty" warning, in CR-22's
-    // own loop over the same four code/file pairs and on the same enum gate. CR-22 ruled the empty
-    // field is the answer "no custom file" rather than an error, which settled the SEVERITY and not
-    // the channel; the twin is what settled the channel. PV-12.
+    // TWIN #2
     writeWarning("coolant channel " + channel + " is set to \"Use custom\""
       + " but no custom file is named -- nothing emitted");
     return;
@@ -1387,13 +1383,7 @@ function setCoolant(coolant) {
     }
 
     if (warn) {
-      // TWIN: paired -- validateJob()'s "asks for X coolant and neither channel is set to it", off
-      // unmatchedCoolantRequests(), which reads the same requestedCoolant() this block's caller does.
-      // AND THE TWO DIFFER IN ONE STATED WAY, which is why it is written at both ends: the pre-flight
-      // is SILENT where both channel Modes are Off and this line is not. That is not drift. Both Modes
-      // Off is the operator declaring the machine has no coolant, and Fusion's tools carry Flood
-      // whether or not anyone wanted it -- the dialog would complain on nearly every hobbyist job. The
-      // file is exact and per-occurrence either way, and this is the exact half. PV-12.
+      // TWIN #3
       writeWarning("No matching Coolant channel : " + ((coolantLevels.indexOf(coolant) != -1 ) ? coolant : "unknown") + " requested");
     }
   }
@@ -1623,6 +1613,7 @@ function validateJob() {
 
   // The likeliest group-4 mistake: the ACTION is set and the declaration above it never touched, so
   // writeMachineHoming() emits NO MOTION and the operator believes the job homed.
+  // TWIN #7 -- the file half is writeMachineHoming()'s.
   if (homesAtJobStart() && !homedXY && !homedZ) {
     warning(localize("\"Home at Job Start\" asks this job to home, but \"Axes Homed and Trusted\" is "
       + "None, so no axis is declared homeable and the post emits no homing motion at all -- the job "
@@ -1634,6 +1625,9 @@ function validateJob() {
   // qualifies -- X/Y homing destroys the pre-jogged XY, Z homing the height recorded as Z0. It is the
   // one pre-jog destroyer that cannot be reordered away, homing being step 2 of writeFirstSection()
   // with everything after it depending on the frame it makes. CR-15 moved the establish; this stands.
+  // TWIN #8 -- the file half is writeMachineHoming()'s, and it is this pair's precedent: PV-4, where
+  // the dialog had the warning and the file did not, and the fix went to the emitter because
+  // validateJob() runs with no output stream.
   if (homesAtJobStart() && (homedXY || homedZ) && originIsPreJogged()) {
     // Advice rather than prohibition: with X/Y declared homed, a stored fixture offset in the active
     // WCS is repeatable across power cycles, so it is a better answer than the destroyed pre-jog.
@@ -1673,6 +1667,7 @@ function validateJob() {
   // "Jog to ..." modes write a register too but stop at an M0 and ask, and a probe writes Z alone.
   // Advice and not a refusal, CR-16's reason: loose stock for the first part beside fixtured ones is a
   // real workflow and the post cannot tell it from the mistake.
+  // TWIN #13 -- the file half is writeWcsOnStart()'s, on the same two predicates.
   if (multiWcs && originIsPreJogged()) {
     warning(localize("\"First WCS / Part\" is a \"Set ... to Current Pos\" mode and this job cuts "
       + collectDistinctOffsets().length + " parts. That mode takes the first part's origin from where "
@@ -1708,6 +1703,7 @@ function validateJob() {
   // the dialog and the file cannot come to differ. The firmware test is that statement being non-empty
   // -- RepRap alone has none. Only the subsequent-part half carries multiWcs, that control being unread
   // on a single-offset job.
+  // TWIN #14 -- the file half is warnJogAtPauseNeedsSender()'s.
   if (jogAtPauseCondition() != "" &&
       (startMode == "Jog XY & Probe Z" || startMode == "Jog XYZ" ||
        (multiWcs && (changeMode == "Jog XY & Probe Z" || changeMode == "Jog XYZ")))) {
@@ -1780,6 +1776,7 @@ function validateJob() {
   // setting that does nothing is the whole complaint: the operator asked for a stop that is not
   // written, and the reason is that these modes take the origin from a jog made before the file started
   // -- with a tool already fitted, by a tip every depth then measures from. Not gated on the frame.
+  // TWIN #15 -- the file half is toolChangeFirstLoad()'s, on the same originIsPreJogged().
   if (!getProperty(properties.toolChangeFirstToolCorrect) && originIsPreJogged()) {
     warning(localize("\"First Tool is Correct\" is Off, but \"First WCS / Part\" is a \"Set ... to "
       + "Current Pos\" mode, which takes this part's origin from where you jog the tool BEFORE "
@@ -1804,6 +1801,10 @@ function validateJob() {
   // of toolChangeFirstLoad() runs BETWEEN the homing and the probe and moves the tool itself, so the
   // height is the macro's. The claim these two warnings make is narrow -- homing was the LAST thing to
   // move the tool -- and it has to stay checkable.
+  // TWIN #12 -- the file half is partProbe()'s, and it covers four callers: this warning word for word
+  // on the first part's own probe, toolChange()'s no-frame warning on the change re-probe, and Guard B
+  // refusing the two multi-part paths outright. No arm is uncovered. Both halves change together, on
+  // the same predicate, or that claim stops being true.
   if (startMode == "Probe Z" && !fixedZEstablishedInFile()) {
     if (homingMovesZ() && !firstToolChangeIsHandedOver()) {
       // One height, two consequences: the rapid to the stored X0 Y0 is an X/Y move, so it happens AT
@@ -1840,6 +1841,7 @@ function validateJob() {
   // The machine park crosses the bed, and writeMachineParkXY() can retract first only in a frame THIS
   // JOB ESTABLISHED -- the same fixedZEstablishedInFile() the park itself reads, so this warning and the
   // file cannot disagree. A warning, not a guard: Fusion's own retract covers an ordinary milling job.
+  // TWIN #4 -- the file half is writeMachineParkXY()'s.
   if (getProperty(properties.machineParkAtEnd) == "Machine" && !fixedZEstablishedInFile()) {
     warning(localize("\"At End Park At\" = machine X0 Y0 crosses the bed to the homing corner, but "
       + "this job establishes no fixed Z reference to retract in, so the tool makes that crossing "
@@ -1867,6 +1869,9 @@ function validateJob() {
   // costs the RETURN as well. Or the first tool is handed over, which a one-tool job reaches and
   // countDistinctTools() > 1 does not -- toolChangeMacroResume() owes the same return there and warns
   // in the file when it cannot make it. PV-13.
+  // TWIN #16 -- the file half is toolChange()'s, at the hand-over.
+  // TWIN #18 -- and toolChangeMacroResume()'s, at the return. One dialog warning over both ends,
+  // because with no frame the post can neither lift the tool nor bring it back.
   if (getProperty(properties.toolChangeMode) != "Refuse"
       && (countDistinctTools() > 1 || firstToolChangeIsHandedOver())
       && !fixedZEstablishedInFile()) {
@@ -1891,7 +1896,11 @@ function validateJob() {
   // It over-reports, and the text says so: a return re-probes only where a change has since made that
   // part's Z0 stale, and that is state this pass does not carry. Over-reporting is the right direction
   // for a pre-flight about a datum, and the file half is exact. Tool 0 and jet tools are skipped,
+  // for a pre-flight about a datum, and the file half is exact. Tool 0 and jet tools are skipped,
   // neither being able to probe.
+  // TWIN #11 -- the file half is partProbe()'s, and this is the pair that shows what a hand-built one
+  // costs: two predicates over the same sections, each half saying in its own text that it must not
+  // drift from the other.
   if (getProperty(properties.toolChangeMode) != "Refuse") {
     var changeReprobes = changeReprobesZ0();
     var returnReprobes = (changeMode == "Probe Z" || changeMode == "Jog XY & Probe Z");
@@ -2005,6 +2014,8 @@ function validateJob() {
     // know BEFORE they post. The file says it too, at each change and at each return, but a person who
     // reads the dialog and sends the job would otherwise meet it only in a place they had no reason to
     // open -- and it is this value that puts the other parts in that position. PV-10.
+    // TWIN #17 -- the file half is toolChange()'s "Manual" arm, which fires on the multi-part case
+    // alone: on a single-part job that text is an instruction the operator is about to carry out.
     if (toolLengthCorrection() == "Manual" && collectDistinctOffsets().length > 1) {
       warning(localize("\"Tool Length Correction By\" is \"User re-zeroed Z by hand at pause\" "
         + "and this job cuts " + collectDistinctOffsets().length + " parts. Re-zeroing at the pause "
@@ -2087,6 +2098,7 @@ function validateJob() {
   // read and no number is quoted -- the build option is named, as $1 and $110 already are. GRBL-gated
   // for the same reason PR-17 is: Marlin re-homes here instead of rapiding, and an RRF machine homed to
   // its axis minima rests AT the coordinate this block asks for.
+  // TWIN #6 -- the file half is writeMachineParkXY()'s, same firmware and same property.
   if (fw == eFirmware.GRBL && getProperty(properties.machineParkAtEnd) == "Machine") {
     warning(localize("\"At End Park At\" = machine X0 Y0 sends the tool to where the homing switches "
       + "tripped, not to where homing left the machine. On a stock Grbl build HOMING_FORCE_SET_ORIGIN "
@@ -2104,6 +2116,7 @@ function validateJob() {
   // (Marlin/src/module/motion.cpp, 2.1.2.5). It never touches coordinate_system[], so a stored G5x
   // register survives -- but an ordinary single-offset Marlin job never re-selects one (see
   // writeWCS()), so nothing re-applies it.
+  // TWIN #5 -- the file half is writeMachineParkXY()'s, gated on the same firmware and property.
   if (fw == eFirmware.MARLIN && getProperty(properties.machineParkAtEnd) == "Machine") {
     warning(localize("\"At End Park At\" = machine X0 Y0 HOMES X and Y on Marlin rather than rapiding "
       + "there, and homing zeroes position_shift -- the work origin this file established. The stored "
@@ -2114,6 +2127,7 @@ function validateJob() {
 
   // Anything parseSafeZExpr() cannot read resolves to a fixed 15 mm on every section, a plausible
   // retract height that looked like the setting working. Both, since they share a documented syntax.
+  // TWIN #1 -- the file half is writeSafeZFormatWarning()'s, which names the same 15 mm fallback.
   var safeZProps = [properties.mapRapidsSafeZ, properties.probeSafeZ];
   for (var s = 0; s < safeZProps.length; ++s) {
     if (parseSafeZExpr(getProperty(safeZProps[s])).mode == eSafeZ.ERROR) {
@@ -2231,6 +2245,9 @@ function validateJob() {
   // Names the operations and the level, both: the level alone leaves the operator hunting a tool
   // setting across every operation, and the operations alone do not say which channel to set. One
   // warning per unmatched level, because the remedy is per level.
+  // TWIN #3 -- the file half is setCoolant()'s, exact and per-occurrence. The two differ in one stated
+  // way, and it is not drift: this pre-flight is silent where both channel Modes are Off, and that line
+  // is not.
   var dryRequests = unmatchedCoolantRequests();
   for (var d = 0; d < dryRequests.length; ++d) {
     warning(localize("This job asks for \"" + dryRequests[d].level + "\" coolant and neither channel is "
@@ -2370,6 +2387,9 @@ function validateJob() {
   // emits nothing, which is the answer "no custom file" -- but it does warn, in the dialog as well as
   // the file. The operator set that channel to read a file and named none, and that is worth saying
   // whether or not THIS job happens to drive the channel. PV-12.
+  // TWIN #2 -- the file half is writeCustomCoolantFile()'s, on the same enum gate. CR-22 ruled the
+  // empty field is the answer "no custom file" rather than an error, which settled the severity and
+  // not the channel; the twin is what settled the channel.
   var coolantCustom = [
     { code: properties.coolantChannelAOn,  file: properties.coolantChannelAOnCustom },
     { code: properties.coolantChannelAOff, file: properties.coolantChannelAOffCustom },
@@ -2410,6 +2430,7 @@ function validateJob() {
     // inside one #if ENABLED(CNC_COORDINATE_SYSTEMS), off by default -- so a Marlin build either has
     // the machine frame AND the WCS registers, or neither. The post cannot read the build, and refusing
     // would deny the frame to every correctly configured CNC Marlin.
+    // TWIN #10 -- the file half is writeFixedZReference()'s, gated on the same firmware.
     if (fw == eFirmware.MARLIN) {
       warning(localize("This job moves in the machine's own Z frame with G53, which on Marlin is the "
         + "build option CNC_COORDINATE_SYSTEMS and is OFF in a stock configuration. The post assumes "
@@ -2433,6 +2454,8 @@ function validateJob() {
     // limits pass it: system_check_travel_limits() (grbl/system.c, 1.1f) rejects target > 0, and 0 is
     // not > 0. The highest safe value is -$27, which the post cannot read, so the text names the
     // pull-off and never a number. CR-10's fact on the Z axis, where CR-10 has it on X/Y.
+    // TWIN #9 -- the file half is writeFixedZReference()'s, on the same firmware and the same parsed
+    // height.
     if (fw == eFirmware.GRBL && parseMachineTravelZ() >= 0) {
       warning(localize("\"Machine Travel Z\" is " + parseMachineTravelZ() + ", which is at or above "
         + "machine zero. On a stock Grbl build (HOMING_FORCE_SET_ORIGIN off) homing leaves every "
@@ -3119,8 +3142,7 @@ function writeMachineParkXY() {
   // fixed Z reference can retract at all, which is what fixedZEstablishedInFile() answers.
   // validateJob() reads the same predicate for its warning, so the two cannot drift.
   if (!fixedZEstablishedInFile()) {
-    // TWIN: paired -- validateJob()'s "At End Park At = machine X0 Y0" warning, on the same
-    // fixedZEstablishedInFile() this arm reads.
+    // TWIN #4
     writeWarning("no retract before parking at machine X0 Y0 -- this job establishes no fixed Z"
       + " reference; the tool crosses the bed at whatever Z the last operation left it at");
   } else {
@@ -3132,7 +3154,7 @@ function writeMachineParkXY() {
     // The in-file half of validateJob()'s Marlin park warning, so a file read on its own carries what
     // its last two blocks cost. set_axis_is_at_home() zeroes position_shift; coordinate_system[] is
     // untouched, but nothing in an ordinary single-offset job re-selects it. motion.cpp, 2.1.2.5.
-    // TWIN: paired -- validateJob()'s Marlin park warning, gated on the same firmware and property.
+    // TWIN #5
     writeWarning("the two homing blocks below zero Marlin's position_shift -- the work origin this file"
       + " established. Any file run after this one must establish its own origin; it cannot resume on"
       + " this one's");
@@ -3144,7 +3166,7 @@ function writeMachineParkXY() {
   // The in-file half of validateJob()'s CR-10 warning, so a file read on its own carries what its last
   // block costs. Below the Marlin return, this route being the only one that rapids at a switch.
   if (fw == eFirmware.GRBL) {
-    // TWIN: paired -- validateJob()'s CR-10 warning, same firmware and same property.
+    // TWIN #6
     writeWarning("machine X0 Y0 is where the homing switches tripped, and on a stock Grbl build homing"
       + " leaves the axes one pull-off inside that point -- so the block below drives X and Y back onto"
       + " the switches, and with hard limits enabled this job ends in Alarm rather than parked. Correct"
@@ -3965,7 +3987,7 @@ function writeMachineHoming() {
   // Asking for the action with nothing declared homeable cannot be satisfied, and is not a no-op worth
   // passing over: the operator believes the job homes. Not an error() -- it costs no safety on its own.
   if (!homeXY && !homeZ) {
-    // TWIN: paired -- validateJob()'s "asks this job to home, but Axes Homed and Trusted is None".
+    // TWIN #7
     writeWarning("\"Home at Job Start\" is on but \"Axes Homed and Trusted\" is None -- nothing was"
       + " homed");
     return;
@@ -3980,8 +4002,7 @@ function writeMachineHoming() {
   // that homing is on and that an axis is declared, so the mode is the whole remaining condition.
   // Advice, not prohibition: a fixture AT machine zero is rare rather than impossible. PV-4.
   if (originIsPreJogged()) {
-    // TWIN: paired -- PV-4, and it is this pair's precedent: the dialog had it, the file did not, and
-    // the fix went to the emitter because validateJob() runs with no output stream.
+    // TWIN #8
     writeWarning("the homing below runs BEFORE \"First WCS / Part\" records the current position as"
       + " the part origin, so whatever this job records as X0 Y0 is where homing left the machine --"
       + " the endstop corner -- and not where you parked the tool. Positioning the tool before"
@@ -4164,7 +4185,7 @@ function writeFixedZReference() {
   // The in-file half of PR-17's post-time warning. Once, at the establish, rather than at every G53 --
   // the height is the same on all of them, and the reason is in validateJob() beside the source read.
   if (fw == eFirmware.GRBL && parseMachineTravelZ() >= 0) {
-    // TWIN: paired -- PR-17's post-time warning, on the same firmware and the same parsed height.
+    // TWIN #9
     writeWarning("machine Z " + xyzFormat.format(machineTravelZ()) + " is at or above machine zero --"
       + " on a stock Grbl build homing leaves every reachable Z negative, and zero itself is where the"
       + " Z endstop tripped, one pull-off above where homing left the axis; a move there returns it onto"
@@ -4175,7 +4196,7 @@ function writeFixedZReference() {
   // The in-file half of validateJob()'s Marlin warning, so a file read on its own carries the
   // assumption its motion depends on. Once, at the establish, rather than at every G53.
   if (fw == eFirmware.MARLIN) {
-    // TWIN: paired -- validateJob()'s Marlin G53 warning, gated on the same firmware.
+    // TWIN #10
     writeWarning("every G53 below assumes this Marlin was compiled with CNC_COORDINATE_SYSTEMS,"
       + " which is off in a stock configuration -- without it G53 is an unknown command and every"
       + " travel-height move in this file is skipped, leaving the tool where the last operation ended");
@@ -4331,8 +4352,7 @@ function partProbe(atOrigin, zUntrusted, startsWhereHomingLeftIt) {
   // touch-point onto uncut stock, and its description names only the origin-at-a-corner case.
   var machined = probePointMachinedBefore(sectionsCompleted, currentWorkOffset);
   if (machined != undefined) {
-    // TWIN: paired -- PV-7, and the pair that shows what a hand-built one costs: two predicates over
-    // the same sections, each half saying in its own text that it must not drift from the other.
+    // TWIN #11
     writeWarning("this probe touches off at " + probePointDescription() + " -- a point this job has"
       + " ALREADY CUT, down to Z" + xyzFormat.format(machined.zMin) + " in "
       + machined.names.join(", ") + ". Where the tool lands on that machined surface instead of the"
@@ -4347,23 +4367,7 @@ function partProbe(atOrigin, zUntrusted, startsWhereHomingLeftIt) {
     // The rapid below is at an unknown height, so the file must say so. A WARNING and not an Info
     // comment: it reports a precondition the operator must satisfy, and Info is gone at Level = Off.
     if (zUntrusted && !fixedZEstablishedInFile()) {
-      // TWIN: paired, and the walk had to enumerate the callers to say so. partProbe(false, true)
-      // arrives from four places: the first part's own probe, which validateJob()'s "First WCS / Part
-      // = Use WCS X0 Y0, Probe Z0 rapids to the stored X0 Y0" warning covers word for word; the tool
-      // change's re-probe, which its no-frame warning covers by naming this rapid; and the two
-      // multi-part paths, which Guard B refuses outright with no frame. No arm is uncovered.
-      //
-      // PR-16, AND THE PAIRING ABOVE IS WHAT FOUND IT. This text and its dialog twin both told the
-      // operator the start height was theirs -- "before the program starts", "wherever you leave the
-      // tool" -- and where the job homes it is not: homing is the last thing to move the tool before
-      // this probe, so the height is the endstop's and no jog before the file can reach it. That is
-      // the spoilboard base probe's defect exactly, one path over: it too ran wherever the tool
-      // already sat, and it closed by DELETION, taking the code and leaving the class. Both halves
-      // change together, on the same predicate, or the "word for word" claim above stops being true.
-      //
-      // ONE TWIN VERDICT OVER TWO TEXTS, and the tag above is deliberately left where it is: the two
-      // arms are one statement about one configuration, differing only in who chose the height, so a
-      // walk that split them would be counting texts rather than claims. It is the only such site.
+      // TWIN #12
       if (startsWhereHomingLeftIt && homingMovesZ()) {
         writeWarning("no Z reference is established, so the XY move below and the G38.2 under it both"
           + " start from whatever height the tool is holding -- and on this job HOMING chose that"
@@ -4423,8 +4427,7 @@ function writeWcsOnStart() {
   // BOTH CHANNELS, PV-4's ruling on the neighbouring pre-jog collision: the person about to run this
   // file is the one who can write the old offset down first, and by the G10 it is too late.
   if (originIsPreJogged() && collectDistinctOffsets().length > 1) {
-    // TWIN: paired -- validateJob()'s "First WCS / Part is a Set ... to Current Pos mode and this job
-    // cuts N parts", on the same two predicates.
+    // TWIN #13
     writeWarning("this file REPLACES the stored X0 Y0 of the part it starts on -- \"First WCS / Part\""
       + " is a \"Set ... to Current Pos\" mode, so the G10 below writes wherever the tool is standing"
       + " when this file starts into that part's work offset register. Every other part in this job is"
@@ -4541,16 +4544,21 @@ function writeCommentLine(text) {
   }
 }
 
-// Every ">>> WARNING:" the post writes goes through here, and it IGNORES Comment Level: eight of them
-// have no validateJob() twin to survive in -- six that should not and two that should. Off means less
-// commentary, not fewer warnings. The prefix lives here rather than at the call sites so it cannot drift.
+// Every ">>> WARNING:" the post writes goes through here, and it IGNORES Comment Level -- Off means
+// less commentary, not fewer warnings. The prefix lives here rather than at the call sites so it
+// cannot drift.
 //
-// EVERY CALL SITE CARRIES A "// TWIN:" VERDICT, so "grep -n '// TWIN:'" is the whole table and it lives
-// beside the code rather than in a document that goes stale. Four values, and the reason clause is the
-// point of each: "paired" names the validateJob() warning that already states the same condition before
-// the job runs; "here" means both channels leave from one statement; "none" means only the emission
-// point knows it, or a dialog line would fire on every job and train the operator to dismiss the
-// dialog; "owed" is a defect with an open row. findings.md Step W ran this walk once.
+// EVERY CALL SITE CARRIES A TWIN VERDICT, so the register is two greps and lives beside the code
+// rather than in a document that goes stale:
+//
+//   "// TWIN #<n>" is a PAIR -- a validateJob() warning stating the same condition before the job
+//   runs, and the file half that states it at the moment it becomes true. The full account is on the
+//   validateJob() side, which names the emitting function; the file side carries the number alone.
+//   Every number appears at least twice, and #16 and #18 are one dialog warning over two file halves.
+//
+//   "// TWIN: here" is both channels leaving from one statement -- warnBothChannels(). "// TWIN: none"
+//   is a warning only the emission point can know, or one whose dialog line would fire on every job
+//   and train the operator to dismiss the dialog. Neither has a partner, so neither takes a number.
 //
 // NO PARENTHESES IN THE TEXT PASSED HERE. writeCommentLine() hands it to sanitizeMessageText(_, "()"),
 // which replaces every run of "(" or ")" with a space, because a grbl comment cannot nest and ends at
@@ -5053,8 +5061,7 @@ function warnJogAtPauseNeedsSender() {
   if (condition == "") {
     return;
   }
-  // TWIN: paired -- validateJob()'s jog-at-pause warning. Both halves take their condition clause
-  // from jogAtPauseCondition(), so the dialog and the file cannot come to say different things.
+  // TWIN #14
   writeWarning(condition + ". Check this before running the file: without it the job stops here and"
     + " cannot be moved until it is resumed.");
 }
@@ -5114,8 +5121,7 @@ function toolChangeFirstLoad() {
   // rather than dangerous, and the remedy is the two modes that load and THEN position. PV-13.
   if (originIsPreJogged()) {
     writeComment(eComment.Debug, " toolChangeFirstLoad: suppressed -- \"First WCS / Part\" records a pre-jogged origin");
-    // TWIN: paired -- validateJob()'s "First Tool is Correct is Off, but First WCS / Part is a
-    // Set ... to Current Pos mode", on the same originIsPreJogged() this arm reads.
+    // TWIN #15
     writeWarning("\"First Tool is Correct\" is Off and nothing was emitted to load one -- \"First WCS /"
       + " Part\" takes this part's origin from where you jogged the tool before starting this file, so"
       + " the tool that made that jog is the one this job assumes and measures from. Fitting a different"
@@ -5335,8 +5341,7 @@ function toolChange(partOriginEstablishesZ0) {
       writeToolChangePosition();
     }
   } else {
-    // TWIN: paired -- validateJob()'s no-frame tool-change warning, which covers BOTH flows and both
-    // ends: this hand-over and the return below.
+    // TWIN #16
     writeWarning("no retract before this tool change -- this job establishes no fixed Z reference, so"
       + " the tool is handed over at whatever height the last operation ended at. Enter \"Machine"
       + " Travel Z\" in group 4, or retract by hand before touching the tool");
@@ -5461,10 +5466,7 @@ function toolChange(partOriginEstablishesZ0) {
     // deep by a tool length. What makes saying so honest rather than alarming is the clearing above --
     // every other part IS handled, at its own return.
     var strandedParts = collectDistinctOffsets().length - 1;
-    // TWIN: paired -- PV-10's regime warning, which states in the dialog that a hand-zero at one pause
-    // reaches one part. It fires on the multi-part case alone: on a single-part job this text is an
-    // instruction the operator is about to carry out, not a condition they would have posted
-    // differently had they known.
+    // TWIN #17
     writeWarning("work Z0 was NOT re-established after this tool change, so it still measures from the"
       + " PREVIOUS tool's length and every depth below is out by the difference between the two."
       + " Re-zero Z by hand at the pause above"
@@ -5601,8 +5603,7 @@ function toolChangeMacroResume() {
   if (fixedZEstablishedInFile()) {
     writeMachineTravelZ("Return to the travel height in the machine frame after the tool change");
   } else {
-    // TWIN: paired -- the same no-frame tool-change warning as the hand-over above; it names the
-    // return explicitly, this being the end it costs.
+    // TWIN #18
     writeWarning("the tool was NOT returned to a known height after the tool change -- this job"
       + " establishes no fixed Z reference, so wherever the macro left the tool is where the next move"
       + " starts from. Enter \"Machine Travel Z\" in group 4");

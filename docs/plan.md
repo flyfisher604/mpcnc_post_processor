@@ -12,7 +12,7 @@ the file that computes it is named instead.
 ## Checkpoint
 
 **Next: Step 6.** Step W is done: the audit ran, `PV-9` closed on it, and the class it bounded is now
-a verdict beside every `writeWarning()` call — `grep -n "// TWIN:"`. The finding the audit found while
+a verdict beside every `writeWarning()` call — `grep -n "// TWIN"`. The finding the audit found while
 closing another has closed too, so **`findings.md` §2 is empty**.
 
 **No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §2, and `PV-14`

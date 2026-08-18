@@ -494,7 +494,7 @@ than an unpaired warning — it reads as two confirmations of the same wrong thi
 **A pre-flight is not earlier in any sense that helps.** The post dialog is read *after* the post has
 run, so both channels arrive at the same moment. What a pre-flight buys is one statement about the whole
 job; what the emission point buys is one per occurrence — which for three stranded parts is the honest
-count. `PV-9`, and `grep -n "// TWIN:"` in the post is the verdict for every site.
+count. `PV-9`, and `grep -n "// TWIN"` in the post is the verdict for every site.
 
 ### The kernel's position is the toolpath's, and only the work frame can correct it
 
