@@ -511,13 +511,14 @@ properties = {
   },
   toolChangeSender: {
     title      : "Tool Change Handled By",
-    description: "Who does the change after the hand-over, and so which token is emitted. Read only on Sender or firmware macro changes it. gSender: T and M6, which the sender must be set to intercept -- GRBL itself rejects M6. CNCjs: T and M6, but it only pauses, so the change and the re-zero are yours. RepRapFirmware tool table: T alone; your tools must be declared in config.g. Other: no token -- the file named in Sender Macro File is included instead. The post then re-asserts absolute mode, units and the work offset, and returns to Machine Travel Z.",
+    description: "Who does the change after the hand-over, and so which token is emitted. Read only on Sender or firmware macro changes it. gSender: T and M6, which the sender must be set to intercept -- GRBL itself rejects M6. CNCjs: T and M6, but it only pauses, so the change and the re-zero are yours. UGS: T and M6, and its tool-change interception is OFF until you switch it on -- enabled, it removes the M6, passes the T word through so the machine state names the tool, moves to a safe height and a change position, waits for you, and can run a tool length probe if you have configured one. If you use that probe, set Tool Length Correction By to Tool change applies tool offset. RepRapFirmware tool table: T alone; your tools must be declared in config.g. Other: no token -- the file named in Sender Macro File is included instead. The post then re-asserts absolute mode, units and the work offset, and returns to Machine Travel Z.",
     group      : "toolChange",
     order      : 20,
     type       : "enum",
     values: [
       { title: "gSender (Sienci) -- T + M6",         id: "gSender" },
       { title: "CNCjs -- T + M6",                    id: "CNCjs"   },
+      { title: "UGS (Universal Gcode Sender) -- T + M6", id: "UGS"  },
       { title: "RepRapFirmware tool table -- T",     id: "RepRap"  },
       { title: "Other -- the macro file below",      id: "Other"   }
     ],
@@ -1938,7 +1939,7 @@ function validateJob() {
   if (toolChangeIsMacro() && countDistinctTools() > 1) {
     var senderId = getProperty(properties.toolChangeSender);
 
-    if (senderId == "gSender" || senderId == "CNCjs") {
+    if (toolChangeSenderIsGrblSender()) {
       warning(localize("\"Tool Change Handled By\" is \"" + toolChangeSenderTitle() + "\", so this job "
         + "hands each change over with M6 -- a command GRBL does not execute. It works only because the "
         + "sender removes the M6 from the stream and runs its own tool-change routine instead, and the "
@@ -2283,7 +2284,7 @@ function validateJob() {
       return;
     }
 
-    if ((handler == "gSender" || handler == "CNCjs") && fw != eFirmware.GRBL) {
+    if (toolChangeSenderIsGrblSender() && fw != eFirmware.GRBL) {
       error("\"Tool Change Handled By\" is \"" + toolChangeSenderTitle() + "\", which is a GRBL sender,"
         + " but this job is posted for " + fw + ". Choose the handler that runs this machine, or"
         + " \"Other\" with a macro file of your own.");
@@ -4913,6 +4914,19 @@ function spindleOff() {
 // G-code message or comment cannot break line syntax, comment syntax or quoted parameters. Runs become
 // a single space; leading/trailing whitespace is preserved so callers keep their own indentation. The
 // second pass squeezes the interior blanks the first creates, which otherwise showed as double gaps.
+//
+// A BLACKLIST PER CALL SITE, AND DELIBERATELY NOT AUTODESK'S WHITELIST -- expect that to be
+// re-proposed, and the answer is here. Their posts declare settings.comments.permittedCommentChars and
+// hand it to the kernel's filterText() inside their own formatComment(), so the whole of what the
+// declaration does is supply a whitelist to a call the post already makes itself: there is NO
+// kernel-side filtering to be had by declaring it (grbl.cps, Rev 45769, 2026-02-17, shipped with
+// Fusion). The two also differ in kind. A whitelist DELETES what it does not list, where this replaces
+// with a space -- which is what keeps a mangled operation name readable, HB-14 and HB-18's whole class.
+// And grbl.cps's own list is " abcdefghijklmnopqrstuvwxyz0123456789.,=_-*:", permitting neither ">"
+// nor "#" nor a quote, so adopting it would strip every ">>> WARNING:" this post writes down to
+// " WARNING:" and take "Tool #2" with it. The one thing a whitelist would bound and this does not is
+// non-ASCII arriving from an operation comment or a tool description; if that is ever wanted it belongs
+// HERE as one clause, not in a list built for another post's messages. PV-19.
 function sanitizeMessageText(text, unsafeChars) {
   var sanitized = String(text).replace(new RegExp("[\\r\\n" + unsafeChars + "]+", "g"), " ");
   return sanitized.replace(/(\S) {2,}(?=\S)/g, "$1 ");
@@ -5168,6 +5182,16 @@ function firstToolChangeIsHandedOver() {
 // validateJob()'s guards, the include pre-flight and the flow itself must not be able to disagree.
 function toolChangeIsMacro() {
   return getProperty(properties.toolChangeMode) == "Macro";
+}
+
+// THE HANDLERS THAT ARE A GRBL SENDER, IN ONE STATEMENT. Three of the four values are a sender that
+// takes "T<n> M6" over GRBL and removes the M6 before the controller sees it; the fourth is
+// RepRapFirmware, where the T word IS the change, and "Other" is the operator's own file. Two places
+// branch on this -- Flow 2's warning and the firmware guard -- and adding a value to one of them and
+// not the other is exactly how a hand-over comes to be warned about and never refused.
+function toolChangeSenderIsGrblSender() {
+  var id = getProperty(properties.toolChangeSender);
+  return id == "gSender" || id == "CNCjs" || id == "UGS";
 }
 
 // The dialog title of the chosen handler, for messages that name it. Reads the enum's own titles so a
@@ -5498,7 +5522,7 @@ function toolChange(partOriginEstablishesZ0) {
 // THE TOKEN IS NOT THE SAME QUESTION ON EVERY TARGET, which is why the handler is a dropdown and not a
 // firmware branch:
 //
-//   gSender / CNCjs -- "T<n> M6". Neither GRBL nor grblHAL executes M6; the controller answers
+//   gSender / CNCjs / UGS -- "T<n> M6". Neither GRBL nor grblHAL executes M6; the controller answers
 //   error:20 and the job stops with the tool in the cut. The route exists only because the SENDER
 //   takes the M6 out of the stream first, in the dataFilter of its Grbl controller
 //   (src/server/controllers/Grbl/GrblController.js -- gSender forked CNCjs's, and PR-20's M0 handling
@@ -5506,6 +5530,22 @@ function toolChange(partOriginEstablishesZ0) {
 //   which tool is coming; what reaches the controller is the T alone, which GRBL parses and does not
 //   act on. THE POST CANNOT VERIFY THAT THE SENDER IS CONFIGURED TO DO ANY OF THIS -- validateJob()
 //   warns, and that warning is the whole of the post's assurance.
+//
+//   UGS DOES IT IN A DIFFERENT PLACE AND TO THE SAME EFFECT, which is why it is listed rather than
+//   left to "Other": ToolChangeInterceptor matches "(?i)(?<![A-Z])M0?6(?![0-9])" and its own javadoc
+//   states the contract -- it "pauses the stream on tool change commands (M6), moves the machine to a
+//   safe height and to a tool change location, waits for the operator to change the tool and
+//   optionally runs a tool length probe before the stream is resumed", and "the M6 word is stripped
+//   from the triggering command, but any tool selection (T2) is issued directly to the controller so
+//   the gcode state reflects the requested tool". InterceptingGcodeStreamReader replaces the
+//   triggering command with a blank line "so it is not executed by the controller, but is still
+//   streamed and counted as a row". Both in ugs-core/src/com/willwinder/universalgcodesender/services/
+//   interceptor/, winder/Universal-G-Code-Sender master, read 2026-08-17.
+//
+//   AND IT IS OFF UNTIL THE OPERATOR TURNS IT ON: ToolChangeInterceptor takes a BooleanSupplier and
+//   its matches() answers false whenever that is false, so an un-enabled UGS streams the M6 straight
+//   through to error:20. That is the same class of fact as gSender's "must be set to intercept" and
+//   is why the shared Flow 2 warning covers all three without naming any of them.
 //
 //   RepRapFirmware -- "T<n>" and NO M6. On RRF the T word IS the change: it runs tfree<current>.g,
 //   tpre<n>.g and tpost<n>.g, and tpost is where a tool-length offset is applied. An M6 beside it would

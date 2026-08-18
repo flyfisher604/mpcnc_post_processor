@@ -379,6 +379,26 @@ const cases = [
                         toolChangeMode:S('Macro'), toolChangeSender:S('gSender') }),
   must:[[/^G28 X$/m,'the job posts - nothing hands over, so no guard has anything to refuse']],
   mustNot:[[/^T\d+ M6$/m,'and no token is emitted for a tool nobody is changing']] },
+
+// --- PV-18, the fourth handler ---------------------------------------------------------
+// WHAT THIS CASE IS ABOUT IS THE GUARD AND NOT THE TOKEN. UGS emits the identical T2 M6 the gSender
+// arm emits -- it falls to the same arm on purpose, the two senders reading the same token -- so the
+// only thing a new value can get wrong is being warned about and never refused, or the reverse.
+// PRO38 and PRO39 are the two halves of that, and they are why the three call sites became one
+// predicate rather than a third disjunct in each.
+{ id:'PRO38', desc:'PV-18 - UGS hands over with the same token, and picks up the same Flow 2 warning',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Macro'), toolChangeSender:S('UGS') }),
+  must:[[/^T2 M6$/m,'the same token: UGS strips the M6 and passes the T on to the controller'],
+        [/Hand over to UGS -- it must intercept the M6 below/,'and the file names the handler']],
+  mustLog:[[/"UGS \(Universal Gcode Sender\) -- T \+ M6", so this job hands each change over with M6/,
+            'the shared warning names the new value by its own dialog title']],
+  custom:(t)=>{ const i=t.search(/^T2 M6$/m); const after=t.slice(i);
+    return ordered(after,[['re-assert G90',/^G90$/m],['re-select G54',/^G54$/m],
+                          ['return to travel Z',/^G53 G0 Z-5 F/m]]); } },
+
+{ id:'PRO39', desc:'PV-18 - ... and the GRBL-sender guard reaches it too: UGS on a RepRap job is refused',
+  cnc:change, props:pro({ jobSelectedFirmware:S('RepRap'), toolChangeMode:S('Macro'), toolChangeSender:S('UGS') }),
+  refuse:[/which is a GRBL sender/,'refused by the same guard that refuses gSender there'] },
 ];
 
 // ---- run ------------------------------------------------------------------------------

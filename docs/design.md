@@ -382,9 +382,14 @@ because the party who has to satisfy it is the operator and that is the only doc
 **The token stopped being one question by becoming a property.** `M6` is real on RRF and is `error:20` on
 GRBL, so whether the route exists at all depends on the *sender* — a sender-side fact no firmware source
 can settle. The post therefore names the handler and emits what that handler reads: `T<n> M6` for gSender
-and CNCjs, whose Grbl `dataFilter` removes the `M6` before the controller sees it; `T<n>` alone for RRF,
-where the T word **is** the change; the operator's own file for anything else. **A handler is listed only
-where its interception is sourced** — which is why `Other` exists and why UGS is not in the list.
+and CNCjs, whose Grbl `dataFilter` removes the `M6` before the controller sees it, and for UGS, whose
+`ToolChangeInterceptor` strips the `M6` and issues the `T` word to the controller on its own
+(`ugs-core/.../services/interceptor/`, master, read 2026-08-17); `T<n>` alone for RRF, where the T word
+**is** the change; the operator's own file for anything else. **A handler is listed only where its
+interception is sourced** — which is why `Other` exists, and why UGS took a source read rather than a
+design decision to add. **What the three GRBL senders share is one predicate and not three disjuncts**:
+`toolChangeSenderIsGrblSender()`, because a fourth value added to the Flow 2 warning and not to the
+firmware guard would be a hand-over that is warned about and never refused.
 
 **Where the manual change happens is Flow 1's question alone, and the frame is its whole substance.** The
 deleted `Tool Change X/Y/Z` were bare `G0` words the dialog called absolute while the machine read them in
