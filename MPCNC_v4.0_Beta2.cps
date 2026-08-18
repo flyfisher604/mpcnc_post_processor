@@ -3132,15 +3132,13 @@ function writeMachineTravelZ(reason) {
 // Park at the machine's own X0 Y0 -- the homing corner -- as the last motion of the job. Two firmware
 // routes, and not the same KIND of operation, which is why this feature's guard is firmware-dependent.
 // GRBL/RepRap emit "G53 G0 X0 Y0", an absolute rapid ADDRESSING a frame the job must already have
-// established, X/Y only. Marlin emits "G28 X / G28 Y", which RE-ESTABLISHES the frame instead --
-// self-establishing, so it needs neither prior homing nor a build option, at the cost of being a homing
-// cycle rather than a rapid. THAT TRADE IS STILL WORTH IT even now that the Z retract above may emit
-// G53 on Marlin: the retract has no alternative, this does. Arithmetic is not a third route -- the G92
-// work frame differs from the machine frame by an offset the post never knew and cannot read back.
+// established. Marlin emits "G28 X / G28 Y", which RE-ESTABLISHES the frame instead, so it needs
+// neither prior homing nor a build option, at the cost of being a homing cycle rather than a rapid.
+// Arithmetic is not a third route: the G92 work frame differs from the machine frame by an offset the
+// post never knew and cannot read back.
 function writeMachineParkXY() {
-  // Retract before crossing the bed -- potentially a full diagonal. Only a job that ESTABLISHED a
-  // fixed Z reference can retract at all, which is what fixedZEstablishedInFile() answers.
-  // validateJob() reads the same predicate for its warning, so the two cannot drift.
+  // Retract before crossing the bed -- potentially a full diagonal. Only a job that established a fixed
+  // Z reference can retract at all, and validateJob() reads the same predicate.
   if (!fixedZEstablishedInFile()) {
     // TWIN #4
     writeWarning("no retract before parking at machine X0 Y0 -- this job establishes no fixed Z"
@@ -3151,10 +3149,9 @@ function writeMachineParkXY() {
 
   if (fw == eFirmware.MARLIN) {
     writeComment(eComment.Info, "   Park at machine X0 Y0 -- re-homing X/Y; G53 is a Marlin build option");
-    // The in-file half of validateJob()'s Marlin park warning, so a file read on its own carries what
-    // its last two blocks cost. set_axis_is_at_home() zeroes position_shift; coordinate_system[] is
-    // untouched, but nothing in an ordinary single-offset job re-selects it. motion.cpp, 2.1.2.5.
-    // TWIN #5
+    // The in-file half, so a file read on its own carries what its last two blocks cost.
+    // set_axis_is_at_home() zeroes position_shift; coordinate_system[] is untouched, but nothing in an
+    // ordinary single-offset job re-selects it. motion.cpp, 2.1.2.5.
     writeWarning("the two homing blocks below zero Marlin's position_shift -- the work origin this file"
       + " established. Any file run after this one must establish its own origin; it cannot resume on"
       + " this one's");
@@ -3182,12 +3179,11 @@ function writeMachineParkXY() {
 }
 
 // A 3-axis section can still be ORIENTED off machine +Z -- a Setup built on a model face rather than
-// the stock top. isMultiAxis() does not catch it, since Fusion emits ordinary X/Y/Z words for such a
+// the stock top. isMultiAxis() does not catch it, Fusion emitting ordinary X/Y/Z words for such a
 // section, so with no guard the part is cut in the wrong plane and nothing in the file says so.
-// Written to FAIL OPEN: it errors only when the orientation is readable AND unambiguously not +Z,
-// because a false positive would abort every job. Nothing in here may throw, which is why every branch
-// concatenates rather than computes. The Debug trace is emitted on every path, so a guard that read
-// nothing is distinguishable from one that read +Z and allowed it.
+// Fails OPEN: it errors only where the orientation is readable AND unambiguously not +Z, a false
+// positive aborting every job. Nothing in here may throw, which is why every branch concatenates
+// rather than computes.
 function isSectionOrientationSupported() {
   var toolPlane = currentSection.workPlane;
   var toolAxis = (toolPlane == undefined) ? undefined : toolPlane.forward;
@@ -3268,30 +3264,24 @@ function onSection() {
   // Determine the Safe Z Height to map G1s to G0s
   safeZforSection(currentSection);
 
-  // SELECT, THEN CHANGE, THEN ESTABLISH -- and all three places in that order are load-bearing.
+  // Select, then change, then establish, and the order is load-bearing at all three. The select is
+  // first because the post-change re-probe writes into whichever work offset is ACTIVE: changing first
+  // put a fresh Z0 into the PREVIOUS section's register. The establish is last because the part must be
+  // set up by the tool that cuts it: selecting and establishing in one call put the new part's probe
+  // ahead of the change, so the outgoing tool measured a Z0 the incoming tool then overwrote. PR-23.
   //
-  // THE SELECT IS FIRST because the post-change re-probe writes into whichever work offset is ACTIVE:
-  // changing first put a fresh Z0 into the PREVIOUS section's register and left this section cutting on
-  // a stale one, a plunge at the wrong depth on the very next move.
-  //
-  // THE ESTABLISH IS LAST because the part must be set up by the tool that cuts it. Selecting and
-  // establishing in one call put the new part's probe ahead of the change, so the outgoing tool measured
-  // a Z0 the incoming tool's re-probe then overwrote -- register-correct, and two probe cycles and four
-  // attach/detach prompts where one and two would do. PR-23.
-  //
-  // The later-section half of the deliberate WCS-selection split: section 1 already selected inside
-  // writeFirstSection(), which had to run before that section's origin write -- and its origin work is
-  // "First WCS / Part"'s, done in there, so wcsOrigin stays undefined for it.
+  // The later-section half of the WCS-selection split: section 1 already selected inside
+  // writeFirstSection(), which had to run before that section's origin write, so wcsOrigin stays
+  // undefined for it.
   var wcsOrigin = undefined;
   if (!isFirstSection()) {
     wcsOrigin = writeWCS(currentSection);
   }
 
-  // The first section's tool LOAD is not here at all: it belongs before that section's origin work,
-  // which writeFirstSection() has already done by this point, so it runs in there. What is passed is
-  // whether the establish below re-establishes Z0 itself -- where it does, the change hands the job to
-  // it instead of doing it twice; where it does not, the change's own re-probe is the only correction
-  // there is and it stays. PR-23.
+  // The first section's tool LOAD is not here at all -- it belongs before that section's origin work,
+  // which writeFirstSection() has already done. What is passed is whether the establish below
+  // re-establishes Z0 itself: where it does, the change hands the job to it instead of doing it twice.
+  // PR-23.
   if (!isFirstSection() && tool.number != getPreviousSection().getTool().number) {
     toolChange(wcsOrigin != undefined && wcsOriginEstablishesZ0(wcsOrigin));
   }
@@ -3414,14 +3404,11 @@ function emitRapid(x, y, z) {
 
 // Rapid movements -- Fusion's, delivered here.
 function onRapid(x, y, z) {
-  // THE TEST HOOK. Under a Personal licence Fusion delivers these same moves to onLinear() as feed
-  // moves, which is the only condition under which group 3 runs at all. Forwarding here reproduces
-  // that, so onLinear() decides whether each one converts back -- the code under test. The property
-  // is invisible and defaults off; see its declaration for why it has no group.
-  //
-  // The feed handed over is Travel Speed X/Y purely so linearMovements() has something to print for
-  // a move that is REFUSED conversion. A refused move printing a travel feed is the hook showing its
-  // hand, not a defect -- which is one reason a file posted this way says so at the top.
+  // The test hook. Under a Personal licence Fusion delivers these same moves to onLinear() as feed
+  // moves, which is the only condition under which group 3 runs at all; forwarding here reproduces
+  // that, so onLinear() decides whether each one converts back -- the code under test. The feed handed
+  // over is Travel Speed X/Y purely so linearMovements() has something to print for a move that is
+  // REFUSED conversion.
   if (getProperty(properties.mapRapidsTestPersonalLicence)) {
     onLinear(x, y, z, propertyMmToUnit(getProperty(properties.feedsTravelSpeedXY)));
     return;
@@ -3475,11 +3462,10 @@ function onCircular(clockwise, cx, cy, cz, x, y, z, feed) {
 }
 
 // Is the current operation a WCS / inspection PROBING operation, as opposed to an ordinary drill /
-// bore / tap cycle? Defined locally on purpose: in the Autodesk reference posts isProbeOperation() is
-// a post-local helper rather than a kernel global, so calling it undefined would abort the post on the
-// first drilled hole. Two independent signals, because either alone can miss one -- the operation
-// STRATEGY names the operation as a whole, the CYCLE TYPE names each point and is always prefixed
-// "probing", so the test needs no per-cycle list to stay current across Fusion versions.
+// bore / tap cycle? Defined locally on purpose: in Autodesk's reference posts isProbeOperation() is a
+// post-local helper rather than a kernel global, so calling it undefined would abort the post on the
+// first drilled hole. Two independent signals, either alone able to miss one -- the operation STRATEGY
+// names the operation as a whole, the CYCLE TYPE names each point and is always prefixed "probing".
 function isProbeOperation() {
   if (hasParameter("operation-strategy") && (getParameter("operation-strategy") == "probe")) {
     return true;
@@ -3491,15 +3477,13 @@ function isProbeOperation() {
 // no canned cycles, Marlin only in an opt-in custom build, and RepRap/Duet reuse those codes for
 // mesh/probe/babystep functions -- so every cycle point is expanded into ordinary G0/G1 moves.
 function onCyclePoint(x, y, z) {
-  // WCS/inspection probing cannot be faked by expansion, which would emit plain G0/G1 moves with no
-  // G38 at all. This post's own Z touch-off is separate; see probeTool().
+  // WCS/inspection probing cannot be faked by expansion, which would emit plain G0/G1 moves with no G38
+  // at all. This post's own Z touch-off is separate; see probeTool().
   //
-  // error() and not cycleNotSupported(): both abort, and the abort is right -- an F360 probing operation
-  // asks the CONTROL to measure several points and compute an offset from them, so on firmware with no
-  // arithmetic it is unimplementable rather than merely unimplemented. But the SDK helper names the
-  // cycle and stops there, and a refusal that is permanent has to carry the alternative or the operator
-  // has nowhere to go. The reason goes in the error() text rather than a warning comment because an
-  // aborted post leaves no file for a comment to be read in.
+  // error() and not cycleNotSupported(): both abort, and the abort is right, but the SDK helper names
+  // the cycle and stops there -- a permanent refusal has to carry the alternative or the operator has
+  // nowhere to go. The reason goes in the error() text because an aborted post leaves no file for a
+  // comment to be read in.
   if (isProbeOperation()) {
     error(localize("WCS probing is not supported. A probing operation asks the controller to measure "
       + "several points and then COMPUTE the work offset from them; GRBL and Marlin have no arithmetic, "
@@ -3697,12 +3681,11 @@ function onCommand(command) {
       }
       return;
     case COMMAND_COOLANT_ON:
-      // THE LEVEL COMES FROM requestedCoolant(), which validateJob()'s pre-flight also reads. THE TWO
-      // ARMS STAY SEPARATE, and that is not tidying left undone: the milling arm calls setCoolant() even
-      // with the answer Off, because that call is what turns a RUNNING channel off, and the jet arm must
-      // not -- F360 defines no coolant for a jet tool, so Off there means "the laser group forced none"
-      // and says nothing about what is running. Folding them would switch coolant off at every laser
-      // section. PV-12.
+      // The level comes from requestedCoolant(), which validateJob()'s pre-flight also reads. The two
+      // arms stay separate: the milling arm calls setCoolant() even with the answer Off, because that
+      // call is what turns a RUNNING channel off, and the jet arm must not -- F360 defines no coolant
+      // for a jet tool, so Off there says nothing about what is running. Folding them would switch
+      // coolant off at every laser section. PV-12.
       if (tool.isJetTool()) {
         var jetCoolant = requestedCoolant(tool);
         if (jetCoolant != eCoolant.Off) {
@@ -3742,34 +3725,26 @@ function onCommand(command) {
       writeBlock(mFormat.format(0));
       return;
 
-    // ONE EVENT, TWO CALLBACKS. The kernel raises COMMAND_POWER_ON/OFF beside onPower(), which is what
-    // emits the laser control -- the ">>> LASER Power ON" comment and the M3/M4 S<n> two lines above
-    // this call. Named here so the fall-through below stops reporting that emission as a no-op:
-    // onPower() owns it, and there is nothing left for this callback to do.
-    //
-    // THE FALL-THROUGH IS NOT SOFTENED. HR-13's rule is right and this was a missing case, not a wrong
-    // channel -- a warning that outlives Comment Level Off is what a vanished Manual NC instruction
-    // needs, and it reached the operator here on every power change of every jet job: 60 of the 975
-    // lines of Cutting/Laser/center.cnc, each one denying the two lines above it. PV-2.
+    // One event, two callbacks. The kernel raises COMMAND_POWER_ON/OFF beside onPower(), which is what
+    // emits the laser control. Named here so the fall-through below stops reporting that emission as a
+    // no-op: onPower() owns it, and there is nothing left for this callback to do. The fall-through is
+    // not softened -- this was a missing case, not a wrong channel, and it reached the operator on
+    // every power change of every jet job. PV-2.
     case COMMAND_POWER_ON:
     case COMMAND_POWER_OFF:
       return;
 
-    // AN OPTIONAL STOP IS TAKEN, ALWAYS. No supported firmware has a working "stop only if the operator
-    // asked for it", so the choice is between a stop that cannot be skipped and a command that vanishes
-    // -- and HR-13's own registered diff proposed M1 on the premise that "M1 is supported by all three
-    // targets", which is true of the parser and false of the behaviour. All three parse it and it means
-    // three different things. grbl 1.1 grbl/gcode.c: "case 1: break; // Optional stop not supported.
-    // Ignore." -- accepted, no error, and nothing pauses. RepRapFirmware src/GCodes/GCodes2.cpp handles
-    // "case 0: // Stop", "case 1: // Sleep" and "case 2: // Stop" in one block, so mid-file it ENDS THE
-    // JOB. Only Marlin does what Fusion means -- Marlin/src/gcode/lcd/M0_M1.cpp waits for the LCD, under
-    // HB-1's HAS_RESUME_CONTINUE. So the post emits M0, which pauses on all three, and says in the file
-    // that the "optional" half is the part it could not keep.
+    // An optional stop is taken, always. No supported firmware has a working "stop only if the operator
+    // asked for it": all three parse M1 and it means three different things. grbl 1.1 grbl/gcode.c --
+    // "case 1: break; // Optional stop not supported. Ignore." -- accepted, no error, nothing pauses.
+    // RepRapFirmware src/GCodes/GCodes2.cpp handles "case 0: // Stop", "case 1: // Sleep" and
+    // "case 2: // Stop" in one block, so mid-file it ENDS THE JOB. Only Marlin does what Fusion means,
+    // in Marlin/src/gcode/lcd/M0_M1.cpp under HB-1's HAS_RESUME_CONTINUE. So the post emits M0, which
+    // pauses on all three, and says in the file that the "optional" half is what it could not keep.
     //
-    // WARNED PER OCCURRENCE and outliving Comment Level Off, for the reason the fallback below gives:
-    // Manual NC is invisible to validateJob(), so there is no post-time twin for this to survive in.
-    // PR-20 is NOT extended to cover it either -- that enumeration is of the stops the POST puts in the
-    // first ten lines of its own preamble, and it cannot see a Manual NC command at all.
+    // Warned per occurrence and outliving Comment Level Off: Manual NC is invisible to validateJob(),
+    // so there is no post-time twin for this to survive in. PR-20 is not extended to cover it either --
+    // that enumeration is of the stops the POST puts in its own first ten lines.
     case COMMAND_OPTIONAL_STOP:
       // TWIN: none -- Manual NC, invisible to a pass over the properties, and the comment above says so.
       writeWarning("an Optional Stop was requested here and is emitted as an UNCONDITIONAL M0 -- none"
@@ -3778,15 +3753,10 @@ function onCommand(command) {
       return;
   }
 
-  // Anything this switch does not name reaches here. Until HR-13 it returned in silence: the Info
-  // comment at the top of this function was the only trace, and at Comment Level Important or Off not
-  // even that survives, so a Manual NC instruction left nothing behind at all. Below the switch rather
-  // than as a default: case so a future case that breaks instead of returning is caught too.
-  //
-  // writeWarning(), NOT writeComment(eComment.Important, ...) as HR-13's own diff proposed: HB-9's rule
-  // is that a warning outlives the level gate, and this one has no validateJob() twin to survive in --
-  // Manual NC is invisible to a post-time pass over the properties.
-  // TWIN: none -- same reason, and here the command itself is only known when the kernel raises it.
+  // Anything this switch does not name reaches here. Below the switch rather than as a "default:" case,
+  // so a future case that breaks instead of returning is caught too. writeWarning() and not an
+  // Important comment, HB-9's rule: a warning outlives the level gate, and this one has no
+  // validateJob() twin to survive in, Manual NC being invisible to a pass over the properties. HR-13.
   writeWarning("command " + getCommandStringId(command) + " is not supported by this post and was not "
     + "emitted");
 }
