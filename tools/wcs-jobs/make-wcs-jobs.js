@@ -214,6 +214,14 @@ var JOBS = [
     what: "Fusion reports offset 0 for a Setup whose Work Offset field was left alone. The alias " +
           'to WCS 1 has to survive a job where a real second offset is also present.' },
 
+  { file: 'mixed-default-explicit.cnc',
+    plan: [['A', 0], ['A', 1]],
+    what: "The one ambiguous pairing: offset 0 and offset 1 in one job. Fusion reports 0 for a " +
+          'Setup left at its default, so both resolve to WCS 1 and the two sections share a ' +
+          'register -- while the Operations panel shows two numbers. `default-offset.cnc` is the ' +
+          'unambiguous neighbour, 0 beside a real second offset, and the two are needed together: ' +
+          'one where the post must warn and one where it must not.' },
+
   { file: 'mid-offsets.cnc',
     plan: [['A', 2], ['A', 3], ['A', 5], ['A', 8]],
     what: 'The four registers no other job selects. wcsGcode() is proved at 1, 4, 6, 7 and 9 and ' +

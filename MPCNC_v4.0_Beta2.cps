@@ -38,6 +38,15 @@ allowedCircularPlanes = undefined;
 // Lets Fusion's UI resolve a section's raw work offset to its actual G-code before posting, instead
 // of showing the bare index. useZeroOffset: false matches the other official posts; it does not change
 // how writeWCS() resolves offset 0, which is still silently aliased to WCS 1 / G54 there.
+//
+// AND NOTHING IN THE KERNEL READS useZeroOffset. In Autodesk's posts it is read by exactly one function,
+// validateCommonParameters(), which is not a library this post fails to import but a function spliced
+// into each of their posts from include_files/commonFunctions.cpi -- and all it does with the flag is
+// suppress an error() where getSection(0).workOffset is 0 and a later section's is greater. That
+// refusal is right for them and wrong here: their offset 0 emits no G5x at all, so any mix is
+// unresolvable, while this post's 0 resolves to G54 and a job mixing 0 with 2 posts correctly as G54
+// then G55. So the flag stays false and inert, and the one genuinely ambiguous case -- 0 beside 1, two
+// labels on one register -- is warned about by mixedDefaultAndExplicitWcs() instead of refused.
 wcsDefinitions = {
   useZeroOffset: false,
   wcs          : [
@@ -1463,6 +1472,34 @@ function collectDistinctOffsets() {
   return list;
 }
 
+// TRUE WHERE ONE SECTION NAMES WORK OFFSET 0 AND ANOTHER NAMES 1 -- two labels on one register.
+// Fusion reports 0 both for a Setup left at its default and for one where the default was chosen
+// explicitly, so 0 IS 1, and collectDistinctOffsets() aliases them together exactly as writeWCS() does.
+// The consequence is not a wrong code but a job the post never sees as multi-part: the alias makes
+// multiWcs false, writeWCS() answers "WCS unchanged" at the boundary, no establish runs, and the second
+// Setup cuts on the first one's origin -- while Fusion's Operations panel shows two numbers.
+//
+// ANY SECTION AGAINST ANY OTHER, and that is not what Autodesk's own posts ask. validateCommonParameters()
+// tests getSection(0).workOffset == 0 against each later section > 0 (grbl.cps, Rev 45769, spliced from
+// include_files/commonFunctions.cpi), which misses a job whose FIRST section is the explicit one -- and
+// refuses on any later offset, not just 1, because their offset 0 emits no G5x at all and so cannot be
+// resolved. This post's 0 resolves to G54, so 0 beside 2 is G54 then G55 and is correct; only 0 beside 1
+// is ambiguous. That is why wcsDefinitions.useZeroOffset stays false and inert rather than enforced.
+function mixedDefaultAndExplicitWcs() {
+  var sawDefault = false;
+  var sawExplicit = false;
+  var n = getNumberOfSections();
+  for (var i = 0; i < n; ++i) {
+    var wo = getSection(i).getWorkOffset();
+    if (wo == 0) {
+      sawDefault = true;
+    } else if (wo == 1) {
+      sawExplicit = true;
+    }
+  }
+  return sawDefault && sawExplicit;
+}
+
 // Distinct tool numbers used across all sections. Counted over SECTIONS rather than getToolTable(),
 // which lists every tool the document knows about including ones this job never switches between.
 function countDistinctTools() {
@@ -1632,6 +1669,29 @@ function validateJob() {
         + "read the register back to check. Declare X/Y homed on a machine with X/Y endstops, or "
         + "choose a mode that establishes the origin during this run."));
     }
+  }
+
+  // TWO LABELS ON ONE REGISTER, and the dialog is the only channel that can say so in time. The post
+  // resolves work offset 0 to WCS 1 and always has -- that alias is correct and is not what is warned
+  // about. What is warned about is a job that carries BOTH labels, because the operator who typed them
+  // is looking at two numbers in Fusion's Operations panel while the machine has one register, and
+  // every per-part mechanism the post owns is switched off by the alias rather than by a decision.
+  //
+  // ADVICE AND NOT A REFUSAL, CR-16's reason: two Setups that really do share a fixture are entitled to
+  // be labelled this way, and the post cannot tell that from the mistake. The text says both readings
+  // rather than assuming the bad one.
+  //
+  // NO FILE TWIN, PV-12's ruling: this is a property of the job knowable at onOpen() and its answer does
+  // not depend on where in the file it is noticed. writeWCS() already writes the alias at Info on every
+  // section it applies to, which is the record, not the warning.
+  if (mixedDefaultAndExplicitWcs()) {
+    warning(localize("This job names work offset 0 in one Setup and 1 in another, and they are the same "
+      + "register: Fusion reports 0 for a Setup left at its default, so the post resolves both to WCS 1 "
+      + "-- G54. Every section runs on ONE origin, and because the post sees a single work offset the "
+      + "per-part origin work that \"Each New WCS / Part\" controls never runs at the boundary between "
+      + "them. If those Setups are two fixtures, number them 1 and 2 in Fusion so each part gets a "
+      + "register of its own. If they are one fixture, nothing is wrong here and the two numbers are "
+      + "only a labelling difference -- the post cannot tell the two cases apart."));
   }
 
   // The post-time half of warnJogAtPauseNeedsSender(), sharing its ONE statement of the condition so

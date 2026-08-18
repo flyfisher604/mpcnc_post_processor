@@ -91,8 +91,8 @@ node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/cor
 node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.0_Beta2.cps "$CNC" out/gcode-structure
 ```
 
-**172 cases — 32 hobbyist, 37 professional, 35 WCS, 11 personal, 41 CorrectGcode, 16 GCodeStructure —
-over 41 job files, and all 172 pass as of 2026-08-17.** The whole run is under a minute.
+**177 cases — 35 hobbyist, 37 professional, 37 WCS, 11 personal, 41 CorrectGcode, 16 GCodeStructure —
+over 42 job files, and all 177 pass as of 2026-08-17.** The whole run is under a minute.
 
 **The six are independent by design and stay that way.** The first four encode personas that disagree
 about what the factory defaults should do, so a shared baseline would have to pick one; the last two
@@ -310,11 +310,11 @@ data's.
 
 ### 4.2 `tools/wcs-jobs/` — job files built for the paths the library cannot reach
 
-`tools/wcs-jobs/make-wcs-jobs.js` builds **fourteen** job files. **It does not author a job.**
+`tools/wcs-jobs/make-wcs-jobs.js` builds **fifteen** job files. **It does not author a job.**
 Nothing here synthesises toolpath data, and that is deliberate: a fixture you cannot reason about
 from its source is not evidence.
 
-*(The directory is named for the work that created it. Eleven of the fourteen are about work
+*(The directory is named for the work that created it. Twelve of the fifteen are about work
 offsets; `mill-then-jet.cnc` is about a tool change and `one-part.cnc` is the control that proves a
 suppression. Renaming it would move every path in the register for no gain.)*
 
@@ -360,7 +360,7 @@ so every section arrives as offset 0. Verified by editing that attribute in Auto
 
 ### 4.3 Every `.cnc` file the suite uses
 
-**41 files.** Twenty-seven are Autodesk's; fourteen are generated. The two tables below are the five
+**42 files.** Twenty-seven are Autodesk's; fifteen are generated. The two tables below are the five
 the persona matrices run on; §4.4 is the twenty-two the two categories add. `A` = 2D-Face tool 1
 (which cuts **across** the part origin, so it is the block that puts a machined surface under a later
 probe); `B` = 2D-Contour tool 2; `J` = a Through-medium laser operation, tool 2; `K` = an Etch laser
@@ -376,7 +376,7 @@ operation, tool 2.
 | `Cutting/Laser/center.cnc` | 7 sections, T2 laser | 1 | a jet tool withholding the provisional Z0 a milling tool receives |
 | `Milling/2D/full program.cnc` | 4 sections, 2 tools | 1 | compensation **in the control**, which all three firmwares refuse |
 
-**Generated** — `tools/wcs-jobs/`, all fourteen from the two sources above:
+**Generated** — `tools/wcs-jobs/`, all fifteen from the two sources above:
 
 | File | Blocks (`tool@offset`) | Cases | What it covers |
 |---|---|---|---|
@@ -391,7 +391,8 @@ operation, tool 2.
 | `jet-two-parts.cnc` | T2@1, T2@2 | 2 | the multi-part half met by a tool that **cannot probe** — `J2`, `J5` |
 | `jet-return.cnc` | T1@1, T2@2, T2@1 | 1 | a **return** the returning tool cannot re-measure — the one arm of `writeWcsOnReturn()` that can only warn, and `PV-9` on the tool side |
 | `spread-offsets.cnc` | T1@1, T1@4, T1@6 | 1 | non-adjacent offsets: the code is computed, not counted |
-| `default-offset.cnc` | T1@0, T1@2 | 1 | the untouched Work Offset field aliased to `G54`, beside a real second offset |
+| `default-offset.cnc` | T1@0, T1@2 | **2** | the untouched Work Offset field aliased to `G54`, beside a real second offset — and `PV-17`'s silent case, the pairing that is *not* ambiguous |
+| `mixed-default-explicit.cnc` | T1@0, T1@1 | 2 | offset `0` beside offset `1` — one register wearing two numbers, which is the only pairing the alias makes ambiguous. `PV-17` |
 | `offset-out-of-range.cnc` | T1@10 | 1 | past `G59.3`, which no supported firmware has |
 | `mill-then-jet.cnc` | T1@1, T2@1 | 1 | a change **into** a tool that cannot probe — `PR-22`'s falsifier |
 
