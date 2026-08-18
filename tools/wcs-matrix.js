@@ -459,6 +459,38 @@ const cases = [
            [/MSG,Load Tool #/,'and the M0 is NOT the fallback -- this mode was chosen to avoid one']],
   mustLog:[[/no tool changer can fit and no supported handler can act on/,
             'and the operator hears it before posting, not only in the file']] },
+
+// --- PV-17, two labels on one register -------------------------------------------------
+// WHAT MAKES THIS CASE WORTH HAVING IS THE g-code IT ASSERTS ALONGSIDE THE WARNING. The post is not
+// being asked to change what it emits -- the alias is correct and stays -- so a case that read only
+// the log would pass on a post that had started emitting two selects. Both halves are here.
+{ id:'W30', desc:'PV-17 - offset 0 and offset 1 in one job: one register, two numbers in Fusion',
+  job:'mixed-default-explicit.cnc',
+  props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip') }),
+  must:[[/writeWCS: workOffset defaulted to: 1/,'the alias is applied and recorded, as it always was']],
+  mustLog:[[/names work offset 0 in one Setup and 1 in another, and they are the same register/,
+            'the dialog says the two labels are one register'],
+           [/number them 1 and 2 in Fusion/,'and names the remedy for the reading that is a mistake'],
+           [/the post cannot tell the two cases apart/,'while conceding the reading that is not']],
+  custom:(t)=>{
+    // ONE SELECT AND NOT TWO, which is the behaviour the warning is ABOUT. Section 2 falls to
+    // writeWCS()'s "WCS unchanged" arm, so no second G54 and no traverse retract are emitted -- and
+    // if that ever changed, the warning's text would be wrong rather than merely unnecessary.
+    const sel = (t.match(/^G54$/gm)||[]).length;
+    const unchanged = /WCS unchanged: 1, not re-selecting/.test(t);
+    return (sel===1 && unchanged)
+      ? [true,'one G54 for both sections, the second falling to the unchanged arm']
+      : [false,`${sel} G54 selects, unchanged arm ${unchanged?'taken':'NOT taken'}`]; } },
+
+// THE NEIGHBOUR THAT MUST STAY SILENT, and it is the case that stops this being "warn whenever a 0
+// appears". default-offset.cnc is 0 beside a real second offset: the alias resolves it to G54, the
+// second section is genuinely G55, and the job is correct -- Autodesk's own rule would refuse it.
+{ id:'W31', desc:'PV-17 - ... and offset 0 beside a REAL second offset says nothing: that job is right',
+  job:'default-offset.cnc',
+  props:mp({ probeOnStart:S('Skip'), probeOnChange:S('Skip') }),
+  must:[[/^G54$/m,'the default resolves to WCS 1'],[/^G55$/m,'and the second Setup is a second register']],
+  mustNotLog:[[/names work offset 0 in one Setup and 1 in another/,
+               'nothing ambiguous here - two labels, two registers']] },
 ];
 
 // ---- run ------------------------------------------------------------------------------
