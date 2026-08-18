@@ -1807,13 +1807,49 @@ function validateJob() {
 
   // The same boundary from the other side: this fires when no fixed Z reference is established and the
   // mode cannot lift. warning(), not error() -- the start height is a promise only the operator can make.
+  //
+  // PR-16 REOPENED, AND IT IS THE HOMING ARM. The finding was the spoilboard base probe: probed wherever
+  // the tool already sat, no XY move being possible before an origin existed, so homing moved the tool
+  // off the spot the probe depended on. It closed BY DELETION when the base went -- and the CLASS did not
+  // go with it. "Use WCS X0 Y0, Probe Z0" is the one surviving mode that probes from a height nothing in
+  // the file wrote, and the advice in the else arm below was unfollowable once homing runs: "position it
+  // clear of the stock before starting" and "reach the stock from where you leave the tool" are both
+  // FALSE then, the height being the endstop's, with no jog before the file able to reach it.
+  //
+  // ONE CONFIGURATION, ONE WARNING, in two texts -- the two cases need different remedies, and a job
+  // that homes must not be told to do something homing undoes. The non-homing arm is unchanged.
+  //
+  // AND NOT WHERE THE FIRST TOOL IS HANDED OVER, on the same predicate partProbe()'s twin reads: that
+  // arm of toolChangeFirstLoad() runs BETWEEN the homing and the probe and moves the tool itself, so
+  // the height is the macro's and naming homing for it would be false. The claim these two warnings
+  // make is narrow -- homing was the LAST thing to move the tool -- and it has to stay checkable.
   if (startMode == "Probe Z" && !fixedZEstablishedInFile()) {
-    warning(localize("\"First WCS / Part\" = \"Use WCS X0 Y0, Probe Z0\" rapids to the stored "
-      + "X0 Y0 before this job has established any Z the post can move in, so that traverse happens "
-      + "at whatever height the tool is left at -- position it clear of the stock, clamps and "
-      + "fixtures before starting the program. The probe that follows searches \"G38 Target\" DOWN FROM "
-      + "that height, so set the target deep enough to reach the stock from where you leave the tool."
-      + " \"Machine Travel Z\" removes both, by establishing a Z the post can move in itself."));
+    if (homingMovesZ() && !firstToolChangeIsHandedOver()) {
+      warning(localize("\"First WCS / Part\" = \"Use WCS X0 Y0, Probe Z0\" rapids to the stored X0 Y0 and "
+        + "then probes DOWN FROM WHEREVER THE TOOL IS, and this job establishes no Z the post can move "
+        + "in -- so both moves start from whatever height the last thing to move the tool left it at, and "
+        + "on this job that thing is \"Home at Job Start\". "
+        + (fw == eFirmware.GRBL
+            ? "The single \"$H\" this post emits on " + fw + " runs the build's whole homing cycle, and the "
+              + "stock cycle homes Z FIRST to clear the work area -- so Z goes to its endstop here even "
+              + "though \"Axes Homed and Trusted\" declares only X and Y."
+            : "The \"G28 Z\" this job emits leaves the tool at the Z endstop.")
+        + " Positioning the tool before starting the file has no effect on either move, and nothing "
+        + "afterwards brings it back to a height you chose. The post cannot know which end of the travel "
+        + "your Z endstop is at, and both ends are wrong here: at the top of travel the stock is the "
+        + "whole travel below, a \"G38 Target\" of " + getProperty(properties.probeG38Target) + " mm never "
+        + "reaches it and the job stops on a probe-fail alarm; at the bed the search starts a pull-off "
+        + "above the bed and runs down into it. Enter \"Machine Travel Z\" in \"4 - Machine Frame\" so "
+        + "both moves start from a height you set, or set \"Home at Job Start\" to Off and position the "
+        + "tool yourself."));
+    } else {
+      warning(localize("\"First WCS / Part\" = \"Use WCS X0 Y0, Probe Z0\" rapids to the stored "
+        + "X0 Y0 before this job has established any Z the post can move in, so that traverse happens "
+        + "at whatever height the tool is left at -- position it clear of the stock, clamps and "
+        + "fixtures before starting the program. The probe that follows searches \"G38 Target\" DOWN FROM "
+        + "that height, so set the target deep enough to reach the stock from where you leave the tool."
+        + " \"Machine Travel Z\" removes both, by establishing a Z the post can move in itself."));
+    }
   }
 
   // The machine park crosses the bed, and writeMachineParkXY() can retract first only in a frame THIS
@@ -3049,6 +3085,26 @@ function homesAtJobStart() {
 }
 function promptsBeforeHome() {
   return getProperty(properties.machineHomeAtStart) == "Pause & Home";
+}
+
+// WHETHER THIS JOB'S HOMING MOVES Z, which is NOT the same question as whether Z is declared homed --
+// and the two answers differ on GRBL, where writeMachineHoming() emits a single "$H" and the BUILD's
+// homing cycle decides which axes it moves. The stock cycle homes Z FIRST: HOMING_CYCLE_0 is
+// (1<<Z_AXIS), commented "REQUIRED: First move Z to clear workspace", under a note reading "Defaults
+// are set for a traditional 3-axis CNC machine. Z-axis first to clear, followed by X & Y" -- and the
+// per-axis $HX/$HY/$HZ sit behind HOMING_SINGLE_AXIS_COMMANDS, default disabled and documented as
+// "very rare" (grbl/config.h, Grbl 1.1h -- GRBL_VERSION in grbl/grbl.h, build 20190830, read
+// 2026-08-17). So a GRBL job declaring X/Y alone still homes Z, which is writeMachineHoming()'s own
+// "the capability split is BOOKKEEPING, NOT EMISSION" seen from the consumer side. Marlin and RepRap
+// emit a per-axis "G28 Z", so the Z declaration is exact there.
+//
+// Read by the emission and by validateJob() alike so the file and the dialog cannot come to differ
+// about which jobs move Z at start -- originIsPreJogged()'s rule, applied to the other axis. PR-16.
+function homingMovesZ() {
+  if (!homesAtJobStart()) {
+    return false;
+  }
+  return (fw == eFirmware.GRBL) ? (machineHomesXY() || machineHomesZ()) : machineHomesZ();
 }
 
 // "Machine Travel Z" as a Number in MILLIMETRES, or undefined when the field is empty or does not parse
@@ -4353,7 +4409,13 @@ var probePauseAfter = true;
 // HEIGHT is also unknown is a SECOND question, asked separately: on the subsequent-part path the tool
 // holds a height this post just wrote. Callers guard tool 0 / jet tools, and the base probe does not
 // use this at all: it always touches off at the origin, with its own pause setting.
-function partProbe(atOrigin, zUntrusted) {
+// `startsWhereHomingLeftIt` says the tool has not moved since writeMachineHoming() ran, which only
+// writeWcsOnStart()'s call can be true of -- CALLER KNOWLEDGE, and that is why it is a parameter rather
+// than a test in here. The other four callers all have motion between the homing and the probe: the two
+// multi-part paths take writeWCS()'s retract, the return takes it too, and the tool change moves the tool
+// by definition. Read only inside the no-frame warning below, whose text asserts a height the operator
+// chose. PR-16.
+function partProbe(atOrigin, zUntrusted, startsWhereHomingLeftIt) {
   var ox = probeOffsetX();
   var oy = probeOffsetY();
   var offsetSet = probeOffsetIsSet();
@@ -4394,10 +4456,33 @@ function partProbe(atOrigin, zUntrusted) {
       // = Use WCS X0 Y0, Probe Z0 rapids to the stored X0 Y0" warning covers word for word; the tool
       // change's re-probe, which its no-frame warning covers by naming this rapid; and the two
       // multi-part paths, which Guard B refuses outright with no frame. No arm is uncovered.
-      writeWarning("no Z reference is established, so the XY move below runs at whatever height the"
-        + " tool is holding -- it must be clear of the stock, clamps and fixtures before the program"
-        + " starts -- and the G38.2 that follows searches G38 Target DOWN FROM THAT HEIGHT, so the"
-        + " target has to be deep enough to reach the stock from wherever you leave the tool.");
+      //
+      // PR-16, AND THE PAIRING ABOVE IS WHAT FOUND IT. This text and its dialog twin both told the
+      // operator the start height was theirs -- "before the program starts", "wherever you leave the
+      // tool" -- and where the job homes it is not: homing is the last thing to move the tool before
+      // this probe, so the height is the endstop's and no jog before the file can reach it. That is
+      // the spoilboard base probe's defect exactly, one path over: it too ran wherever the tool
+      // already sat, and it closed by DELETION, taking the code and leaving the class. Both halves
+      // change together, on the same predicate, or the "word for word" claim above stops being true.
+      //
+      // ONE TWIN VERDICT OVER TWO TEXTS, and the tag above is deliberately left where it is: the two
+      // arms are one statement about one configuration, differing only in who chose the height, so a
+      // walk that split them would be counting texts rather than claims. It is the only such site.
+      if (startsWhereHomingLeftIt && homingMovesZ()) {
+        writeWarning("no Z reference is established, so the XY move below and the G38.2 under it both"
+          + " start from whatever height the tool is holding -- and on this job HOMING chose that"
+          + " height, not you. Nothing has moved the tool since, and nothing between here and the probe"
+          + " brings it to a height you set, so positioning it before starting this file changes"
+          + " neither move. Check that the crossing to X0 Y0 clears your stock, clamps and fixtures at"
+          + " the height homing leaves. G38 Target is " + getProperty(properties.probeG38Target)
+          + " mm here, and it is a DISTANCE measured from the endstop rather than from the stock --"
+          + " check that it reaches. Setting \"Machine Travel Z\" removes both questions.");
+      } else {
+        writeWarning("no Z reference is established, so the XY move below runs at whatever height the"
+          + " tool is holding -- it must be clear of the stock, clamps and fixtures before the program"
+          + " starts -- and the G38.2 that follows searches G38 Target DOWN FROM THAT HEIGHT, so the"
+          + " target has to be deep enough to reach the stock from wherever you leave the tool.");
+      }
     }
     if (offsetSet) {
       writeComment(eComment.Info, "   Move to probe point = origin + offset X" + xyzFormat.format(ox) + " Y" + xyzFormat.format(oy) + ", then probe Z");
@@ -4437,11 +4522,27 @@ function writeWcsOnStart() {
   if (mode == "Skip") {
     // "Use WCS X0 Y0 Z0": trust the stored origin, so probeSafeZ() is meaningful in that frame.
     // "move" and not "retract" -- an ABSOLUTE Z means a tool parked above Safe Z descends to it first.
+    //
+    // HR-26 REOPENED, AND THIS ARM IS THE MIRROR OF IT. The finding was a base-clearance retract with no
+    // tool-0 / jet guard where the establish beside it had one; it closed by deletion with the base. Here
+    // the SAME retract carried the guard the other way round -- canProbe gated a CLEARANCE move on the one
+    // mode that PROBES NOTHING. So a laser or a tool-0 job crossed the bed to the stored X0 Y0 at whatever
+    // height it happened to hold, while a milling tool on byte-identical settings was lifted to Safe Z
+    // first: the same job, the same dialog, differing on a tool property that has nothing to do with
+    // clearance. Z0's trust is the MODE's premise and holds for every tool -- that is what "Use WCS
+    // X0 Y0 Z0" MEANS -- so nothing in this arm depends on being able to probe.
+    //
+    // WHY THE MATRIX NEVER CAUGHT IT: the exposure is a job with NO FRAME. With one,
+    // writeFixedZReference() has already put the tool at "Machine Travel Z" before this runs, and every
+    // jet case on the books is multi-WCS, which Guard B refuses without a frame. The single-part laser
+    // job that wants exactly this mode -- a jet tool has nothing to probe with, so the operator sets the
+    // origin at the controller and tells the post to measure nothing -- is the one that had no retract.
+    //
+    // THE ARMS BELOW KEEP THEIR canProbe GUARDS AND MUST: each of those bounds a G38.2 or a provisional
+    // Z0 that only a probe overwrites, so there the tool really is the condition. CR-12, PV-3.
     writeComment(eComment.Info, "   Use stored work origin; move Z to Safe Z, then to X0 Y0");
     resetAll();
-    if (canProbe) {
-      rapidMovementsZ(probeSafeZ());
-    }
+    rapidMovementsZ(probeSafeZ());
     rapidMovementsXY(0, 0);
     flushMotions();
     return;
@@ -4452,7 +4553,14 @@ function writeWcsOnStart() {
     // Skip, Z is stale and about to be probed, so no absolute Z move is emitted in this frame.
     writeComment(eComment.Info, "   Use stored work origin X0 Y0; probe Z");
     if (canProbe) {
-      partProbe(false, true);
+      // THE ONE CALLER THAT CAN STILL BE STANDING WHERE HOMING LEFT THE TOOL. Between
+      // writeMachineHoming() and here the preamble emits the WCS select, Start() or the start file,
+      // writeFixedZReference() and toolChangeFirstLoad() -- and only the last two can move anything. The
+      // frame moves nothing when there is none, which is the very condition the warning inside asks
+      // about; the first load moves the tool on ONE of its four arms, the hand-over, which is what
+      // firstToolChangeIsHandedOver() answers. Read it rather than re-deriving it: it carries both
+      // suppressions, so it says what was EMITTED and not what was asked for. PR-16, PV-13.
+      partProbe(false, true, !firstToolChangeIsHandedOver());
     } else {
       warnZ0NotEstablished("Set X0 Y0 Z0 to Current Pos");
       writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool) -- moving to stored X0 Y0");

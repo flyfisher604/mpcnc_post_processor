@@ -142,6 +142,30 @@ const cases = [
   must:[[/^G10 L20 P1 X0 Y0$/m,'no Z word - a fake Z0 would silently become Set X0 Y0 Z0']],
   mustNot:[[/^G10 L20 P1 X0 Y0 Z0$/m,'the milling form must not appear']] },
 
+// --- HR-26 reopened: a CLEARANCE retract must not read a PROBE's guard --------------------
+// H36 AND H37 ARE THE SAME ASSERTION ON PURPOSE, and that is the whole finding: "Use WCS X0 Y0 Z0"
+// probes nothing, so the lift before the crossing to the stored X0 Y0 cannot depend on whether the
+// tool COULD have probed. It did -- canProbe gated it -- so the laser job below crossed the bed at
+// whatever height it was holding while the identical milling job was lifted to Safe Z first. Neither
+// case sets "Machine Travel Z": with a frame the G53 establish has already lifted the tool and the
+// bug is invisible, which is why every jet case on the books walked past it.
+{ id:'H36', desc:'HR-26 - a jet tool on Use WCS X0 Y0 Z0 is lifted to Safe Z before crossing to the origin',
+  cnc:'Cutting/Laser/center.cnc', props:{probeOnStart:S('Skip')},
+  must:[[/^G0 Z\d+(\.\d+)? F\d/m,'the clearance move a jet tool used to be denied']],
+  mustNot:[[/^G38\.2/m,'still nothing probes - the mode measures nothing and the tool could not anyway']],
+  // The X/Y move carries no G0: the Safe-Z rapid above it left G0 modal. If the lift were suppressed
+  // again the X/Y line would carry the G0 itself, so this ordering fails loudly rather than silently.
+  custom:(t)=>{ const z=t.search(/^G0 Z\d/m), xy=t.search(/^X0 Y0 F\d/m);
+    return (z>=0 && xy>=0 && z<xy) ? [true,`Safe Z @${z} then X0 Y0 @${xy}`]
+                                   : [false,`lift@${z} crossing@${xy} - the crossing must not lead`]; } },
+{ id:'H37', desc:'HR-26 - and the milling job it is meant to match, on the same mode and the same absent frame',
+  cnc:'Milling/2D/face.cnc', props:{probeOnStart:S('Skip')},
+  must:[[/^G0 Z\d+(\.\d+)? F\d/m,'the lift that was always here, now the control rather than the exception']],
+  mustNot:[[/^G38\.2/m,'no probe on this mode either']],
+  custom:(t)=>{ const z=t.search(/^G0 Z\d/m), xy=t.search(/^X0 Y0 F\d/m);
+    return (z>=0 && xy>=0 && z<xy) ? [true,`Safe Z @${z} then X0 Y0 @${xy}`]
+                                   : [false,`lift@${z} crossing@${xy} - the crossing must not lead`]; } },
+
 // --- PV-4, both branches of the condition -------------------------------------------
 { id:'H26', desc:'PV-4 - homing before a Current Pos origin warns IN THE FILE', cnc:'Milling/2D/face.cnc',
   props:{machineHomedAxes:S('XYZ'), machineHomeAtStart:S('Home'), probeOnStart:S('Current XY & Probe Z')},
