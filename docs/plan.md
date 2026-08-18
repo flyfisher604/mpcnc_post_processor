@@ -11,12 +11,17 @@ the file that computes it is named instead.
 
 ## Checkpoint
 
-**Next: Step 7.** Step 6 is done: every comment in the post was read and rewritten, and the
-`writeWarning()` pairs the Step W audit left are now numbered — `grep -n "// TWIN #"`, every number
-returning exactly two sites. **`findings.md` §2 is empty.**
+**The tree is Beta 3.** The deliverable is `MPCNC_v4.0_Beta3.cps`, and what the beta contains is
+`release-notes-v4.0-beta3.md`. **Next: Step 8 — cut the release.**
+
+Step 7 is done: the four user documents describe the post as it now is, and `guide-pro.md` states
+plainly what is not verified. **`findings.md` §2 is empty.**
 
 **No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §2, and `PV-14`
 is the row.
+
+**What the beta still owes is `findings.md` §7.** Its first item is a file posted from Fusion, which
+no session can supply.
 
 **Nothing is pushed.** No work since the `Assessment` merge is on `origin`. Pushing is the
 author's call, not a session's.
@@ -30,24 +35,19 @@ version — never from a sender console, a dry run or a non-GRBL controller.
 
 | | Item | Blocked on |
 |---|---|---|
-| **7** | Documents, once | — |
+| **8** | Cut the Beta 3 release | the author — `findings.md` §7's first item needs Fusion |
 
 **`validateJob()` and the property block were never restructured** — Step 6 measured both and left
 them. Neither is short; whether either is too long is a judgement no measurement settles, and it is
 the author's to make against the file as it now reads.
 
-## Step 7 — Documents, once
+## Step 8 — Cut the Beta 3 release
 
-The guides are off-limits during code changes, so they are done here, together: per-step means
-rewriting `guide-pro.md` three times.
-
-| Document | What falls due |
-|---|---|
-| `design.md` | Believed current — **re-read before assuming it** |
-| `property-reference.md` | Regenerate, and **recount**: every count it has ever stated was wrong. `mapRapidsTestPersonalLicence` is `visible: false` and belongs in no user document |
-| `guide-pro.md` | The **operator's** obligations, stated explicitly — every work offset set before the job, one clearance clearing every fixture, machine homed. F360 states this nowhere and the emitted g-code depends on it. And plainly what is verified and what is not |
-| `guide-hobbyist.md` | Flow 1's end-of-file behaviour; the Marlin do-not-home rule and the minimum Marlin version; **mid-job indexing** — the jog modes as a supported workflow, with the sender condition on GRBL and the panel condition on Marlin |
-| `README.md` | Feature list, and the hobbyist/professional split |
+- **`README.md` still calls Beta 2 current** and names the Beta 2 file in its install steps. A
+  guide is the author's to change, and this one now contradicts the tree.
+- **The tag**, once §7 is answered or accepted as outstanding at the beta.
+- **§7's first item** — a file posted from Fusion, which most of *Invalidated by landed fixes* in
+  `findings.md` §5 also waits on.
 
 ## Parked, and on what
 
@@ -65,7 +65,7 @@ until it appears in the table above.
 
 ## Done
 
-Phase C · Step 0 · Steps 1.1, 1.2, 1.3, 2, 3, 4, 5, 6 · F2–F7 · Step V.
+Phase C · Step 0 · Steps 1.1, 1.2, 1.3, 2, 3, 4, 5, 6, 7 · F2–F7 · Step V.
 
 **What each one did is its commits** — `git log --grep` by step or finding id — and what each one
 left is a row in `findings.md`. Two are worth knowing without looking them up: **Step 2** retired

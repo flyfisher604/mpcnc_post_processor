@@ -8,8 +8,8 @@ machines. This is a modified fork of
 originally forked from
 [martindb/mpcnc_posts_processor](https://github.com/martindb/mpcnc_posts_processor).
 
-This is the **v4.0 (Beta)** post processor, distributed as the single file
-`MPCNC_v4.0_Beta2.cps`.
+This is the **v4.0 (Beta 3)** post processor, distributed as the single file
+`MPCNC_v4.0_Beta3.cps`.
 
 Supported firmware (set by the **Job → CNC Firmware** property):
 
@@ -76,13 +76,15 @@ multi-axis operations are rejected with a clear error.
 
 # Installation
 
-The post is a single file, `MPCNC_v4.0_Beta2.cps`.
+The post is a single file, `MPCNC_v4.0_Beta3.cps`.
 
 1. In Fusion, choose **Manage → Post Library**.
 2. Select My posts/Local in the sidebar.
 3. If an older copy is installed, select it and use the trash-can icon to remove it
-   first.
-4. Use the Import icon to import `MPCNC_v4.0_Beta2.cps` (or the latest version available).
+   first. **Beta 3 has a different filename from Beta 2**, so an old copy will sit
+   alongside it rather than being replaced, and the two are hard to tell apart in the
+   picker.
+4. Use the Import icon to import `MPCNC_v4.0_Beta3.cps` (or the latest version available).
 5. Close the dialog.
 6. When posting, select **Choose from library...** and select this post.
 7. Review and set the properties as needed — start with the guide for your kind of job, above.
@@ -93,7 +95,24 @@ The post is a single file, `MPCNC_v4.0_Beta2.cps`.
 
 # Release history
 
-## v4.0 Beta 2 — current
+## v4.0 Beta 3 — current
+
+Beta 2 gave each part its own zero. Beta 3 corrected **where those zeros come from**, rebuilt tool
+changes around what the post can actually do, and — for the first time — *ran* the post against
+Autodesk's own engine instead of reasoning about it.
+
+Two things to do before your first Beta 3 job, neither of them optional:
+
+1. **Your saved settings will not carry over.** Every property key in the dialog was renamed, so a
+   Beta 2 preset falls back to its shipped default on every setting. Walk the dialog once, and
+   look hardest at groups **4**, **5** and **6** — those changed most in meaning as well as in name.
+2. **The post has a new filename**, and Fusion identifies a post by filename. Remove
+   `MPCNC_v4.0_Beta2.cps` from the Post Library rather than leaving it beside Beta 3.
+
+**[→ Full release notes for Beta 3](docs/release-notes-v4.0-beta3.md)** — what changed, per firmware,
+and what is *not* verified.
+
+## v4.0 Beta 2
 
 Beta 1 knew one zero: wherever the tool happened to be when the job started. Beta 2 keeps track
 of one per part, plus one job-level height in the machine's own frame to cross the bed at.
