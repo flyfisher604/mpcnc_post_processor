@@ -10,9 +10,10 @@ maintained** — `release-notes-v4.0-beta3.md` is the document that stays curren
 Beta 3 of the Fusion 360 post processor for MPCNC, LowRider and similar GRBL / Marlin / RepRap
 machines is up.
 
-**[Download `MPCNC_v4.0_Beta3.cps`](https://github.com/flyfisher604/mpcnc_post_processor/blob/master/MPCNC_v4.0_Beta3.cps)**
-· [Full release notes](https://github.com/flyfisher604/mpcnc_post_processor/blob/master/docs/release-notes-v4.0-beta3.md)
-· [First-job guide](https://github.com/flyfisher604/mpcnc_post_processor/blob/master/docs/guide-hobbyist.md)
+**[Download `MPCNC_v4.0_Beta3.cps`](https://github.com/flyfisher604/mpcnc_post_processor/releases/download/v4.0_Beta3/MPCNC_v4.0_Beta3.cps)**
+· [Release page](https://github.com/flyfisher604/mpcnc_post_processor/releases/tag/v4.0_Beta3)
+· [Full release notes](https://github.com/flyfisher604/mpcnc_post_processor/blob/v4.0_Beta3/docs/release-notes-v4.0-beta3.md)
+· [First-job guide](https://github.com/flyfisher604/mpcnc_post_processor/blob/v4.0_Beta3/docs/guide-hobbyist.md)
 
 ### Two things before your first job — neither is optional
 
@@ -45,13 +46,16 @@ meaning as well as in name.
 Plus a long list of clearer warnings, and jobs that are now refused *before* a file is written rather
 than posted in a state that would crash your machine.
 
-### Please read this part
+### What stands behind this
 
-It is a beta, and I would rather be straight about what stands behind it. **I have no CNC controller
-to test against**, so every firmware claim in this release is settled by reading that firmware's own
-source, not by running it. No file has yet been posted from Fusion itself either — the automated
-testing drives Autodesk's own intermediate files.
+Beta 3 is the first release with an automated regression suite behind it: **190 cases across six
+matrices, posting 42 job files through Autodesk's own post engine and reading the emitted g-code back
+to check it against the toolpath Fusion asked for** — all 190 passing, with every boolean setting in
+the dialog exercised both ways.
 
-So: **review your g-code before you cut**, and if something looks wrong, please post it here along
-with the file and your settings. That is by far the most useful thing anyone can do for this project
-right now.
+Two limits are worth knowing. Firmware behaviour is settled by reading each firmware's own source and
+changelog, citing file and version, rather than by running it — I have no controller here. And the
+suite drives Autodesk's intermediate files, not a Setup you built yourself.
+
+So it is still a beta: **review your g-code before you cut.** If something looks off, please post it
+here with the file and your settings — that is the fastest route to a fix.
