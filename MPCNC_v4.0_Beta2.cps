@@ -35,18 +35,17 @@ maximumCircularSweep = toRad(180); // split arcs >180 deg (so full circles post 
 allowHelicalMoves = false;
 allowedCircularPlanes = undefined;
 
-// Lets Fusion's UI resolve a section's raw work offset to its actual G-code before posting, instead
-// of showing the bare index. useZeroOffset: false matches the other official posts; it does not change
-// how writeWCS() resolves offset 0, which is still silently aliased to WCS 1 / G54 there.
+// Lets Fusion's UI resolve a section's raw work offset to its actual G-code before posting, instead of
+// showing the bare index. useZeroOffset: false matches the other official posts and does not change how
+// writeWCS() resolves offset 0, which is still aliased to WCS 1 / G54 there.
 //
-// AND NOTHING IN THE KERNEL READS useZeroOffset. In Autodesk's posts it is read by exactly one function,
-// validateCommonParameters(), which is not a library this post fails to import but a function spliced
-// into each of their posts from include_files/commonFunctions.cpi -- and all it does with the flag is
-// suppress an error() where getSection(0).workOffset is 0 and a later section's is greater. That
-// refusal is right for them and wrong here: their offset 0 emits no G5x at all, so any mix is
-// unresolvable, while this post's 0 resolves to G54 and a job mixing 0 with 2 posts correctly as G54
-// then G55. So the flag stays false and inert, and the one genuinely ambiguous case -- 0 beside 1, two
-// labels on one register -- is warned about by mixedDefaultAndExplicitWcs() instead of refused.
+// Nothing in the kernel reads useZeroOffset. In Autodesk's posts it is read by one function,
+// validateCommonParameters() -- not a library this post fails to import but a function spliced into
+// each of theirs from include_files/commonFunctions.cpi -- and all it does is suppress an error() where
+// getSection(0).workOffset is 0 and a later section's is greater. That refusal is right for them and
+// wrong here: their offset 0 emits no G5x at all, so any mix is unresolvable, while this post's
+// resolves to G54 and a job mixing 0 with 2 posts correctly as G54 then G55. So the flag stays false
+// and inert, and the one ambiguous case -- 0 beside 1 -- is warned about by mixedDefaultAndExplicitWcs().
 wcsDefinitions = {
   useZeroOffset: false,
   wcs          : [
@@ -86,11 +85,11 @@ var eCoolant = {
     FloodThroughTool: "Flood and ThroughTool",
     };
 
-// Maps Fusion's numeric tool.coolant to a coolant name, so the index IS the F360 constant:
-// 0 COOLANT_DISABLED, 1 FLOOD, 2 MIST, 3 THROUGH_TOOL, 4 AIR, 5 AIR_THROUGH_TOOL, 6 SUCTION,
-// 7 FLOOD_MIST, 8 FLOOD_THROUGH_TOOL. Order is fixed by Fusion and must not be sorted. Built from
-// eCoolant rather than repeating its strings, so the two cannot drift; eCoolant must stay above this
-// line, as the assignment runs at load time and reads it.
+// Maps Fusion's numeric tool.coolant to a coolant name, so the index IS the F360 constant: 0
+// COOLANT_DISABLED, 1 FLOOD, 2 MIST, 3 THROUGH_TOOL, 4 AIR, 5 AIR_THROUGH_TOOL, 6 SUCTION, 7
+// FLOOD_MIST, 8 FLOOD_THROUGH_TOOL. Order is fixed by Fusion and must not be sorted. Built from
+// eCoolant rather than repeating its strings, so eCoolant must stay above this line -- the assignment
+// runs at load time and reads it.
 const coolantLevels = [eCoolant.Off, eCoolant.Flood, eCoolant.Mist, eCoolant.ThroughTool,
                        eCoolant.Air, eCoolant.AirThroughTool, eCoolant.Suction, eCoolant.FloodMist,
                        eCoolant.FloodThroughTool];
@@ -98,9 +97,9 @@ const coolantLevels = [eCoolant.Off, eCoolant.Flood, eCoolant.Mist, eCoolant.Thr
 // Dialog group definitions -- Post Processor Guide 5.1.5. A property's `group:` is a KEY into this
 // object, not a label: `order` places the group, `title` is what the operator reads. Each key is the
 // token the member properties' own keys carry (`job` <- `A_Job_...`), so a property filed under the
-// wrong group is visible on sight. `order` starts at 100, clear of the built-in groups at 10..60, in
-// steps of 10. Guard then augment key by key -- assigning a whole literal over the top of the guard
-// would discard whatever it just preserved.
+// wrong group is visible on sight. `order` starts at 100, clear of the built-in groups at 10..60.
+// Guard then augment key by key -- assigning a whole literal over the guard would discard what it just
+// preserved.
 if (typeof groupDefinitions != "object") {
   groupDefinitions = {};
 }
@@ -290,18 +289,16 @@ properties = {
     scope      : "post"
   },
 
-  // THE ONE TEST HOOK IN THIS FILE, and it exists because group 3 is otherwise unreachable by any
+  // The one test hook in this file, and it exists because group 3 is otherwise unreachable by any
   // automated run: a paid licence delivers every link, retract and traverse to onRapid(), so
-  // isSafeToRapid() is never consulted and nothing above can be exercised. The Personal edition
-  // delivers those same moves as FEED moves; onRapid() below reproduces that when this is set.
+  // isSafeToRapid() is never consulted. The Personal edition delivers those same moves as FEED moves,
+  // which onRapid() reproduces when this is set.
   //
-  // NO "group" KEY, DELIBERATELY, and it is doing two jobs. writeAllProperties() skips a property
-  // with no group -- "not a dialog property" -- so a normal job's property dump is unchanged to the
-  // byte, and "visible: false" keeps it out of the dialog. Autodesk ship the same idiom for the same
-  // purpose: Data/Posts/tormach.cps, "Allow all tool numbers for probes", post kernel 5.388.0.
-  //
-  // Being out of the dump would otherwise cost the file its record of what produced it, so
-  // validateJob() announces this one in BOTH channels instead. It cannot be on in silence.
+  // No "group" key, deliberately, and it does two jobs: writeAllProperties() skips a property with no
+  // group, so a normal job's property dump is unchanged to the byte, and "visible: false" keeps it out
+  // of the dialog. Autodesk ship the same idiom for the same purpose -- Data/Posts/tormach.cps, "Allow
+  // all tool numbers for probes", post kernel 5.388.0. Being out of the dump would cost the file its
+  // record of what produced it, so validateJob() announces this one in both channels instead.
   mapRapidsTestPersonalLicence: {
     title      : "TEST ONLY -- deliver rapids as feed moves",
     description: "FOR TESTING PURPOSES ONLY. DO NOT ENABLE.",
@@ -326,12 +323,11 @@ properties = {
     value: "None",
     scope: "post"
   },
-  // FILLING THIS IS THE OPT-IN. There is no enum and no boolean beside it: the frame exists when the
-  // machine declares Z homed AND this parses, and it does not otherwise. It sits here rather than in a
-  // group of its own because a height in the machine frame is meaningless beside a declaration that the
-  // machine has one. A STRING, not a number, because "empty" is what says NO FRAME and Fusion's schema
-  // gives a numeric property no unset state -- and every sentinel would be a real reachable height, 0
-  // very much included.
+  // Filling this is the opt-in: no enum and no boolean sits beside it -- the frame exists when the
+  // machine declares Z homed AND this parses. It sits in this group rather than one of its own because
+  // a height in the machine frame is meaningless beside a declaration that the machine has one. A
+  // STRING and not a number, because "empty" is what says NO FRAME and Fusion's schema gives a numeric
+  // property no unset state; every sentinel would be a real reachable height, 0 included.
   machineTravelZ: {
     title      : "Machine Travel Z",
     description: "The height the tool holds while travelling -- an absolute machine coordinate in mm, often negative. Empty (default): the job has no fixed Z reference. Filled: a Z reference that does not move with stock thickness, which a multi-part job cannot post without. Needs Z declared homed above. Measure it once: home, jog clear of every clamp, and read Z off your sender. It belongs to the machine, not the job, and a wrong value sends the tool to a wrong height at travel speed.",
@@ -481,26 +477,20 @@ properties = {
     scope      : "post"
   },
 
-  // THE POST PERFORMS NO TOOL CHANGE, on any firmware, and this group is what it does instead. A
+  // The post performs no tool change, on any firmware, and this group is what it does instead. A
   // measured change needs a probe, a subtraction and a register to hold the result, and the post can
-  // supply none of the three -- it cannot compute an offset it will not learn until the operator swaps
-  // the tool, hours after posting, and it can never read a register back. So its role is to arrive
-  // correctly, hand over, and resume correctly. design.md -> Tool changes.
+  // supply none of the three. Its role is to arrive correctly, hand over, and resume correctly.
+  // design.md -> Tool changes.
   toolChangeMode: {
     title      : "At a Tool Change",
     description: "What the job does when the tool number changes. The post never changes the tool itself. Refuse a multi-tool job: a job with more than one tool does not post -- split it into one file per tool. Manual change at a pause: the tool retracts, moves to the Manual Position if set, the spindle and coolant stop, and the program stops (M0) for you to change the tool. Do not jog at that pause. Sender or firmware macro changes it: the same retract and stops, then the token named by Tool Change Handled By below. Test that on air -- the post cannot check anything is listening, and an ignored token cuts on with the wrong tool. Hand-over needs Machine Travel Z, and is not available on Marlin.",
     group      : "toolChange",
     order      : 10,
     type       : "enum",
-    // THE TITLES SAY WHO ACTS AND WHAT HAPPENS; the ids are unchanged and are not display text. "Refuse
-    // to post" read as a blanket refusal and this mode refuses exactly one thing, a job carrying more
-    // than one tool -- a single-tool job posts on it, which is the shipped default and the commonest
-    // configuration there is. "Pause for a manual change" named the M0 rather than the party doing the
-    // work, which is what the operator is actually choosing between.
-    //
-    // THE IDS STAY. A property id is what Fusion stores and what all four matrices pass on the command
-    // line, so moving one resets every saved setting, alters the property dump in every saved artifact
-    // and rewrites every case that names it. Nothing an operator sees says "Pause".
+    // The titles say who acts and what happens; the ids are unchanged and are not display text. A
+    // property id is what Fusion stores and what all four matrices pass on the command line, so moving
+    // one resets every saved setting, alters the property dump in every saved artifact and rewrites
+    // every case that names it. Nothing an operator sees says "Pause".
     values: [
       { title: "Refuse a multi-tool job",           id: "Refuse" },
       { title: "Manual change at a pause",          id: "Pause"  },
@@ -534,13 +524,12 @@ properties = {
     value      : "",
     scope      : "post"
   },
-  // WHERE THE MANUAL CHANGE HAPPENS. Three fields and not one because Fusion's dialog has no vector
+  // Where the manual change happens. Three fields and not one because Fusion's dialog has no vector
   // type, and STRINGS because empty is what says "do not move" -- exactly as Machine Travel Z's empty
-  // says "no frame", and for the same reason: every numeric sentinel is a real reachable coordinate.
-  //
-  // MACHINE COORDINATES, which is the whole difference from the Tool Change X/Y/Z these replace. Those
-  // were plain G0 words the dialog presented as absolute while the machine read them in whichever WCS
-  // happened to be active, so the "fixed" change spot moved with every part origin. These are G53.
+  // says "no frame", every numeric sentinel being a real reachable coordinate. Machine coordinates,
+  // which is the whole difference from the Tool Change X/Y/Z these replace: those were plain G0 words
+  // the dialog presented as absolute while the machine read them in whichever WCS was active, so the
+  // "fixed" change spot moved with every part origin. These are G53.
   toolChangePositionX: {
     title      : "Manual Position X",
     description: "Where the tool goes in X for a manual tool change -- an absolute machine coordinate in mm. Empty: it does not move in X or Y, and the change happens above the last cut. Fill both X and Y or neither. Needs X and Y declared homed and Machine Travel Z set, and is read only on Manual change at a pause. The tool does not return to the point it left; it returns to Machine Travel Z.",
@@ -568,17 +557,11 @@ properties = {
     value      : "",
     scope      : "post"
   },
-  // A DECLARATION, NOT A PROMPT, and that is the whole of PV-13. This was "Prompt for the First Tool",
-  // a boolean whose On emitted one M0 saying "Load Tool #n" -- on EVERY mode, because it never read
-  // "At a Tool Change" at all. So a job set up to hand every change to a sender or an ATC still stopped
-  // and asked a human to fit the one tool the changer already holds. What the operator actually knows is
-  // whether the tool in the spindle is the one this job starts with; who fits it if it is not is a
-  // question they have already answered one field above.
-  //
-  // THE KEY CHANGED WITH THE SENSE. A saved `true` under the old key meant "prompt me" and under this
-  // one would mean "no action" -- the exact inversion, silently. Renaming resets the setting to its
-  // default, which is the cost stated at the head of this block, and the new default reproduces the old
-  // shipped behaviour: no prompt, nothing emitted. PV-10 paid the same cost for the same reason.
+  // A declaration, not a prompt. What the operator knows is whether the tool in the spindle is the one
+  // this job starts with; who fits it if it is not is a question they have already answered one field
+  // above. The key changed with the sense -- a saved `true` under the old key meant "prompt me" and
+  // under this one would mean "no action", the exact inversion -- so renaming resets the setting to its
+  // default, and that default reproduces the old shipped behaviour: no prompt, nothing emitted. PV-13.
   toolChangeFirstToolCorrect: {
     title      : "First Tool is Correct",
     description: "On: the tool in the spindle is the one this job starts with, and nothing is emitted for it. Off: the first tool is loaded before any origin is recorded or probed -- so Z0 is measured with the tool that will cut -- by whatever At a Tool Change says. Manual change at a pause, or Refuse a multi-tool job: a stop (M0) for you to fit it. Sender or firmware macro changes it: the same token every other change uses, so a changer loads it and no one is asked to. Ignored on the two Set ... to Current Pos origin modes, which take the origin from a jog you made with a tool already fitted.",
@@ -588,22 +571,20 @@ properties = {
     value      : true,
     scope      : "post"
   },
-  // THREE ANSWERS AND NOT TWO, which is the whole of PV-10. This was a boolean whose Off carried two
-  // incompatible assertions -- its own description said "for a sender or macro that already re-zeroes
-  // OR applies a tool offset" -- and they differ in exactly the thing that matters to a multi-part job:
+  // Three answers and not two, which is the whole of PV-10. This was a boolean whose Off carried two
+  // incompatible assertions, and they differ in exactly the thing that matters to a multi-part job:
   //
-  //   A TOOL-LENGTH OFFSET CORRECTS THE FRAME. G43/G43.1 shifts Z once, so EVERY work offset's stored
+  //   A tool-length offset corrects the FRAME. G43/G43.1 shifts Z once, so every work offset's stored
   //   Z0 stays valid at the same instant and none of them is touched.
   //
-  //   A RE-PROBE, OR A HAND-ZERO, CORRECTS ONE REGISTER. The part it stands on is right afterwards and
+  //   A re-probe, or a hand-zero, corrects ONE register. The part it stands on is right afterwards and
   //   every other part is still measured by the tool just removed.
   //
   // The boolean could not tell those apart, so it treated a hand-zero as though it had corrected the
   // whole job -- one part fixed, the rest stranded silently. design.md -> Tool changes.
   //
-  // THE KEY CHANGED WITH THE TYPE. A saved boolean cannot be coerced into an enum id by any rule this
-  // project can verify without Fusion, so the rename makes the reset explicit and total: an operator
-  // who had the old field Off gets "Probe" until they answer this one.
+  // The key changed with the type: a saved boolean cannot be coerced into an enum id by any rule this
+  // project can verify without Fusion, so the rename makes the reset explicit and total.
   toolChangeZ0Correction: {
     title      : "Tool Length Correction By",
     description: "Who corrects the work Z0 for the new tool's length. This machine has no tool-length system, so something must. GCode reprobes Z0 after change: this post re-probes Z0 at every change, and marks every OTHER part's Z0 stale so a return to it is re-measured too. Tool change applies tool offset: your sender or macro applies a tool-length offset, which shifts the whole Z frame -- every part's stored Z0 stays valid and this post probes nothing. User re-zeroed Z by hand at pause: you re-zero Z by hand at the pause, which corrects the part active at that pause and no other -- every other part is marked stale and is re-measured, or warned about, when the job returns to it. The probe searches down from Machine Travel Z, so G38 Target must reach the stock from there. No probe is written for tool 0 or a laser tool.",
@@ -618,9 +599,8 @@ properties = {
     value: "Probe",
     scope: "post"
   },
-  // THESE TWO USED TO SIT IN GROUP 7 and were the only tool-change settings outside this group. They
-  // ADD to the hand-over sequence, where group 7's two REPLACE the post's header and footer, so they
-  // never belonged beside them. Keys are unchanged, so nobody's saved setting resets.
+  // These ADD to the hand-over sequence, where group 7's two REPLACE the post's header and footer,
+  // which is why they sit here and not beside them. Keys are unchanged, so no saved setting resets.
   includeToolFile1: {
     title      : "Tool Change Start",
     description: "A file of your g-code inserted at the start of each tool change, before the retract and the stops. It runs where the cut ended, at cutting height, so any move in it is yours to make safe. Ignored unless At a Tool Change hands over. Naming any file makes Fusion ask whether this post is safe -- answer Yes, or the post aborts.",
@@ -882,11 +862,11 @@ properties = {
     scope      : "post"
   },
 
-  // RRF 3.x AND 2.05 ARE BOTH NAMED in these descriptions because the field is the operator's to set
+  // RRF 3.x and 2.05 are both named in these descriptions because the field is the operator's to set
   // and the two generations take different forms: 3.x moved spindle setup out of M453 into M950/M563
   // entirely, and moved M452's pin from P/I to C"pin". The defaults are the 3.x forms; neither names a
-  // pin, because a missing pin means the laser never fires and a WRONG one drives an output the
-  // operator did not choose. One command per field -- the string goes through a single writeBlock(). PR-13.
+  // pin, a missing one meaning the laser never fires and a wrong one driving an output the operator did
+  // not choose. One command per field -- the string goes through a single writeBlock(). PR-13.
   duetMillingMode: {
     title      : "Milling Mode",
     description: "GCode that puts a Duet into CNC mode, written on the first section and again at every section-type change. RRF 3.x: M453 on its own -- the spindle is created in config.g with M950 R0 C\"<pin>\" Q<freq> L<max rpm> and bound to the tool with M563 ... R0, and M453 S<n> is refused there. RRF 2.05: M453 P<pin> I<0|1> R<max rpm> F<freq>, which is the M453 P2 I0 R30000 F200 this field used to ship. One command only: the string is written as a single line.",
@@ -1318,16 +1298,15 @@ var curCoolant = eCoolant.Off;        // The coolant requested by the tool
 var coolantChannelA = eCoolant.Off;   // The coolant running in ChannelA
 var coolantChannelB = eCoolant.Off;   // The coolant running in ChannelB
 
-// WHAT A TOOL ASKS FOR, in ONE place, because two things read it and they must not be able to disagree:
+// What a tool asks for, in one place, because two things read it and must not be able to disagree:
 // onCommand(COMMAND_COOLANT_ON) decides what to switch on, and validateJob()'s pre-flight decides what
-// to warn about before the job runs. probePointMachinedBefore() is the same rule one path over, and
-// HB-5's is why -- the two channels have to be the same question asked twice, not two questions that
-// happen to agree today.
+// to warn about before the job runs. HB-5's rule -- the two channels have to be the same question asked
+// twice, not two questions that happen to agree today.
 //
-// TWO SOURCES AND NOT ONE. tool.coolant is Fusion's own constant and coolantLevels IS that index, so a
-// milling tool answers for itself. F360 defines no coolant at all for a JET tool, which is why the laser
-// group carries a forced level -- an air assist, usually -- and that property is the answer there. A
-// walk that read tool.coolant alone would call every laser job dry. PV-12.
+// Two sources and not one. tool.coolant is Fusion's own constant and coolantLevels IS that index, so a
+// milling tool answers for itself. F360 defines no coolant at all for a JET tool, which is why the
+// laser group carries a forced level -- an air assist, usually -- and that property is the answer
+// there. A walk that read tool.coolant alone would call every laser job dry. PV-12.
 function requestedCoolant(t) {
   if (t.isJetTool()) {
     return getProperty(properties.laserCoolant);
@@ -1335,16 +1314,17 @@ function requestedCoolant(t) {
   return (t.coolant < coolantLevels.length) ? coolantLevels[t.coolant] : eCoolant.Off;
 }
 
+// Switch the coolant channels to the level this tool asks for. Both channels are taken to Off first,
+// then the requested level is matched against each channel's configured Mode; a level neither Mode
+// carries is warned about and nothing is emitted for it.
 function setCoolant(coolant) {
   writeComment(eComment.Debug, " ---- Coolant: " + coolant  + " cur: " + curCoolant + " A: " + coolantChannelA + " B: " + coolantChannelB);
 
-  // If the coolant for this tool is the same as the current coolant then there is nothing to do
   if (curCoolant == coolant) {
     return;
   }
 
-  // We are changing coolant, so disable any active coolant channels
-  // before we switch to the other coolant
+  // Both channels off first: whatever is running has to stop before the requested level can be matched.
   if (coolantChannelA != eCoolant.Off) {
     writeComment((coolant == eCoolant.Off) ? eComment.Important: eComment.Info, " >>> Coolant Channel A: " + eCoolant.Off);
     coolantChannelA = eCoolant.Off;
@@ -1357,11 +1337,7 @@ function setCoolant(coolant) {
     CoolantB(false);
   }
 
-  // At this point we know that all coolant is off so make that the current coolant
   curCoolant = eCoolant.Off;
-
-  // As long as we are not disabling coolant (coolant = Off), then check if either coolant channel
-  // matches the coolant requested. If neither do then issue an warning
 
   var warn = true;
 
