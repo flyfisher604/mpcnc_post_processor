@@ -774,7 +774,7 @@ a fix scoped to the mode would have left it behind, and why the fix went to the 
 other channel. That inversion is deliberate: a `warnBothChannels()` reverted to `writeWarning()` turns
 them red again, so the closure is pinned exactly as the gap was.
 
-**The remaining residue is cases, not files.** `findings.md` §7 *Owed* item 6 listed five gaps; the
+**The remaining residue is cases, not files.** `findings.md` §7 *Owed* item 2 listed five gaps; the
 jet block and the four offsets are now built, and the other three need no artifact — a jog mode on a
 stale return, Flow 2 on RepRapFirmware across a WCS change, and the change position crossed with a
 WCS traverse are all property sets over `change-then-return.cnc` and `part-then-tools.cnc`.

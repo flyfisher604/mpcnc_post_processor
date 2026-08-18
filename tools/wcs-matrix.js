@@ -181,6 +181,13 @@ const cases = [
     const seg = between(t, /WCS changed: 1 -> 2/, /2D-Face - Milling - Tool: 1/);
     const n = countOf(seg, /G38\.2/g);
     if (n !== 1) return [false, `${n} probes at the new-part-and-new-tool boundary, expected exactly 1`];
+    // PR-23a's OTHER HALF, which the register was owed and this case did not assert: the criterion is
+    // one probe AND one attach/detach pair. A probe count alone passes a post that asks for the plate
+    // twice for one measurement, and a duplicated establish is exactly what this ordering prevents.
+    const fit = countOf(seg, /MSG,Attach ZProbe/g), off = countOf(seg, /MSG,Detach ZProbe/g);
+    if (fit !== 1 || off !== 1) {
+      return [false, `${fit} attach and ${off} detach prompts at the boundary, expected one of each`];
+    }
     return ordered(seg, [['G55',/^G55$/m], ['tool change',/Tool Change Start/],
                          ['hand over',/MSG,Change to Tool #1/], ['change ends',/Tool Change End/],
                          ['establish',/^G10 L20 P2 Z0$/m], ['probe',/^G38\.2/m]]);
