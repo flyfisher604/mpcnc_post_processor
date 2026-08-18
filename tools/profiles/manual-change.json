@@ -1,0 +1,4 @@
+{
+  "_comment": "Factory GRBL, with the multi-tool refusal answered as the dialog tells the operator to answer it: Flow 1, a manual change at each boundary. Any two-tool .cnc file needs this to post at all.",
+  "toolChangeMode": "Pause"
+}

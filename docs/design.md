@@ -212,6 +212,11 @@ number a copied Setup or a shared design makes **wrong** rather than merely diff
 Settled by reading each firmware's own source and changelog rather than by testing on a machine. Cite the
 file and version when adding here.
 
+**None of it can be re-derived from Fusion.** F360 knows nothing about GRBL's axis-limit rapids, Marlin's
+build options or RRF's `G53`, and this project has no controller to ask instead — so every row here cost a
+source read and a row deleted costs another one to replace. **These tables are load-bearing, not
+informative**, and a claim about firmware that cites nothing is the one to distrust.
+
 - Marlin — `MarlinFirmware/Marlin`, `Marlin/src/gcode/gcode.h` + `gcode.cpp`
 - RepRapFirmware — `Duet3D/RepRapFirmware`, `src/GCodes/GCodes2.cpp`, plus the RRF wiki changelog
 - GRBL — `gnea/grbl` wiki; FluidNC — `wiki.fluidnc.com`
@@ -271,6 +276,64 @@ not learn until the operator swaps the tool, hours after posting, and it can nev
 (*Selection is deterministic, origin is trusted*). So the post's role is to **arrive correctly, hand over,
 and resume correctly** — never to perform the change. Everything the old design did beyond that was the
 error.
+
+### A re-probe corrects one register; a tool-length offset corrects the frame
+
+**That difference decides what a change leaves behind**, and it is why the dialog asks *who* corrects
+rather than *whether to probe*. A work Z0 lives in a WCS register as a machine-Z coordinate, so
+measuring it writes **one** register and leaves every other part still measured by the tool just
+removed. `G43`/`G43.1` writes no register at all — it shifts the **Z frame** — so every part's stored
+Z0 becomes correct at the same instant, none of them touched. Read against *Frames*: **there is no
+tool-length system here**, which is exactly why the substitute the post reaches for corrects less than
+the thing it substitutes for.
+
+**Three answers, and only one of them leaves the other parts alone.** `Tool Length Correction By`:
+
+| Answer | Reach | What the post does |
+|---|---|---|
+| **This post** | one register | re-probes the active offset, and marks **every other** part stale so its own return re-measures it |
+| **The tool change** | the frame | nothing — no probe, nothing marked stale, and the file states the condition it is trusting |
+| **Me, by hand** | one register | nothing measured; every part **but the one active at the pause** is marked stale |
+
+**It was a boolean until `findings.md` `PV-10`**, whose Off carried *"the handler applied an offset"*
+and *"I will re-zero at the pause"* as one answer. Those reach different numbers of parts, so a
+hand-zero was booked as though it had corrected the whole job: the operator did exactly as the file
+told them and the next part was cut deep by a tool length. **The post can verify none of the three** —
+same standing as every other clause of the Flow 2 contract — so each is an operator assertion, and the
+two whose stated party may not exist are warned about at `onOpen()`.
+
+### The first tool is loaded, not changed — and by whichever flow the job selected
+
+**The first tool is a special case of neither flow and of both.** Nothing is running, no Z0 exists yet to
+invalidate, and the tool stands where the last preamble step left it — so **none of a change's arrive-and-
+resume work is owed**: no retract to repeat, no spindle or coolant to stop, no `Manual Position`
+excursion, and no re-probe, because the origin write a few blocks below establishes Z0 with the tool just
+fitted. That last point is the ordering the whole thing exists for: **load before the origin work**, or Z0
+is measured with the tool the load was there to replace.
+
+**What is NOT special is who does it.** `First Tool is Correct` is a declaration — the tool in the spindle
+either is the one this job starts with or is not — and where it is not, **`At a Tool Change` decides who
+fits it**, exactly as at every other boundary. A job that hands every change to a sender or a changer must
+not stop and ask a human for the one tool the changer already holds; that was the defect (`findings.md`
+`PV-13`), and it followed from the setting being *a prompt* rather than *a fact about the spindle*.
+
+**Refuse and Manual emit the same bytes here, and that is correct rather than an omission.** The two modes
+differ at a *change*, and this is not one. Refuse means one tool per file, so on such a file there is no
+second boundary for them to differ at.
+
+**Three conditions suppress the load, and each says so in the file:**
+
+- **A pre-jogged origin.** The two `Set … to Current Pos` modes take the origin from a jog made before
+  line 1, with a tool already fitted — so declaring that tool incorrect contradicts the mode, and on the
+  hand-over route the macro would move the tool **off the position about to be recorded**.
+- **A first tool no changer can fit** — tool 0 or a jet tool. `T0 M6` names no tool to any handler in the
+  list and a laser is not in a changer. The `M0` routes are unaffected: asking a *person* to fit a laser
+  is a sensible thing to do.
+- **The declaration itself**, which is the default and emits nothing at all.
+
+**Every Flow 2 guard had to widen with this.** They were keyed on more than one tool in the job, because
+until this existed a one-tool job could not reach a hand-over at all. It now can, and it owes the same
+refusals — Marlin has no tool-length register whether the hand-over is the first tool's or the fourth's.
 
 ### Flow 1 — the manual change, at the end of a file
 
@@ -368,6 +431,39 @@ Carried from the register the old design filled, because each is a defect the re
 ---
 
 ## Design notes behind the shipped behaviour
+
+### Which channel a warning belongs in, and the one question that decides it
+
+The post writes to two channels and they reach different people. `writeWarning()` puts a `>>> WARNING:`
+line in the g-code — ungated by `Comment Level`, because a warning is not commentary — and it reaches
+whoever opens the file. `warning()` raises a line in Fusion's post dialog, and it reaches whoever posts.
+**Those are often the same person on different days, and the operator who posts, reads the dialog and
+sends the file without opening it is the one every one-channel warning was written past.**
+
+**The question is not "is this important". It is: could a person who never opens the file act on this?**
+
+- A condition **the properties and the job's shape fix** is answerable before the job runs and belongs in
+  both channels. A stranded work Z0, a mode that establishes nothing, a coolant channel with no file —
+  the operator would have posted differently had they known.
+- A condition **the emitting block discovers** belongs in the file. An unsupported Manual NC command, a
+  clamped dwell, a rigid-tapping request: the post learns of it from the kernel, mid-stream, and there
+  was no earlier moment at which to say it.
+- A condition **true of every job on a firmware** belongs in the file even though it is knowable, and the
+  GRBL rapid-`F` warning is the case. A dialog line on every post is one the operator learns to dismiss,
+  and that costs the pairs above the attention they depend on.
+
+**Both channels should leave from one statement.** `warnBothChannels()` writes the file line and raises
+the dialog line from one call, so the condition is evaluated once and the text exists once. The
+alternative — a `validateJob()` pre-flight beside the emitter's own warning — needs a **second
+predicate**, computed at `onOpen()` to predict what the emitter will decide later, and the two can come
+to disagree; `PV-7` has such a pair by necessity (only the emission point knows a probe is actually
+happening) and each half says in its own text that it must not drift from the other. Prefer the paired
+form only where the pre-flight can say something the emitter cannot.
+
+**A pre-flight is not earlier in any sense that helps.** The post dialog is read *after* the post has
+run, so both channels arrive at the same moment. What a pre-flight buys is one statement about the whole
+job; what the emission point buys is one per occurrence — which for three stranded parts is the honest
+count. `PV-9`, and `grep -n "// TWIN:"` in the post is the verdict for every site.
 
 ### The kernel's position is the toolpath's, and only the work frame can correct it
 
@@ -494,9 +590,45 @@ leaves on disk: `onOpen()` refuses before any output, so the job writes **no fil
 
 **Properties** use the combined-inline `properties = {}` form, read with `getProperty(properties.key)`.
 
-**`Personal.cps`** (repo root, git-excluded) is the post with `onRapid()` rerouted into `onLinear()` — the
-only way to reach the group-3 code, since a paid licence emits real `G0`s. Re-create it from the current
-`.cps`; its evidence is about *logic*, never about what the post emits.
+**One test hook lives in the post, and it is `mapRapidsTestPersonalLicence`.** It reroutes `onRapid()`
+into `onLinear()`, which is the only way to reach the group-3 code: a paid licence emits real `G0`s, so
+`isSafeToRapid()` is never consulted. It is `visible: false` and has **no `group`**, so no dialog offers
+it and the property dump ignores it — and because the dump is how a file records what produced it,
+`validateJob()` announces the hook in both channels instead. **The design rule it carries:** every rapid
+the post makes on its own behalf goes through `emitRapid()`, never `onRapid()`, so the hook can capture
+only what Fusion delivered. `integration.md` §6.5 is the mechanism and the guards.
+
+*(It replaces `Personal.cps`, a git-excluded copy of the post carrying the same edits by hand. That copy
+went stale unnoticed — a harness that is a duplicate does not fail loudly, it answers questions about a
+post that no longer exists — and its evidence could only ever be about *logic*, never about what the post
+emits. The hook tests the deliverable, so that limit is gone. Any `Personal.cps` still on disk is dead.)*
+
+**The post runs without Fusion, and `integration.md` is how.** `post.exe` over the intermediate `.cnc`
+files, driven by `tools/post-run.ps1` for one job or by the four matrices in `tools/` for many — that
+file owns the machinery, the property-coverage measure and the bounds. What a row settled that way may
+claim is `findings.md` §4's `utility` method. Three facts about it are design's rather than the
+harness's, and only these are stated here:
+
+**It is the only check that answers *does the post run at all*.** `PV-1` was a crash in the first
+statement of `onOpen()` that `node --check` passes and a code walk had no way to see, and it stood for
+four commits. A walk proves what the post writes given a configuration; it cannot prove the post
+executes.
+
+**Every `.cnc` Autodesk ships uses one work offset**, censused 2026-08-16 across the whole library. So
+`Each New WCS / Part`, `writeWCS()`'s traverse arm and `writeWcsOnReturn()` — a third of the multi-part
+design — were unreachable from that library by any harness, and Fusion can produce such a job only by
+hand and only with a licence. `tools/wcs-jobs/` closes it by **splicing rather than authoring**: each
+job is a byte copy of one Autodesk file's blocks with at most one 32-bit word changed per block, so
+two blocks in different offsets are the same operation with one variable moved and any difference in
+the output is attributable to the WCS logic rather than to a fixture. **The same splice reaches the
+jet tool and the change into one**, drawing blocks from a milling source and a laser source, which is
+how `PR-22` and the `canProbe`-false arms came to be posted at all. **The XML serialisation cannot
+substitute** — its reader silently drops `work-offset` and every section arrives as offset 0, verified
+by editing that attribute in Autodesk's own `Milling/2D/bore.xml` and posting it.
+
+**A green matrix is not a verified post.** All three findings these matrices have returned came from
+**reading the passing output**, and two of the cases themselves were passing while asserting nothing
+useful. A green run means the questions asked were answered, not that the right questions were asked.
 
 **`git commit -m` with a PowerShell here-string mangles messages containing double quotes.** Write the
 message to a file and use `git commit -F`, or pipe it in.

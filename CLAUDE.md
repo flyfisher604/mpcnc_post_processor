@@ -7,7 +7,8 @@ A Fusion 360 post for GRBL / Marlin / RepRap hobby CNC. The deliverable is
 
 **It is the only file that says what is next.** Start at its *Checkpoint*, and reach everything else from
 there — `docs/findings.md` when a specific finding or test row is in play, `docs/design.md` when changing
-frame, Z-reference or ordering behaviour. Do not read or search under `./Test/` unless asked.
+frame, Z-reference or ordering behaviour, `docs/integration.md` when running the post against a job file
+or asking what a run may claim. Do not read or search under `./Test/` unless asked.
 
 Each of those files states its own rules at its foot. Follow them when you edit it.
 
@@ -49,6 +50,8 @@ side effect of another task. Repo docs are reviewed in a diff; memories go stale
 - **The user guides** — `README.md` and `docs/guide-hobbyist.md` / `guide-pro.md` /
   `property-reference.md`. Not touched during code changes, only when asked — and **when they fall behind
   the post, that is the author's call to make**, not something a session detects or acts on.
-- **`Personal.cps`** — a git-excluded test harness, not part of the post. What it is, is in `design.md`.
+- **`Personal.cps`** — a git-excluded copy of the post, **superseded and dead**. The Personal-licence
+  simulation is now a `visible: false` property inside the post itself; `design.md` says why, and
+  `integration.md` §6.5 is the machinery. Do not revive the copy.
 - **`Assessment/`** — the analysis this plan came from, dated 2026-08-13. Read it for evidence, never for
   where things live: its file pointers predate the document consolidation.
