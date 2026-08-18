@@ -11,9 +11,9 @@ the file that computes it is named instead.
 
 ## Checkpoint
 
-**Next: Step 6.** Step W is done: the audit ran, `PV-9` closed on it, and the class it bounded is now
-a verdict beside every `writeWarning()` call — `grep -n "// TWIN"`. The finding the audit found while
-closing another has closed too, so **`findings.md` §2 is empty**.
+**Next: Step 7.** Step 6 is done: every comment in the post was read and rewritten, and the
+`writeWarning()` pairs the Step W audit left are now numbered — `grep -n "// TWIN #"`, every number
+returning exactly two sites. **`findings.md` §2 is empty.**
 
 **No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §2, and `PV-14`
 is the row.
@@ -30,17 +30,11 @@ version — never from a sender console, a dry run or a non-GRBL controller.
 
 | | Item | Blocked on |
 |---|---|---|
-| **6** | Clarity | — |
-| **7** | Documents, once | 6 |
+| **7** | Documents, once | — |
 
-## Step 6 — Clarity
-
-- **Re-measure before restructuring.** `validateJob()` and the property block were both named as
-  too long, and Steps 2–4 have cut into each since. They may not need the work; the numbers this
-  file used to quote were stale every time they were read.
-- **The comment-only lines stay, and there are hundreds.** Every one of the sharpest findings in
-  the assessment came out of a comment the post wrote about itself. **One of them was wrong** —
-  corrected by `PR-19` — which is an argument for reading them, not for thinning them.
+**`validateJob()` and the property block were never restructured** — Step 6 measured both and left
+them. Neither is short; whether either is too long is a judgement no measurement settles, and it is
+the author's to make against the file as it now reads.
 
 ## Step 7 — Documents, once
 
@@ -71,7 +65,7 @@ until it appears in the table above.
 
 ## Done
 
-Phase C · Step 0 · Steps 1.1, 1.2, 1.3, 2, 3, 4, 5 · F2–F7 · Step V.
+Phase C · Step 0 · Steps 1.1, 1.2, 1.3, 2, 3, 4, 5, 6 · F2–F7 · Step V.
 
 **What each one did is its commits** — `git log --grep` by step or finding id — and what each one
 left is a row in `findings.md`. Two are worth knowing without looking them up: **Step 2** retired

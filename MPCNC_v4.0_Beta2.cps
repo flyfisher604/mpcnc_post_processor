@@ -2802,21 +2802,16 @@ function wcsGcode(workOffset) {
   return undefined;
 }
 
-// Every machine-frame move goes through here, so the travel-Z retract and the X/Y park cannot come to
-// differ about how G53 is emitted. Pass the axis words already formatted; this adds G53 G0 and the feed.
+// Every machine-frame move goes through here, so the travel-Z retract and the X/Y park cannot differ
+// about how G53 is emitted. Pass the axis words formatted; this adds G53 G0 and the feed.
 //
-// One block always, for two independent firmware reasons. G53 "is not modal and must be programmed on
-// each line", and "it is an error if G53 is used without G0 or G1 being active" -- so nothing may be
-// appended, a Z move and an X/Y park are two blocks rather than one diagonal, and the G0 goes through
-// gFormat and not gMotionModal, which would suppress the word exactly when G0 is already active. And
+// One block always. G53 "is not modal and must be programmed on each line" and "it is an error if G53
+// is used without G0 or G1 being active", so a Z move and an X/Y park are two blocks and the G0 goes
+// through gFormat, not gMotionModal, which would suppress the word when G0 is already active. And
 // Marlin's G53() restores the saved coordinate system INSIDE "if (parser.chain())"
-// (Marlin/src/gcode/geometry/G53-G59.cpp, 2.0.9.7 and 2.1.2.5), so a BARE G53 on its own line leaves
-// native space active for the rest of the job.
-//
-// The Marlin re-select below is belt-and-braces on top of that, and not idle: both reports of G53
-// misbehaving there -- issues 13843 and 14743 -- closed without a fix commit. It re-selects
-// currentWorkOffset's OWN G5x, never a fixed G54, which would be the wrong register on any job whose
-// active offset is not the first.
+// (Marlin/src/gcode/geometry/G53-G59.cpp, 2.0.9.7 and 2.1.2.5), so a bare G53 on its own line leaves
+// native space active for the rest of the job. The Marlin re-select below is belt-and-braces on that,
+// both reports of G53 misbehaving there -- issues 13843 and 14743 -- having closed with no fix commit.
 function writeMachineFrameBlock(axisWords, feedMmPerMin) {
   resetAll();
   writeBlock(gFormat.format(53), gFormat.format(0), axisWords[0], axisWords[1],
@@ -3769,18 +3764,11 @@ function writeFirstSection() {
     loadFile(getProperty(properties.includeStartFile));
   }
 
-  // Two orders, and which one applies is originIsPreJogged(). Both run the same three steps after
-  // Start(), so positioning and units are set either way.
-  //
-  // The ordinary order -- establish, load, origin. The establish leaves the tool at a height that
-  // clears the bed, which is where the travel to the first part's X0 Y0 starts from, so it must precede
-  // an origin step that TRAVELS; and the tool is loaded before the origin is set, because Z0 must be
-  // established with the tool that cuts.
-  //
-  // The pre-jog order -- origin, then establish: the origin IS where the operator already put the tool,
-  // so there is no travel to start from, and the G53 move would destroy the position being recorded.
-  // The first load is dropped rather than reordered, these modes already asserting a fitted tool.
-  // CR-15, PV-13.
+  // Two orders, and originIsPreJogged() decides. Ordinary: establish, load, origin -- the establish
+  // leaves the tool at a height that clears the bed, which is where the travel to X0 Y0 starts from, and
+  // the tool is loaded first because Z0 must be established with the tool that cuts. Pre-jog: origin,
+  // then establish -- the origin IS where the operator put the tool, so there is no travel to start
+  // from and the G53 move would destroy the position being recorded. CR-15, PV-13.
   if (originIsPreJogged()) {
     toolChangeFirstLoad();
     writeWcsOnStart();
@@ -4799,17 +4787,12 @@ function toolChange(partOriginEstablishesZ0) {
 
   // --- 1. Arrive. Leave the machine in the state a hand-over is entitled to assume. ---------------
 
-  // One frame, and the file names it: the hand-over height is the machine frame's own travel height,
-  // the same G53 block every cross-part retract uses. What this replaces -- Tool Change X/Y/Z -- were
-  // plain G0 words the dialog presented as absolute while the machine read them in whichever WCS was
-  // active, so the "fixed" change spot drifted with every part.
-  //
-  // The excursion is Flow 1's alone: a macro moves the tool itself, in a frame the post cannot see.
-  //
-  // Unconditional, even where it means two identical G53 blocks in a row. The post tracks no
-  // machine-frame position by design, so "already there" would be a belief to maintain across
-  // everything that can move the tool -- "Tool Change Start" being an operator's include file. A second
-  // rapid to a height already held is safe; a stale belief that it is up there is not. PR-23.
+  // One frame, and the file names it: the hand-over height is the machine frame's own travel height.
+  // What this replaces -- Tool Change X/Y/Z -- were plain G0 words the dialog presented as absolute
+  // while the machine read them in whichever WCS was active. Unconditional, even where it means two
+  // identical G53 blocks in a row: the post tracks no machine-frame position by design, so "already
+  // there" would be a belief to maintain across everything that can move the tool, "Tool Change Start"
+  // included. PR-23.
   if (fixedZEstablishedInFile()) {
     writeMachineTravelZ("Retract to the travel height in the machine frame before the tool change");
     // After the retract and not instead of it: the excursion crosses the bed, so it may only start
