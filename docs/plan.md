@@ -15,8 +15,7 @@ the file that computes it is named instead.
 a verdict beside every `writeWarning()` call — `grep -n "// TWIN:"`. The finding the audit found while
 closing another has closed too, so **`findings.md` §2 is empty**.
 
-**Live risk: `HR-6 (B)`** — the orientation guard may be a no-op on exactly the case it exists to
-catch, and the failure mode is a part cut in the wrong plane, silently. `findings.md` §7 has it.
+**No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §7.
 
 **Nothing is pushed.** No work since the `Assessment` merge is on `origin`. Pushing is the
 author's call, not a session's.
@@ -32,11 +31,6 @@ version — never from a sender console, a dry run or a non-GRBL controller.
 |---|---|---|
 | **6** | Clarity | — |
 | **7** | Documents, once | 6 |
-
-**Worth one post of its own, and it is not a row here:** `HR-6 (B)`'s rotated Setup. Five rotated
-Setups are on disk already, so it is a `utility` row to write rather than a job to build —
-`integration.md` §7.5. `PR-2c` closed on a ruling rather than an artifact, so that one post
-settles both.
 
 ## Step 6 — Clarity
 
