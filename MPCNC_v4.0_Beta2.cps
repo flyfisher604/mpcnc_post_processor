@@ -1825,17 +1825,23 @@ function validateJob() {
   // make is narrow -- homing was the LAST thing to move the tool -- and it has to stay checkable.
   if (startMode == "Probe Z" && !fixedZEstablishedInFile()) {
     if (homingMovesZ() && !firstToolChangeIsHandedOver()) {
-      warning(localize("\"First WCS / Part\" = \"Use WCS X0 Y0, Probe Z0\" rapids to the stored X0 Y0 and "
-        + "then probes DOWN FROM WHEREVER THE TOOL IS, and this job establishes no Z the post can move "
-        + "in -- so both moves start from whatever height the last thing to move the tool left it at, and "
-        + "on this job that thing is \"Home at Job Start\". "
+      // ONE HEIGHT, TWO CONSEQUENCES, and the text must not blur them: the rapid to the stored X0 Y0 is
+      // an X/Y move, so it happens AT the height the tool is holding, and the G38.2 is AT the stored
+      // X0 Y0 and searches DOWN FROM that same height. The probe's position is the register's; only its
+      // start height is the tool's. Saying the probe starts "where the tool stands" reads as the position
+      // and is wrong -- the file half and the non-homing arm both say "height", and so does this now.
+      warning(localize("\"First WCS / Part\" = \"Use WCS X0 Y0, Probe Z0\" rapids to the stored X0 Y0 -- an "
+        + "X/Y move, made at whatever height the tool is holding -- and the G38.2 that follows searches "
+        + "DOWN FROM THAT SAME HEIGHT, this job establishing no Z the post can move in. So one height "
+        + "decides both whether the crossing clears your work and whether the probe can reach the stock, "
+        + "and on this job \"Home at Job Start\" is what chose it. "
         + (fw == eFirmware.GRBL
             ? "The single \"$H\" this post emits on " + fw + " runs the build's whole homing cycle, and the "
               + "stock cycle homes Z FIRST to clear the work area -- so Z goes to its endstop here even "
               + "though \"Axes Homed and Trusted\" declares only X and Y."
             : "The \"G28 Z\" this job emits leaves the tool at the Z endstop.")
-        + " Positioning the tool before starting the file has no effect on either move, and nothing "
-        + "afterwards brings it back to a height you chose. The post cannot know which end of the travel "
+        + " Positioning the tool before starting the file has no effect on that height, and nothing "
+        + "between the homing and the probe brings it back to one you chose. The post cannot know which end of the travel "
         + "your Z endstop is at, and both ends are wrong here: at the top of travel the stock is the "
         + "whole travel below, a \"G38 Target\" of " + getProperty(properties.probeG38Target) + " mm never "
         + "reaches it and the job stops on a probe-fail alarm; at the bed the search starts a pull-off "

@@ -415,7 +415,7 @@ const cases = [
          'the file says the start height is not the operator\'s']],
   mustNot:[[/must be clear of the stock, clamps and fixtures before the program starts/,
             'and the old text, which asked for something homing undoes, is gone']],
-  mustLog:[[/probes DOWN FROM WHEREVER THE TOOL IS/,'the dialog half - HB-5'],
+  mustLog:[[/searches DOWN FROM THAT SAME HEIGHT/,'the dialog half - HB-5'],
            [/declares only X and Y/,'naming the sharp claim: the declaration does not bound $H']],
   mustNotLog:[[/set the target deep enough to reach the stock from where you leave the tool/,
                'the unfollowable advice is not offered to a job that homes']] },
@@ -429,7 +429,7 @@ const cases = [
            [/^\$H$/m,'nothing homes']],
   mustLog:[[/set the target deep enough to reach the stock from where you leave the tool/,
             'and so does the dialog']],
-  mustNotLog:[[/probes DOWN FROM WHEREVER THE TOOL IS/,'the homing text stays off this branch']] },
+  mustNotLog:[[/searches DOWN FROM THAT SAME HEIGHT/,'the homing text stays off this branch']] },
 
 { id:'PRO42', desc:'PR-16 - Marlin homes Z per axis, so the text names G28 Z rather than the $H cycle',
   cnc:face, props:{ jobSelectedFirmware:S('Marlin'), machineHomedAxes:S('XYZ'),
@@ -450,7 +450,7 @@ const cases = [
          'and the height is still the operator\'s, so the original text stands']],
   mustNot:[[/^G28 Z$/m,'Z is not homed - the declaration bounds the emission on this firmware'],
            [/HOMING chose that height/,'so homing is not blamed for a height it never touched']],
-  mustNotLog:[[/probes DOWN FROM WHEREVER THE TOOL IS/,'and the dialog agrees, on the same predicate']] },
+  mustNotLog:[[/searches DOWN FROM THAT SAME HEIGHT/,'and the dialog agrees, on the same predicate']] },
 
 { id:'PRO44', desc:'PR-16 - a handed-over first tool moves the tool after homing, so homing is not what set the height',
   cnc:face, props:{ machineHomedAxes:S('XY'), machineHomeAtStart:S('Home'), machineParkAtEnd:S('Work'),
@@ -461,7 +461,7 @@ const cases = [
   // firstToolChangeIsHandedOver() rather than re-deriving it - PV-13's predicate, reused.
   must:[[/^T1 M6$/m,'the first tool is handed over, so something moved the tool after $H']],
   mustNot:[[/HOMING chose that height/,'and the file does not claim homing set the probe height']],
-  mustNotLog:[[/probes DOWN FROM WHEREVER THE TOOL IS/,'nor does the dialog']],
+  mustNotLog:[[/searches DOWN FROM THAT SAME HEIGHT/,'nor does the dialog']],
   mustLog:[[/set the target deep enough to reach the stock from where you leave the tool/,
             'the general text is what a hand-over gets']] },
 ];

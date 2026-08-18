@@ -74,6 +74,12 @@ it; **RRF has no such lock** and will run the move against a machine zero that h
 takes a post-time warning when this frame is in use with `Home at Job Start = Off`, and it is the only
 target that needs one.
 
+**`Home at Job Start` is read for one other kind of question, and it is not about trust.** *Is this frame
+trustworthy?* is answered by the declaration alone, for the reason just given. *Where is the tool standing
+now?* can only be answered by the action, because homing is a **motion** — and the two must not be confused
+into a rule that the frame needs the action after all. Every reader of the action asks the second question:
+the pre-jog warnings, and the height a probe with no frame searches down from (`PR-16`).
+
 ### The machine frame — capability, then action
 
 `Axes Homed and Trusted` — `None` / `XY Only` / `Z Only` / `XYZ` — is a **fact about the machine**;
@@ -102,7 +108,16 @@ machine-Z datum needs Z and the stored-offset warning needs X/Y, and **neither i
 
 So **on GRBL the split is bookkeeping, not emission** — the post can neither emit per-axis homing nor
 corroborate the declaration. FluidNC could, and this post treats FluidNC as GRBL throughout: the one place
-that conflation costs something real. **The action is one enum, `Home at Job Start` = `Off` / `Home` /
+that conflation costs something real.
+
+**Bookkeeping is not the whole cost, and this is the trap: on GRBL the declaration does not bound what
+MOVED.** The table above reads as a limit on what the post can *emit*; it is also a limit on what the post
+may *conclude*. A consumer asking *did Z move at job start?* must not read `machineHomesZ()` there, because
+one `$H` runs the whole cycle whatever the dialog says — **a GRBL job declaring `XY Only` still homes Z**,
+while `G28 Z` is exact. So `homingMovesZ()` is a **third** predicate; it composes the other two with the
+firmware and the action rather than reading the property, so the *only two accessors* rule above stands. A
+single `homesAtJobStart()` gate would have made a Marlin `XY Only` job blame homing for a Z it never
+touched — `findings.md` `PR-16`, where `PRO40`/`PRO43` are that pair. **The action is one enum, `Home at Job Start` = `Off` / `Home` /
 `Pause, then Home`**, and its pause is **one stop before any homing motion**, whatever the firmware and
 axes; the post does not control homing order. That pause was a second boolean until it was folded in —
 unlike the axis declaration, **this merge deleted a state rather than renaming one**: "prompt" was inert
@@ -177,6 +192,11 @@ whose active offset is not the first.
 > none possible, since the establish runs before any origin exists — so parking over the stock recorded the
 > stock top as "the spoilboard" and every clearance from it was short by the stock thickness, silently
 > (`findings.md` `PR-16`). **Do not re-propose it without an answer to that.**
+> **And the answer is owed to a live warning, not to a deleted feature.** `PR-16` was closed *by deletion*
+> and reopened 2026-08-17 when the same defect turned up on `Use WCS X0 Y0, Probe Z0`, which also probes from
+> a height nothing in the file wrote — see *Why the first section's arrival is asymmetric*. So the hazard the
+> base died of is a documented, tested property of this post's one remaining probe-from-an-unknown-height
+> path, and any revival has to be better than that, not merely aware of it.
 > **Retired with it: the enum flip.** Two frames sharing one clearance field made a height valid in the
 > other frame a valid-*looking* height, and only one direction was detectable. One frame, one meaning, no
 > flip — and the guard that caught the detectable direction goes too, having nothing left to catch.
@@ -465,6 +485,12 @@ to disagree; `PV-7` has such a pair by necessity (only the emission point knows 
 happening) and each half says in its own text that it must not drift from the other. Prefer the paired
 form only where the pre-flight can say something the emitter cannot.
 
+**And the drift a pair risks is not only in the predicate — it is in the TEXT, which is the half that gets
+corrected.** `PR-16` was found by taking one such comment at its word: it claimed the two halves covered the
+condition *"word for word"*, and reading them together showed both giving advice the configuration made
+impossible. So a correction to either half is owed to both, and a pair whose texts have drifted is worse
+than an unpaired warning — it reads as two confirmations of the same wrong thing.
+
 **A pre-flight is not earlier in any sense that helps.** The post dialog is read *after* the post has
 run, so both channels arrive at the same moment. What a pre-flight buys is one statement about the whole
 job; what the emission point buys is one per occurrence — which for three stranded parts is the honest
@@ -537,17 +563,42 @@ The resolution keeps the intent and fixes the placement: the first section's saf
 the fixed Z reference is established, in that reference's frame. That exposed a hard limit — **with no
 fixed reference there is no established frame at job start at all**, so no retract can be made safe there.
 That case gets a `>>> WARNING:` instead, on the one path that deliberately emits no absolute Z move — a
-precondition the operator must satisfy, not commentary, so it bypasses `Comment Level` and the same
-sentence is raised in the post dialog where there is still something to change. The post does **not**
+precondition the operator must satisfy, not commentary, so it bypasses `Comment Level` and is paired with a
+post-dialog line where there is still something to change. The post does **not**
 substitute a relative `G91` lift: it would be the only motion emitted in no frame at all, its extent is
 unknowable on a machine whose Z travel the post cannot see, and it would leave the `G38.2` target — an
 absolute Z in the same stale frame — exactly as unbounded as it found it.
+
+**One height carries both halves of that warning, and it is the tool's height and not its position.** On
+`Use WCS X0 Y0, Probe Z0` the rapid to the stored X0 Y0 is an **X/Y move**, made at whatever height the
+tool is holding, and the `G38.2` is **at the stored X0 Y0** and searches `G38 Target` down from that same
+height. So the probe's *position* is the register's and only its *start height* is the tool's — a warning
+that says the probe starts "where the tool stands" reads as the position and is wrong.
+
+**And the precondition is only the operator's to satisfy where nothing else moves the tool — which homing
+does.** `Home at Job Start` runs two steps earlier and leaves the tool at an endstop, so *position it clear
+before starting* and *set the target deep enough to reach from where you leave the tool* are both
+unfollowable on a homing job: the height is the switch's, and no jog before line 1 of the file reaches it.
+**Advice a configuration prevents is worse than none**, so the warning carries two texts on one condition,
+differing only in who chose the height, and the homing text names the endstop instead of asking for a jog.
+It is excluded where the first tool is **handed over**, that arm moving the tool after homing, so the height
+is the macro's — `firstToolChangeIsHandedOver()`, read by both halves rather than re-derived. This is
+`PR-16`, and the *class* of the retired spoilboard base: a probe that ran wherever the tool already sat.
 
 **The machine frame lifts the limit rather than working around it.** A declared, homed machine Z *is* an
 established frame at job start, so on such a machine the arrival emits a real `G53 G0 Z<Machine Travel Z>`
 and the warning is suppressed. The limit stands only where it is still true: a job with no frame at all —
 and on Marlin *declaring* one is not establishing it, the one implementation being refused there, so the
 suppression asks whether the frame is established **in this file** and not what the dialog was set to.
+
+**A clearance move is never a probe question.** `Use WCS X0 Y0 Z0` arrives by lifting to the probe Safe Z
+and then crossing to the stored X0 Y0 — an absolute work-frame Z, meaningful because trusting that origin is
+the mode's whole premise. That lift was gated on the tool being able to probe, on **the one mode that probes
+nothing**, so a laser or tool-0 job crossed the bed at whatever height it was holding while a milling tool
+on identical settings was lifted first. The premise is the **mode's** and holds for every tool; the rule is
+that clearance and measurement are separate questions and only the second may read the tool. The guards that
+stay are the ones bounding a `G38.2` or a provisional Z0 that only a probe overwrites — there the tool
+really is the condition (`HR-26`, and `CR-12`/`PV-3` for the arms that keep theirs).
 
 **Two modes make no arrival at all, and they take the order in reverse.** Everything above is about the
 first section *travelling* to its origin. The two `Set … to Current Pos` modes do not travel: the origin
