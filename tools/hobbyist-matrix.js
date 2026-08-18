@@ -212,6 +212,54 @@ const cases = [
   mustLog:[[/"Turn Channel A On" is "Use custom".*"Channel A On Custom".*is\s+empty/s,
             'the dialog names the channel AND the field to fill']],
   mustNotLog:[[/asks for "Mist" coolant/,'the level IS matched here - only the file behind it is missing']] },
+
+// --- PV-16, a coolant code posted into the wrong dialect -------------------------------
+// ON face.cnc AND NOT ON THE LASER JOB, deliberately: this warning reads two properties and no
+// toolpath at all, and the cheapest job that proves it is the one that proves nothing else. What the
+// laser job is needed for is the LEVEL question above, which needs a tool that asks for a coolant.
+{ id:'H33', desc:'PV-16 - one Marlin code on a GRBL job: the dialog names the field and the dialect',
+  cnc:'Milling/2D/face.cnc',
+  props:{coolantChannelAMode:S('Flood'), coolantChannelAOn:S('M42 P6 S255')},
+  // THE FILE IS THE OTHER HALF OF THE CLAIM, and it is here because the first draft of this case
+  // asserted the opposite and failed. face.cnc's tool carries Flood -- Fusion's tools carry it whether
+  // or not anyone wanted it, which is the fact PV-12's own gate rests on -- so channel A matches, and
+  // a Marlin pin-write lands in a GRBL file. The warning is about a configuration; the damage is a line.
+  must:[[/^M42 P6 S255$/m,'the wrong-dialect code really is emitted, into a Grbl file']],
+  mustLog:[[/posted for Grbl, and a coolant code it will emit belongs to another firmware/,
+            'singular - one field is wrong, and the job dialect is named'],
+           [/"Turn Channel A On" is "M42 P6 S255", which this post lists as Marlin/,
+            'names the field, its value and the dialect the value was shipped for'],
+           [/Choose the "Grbl:" values/,'and names the prefix to pick from instead']],
+  mustNotLog:[[/"Turn Channel A Off"/,'the off code is M9 and correct - a paired warning would name it too']] },
+
+// THE REAL SHAPE OF THE MISTAKE: the firmware is changed and the coolant group is left alone. All four
+// shipped code defaults are GRBL's, so a Marlin job with both channels configured has four wrong fields
+// and gets ONE warning naming each -- which is the count assertion, not the presence of the text.
+{ id:'H34', desc:'PV-16 - firmware switched to Marlin, coolant defaults left: four fields, one warning',
+  cnc:'Milling/2D/face.cnc',
+  props:{jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'), coolantChannelBMode:S('Mist')},
+  mustLog:[[/posted for Marlin, and coolant codes it will emit belong to another firmware/,'plural'],
+           [/Choose the "Mrln:" values/,'the remedy follows the job, not the field']],
+  // COUNTED PER LINE AND NOT PER LOG. The harness's logText is the log file plus stdout plus stderr and
+  // post.exe echoes each warning to both, so a raw occurrence count reads one warning as two -- which
+  // is how this check failed on its first run. The claim is about ONE warning carrying four fields, so
+  // it is asked of each warning line: four separate warnings would put one field on each.
+  custom:(t,ref,log)=>{
+    const fields = ['Turn Channel A On','Turn Channel A Off','Turn Channel B On','Turn Channel B Off'];
+    const lines = log.split(/\r?\n/).filter(l => l.includes('belong to another firmware'));
+    const whole = lines.filter(l => fields.every(f => l.includes(`"${f}" is "`)));
+    return (lines.length > 0 && whole.length === lines.length)
+      ? [true,`all four fields in one warning, on each of ${lines.length} channel(s) that carried it`]
+      : [false,`${lines.length} warning line(s), ${whole.length} naming all four fields`]; } },
+
+// THE NEGATIVE, AND IT CARRIES THE EXEMPTION WITH IT. Channel A is the shipped GRBL pair on a GRBL job
+// -- matching, so silent -- and channel B's on code is "Use custom", which has no dialect the post can
+// read and must not be guessed at. CR-22's empty-file warning still fires for B and is left alone: it
+// is a different question and this case must not assert its absence.
+{ id:'H35', desc:'PV-16 - matching codes say nothing, and "Use custom" is exempt rather than wrong',
+  cnc:'Milling/2D/face.cnc',
+  props:{coolantChannelAMode:S('Flood'), coolantChannelBMode:S('Mist'), coolantChannelBOn:S('Use custom')},
+  mustNotLog:[[/belongs? to another firmware/,'nothing to say: one pair matches and the other has no dialect']] },
 ];
 
 const results = [];
@@ -249,7 +297,10 @@ for (const c of cases) {
     for (const [re,what] of (c.mustNot||[]))    checks.push([!re.test(text), `must not: ${what}`]);
     for (const [re,what] of (c.mustLog||[]))    checks.push([re.test(logText),  `must warn: ${what}`]);
     for (const [re,what] of (c.mustNotLog||[])) checks.push([!re.test(logText), `must not warn: ${what}`]);
-    if (c.custom) checks.push(c.custom(text, reference));
+    // THE LOG IS A THIRD ARGUMENT AND NOT A SECOND CHANNEL OF ITS OWN. mustLog/mustNotLog answer
+    // "is this text there"; a custom check that has to COUNT warnings -- one warning naming four
+    // fields, not four warnings -- cannot be written as a pattern, and H34 is the first that needs it.
+    if (c.custom) checks.push(c.custom(text, reference, logText));
   }
   const pass = checks.every(x=>x[0]);
   results.push({ id:c.id, desc:c.desc, pass, checks });

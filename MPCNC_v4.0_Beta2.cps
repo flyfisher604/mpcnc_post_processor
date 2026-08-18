@@ -1476,6 +1476,47 @@ function countDistinctTools() {
   return count;
 }
 
+// THE ONE PLACE A DIALECT LABEL MEANS A FIRMWARE. Every built-in value in the four coolant code enums
+// carries its dialect in its own title -- "Grbl: M7 (mist)", "Mrln: M42 P6 S255" -- so the check reads
+// the declaration the operator chose from rather than keeping a second list of codes that would drift
+// the first time a value is added to a dropdown. This table connects a label to a firmware and is the
+// whole of what is declared twice; it is read in both directions, resolving a chosen code to a firmware
+// and naming the prefix the operator should be picking from.
+var coolantDialectLabels = [
+  { label: "Grbl", firmware: eFirmware.GRBL },
+  { label: "Mrln", firmware: eFirmware.MARLIN }
+];
+
+// The label this post uses for a firmware's coolant codes, or undefined where it labels none -- which
+// is RepRapFirmware, and is what scopes the warning below.
+function coolantDialectLabel(firmware) {
+  for (var i = 0; i < coolantDialectLabels.length; ++i) {
+    if (coolantDialectLabels[i].firmware == firmware) {
+      return coolantDialectLabels[i].label;
+    }
+  }
+  return undefined;
+}
+
+// The firmware a coolant code property's CURRENT value was shipped for, off that value's own title.
+// undefined is the answer "no dialect this post can name" and covers both "Use custom", where the file
+// is the operator's and its dialect is unknowable, and any future unlabelled value.
+function coolantCodeFirmware(prop) {
+  var id = getProperty(prop);
+  for (var i = 0; i < prop.values.length; ++i) {
+    if (prop.values[i].id == id) {
+      var label = String(prop.values[i].title).split(":")[0];
+      for (var j = 0; j < coolantDialectLabels.length; ++j) {
+        if (coolantDialectLabels[j].label == label) {
+          return coolantDialectLabels[j].firmware;
+        }
+      }
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 // Every coolant level this job asks for that NEITHER channel Mode carries, with the operations that
 // asked -- [{level, names}], or empty. setCoolant()'s own warning is exact and per-occurrence; this is
 // the pre-flight half, and it exists because the file is not the channel an operator reads before they
@@ -2019,6 +2060,59 @@ function validateJob() {
         + "signed decimal number of millimetres -- so the post reads the field as EMPTY, which is the "
         + "answer \"not set\", and the motion it controls is simply not emitted. Give a plain number "
         + "such as -12 or -12.5, with no unit suffix and no other characters."));
+    }
+  }
+
+  // THE CODE IS EMITTED UNCHANGED, so a value taken from another firmware's half of the dropdown posts
+  // straight into this job's dialect. CoolantA()/CoolantB() hand the chosen enum id to writeBlock()
+  // with no firmware test of any kind, and nothing between the dialog and the file reads the pair --
+  // the four code enums list both dialects together because one post serves both, and the operator is
+  // the only thing that has ever matched them.
+  //
+  // GATED ON THE CHANNEL MODE -- CR-24's gate, for CR-24's reason: the Mode ships Off, so a configured
+  // channel is the operator's own opt-in and it is the property the emission itself reads. BOTH codes
+  // of a configured channel are checked; the off code is emitted as surely as the on code, and at
+  // onClose() where a mid-stream refusal costs the whole job.
+  //
+  // WARNED AND NOT REFUSED, and the label is exactly why: it says which firmware this post SHIPPED the
+  // code for, not that no other firmware takes it. A Marlin build compiled with coolant support answers
+  // M7 and M8, and the operator who picked one there may be right. What the post can say without
+  // reading anyone's build is that its own two declarations disagree.
+  //
+  // REPRAPFIRMWARE IS NOT REACHED AND THAT IS DELIBERATE. The post labels no value for it, so there is
+  // no declaration to contradict; every built-in code is another firmware's, and a warning that fires
+  // on every RepRap job with a channel configured would assert something no source read here settles
+  // and would be skipped by everyone -- PV-12's own ruling about a dialog that always complains.
+  var jobDialect = coolantDialectLabel(fw);
+  if (jobDialect != undefined) {
+    var coolantCodeProps = [];
+    if (getProperty(properties.coolantChannelAMode) != eCoolant.Off) {
+      coolantCodeProps.push(properties.coolantChannelAOn, properties.coolantChannelAOff);
+    }
+    if (getProperty(properties.coolantChannelBMode) != eCoolant.Off) {
+      coolantCodeProps.push(properties.coolantChannelBOn, properties.coolantChannelBOff);
+    }
+    var wrongDialect = [];
+    for (var cd = 0; cd < coolantCodeProps.length; ++cd) {
+      var codeFw = coolantCodeFirmware(coolantCodeProps[cd]);
+      if (codeFw != undefined && codeFw != fw) {
+        wrongDialect.push("\"" + coolantCodeProps[cd].title + "\" is \"" + getProperty(coolantCodeProps[cd])
+          + "\", which this post lists as " + codeFw);
+      }
+    }
+    // ONE WARNING AND NOT FOUR. A channel's on and off codes are chosen as a pair and go wrong as a
+    // pair, so a warning per field would say one sentence up to four times over a single mistake --
+    // and the remedy is one decision, unlike PV-12's per-level warning below, where two unmatched
+    // levels really are two.
+    if (wrongDialect.length > 0) {
+      warning(localize("This job is posted for " + fw + ", and "
+        + (wrongDialect.length == 1 ? "a coolant code it will emit belongs"
+                                    : "coolant codes it will emit belong")
+        + " to another firmware: " + wrongDialect.join("; ") + ". The post emits the code exactly as it "
+        + "stands, so a controller that does not implement it answers the line as an unsupported command "
+        + "and the job stops mid-operation with the tool in the cut. Choose the \"" + jobDialect
+        + ":\" values in \"9 - Coolant\", or \"Use custom\" and a file of your own if your controller "
+        + "takes something this post does not list."));
     }
   }
 
