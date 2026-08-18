@@ -13,10 +13,11 @@ This is the **v4.0 (Beta)** post processor, distributed as the single file
 
 Supported firmware (set by the **Job → CNC Firmware** property):
 
-- GRBL 1.1 / FluidNC
-- Marlin 2.x
-- RepRap firmware (Duet3D)
-- Repetier 1.0.3 (untested; g-code is the same as Marlin)
+- **Grbl** — GRBL 1.1, and FluidNC, which this post treats as GRBL throughout
+- **Marlin** — Marlin 2.x. Read from source at 2.0.9.7 and 2.1.2.5; nothing below that was
+  read, so **2.0.9.7 is the floor** every Marlin claim here rests on
+- **RepRap** — RepRapFirmware (Duet3D)
+- Repetier 1.0.3 is untested; its g-code is Marlin's, so choose **Marlin**
 
 ---
 
@@ -24,9 +25,9 @@ Supported firmware (set by the **Job → CNC Firmware** property):
 
 | | Read this |
 |---|---|
-| **One part, one tool, zeroed by hand.** You jog to your corner, post, and cut. | **[Hobbyist guide](docs/guide-hobbyist.md)** — six settings matter; the rest can stay as they ship |
-| **Several operations, several tools, or several parts on their own fixtures.** | **[Pro guide](docs/guide-pro.md)** — work coordinate systems, fixed Z references, tool changes, the validation guards |
-| **Looking up one setting.** | **[Property reference](docs/property-reference.md)** — all 69, in dialog order |
+| **One part, one tool, zeroed by hand.** You jog to your corner, post, and cut. | **[Hobbyist guide](docs/guide-hobbyist.md)** — seven settings matter; the rest can stay as they ship |
+| **Several operations, more than one tool, or several parts on their own fixtures.** | **[Pro guide](docs/guide-pro.md)** — work offsets, the machine travel height, tool-change hand-over, the validation guards |
+| **Looking up one setting.** | **[Property reference](docs/property-reference.md)** — all 62, in dialog order |
 
 ---
 
@@ -37,26 +38,39 @@ At its core the post turns a Fusion CAM program into g-code for a hobby-class CN
 translation it is built around one central idea that shapes every other feature:
 
 **These machines are *work-relative*.** Most of them have no reliable machine-Z
-reference — no tool setter, often no Z endstop, sometimes no endstops at all. So the
-post does not lean on the machine frame. Instead you establish a **work zero** (by
-jogging to it, or by probing a touch plate), and everything the post emits — cutting,
-retracts, traverses between parts — is measured relative to that zero. Where a machine
-*can* home, homing is used for X/Y repeatability, never as the everyday Z reference.
+reference — no tool setter, no tool-length offset register, often no Z endstop, sometimes no
+endstops at all. So the post does not lean on the machine frame. Instead you establish a
+**work zero** (by jogging to it, or by probing a touch plate), and everything the post emits —
+cutting, retracts, traverses between parts — is measured relative to that zero. Where a machine
+*can* home, homing buys repeatability and one job-level travel height, never the everyday Z
+cutting reference.
+
+Two consequences run through the whole post, and knowing them explains most of the dialog:
+
+- **The post commands a work offset and can never read one back.** It always knows *which*
+  register is active, because it selects it itself at job start over whatever your sender left
+  modal. It never knows *where* that register points — register contents are runtime state in the
+  controller and there is no round trip. So every mode that uses a stored origin **trusts** it,
+  and the shipped defaults establish an origin rather than trust one.
+- **The post changes no tool, on any firmware.** A measured tool change needs a probe, a
+  subtraction and a register to hold the result, and the post has none of the three. Its whole
+  role at a change is to arrive correctly, hand over, and resume correctly.
 
 The post is designed to **degrade gracefully**:
 
-- A **one-part job** needs almost no setup. Jog to your zero, accept the defaults, post, run.
-- A **larger job** — many operations, multiple tools, or several copies on separate fixtures —
+- A **one-part, one-tool job** needs almost no setup. Jog to your zero, accept the defaults, post, run.
+- A **larger job** — many operations, more than one tool, or several parts on separate fixtures —
   has the extra structure available and validated, without complicating the simple case.
 
-Other capabilities: 3-axis milling and jet (laser / plasma / waterjet) operations;
-canned drilling cycles expanded into plain moves; arcs; 3 laser power levels; two
-configurable coolant channels; adjustable comment verbosity; optional line numbers;
-external include files for custom g-code. Only 3-axis toolpaths are supported —
+Other capabilities: 3-axis milling and jet (laser / plasma / waterjet) operations; canned
+drilling cycles expanded into plain moves; arcs; 3 laser power levels; two configurable coolant
+channels; four comment levels with a full property dump at the head of every file; optional line
+numbers; external include files for custom g-code. Only 3-axis toolpaths are supported —
 multi-axis operations are rejected with a clear error.
 
-> **Units:** the post outputs in whatever units the Setup uses (mm or inch), **but all
-> post properties must be entered in millimetres.**
+> **Units:** the post outputs in whatever units the Setup uses (mm or inch), **but every
+> dimension in the dialog is entered in millimetres.** The head of each posted file echoes the
+> values the post *resolved* — in output units — so you can check them before the machine moves.
 
 ---
 
@@ -81,43 +95,53 @@ The post is a single file, `MPCNC_v4.0_Beta2.cps`.
 
 ## v4.0 Beta 2 — current
 
-Beta 1 knew one zero: wherever the tool happened to be when the job started. Beta 2 can keep
-track of several — the machine, the spoilboard, and each part — and move safely between them.
+Beta 1 knew one zero: wherever the tool happened to be when the job started. Beta 2 keeps track
+of one per part, plus one job-level height in the machine's own frame to cross the bed at.
 
-1. **More than one work zero.** Beta 1 set a single origin for the whole program. Beta 2 can
-   store a separate zero for each part, in the controller's own memory, and switch between
-   them as the job runs. (Marlin can still only hold one.)
-   → [What a WCS is](docs/guide-pro.md#what-a-wcs-is-and-what-this-post-does-with-it)
-2. **You choose how the zero gets set.** Beta 1 had two checkboxes. Beta 2 asks you to pick:
+1. **More than one work zero.** Beta 1 set a single origin for the whole program. Beta 2 stores a
+   separate zero for each part, in the controller's own registers, and switches between them as
+   the job runs. All three firmwares have those registers; on Marlin they arrive with one build
+   option (`CNC_COORDINATE_SYSTEMS`), which the post assumes and warns about rather than refusing.
+   → [What a work offset is](docs/guide-pro.md#what-a-work-offset-is-and-what-this-post-does-with-it)
+2. **You choose how each zero gets set.** Beta 1 had two checkboxes. Beta 2 asks you to pick:
    use where the tool is now, use a zero the controller already has stored, or stop and let
    you jog to it — each with or without probing Z off a touch plate.
-   → [Origin modes](docs/guide-pro.md#origin-modes-in-full)
-3. **Several parts in one job.** Cut copies of a part on separate fixtures in a single run,
-   re-probing each one so stock thickness can vary.
-   → [Several copies on separate fixtures](docs/guide-pro.md#several-copies-on-separate-fixtures)
-4. **Homing at job start**, if your machine has endstops — group **4**, which now separates
-   *what your machine can home* from *what this job should do*.
-   → [The machine frame](docs/guide-pro.md#the-machine-frame-homing)
-5. **A fixed Z reference** — group **5**. Zero to the spoilboard, or to the machine's own homed
-   Z, rather than to the stock, so the tool can lift to a height that clears everything on the
-   bed before it travels to another part. → [A fixed Z reference](docs/guide-pro.md#a-fixed-z-reference)
-6. **Unsafe jobs are refused before any file is written**, with a message saying what to
-   change, and several common mistakes now warn you.
+   → [Origin modes in full](docs/guide-pro.md#origin-modes-in-full)
+3. **Several parts in one job.** Parts on separate fixtures cut in a single run, re-probing each
+   one so stock thickness can vary — and one part from several datums on one fixture, each datum
+   being a work offset like a part.
+   → [Several parts in one job](docs/guide-pro.md#several-parts-in-one-job)
+4. **The machine frame, split in two.** Group **4** separates *what your machine can home* from
+   *what this job should do about it*, so "homed at the controller, do not home here" is now
+   sayable. → [The machine frame](docs/guide-pro.md#the-machine-frame-and-the-travel-height)
+5. **One travel height in the machine's own frame.** **Machine Travel Z** is an absolute machine
+   coordinate, read off your sender once and typed in. The machine's homed Z is the only frame
+   whose Z0 does not move with stock thickness, so it is the only height that can clear every
+   fixture on a job whose parts differ in thickness — and a multi-part job is refused without it.
+   → [The travel height](docs/guide-pro.md#the-machine-frame-and-the-travel-height)
+6. **Tool changes rebuilt around what the post can actually do**, which is arrive, hand over and
+   resume. Group **6** asks who performs the change — nobody (refuse the job), you at a pause, or
+   your sender's or firmware's own macro — and, separately, **who corrects Z0** for the new tool's
+   length. **A multi-tool job is now refused by default** rather than posted with its changes
+   silently dropped. → [Tool changes](docs/guide-pro.md#tool-changes)
+7. **Unsafe jobs are refused before any file is written**, with a message saying what to change;
+   many more conditions warn you — in Fusion's post dialog, in the file, or in both.
    → [Validation guards](docs/guide-pro.md#validation-guards)
-7. **Better probing.** Prompts to attach and remove the probe, and the option to touch off
-   away from the corner so the origin can sit off the material.
+8. **Better probing.** Prompts to attach and remove the probe, and the option to touch off
+   away from the part origin so that origin can sit off the material.
    → [Probing](docs/guide-pro.md#probing)
-8. **The dialog was rebuilt** — 11 groups instead of 9, numbered in the order you work through
-   them, and every setting is now listed at the top of the posted file.
-   → [Property reference](docs/property-reference.md)
-9. **Safer endings and clearer prompts.** The spindle stops *before* the tool parks; a hand-set
-   router is prompted whenever the speed or direction changes, not just at the start; and each
-   firmware now gets the right end-of-program code.
-10. **Your saved settings carry over from Beta 1 only in part** — the dialog's internal keys were
-    rebuilt, so expect to re-enter a customised preset once. **Check group 6 before your first
-    job**: the origin choice is new and its default is not what Beta 1 did. Two defaults also
-    moved during the Beta 2 series — **Scale Feedrate** is now on, and the coolant channel codes
-    now default to the GRBL dialect rather than Marlin's.
+9. **The dialog was rebuilt** — 10 numbered groups in the order you work through them, and every
+   setting is dumped at the head of the posted file, together with the values the post resolved
+   from them. → [Property reference](docs/property-reference.md)
+10. **Safer endings and clearer prompts.** The spindle stops *before* the tool parks; a hand-set
+    router is prompted whenever the speed or direction changes, not only at the start; and each
+    firmware gets the right end-of-program code.
+11. **Saved settings do not carry over from Beta 1**, and several were rebuilt during the Beta 2
+    series itself — the dialog's internal keys changed, so expect to re-enter a customised preset
+    once. **Check groups 4, 5 and 6 before your first job:** the origin choice is new and its
+    default is not what Beta 1 did, **Machine Travel Z** ships empty on purpose, and **At a Tool
+    Change** ships at *Refuse a multi-tool job*. **Scale Feedrate** is now on, and the coolant
+    channel codes default to the GRBL dialect rather than Marlin's.
 
 ## v4.0 Beta 1
 
@@ -140,10 +164,23 @@ correctness rather than new machine features:
 - Only 3-axis toolpaths — 4/5-axis operations error out.
 - Cutter/radius compensation must be **In computer**; control-side G41/G42 is a posting
   error.
-- Arcs are on the XY plane (Marlin/RepRap) or all planes (GRBL); full circles are two
-  arcs.
-- Canned cycles (drill/peck/bore/tap) are expanded into plain G0/G1 moves.
+- **A Setup built on a tilted face is refused**, with the tilt named — the tool only moves
+  straight down, so a Setup whose Z is not the machine's Z would cut in the wrong plane.
+- **CAM probing operations are refused.** The post's own Z touch-off is not one of them; a Fusion
+  WCS-probing operation asks the controller to measure and store an offset, which none of these
+  controllers can do.
+- Arcs are on the XY plane (Marlin/RepRap) or all planes (GRBL); full circles post as two
+  arcs; helical moves are linearised.
+- Canned cycles (drill/peck/bore/tap) are expanded into plain G0/G1/G4 moves. **No supported
+  firmware has them** — and on RepRap those g-code numbers mean bed probing instead, which is
+  worse than absent.
 - Manual NC **Pass through** commands are emitted verbatim.
+- **`M1` (optional stop) is emitted as `M0`.** No supported firmware gives the *optional* half a
+  usable meaning: GRBL parses `M1` and does nothing, RepRap treats it as end-of-job, and only
+  Marlin waits for the LCD. The file says so where it happens.
+- **Travel Speed X/Y and Travel Speed Z do nothing on GRBL or FluidNC.** Their planner takes a
+  rapid's rate from the axis maximums held in the controller, not from the `F` word in the block,
+  and no line a posted file may contain changes that. Marlin and RepRap obey both.
 - **End of program differs by firmware.** GRBL ends with `M30`. Marlin and RepRap get
   `M84 S60` first, restoring the 60-second idle timeout the post disables for the duration of
   the job (a bare `M84` would drop an unbalanced gantry in Z). RepRap then gets `M2`, which it
@@ -151,16 +188,23 @@ correctness rather than new machine features:
   steppers, it overrides the timeout just set. Marlin gets no program-end code because it has
   never implemented one: `M2` is unknown there and `M30` means "delete SD file", so on Marlin
   the end of the file *is* the end of the program.
+- **No `%` wrapper is written, on any firmware** — stock Grbl 1.1 has no `%` feature, so the line
+  reaches the parser and answers `error:1`.
 - GRBL laser jobs likely need laser mode enabled
   ([`$32=1`](https://github.com/gnea/grbl/wiki/Grbl-v1.1-Laser-Mode)).
-- Built-in tool change with LCD/SD: printing from SD and using the LCD to restart is
-  required.
+- **Firmware claims in these documents are settled from each firmware's own source and
+  changelog, with the file and version cited.** This project has no controller to test against,
+  so nothing here is proved by having been run on a machine — see
+  [what is verified](docs/guide-pro.md#what-is-verified-and-what-is-not).
 
 ---
 
 # Resources
 
 - [Marlin G-codes](https://marlinfw.org/meta/gcode/)
+- [GRBL 1.1 wiki](https://github.com/gnea/grbl/wiki)
+- [FluidNC wiki](http://wiki.fluidnc.com/)
+- [Duet / RepRapFirmware G-code reference](https://docs.duet3d.com/User_manual/Reference/Gcodes)
 - [PostProcessor Class Reference](https://cam.autodesk.com/posts/reference/classPostProcessor.html)
 - [Post Processor Training Guide (PDF)](https://cam.autodesk.com/posts/posts/guides/Post%20Processor%20Training%20Guide.pdf)
 - [Dumper PostProcessor](https://cam.autodesk.com/hsmposts?p=dump)
