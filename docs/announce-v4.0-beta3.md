@@ -12,8 +12,11 @@ machines is up.
 
 **[Download `MPCNC_v4.0_Beta3.cps`](https://github.com/flyfisher604/mpcnc_post_processor/releases/download/v4.0_Beta3/MPCNC_v4.0_Beta3.cps)**
 · [Release page](https://github.com/flyfisher604/mpcnc_post_processor/releases/tag/v4.0_Beta3)
+
+[Overview and install](https://github.com/flyfisher604/mpcnc_post_processor/blob/v4.0_Beta3/README.md)
+· [One part, one tool, zeroed by hand](https://github.com/flyfisher604/mpcnc_post_processor/blob/v4.0_Beta3/docs/guide-hobbyist.md)
+· [Several tools, or several parts on their own fixtures](https://github.com/flyfisher604/mpcnc_post_processor/blob/v4.0_Beta3/docs/guide-pro.md)
 · [Full release notes](https://github.com/flyfisher604/mpcnc_post_processor/blob/v4.0_Beta3/docs/release-notes-v4.0-beta3.md)
-· [First-job guide](https://github.com/flyfisher604/mpcnc_post_processor/blob/v4.0_Beta3/docs/guide-hobbyist.md)
 
 ### Two things before your first job — neither is optional
 
