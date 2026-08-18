@@ -1,14 +1,14 @@
 # MPCNC post processor — working rules
 
 A Fusion 360 post for GRBL / Marlin / RepRap hobby CNC. The deliverable is
-`MPCNC_v4.0_Beta2.cps`; everything else in the repo supports it.
+`MPCNC_v4.0_Beta3.cps`; everything else in the repo supports it.
 
 ## Read `docs/plan.md` first
 
 **It is the only file that says what is next.** Start at its *Checkpoint*, and reach everything else from
 there — `docs/findings.md` when a specific finding or test row is in play, `docs/design.md` when changing
 frame, Z-reference or ordering behaviour, `docs/integration.md` when running the post against a job file
-or asking what a run may claim. Do not read or search under `./Test/` unless asked.
+or asking what a run may claim.
 
 Each of those files states its own rules at its foot. Follow them when you edit it.
 

@@ -1,6 +1,6 @@
-# Findings — `MPCNC_v4.0_Beta2.cps`
+# Findings — `MPCNC_v4.0_Beta3.cps`
 
-Every logged issue and the tests that confirm it. **87 findings — 76 fixed ·
+Every logged issue and the tests that confirm it. **89 findings — 78 fixed ·
 10 closed by design · 1 withdrawn · 0 open.** Test registers in §4 and §5.
 
 > **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
@@ -54,7 +54,7 @@ set out to close. **The class it belonged to is bounded and stays bounded**: the
 `writeWarning()` site lives beside the call, so a warning in the wrong channel is now something you look
 up rather than something you find.
 
-> **The verdict table is two greps over `MPCNC_v4.0_Beta2.cps` and lives nowhere else.**
+> **The verdict table is two greps over `MPCNC_v4.0_Beta3.cps` and lives nowhere else.**
 > `grep -n "// TWIN #"` is the paired half: **18 numbered pairs**, each number appearing **exactly
 > twice** — the full account on the `validateJob()` side, which names the emitting function, and the
 > number alone at the file half, so a pair cannot half-exist. `#16` and `#18` are one dialog warning

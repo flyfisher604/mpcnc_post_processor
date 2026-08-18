@@ -1,6 +1,6 @@
 # Design — the target, and why the shipped behaviour is what it is
 
-The **why** behind `MPCNC_v4.0_Beta2.cps`, for the parts of it the code cannot state: the frame model the
+The **why** behind `MPCNC_v4.0_Beta3.cps`, for the parts of it the code cannot state: the frame model the
 rest of the record reads against, the external firmware facts each decision rests on, and the arguments
 behind orderings that look arbitrary in the source.
 
