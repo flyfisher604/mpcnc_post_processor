@@ -457,7 +457,7 @@ const cases = [
 // laser on any other output was driven by nothing and fan 0 was driven by the laser.
 { id:'CG22a', desc:'Marlin fan mode: both power levels reach the fan the operator named, and no M107 is emitted',
   cnc:'Cutting/Laser/center.cnc',
-  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('106'), laserMarlinPinFan:N(2) },
+  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('M106'), laserMarlinPinFan:N(2) },
   // Six Through sections and one Etch in this one file, so both power levels are proved here for the
   // same reason CG20 uses it: 80% -> 204 and 40% -> 102 on Marlin's 0-255 scale.
   must:[[/^M106 P2 S204$/m,'Through fires on fan 2 at 80% -> S204'],
@@ -475,7 +475,7 @@ const cases = [
 
 { id:'CG22b', desc:'... and the index is emitted even at its default of 0, rather than left implicit',
   cnc:'Cutting/Laser/center.cnc',
-  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('106') },
+  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('M106') },
   // The control for CG22a: P0 is what a bare M106 already means on a single-extruder Marlin build, so
   // this case is about the post SAYING which output it drives. RRF resolves an absent P differently --
   // a bare M106 P{n} there is a status report and switches nothing -- which is why it is never omitted.
@@ -484,7 +484,7 @@ const cases = [
 
 { id:'CG22c', desc:'Marlin pin mode takes the same field, and pairs its firing with S0 on that pin',
   cnc:'Cutting/Laser/center.cnc',
-  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('42'), laserMarlinPinFan:N(7) },
+  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('M42'), laserMarlinPinFan:N(7) },
   must:[[/^M42 P7 S204$/m,'Through fires on pin 7'],
         [/^M42 P7 S0$/m,'and is stopped on the same pin']],
   mustNot:[[/^(N\d+ )?M106\b/m,'no fan code in pin mode']] },
@@ -493,14 +493,14 @@ const cases = [
 // 0 is a legitimate FAN index and no laser's pin, so pin mode must say what it drives or not post.
 { id:'CG22d', desc:'pin mode with the Pin/Fan # left at 0 is refused rather than aimed at pin 0',
   cnc:'Cutting/Laser/center.cnc',
-  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('42') },
+  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('M42') },
   refuse:[/is still 0, which names no output this post can believe you chose/,'the field is named, with both remedies'] },
 
 // The control for the guard above, and for the firmware scoping under it: the Marlin/Reprap mode ships
 // "106" and GRBL ships as the firmware, so a guard that read the property on the wrong firmware would
 // refuse every default job in this file. Thirty-odd GRBL cases here are that control; this one states it.
 { id:'CG22e', desc:'... and a GRBL job posts untouched by it -- the Marlin/Reprap mode is not read there',
-  cnc:'Cutting/Laser/center.cnc', props:{ laserMarlinMode:S('42') },
+  cnc:'Cutting/Laser/center.cnc', props:{ laserMarlinMode:S('M42') },
   must:[[/^M4 S800$/m,'the GRBL mode fires the laser and the Marlin pin mode is ignored']],
   mustNot:[[/^(N\d+ )?M42\b/m,'no M42 on a firmware that has none']] },
 
@@ -520,6 +520,67 @@ const cases = [
   custom:ctx => {
     const on = M.countOf(ctx.text, /^M8$/gm), off = M.countOf(ctx.text, /^M9$/gm);
     return on === off ? [true, `${on} coolant on, ${off} off -- paired`] : [false, `${on} on against ${off} off`]; } },
+
+// GH-16d. The Marlin values name the output now instead of freezing it at pin 6 or 11 -- which were the
+// RAMPS servo header, and are HEATER_2 and Y_MIN on a Rambo, both refused there as protected pins.
+{ id:'CG24a', desc:'coolant on a fan: the channel switches the fan the operator named, and closes it',
+  cnc:'Milling/Coolant Codes/flood.cnc',
+  props:{ jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'),
+          coolantChannelAOn:S('M106'), coolantChannelAOff:S('M106'), coolantChannelAPinFan:N(2) },
+  must:[[/^M106 P2 S255$/m,'on'],[/^M106 P2 S0$/m,'and off, on the same fan']],
+  mustNot:[[/^(N\d+ )?M[789]\b/m,'no GRBL coolant code on a Marlin job']],
+  custom:ctx => {
+    const on = M.countOf(ctx.text, /^M106 P2 S255$/gm), off = M.countOf(ctx.text, /^M106 P2 S0$/gm);
+    return on === off ? [true, `${on} coolant on, ${off} off -- paired`] : [false, `${on} on against ${off} off`]; } },
+
+{ id:'CG24b', desc:'... and on a pin, from the same field',
+  cnc:'Milling/Coolant Codes/flood.cnc',
+  props:{ jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'),
+          coolantChannelAOn:S('M42'), coolantChannelAOff:S('M42'), coolantChannelAPinFan:N(6) },
+  must:[[/^M42 P6 S255$/m,'on'],[/^M42 P6 S0$/m,'and off, on the pin named']],
+  mustNot:[[/^(N\d+ )?M106\b/m,'no fan code when the pin form is chosen']] },
+
+{ id:'CG24c', desc:'... and the pin form with the number left at 0 is refused',
+  cnc:'Milling/Coolant Codes/flood.cnc',
+  props:{ jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'),
+          coolantChannelAOn:S('M42'), coolantChannelAOff:S('M42') },
+  refuse:[/is still 0, which names no output this post can believe you chose/,'the guard reaches group 9 too'] },
+
+{ id:'CG24d', desc:'... and a channel opened with one form and closed with another is refused',
+  cnc:'Milling/Coolant Codes/flood.cnc',
+  props:{ jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'),
+          coolantChannelAOn:S('M106'), coolantChannelAOff:S('M42'), coolantChannelAPinFan:N(2) },
+  refuse:[/are set to different outputs/,'the pair is named, and so is the output left running'] },
+
+// Both channels on ONE level, the only way a shipped job reaches the two-channel path. The claim is the
+// ORDER: setCoolant() takes both channels off before switching either on, which is what makes GRBL's
+// M9 -- one code that stops every output at once -- harmless here.
+{ id:'CG24e', desc:'two GRBL channels on one level: every off follows every on, which is what makes M9 safe',
+  cnc:'Milling/Coolant Codes/flood.cnc',
+  props:{ coolantChannelAMode:S('Flood'), coolantChannelBMode:S('Flood') },
+  must:[[/^M8$/m,'channel A switches on'],[/^M7$/m,'and channel B with it']],
+  custom:ctx => {
+    const at = re => ctx.lines.filter(l => re.test(l.raw)).map(l => l.i);
+    const ons = at(/^M[78]$/), offs = at(/^M9$/);
+    if (ons.length !== 2) return [false, `${ons.length} ons, expected one per channel`];
+    if (!offs.length) return [false, 'nothing switches either channel off'];
+    return offs[offs.length - 1] > ons[ons.length - 1]
+      ? [true, `${ons.length} on then ${offs.length} off, the last block being an off`]
+      : [false, `an on at line ${ons[ons.length - 1]} follows the last off`]; } },
+
+{ id:'CG24f', desc:'... and two channels may share one output, because the offs come first',
+  cnc:'Milling/Coolant Codes/flood.cnc',
+  props:{ jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'), coolantChannelBMode:S('Flood'),
+          coolantChannelAOn:S('M42'), coolantChannelAOff:S('M42'), coolantChannelAPinFan:N(6),
+          coolantChannelBOn:S('M42'), coolantChannelBOff:S('M42'), coolantChannelBPinFan:N(6) },
+  must:[[/^M42 P6 S255$/m,'the shared output is switched on']],
+  custom:ctx => {
+    const at = re => ctx.lines.filter(l => re.test(l.raw)).map(l => l.i);
+    const ons = at(/^M42 P6 S255$/), offs = at(/^M42 P6 S0$/);
+    if (!ons.length || !offs.length) return [false, `${ons.length} on, ${offs.length} off`];
+    return offs[offs.length - 1] > ons[ons.length - 1]
+      ? [true, `${ons.length} on and ${offs.length} off on one output, ending off`]
+      : [false, 'the shared output is left on']; } },
 
 // === D. what the post does not support is REFUSED, not mis-emitted ====================
 { id:'CG25', desc:'a simultaneous 5-axis toolpath is refused at the section, not linearized',
@@ -593,7 +654,7 @@ const cases = [
 // is a property that changes WHAT THE FILE SAYS rather than what the job is, which is this category's
 // own question, so they are cases here rather than a sixth persona somewhere else.
 { id:'CG32', desc:'Spindle Control M3/M5: the commanded codes REPLACE the two operator prompts',
-  cnc:face, props:{ jobSpindleControl:S('3') },
+  cnc:face, props:{ jobSpindleControl:S('M3') },
   must:[[/^M3 S5000$/m,'the spindle is commanded, at the speed the tool asks for'],
         [/^M5$/m,'and stopped the same way']],
   mustNot:[[/MSG,Turn ON \d+ RPM/,'no prompt to start it by hand'],
@@ -608,7 +669,7 @@ const cases = [
 // GH-16b. Issue 16's other half: one switched output carries the router and vac, and until this landed
 // the only thing the post could do about it was ask the operator to reach for a switch.
 { id:'CG32a', desc:'Spindle Control Fan: M106 switches the router, once on and once off, with no prompt',
-  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('106') },
+  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('M106') },
   must:[[/^M106 P0 S255$/m,'the output is switched on, S255 being the full-on flag'],
         [/^M106 P0 S0$/m,'and off on the same output'],
         [/>>> Spindle ON -- 5000 RPM requested, and this output carries no speed/,
@@ -628,24 +689,24 @@ const cases = [
                                    : [false, `${on} on and ${off} off, expected one of each`]; } },
 
 { id:'CG32b', desc:'... and Pin mode does it with M42 on the pin named, S255 and S0',
-  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('42'), jobSpindlePinFan:N(11) },
+  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('M42'), jobSpindlePinFan:N(11) },
   must:[[/^M42 P11 S255$/m,'on'],[/^M42 P11 S0$/m,'and off, on the pin the operator named']],
   mustNot:[[/^(N\d+ )?M106\b/m,'no fan code in pin mode'],
            [/^(N\d+ )?M[345]\b/m,'and no spindle code either']] },
 
 { id:'CG32c', desc:'... and a fan-mode job posted for GRBL is refused, not handed an M106 GRBL cannot answer',
-  cnc:face, props:{ jobSpindleControl:S('106') },
+  cnc:face, props:{ jobSpindleControl:S('M106') },
   refuse:[/is set to a fan \(M106\) output and this job is posted for GRBL/,'the mode, the code and the firmware are all named'] },
 
 { id:'CG32d', desc:'... and pin mode with the Pin/Fan # left at 0 is refused on the spindle side too',
-  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('42') },
+  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('M42') },
   refuse:[/is still 0, which names no output this post can believe you chose/,'the same guard, reached through group 1'] },
 
 // The other branch of CG32a's condition, and CG17's job is the one that reaches it: onSpindleSpeed()
 // four times inside one section. A switched output cannot answer a speed change, and the failure to
 // guard against would be four more M106 P0 S255 lines that change nothing -- or, worse, silence.
 { id:'CG32e', desc:'... and a mid-operation speed change on a switched output is stated, not re-emitted',
-  cnc:'Milling/Drilling/break through.cnc', props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('106') },
+  cnc:'Milling/Drilling/break through.cnc', props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('M106') },
   must:[[/RPM requested and NOT commanded -- this output is on\/off only/,'the file says the change cannot be served']],
   custom:ctx => {
     const on = M.countOf(ctx.text, /^M106 P0 S255$/gm), off = M.countOf(ctx.text, /^M106 P0 S0$/gm);

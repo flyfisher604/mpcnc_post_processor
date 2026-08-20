@@ -2,7 +2,7 @@
   "_comment": "Marlin, machine declared homed on all three axes, a machine-frame travel Z and end park, Debug comments so the traces are in the file. Draws three post-time warnings by design -- G53 before homing, the Marlin end park that homes, and CNC_COORDINATE_SYSTEMS.",
   "jobSelectedFirmware": "Marlin",
   "jobCommentLevel": "Debug",
-  "jobSpindleControl": "3",
+  "jobSpindleControl": "M3",
   "machineHomedAxes": "XYZ",
   "machineTravelZ": "-2",
   "machineParkAtEnd": "Machine",

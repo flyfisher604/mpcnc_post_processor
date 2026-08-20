@@ -46,6 +46,7 @@ const TRACE = path.join(__dirname, 'trace.cps');
 const WCSJOBS = path.join(__dirname, 'wcs-jobs');
 
 const S = v => `"${v}"`;
+const N = v => String(v);             // unquoted -- an integer property rejects "0"
 const B = v => (v ? 'true' : 'false');
 
 // ---------------------------------------------------------------------------------------------
@@ -76,6 +77,14 @@ const promptsAt = (ctx, needle) => ctx.lines
 // The first block whose text matches, by line number.
 const blockAt = (ctx, re) => { for (const b of M.blocks(ctx.lines)) if (re.test(b.raw)) return b.i; return -1; };
 const blocksAt = (ctx, re) => M.blocks(ctx.lines).filter(b => re.test(b.raw)).map(b => b.i);
+
+// The spindle can be started three ways since GH-16b: M3/M4, an operator prompt, or a switched fan/pin
+// output. The last has no M-code of its own, so a rule reading only M3/M5 cannot see it running.
+const spindleOnAt  = ctx => [blockAt(ctx, /^(N\d+ )?M[34]\b/)]
+  .concat(promptsAt(ctx, 'Turn ON'), blocksAt(ctx, /^(N\d+ )?M(?:106|42) P\d+ S(?!0$)\d+$/))
+  .filter(x => x >= 0);
+const spindleOffAt = ctx => blocksAt(ctx, /^(N\d+ )?M5\b/)
+  .concat(promptsAt(ctx, 'Turn OFF spindle'), blocksAt(ctx, /^(N\d+ )?M(?:106|42) P\d+ S0$/));
 
 const ok   = msg => [true, msg];
 const fail = msg => [false, msg];
@@ -148,7 +157,7 @@ const INVARIANTS = [
     if (!ctx.hasMilling || ctx.hasJet) return SKIP;
     const cut = ctx.motions.filter(isCut)[0];
     if (!cut) return SKIP;
-    const on = [blockAt(ctx, /^(N\d+ )?M[34]\b/)].concat(promptsAt(ctx, 'Turn ON')).filter(x => x >= 0);
+    const on = spindleOnAt(ctx);
     if (!on.length) return fail(`line ${cut.line} cuts and nothing in the file starts a spindle`);
     const at = Math.min.apply(null, on);
     return at < cut.line ? ok(`the spindle is started at line ${at}, above the first cut at line ${cut.line}`)
@@ -162,7 +171,7 @@ const INVARIANTS = [
     const cuts = ctx.motions.filter(isCut);
     if (!cuts.length) return SKIP;
     const last = cuts[cuts.length - 1].line;
-    const off = blocksAt(ctx, /^(N\d+ )?M5\b/).concat(promptsAt(ctx, 'Turn OFF spindle')).filter(x => x > last);
+    const off = spindleOffAt(ctx).filter(x => x > last);
     return off.length ? ok(`the spindle is stopped at line ${Math.min.apply(null, off)}, after the last cut at line ${last}`)
                       : fail(`the last cut is at line ${last} and nothing stops the spindle after it`); } },
 
@@ -178,7 +187,7 @@ const INVARIANTS = [
     const cuts = ctx.motions.filter(isCut);
     if (!cuts.length) return SKIP;
     const lastCut = cuts[cuts.length - 1].line;
-    const stops = blocksAt(ctx, /^(N\d+ )?M5\b/).concat(promptsAt(ctx, 'Turn OFF spindle')).filter(x => x > lastCut);
+    const stops = spindleOffAt(ctx).filter(x => x > lastCut);
     if (!stops.length) return SKIP;      // reported by the spindle rule above; not this rule's claim
     const stop = Math.min.apply(null, stops);
     // A Z RETRACT IS NOT A CROSSING and is exactly what should happen there. What must not happen is
@@ -337,16 +346,20 @@ const INVARIANTS = [
       ? ok(`the file ends with a rapid to the work origin (line ${last.line})`)
       : fail(`the last motion is line ${last.line}, not a rapid to work X0 Y0`); } },
 
-{ name:'coolant-is-turned-off-again',
-  why:'a channel left running floods the machine for as long as it is powered',
-  needs:'a program that switches a coolant channel',
+{ name:'switched-output-is-turned-off-again',
+  why:'an output left on keeps running after the program ends -- coolant floods, a router spins',
+  needs:'a program that switches a coolant channel or a fan/pin output',
+  // WAS coolant-only, and had to widen with GH-16d: M106 P0 S255 from coolant channel A and from the
+  // spindle's fan mode are the same line, so no text test can tell them apart. Without the Marlin forms
+  // this SKIPped on every M106/M42 job, and a SKIP is reported as a pass -- it would have gone quiet.
   run: ctx => {
-    const on = blocksAt(ctx, /^(N\d+ )?M[78]\b/), off = blocksAt(ctx, /^(N\d+ )?M9\b/);
+    const on = blocksAt(ctx, /^(N\d+ )?(M[78]\b|M(?:106|42) P\d+ S(?!0$)\d+$)/),
+          off = blocksAt(ctx, /^(N\d+ )?(M9\b|M(?:106|42) P\d+ S0$)/);
     if (!on.length) return SKIP;
-    if (!off.length) return fail(`${on.length} coolant channel(s) switched on and nothing switches one off`);
+    if (!off.length) return fail(`${on.length} output(s) switched on and nothing switches one off`);
     return off[off.length - 1] > on[on.length - 1]
       ? ok(`${on.length} on, ${off.length} off, and the last block of the pair is an off`)
-      : fail(`the last coolant block is an on, at line ${on[on.length - 1]}`); } },
+      : fail(`the last switched-output block is an on, at line ${on[on.length - 1]}`); } },
 
 { name:'line-numbers-only-ever-increase',
   why:'a sender that reports a line number has to be able to find it',
@@ -451,7 +464,16 @@ const programs = [
   cnc:'Milling/Coolant Codes/flood.cnc', props:{ coolantChannelAMode:S('Flood') } },
 
 { id:'GS16', desc:'the hobbyist file with a commanded spindle instead of an operator prompt', cnc:face,
-  props:{ jobSpindleControl:S('3'), machineParkAtEnd:S('Off') } },
+  props:{ jobSpindleControl:S('M3'), machineParkAtEnd:S('Off') } },
+
+// GH-16d. The one program here that switches an output with the Marlin fan form. It exists because
+// switched-output-is-turned-off-again skipped every case in this file but GS15, so the widened
+// invariant would have read as passing without ever having run.
+{ id:'GS17', desc:'a Marlin program that switches its router and its coolant on fan outputs', cnc:face,
+  props:{ jobSelectedFirmware:S('Marlin'), machineParkAtEnd:S('Off'),
+          jobSpindleControl:S('M106'), jobSpindlePinFan:N(0),
+          coolantChannelAMode:S('Flood'), coolantChannelAOn:S('M106'),
+          coolantChannelAOff:S('M106'), coolantChannelAPinFan:N(2) } },
 ];
 
 // ---- run ------------------------------------------------------------------------------

@@ -243,7 +243,9 @@ const cases = [
 // laser job is needed for is the LEVEL question above, which needs a tool that asks for a coolant.
 { id:'H33', desc:'PV-16 - one Marlin code on a GRBL job: the dialog names the field and the dialect',
   cnc:'Milling/2D/face.cnc',
-  props:{coolantChannelAMode:S('Flood'), coolantChannelAOn:S('M42 P6 S255')},
+  // The pin is set because since GH-16d the M42 value takes its number from the channel field, and a
+  // channel left at 0 is refused before it can post -- which would prove nothing about the dialect.
+  props:{coolantChannelAMode:S('Flood'), coolantChannelAOn:S('M42'), coolantChannelAPinFan:N(6)},
   // THE FILE IS THE OTHER HALF OF THE CLAIM, and it is here because the first draft of this case
   // asserted the opposite and failed. face.cnc's tool carries Flood -- Fusion's tools carry it whether
   // or not anyone wanted it, which is the fact PV-12's own gate rests on -- so channel A matches, and
@@ -251,7 +253,7 @@ const cases = [
   must:[[/^M42 P6 S255$/m,'the wrong-dialect code really is emitted, into a Grbl file']],
   mustLog:[[/posted for Grbl, and a coolant code it will emit belongs to another firmware/,
             'singular - one field is wrong, and the job dialect is named'],
-           [/"Turn Channel A On" is "M42 P6 S255", which this post lists as Marlin/,
+           [/"Turn Channel A On" is "Mrln: M42 P\{pin\} S255", which this post lists as Marlin/,
             'names the field, its value and the dialect the value was shipped for'],
            [/Choose the "Grbl:" values/,'and names the prefix to pick from instead']],
   mustNotLog:[[/"Turn Channel A Off"/,'the off code is M9 and correct - a paired warning would name it too']] },
