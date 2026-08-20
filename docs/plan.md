@@ -11,23 +11,22 @@ the file that computes it is named instead.
 
 ## Checkpoint
 
-**The tree is v4.1 Beta 3.** The deliverable is `MPCNC_v4.1_Beta3.cps`, and what the release
-contains is `release-notes-v4.1-beta3.md`. **Next: Step 8 — cut the release.**
+**The tree is v4.1 Beta 3, and `v4.1_Beta3` is tagged and on `origin`.** The deliverable is
+`MPCNC_v4.1_Beta3.cps`, and what the release contains is `release-notes-v4.1-beta3.md`.
+**Next: the release page, which is the last of Step 8.**
 
 Step 7 is done: the four user documents describe the post as it now is, and `guide-pro.md` states
 plainly what is not verified. **What is open stands in `findings.md` §2**, which owns that count.
 
-**Issue 16 is answered and merged** — `findings.md` `GH-16a` to `GH-16d`. The version bump and
-the documents that followed it are on branch `v4.1beta3`.
+**Issue 16 is answered, and it is what v4.1 Beta 3 is** — `findings.md` `GH-16a` to `GH-16d`.
 
 **No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §2, and `PV-14`
 is the row.
 
-**What the beta still owes is `findings.md` §7.** Its first item is a file posted from Fusion, which
-no session can supply.
+**§7 is accepted as outstanding at the beta**, which is what let the tag be cut. Its first item is a
+file posted from Fusion, which no session can supply; the release notes and the tag both say so.
 
-**Nothing is pushed.** No work since the `Assessment` merge is on `origin`. Pushing is the
-author's call, not a session's.
+**`master` and `v4.1_Beta3` are on `origin`.** What is not is the release page.
 
 **No controller access.** Firmware questions are settled from firmware source, citing file and
 version — never from a sender console, a dry run or a non-GRBL controller.
@@ -38,17 +37,17 @@ version — never from a sender console, a dry run or a non-GRBL controller.
 
 | | Item | Blocked on |
 |---|---|---|
-| **8** | Cut the v4.1 Beta 3 release | the author — `findings.md` §7's first item needs Fusion |
+| **8** | Publish the v4.1 Beta 3 release page | an authenticated `gh` — the merge, the tag and the push are done |
 
 **`validateJob()` and the property block were never restructured** — Step 6 measured both and left
 them. Neither is short; whether either is too long is a judgement no measurement settles, and it is
 the author's to make against the file as it now reads.
 
-## Step 8 — Cut the v4.1 Beta 3 release
+## Step 8 — Publish the release page
 
-- **The tag**, once §7 is answered or accepted as outstanding at the beta.
-- **§7's first item** — a file posted from Fusion, which most of *Invalidated by landed fixes* in
-  `findings.md` §5 also waits on.
+**The asset is `MPCNC_v4.1_Beta3.cps` itself, under exactly that name.** Both announcements link
+`releases/download/<tag>/MPCNC_v4.1_Beta3.cps`, so a zip uploaded there answers the download with a
+404. `announce-v4.1-beta3.md` is the line that fixes the name.
 
 ## Parked, and on what
 
