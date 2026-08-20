@@ -73,7 +73,7 @@ node tools/<name>-matrix.js  <post.exe>  <post.cps>  <job root>  <output dir>
 
 - **`<post.exe>`** — under `%LOCALAPPDATA%\Autodesk\webdeploy\production\<hash>\Applications\CAM360\`.
   `post-run.ps1` locates it by search rather than by a pinned path; a matrix is handed it.
-- **`<post.cps>`** — `MPCNC_v4.0_Beta3.cps`, the deliverable.
+- **`<post.cps>`** — `MPCNC_v4.1_Beta3.cps`, the deliverable.
 - **`<job root>`** — the `res\CNC files` directory inside the installed **Autodesk HSM Post
   Processor** VS Code extension, except for `wcs-matrix.js`, which takes `tools/wcs-jobs`.
 - **`<output dir>`** — anywhere outside the repo. Each case writes `<id>.gcode` and `<id>.log` there,
@@ -83,12 +83,12 @@ node tools/<name>-matrix.js  <post.exe>  <post.cps>  <job root>  <output dir>
 print, and the last line is the tally.
 
 ```
-node tools/hobbyist-matrix.js        "$POST" MPCNC_v4.0_Beta3.cps "$CNC" out/hobbyist
-node tools/professional-matrix.js    "$POST" MPCNC_v4.0_Beta3.cps "$CNC" out/professional
-node tools/wcs-matrix.js             "$POST" MPCNC_v4.0_Beta3.cps tools/wcs-jobs out/wcs
-node tools/personal-matrix.js        "$POST" MPCNC_v4.0_Beta3.cps "$CNC" out/personal
-node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.0_Beta3.cps "$CNC" out/correct-gcode
-node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.0_Beta3.cps "$CNC" out/gcode-structure
+node tools/hobbyist-matrix.js        "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/hobbyist
+node tools/professional-matrix.js    "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/professional
+node tools/wcs-matrix.js             "$POST" MPCNC_v4.1_Beta3.cps tools/wcs-jobs out/wcs
+node tools/personal-matrix.js        "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/personal
+node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/correct-gcode
+node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/gcode-structure
 ```
 
 **207 cases — 37 hobbyist, 46 professional, 39 WCS, 11 personal, 57 CorrectGcode, 17 GCodeStructure —
@@ -501,7 +501,7 @@ matrices build the literal with three one-line helpers (`S`, `N`, `B`) for the s
 The schema is the authority on what exists:
 
 ```
-post.exe --interrogate --noheader --nointeraction MPCNC_v4.0_Beta3.cps > schema.json
+post.exe --interrogate --noheader --nointeraction MPCNC_v4.1_Beta3.cps > schema.json
 ```
 
 **And a fourth failure, which belongs to the shell rather than to the post.** PowerShell 5.1 will not
@@ -513,28 +513,39 @@ the quoting Node's problem; anything else driving `post.exe` has to solve it one
 
 ### 6.2 What is covered today
 
-Measured against that schema, across all six matrices — by scanning every property literal the six
-files pass and comparing it to `--interrogate`, so the measure is reproducible rather than counted by
-hand:
+Measured against that schema, across all six matrices, by `tools/property-coverage.js`:
+
+```
+post.exe --interrogate --noheader --nointeraction MPCNC_v4.1_Beta3.cps > schema.json
+node tools/property-coverage.js schema.json
+```
 
 | Measure | Reached | Total |
 |---|---|---|
-| Properties **varied** by at least one case | **44** | 62 |
-| Enum **values** reached, counting the factory default as reached | **53** | 90 |
-| Boolean **states** reached, both ways | **18** | 18 |
+| Properties **varied** by at least one case | **53** | 65 |
+| Enum **values** reached, counting the factory default as reached | **68** | 95 |
+| Boolean **states** reached, both ways | **16** | 16 |
 
-**The denominator is 62 and the schema now reports 63.** The extra one is the test hook of §6.5,
-which is not a coverage target: it is part of the harness that reaches the others. Counting it would
-inflate the number with the instrument — and the boolean row is why that matters: **every boolean the
-operator can reach is now set both ways**, which reads as 18/18 only once the hook is out of it.
+**That script exists because this table used to say `44`, `53` and `18` and could not be re-run.** The
+numbers were counted by hand against an `--interrogate` dump; the method was described here and never
+committed, and it does not reproduce. The three above are the script's own output, so a property added
+tomorrow moves them by being run rather than by being remembered, and its `never varied`, `enums not
+fully reached` and `booleans set one way only` lists are what §7 is drawn from.
+
+**The denominator is 65 and the schema reports 66.** The extra one is the test hook of §6.5, which is
+not a coverage target: it is part of the harness that reaches the others. Counting it would inflate
+the number with the instrument — and the boolean row is why that matters: **every boolean the operator
+can reach is set both ways**, which reads as 16/16 only once the hook is out of it. It is 16 rather
+than 18 because `GH-16b` retired a boolean by making it a four-way enum.
 
 **Groups 2 and 3 are at 100%** — all seven feed properties and both rapid-mapping properties are
 varied and asserted, which they were not before `personal-matrix.js`. Group 2 was the sharper of the
 two gaps: six of its seven were *set* by earlier cases, but only as scenery.
 
 **Every enum that decides behaviour is at 100%:** `probeOnStart` 6/6, `probeOnChange` 4/4,
-`toolChangeMode` 3/3, `toolChangeSender` 4/4, `jobSelectedFirmware` 3/3, `machineHomedAxes` 4/4,
-`machineParkAtEnd` 3/3, `jobCommentLevel` 4/4. Those eight are the post's decision surface — the
+`toolChangeMode` 3/3, `toolChangeSender` 5/5, `jobSelectedFirmware` 3/3, `machineHomedAxes` 4/4,
+`machineParkAtEnd` 3/3, `jobCommentLevel` 4/4, `jobSpindleControl` 4/4. Those nine are the post's
+decision surface — the
 properties that change *what the file is* rather than how it is spelled — and the crossing of the
 first two with the tool change is what `wcs-matrix.js` exists for.
 
@@ -547,10 +558,11 @@ The two single values that used to sit outside those two groups — `machineHome
 Three distinctions, because the number above is easy to over-read.
 
 **Reached is not the same as varied.** A property left alone still runs — at its factory default, in
-every case. So the default path of all 62 is exercised on every run, and the 18 that no case *varies*
-are 18 whose **alternative** values have never been posted. That is the real gap, and it is what
-§7 lists. **All eighteen are coolant, laser or an include file**, which is the whole of §7.2, §7.3 and
-§7.4 and nothing outside them.
+every case. So the default path of all 65 is exercised on every run, and the 12 that no case *varies*
+are 12 whose **alternative** values have never been posted. That is the real gap, and it is what
+§7 lists. **All twelve are a laser setting or a file name** — §7.2's eight and §7.4's four, and nothing
+outside them. §7.3's coolant *codes* left this list with `GH-16d`; what coolant still owes is enum
+values, not an unposted property.
 
 **Varied is not the same as asserted, and group 2 is the case that proves it.** `machineHomedAxes`
 is set in almost every professional and WCS case as part of the baseline, but only two cases assert
@@ -714,7 +726,7 @@ what is missing is a ruling on which of the ten a hobby machine should serve, no
 
 ### 7.4 Needs no new file — but is a deferred workstream
 
-**Laser is 7 properties and 11 unreached values**, and `Cutting/Laser/` ships three jobs. The library
+**Laser is 7 properties and 9 unreached values**, and `Cutting/Laser/` ships three jobs. The library
 is richer than the register assumes: `center.cnc` censuses as **7 sections** on one tool, not one
 operation.
 
