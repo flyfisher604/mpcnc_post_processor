@@ -122,13 +122,31 @@ properties = {
     value: eFirmware.GRBL,
     scope: "post"
   },
-  jobManualSpindlePowerControl: {
-    title      : "Manual Spindle On/Off",
-    description: "On: the post prompts you to switch the router on and off by hand and emits no M3/M5 -- for a trim router or any spindle without electronic control. Off: the post commands the spindle with M3/M5. On Marlin those codes are a build option: a stock build has neither SPINDLE_FEATURE nor LASER_FEATURE, answers M3 with an unknown-command warning and runs the whole job with the spindle never started. V1 Engineering's own V1CNC builds enable LASER_FEATURE, where M3 does switch the spindle/laser pin -- but S is read as cutter power, not RPM, and M4 is not a reversal.",
+  // Was the boolean "Manual Spindle On/Off". The key moved with the type -- a stored true/false is not
+  // an enum id -- so a saved configuration falls back to the default, which is what the boolean shipped.
+  jobSpindleControl: {
+    title      : "Spindle Control",
+    description: "Who switches the router or spindle on, and with what. Prompt the operator: the post emits no spindle code at all and stops (M0) to ask -- for a trim router or any spindle without electronic control. Spindle M3/M5: the post commands it, with S carrying the RPM. On Marlin those codes are a build option -- a stock build has neither SPINDLE_FEATURE nor LASER_FEATURE, answers M3 with an unknown-command warning and runs the whole job with the spindle never started; V1 Engineering's own V1CNC builds enable LASER_FEATURE, where M3 does switch the spindle/laser pin, but S is read as cutter power, not RPM, and M4 is not a reversal. Fan M106 and Pin M42 are for a router on a switched output -- a relay on a fan header or a spare pin -- and both are ON or OFF only: they carry no speed and no direction, the RPM going to a comment. Neither is GRBL's, and a job posted for GRBL with either selected is refused rather than emitted. Both take their output number from Pin/Fan # below.",
     group      : "job",
     order      : 20,
-    type       : "boolean",
-    value      : true,
+    type       : "enum",
+    values: [
+      { title: "Prompt the operator (M0)", id: "manual" },
+      { title: "Spindle - M3 S{RPM}/M5", id: "M3" },
+      { title: "Fan - M106 P{n} S255/S0", id: "M106" },
+      { title: "Pin - M42 P{pin} S255/S0", id: "M42" }
+    ],
+    value: "manual",
+    scope: "post"
+  },
+  // 25: group 1's decades were all taken, and renumbering six properties to place one field is worse.
+  jobSpindlePinFan: {
+    title      : "Spindle: Pin/Fan #",
+    description: "The output number Spindle Control uses in its Fan and Pin modes, and FOUR different things depending on which mode and which firmware -- re-check it whenever you change either. Fan mode: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). Pin mode: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored in the other two modes. A wrong number is not equally visible on the two firmwares: Marlin returns silently for an index it does not have, so the router never starts and the job cuts with a dead spindle, while RepRapFirmware answers \"Fan number not found\" or refuses the port. Pin mode carries two more conditions of its own -- M42 is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses M42 on a protected pin, which includes every FANn_PIN, so a fan header cannot be reached this way. Use Fan mode for a fan header and Pin mode for a spare output.",
+    group      : "job",
+    order      : 25,
+    type       : "integer",
+    value      : 0,
     scope      : "post"
   },
   jobCommentLevel: {
@@ -647,25 +665,25 @@ properties = {
   },
   laserMarlinMode: {
     title      : "Laser: Marlin/Reprap Mode",
-    description: "Marlin/Reprap mode of the laser/plasma cutter.",
+    description: "Marlin/Reprap mode of the laser/plasma cutter. Fan and Pin both take their output number from Pin/Fan # below. No mode emits M107: RepRapFirmware ignores its P word and zeroes whatever fans the current tool maps, so the off code is M106 with S0 -- which is what M107 does on Marlin anyway.",
     group      : "laser",
     order      : 40,
     type       : "enum",
     values: [
-      { title: "Fan - M106 S{PWM}/M107", id: "106" },
-      { title: "Spindle - M3 O{PWM}/M5", id: "3" },
-      { title: "Pin - M42 P{pin} S{PWM}", id: "42" }
+      { title: "Fan - M106 P{n} S{PWM}/S0", id: "M106" },
+      { title: "Spindle - M3 O{PWM}/M5", id: "M3" },
+      { title: "Pin - M42 P{pin} S{PWM}", id: "M42" }
     ],
-    value: "106",
+    value: "M106",
     scope: "post"
   },
-  laserMarlinPin: {
-    title      : "Laser: Marlin M42 Pin",
-    description: "Marlin custom pin number for the laser/plasma cutter. Read only in Pin mode.",
+  laserMarlinPinFan: {
+    title      : "Laser: Pin/Fan #",
+    description: "The output number the mode above uses, and FOUR different things depending on mode and firmware -- re-check it whenever you change either. Fan mode: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). Pin mode: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored in Spindle mode. A wrong number is not equally visible on the two firmwares: Marlin returns silently for an index it does not have, so the laser never fires and no error says so, while RepRapFirmware answers \"Fan number not found\" or refuses the port. Pin mode carries two more conditions of its own -- M42 is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses M42 on a protected pin, which includes every FANn_PIN, so a fan header cannot be reached this way. Use Fan mode for a fan header and Pin mode for a spare output.",
     group      : "laser",
     order      : 50,
     type       : "integer",
-    value      : 4,
+    value      : 0,
     scope      : "post"
   },
   laserGrblMode: {
@@ -744,13 +762,13 @@ properties = {
   },
   coolantChannelAOn: {
     title      : "Turn Channel A On",
-    description: "The g-code that switches channel A on. Match it to your CNC Firmware -- the post emits it unchanged, so a Marlin code sent to GRBL is rejected mid-job. Use custom takes it from a file set further down this group. On GRBL neither code is guaranteed: stock Grbl 1.1 compiles M7 only when ENABLE_M7 is uncommented in grbl/config.h and answers error:20 without it, while FluidNC never errors and acts on M7 or M8 only where config.yaml declares a coolant mist_pin or flood_pin -- V1 Engineering's Jackpot 1 configs declare both pins, and its Jackpot 2 and Jackpot 3 configs ship NO_PIN for both.",
+    description: "The g-code that switches channel A on. Match it to your CNC Firmware -- the post emits what you pick, so a Marlin code sent to GRBL is rejected mid-job. The two Marlin values take their output number from Channel A Pin/Fan # below; the GRBL codes are emitted verbatim; Use custom takes the whole thing from a file set further down this group. On GRBL neither code is guaranteed: stock Grbl 1.1 compiles M7 only when ENABLE_M7 is uncommented in grbl/config.h and answers error:20 without it, while FluidNC never errors and acts on M7 or M8 only where config.yaml declares a coolant mist_pin or flood_pin -- V1 Engineering's Jackpot 1 configs declare both pins, and its Jackpot 2 and Jackpot 3 configs ship NO_PIN for both.",
     group      : "coolant",
     order      : 30,
     type       : "enum",
     values: [
-      { title: "Mrln: M42 P6 S255", id: "M42 P6 S255" },
-      { title: "Mrln: M42 P11 S255", id: "M42 P11 S255" },
+      { title: "Mrln: M106 P{n} S255", id: "M106" },
+      { title: "Mrln: M42 P{pin} S255", id: "M42" },
       { title: "Grbl: M7 (mist)", id: "M7" },
       { title: "Grbl: M8 (flood)", id: "M8" },
       { title: "Use custom", id: "Use custom" }
@@ -760,17 +778,27 @@ properties = {
   },
   coolantChannelAOff: {
     title      : "Turn Channel A Off",
-    description: "The g-code that switches channel A off. Same dialect as Turn Channel A On. On GRBL, M9 is the only off code and stops every coolant output at once.",
+    description: "The g-code that switches channel A off. Same dialect and, on the two Marlin values, the same output as Turn Channel A On -- both read Channel A Pin/Fan # below, so a channel cannot be opened on one output and closed on another. On GRBL, M9 is the only off code and stops every coolant output at once; that is harmless here because this post takes BOTH channels off before it switches either on.",
     group      : "coolant",
     order      : 40,
     type       : "enum",
     values: [
-      { title: "Mrln: M42 P6 S0", id: "M42 P6 S0" },
-      { title: "Mrln: M42 P11 S0", id: "M42 P11 S0" },
+      { title: "Mrln: M106 P{n} S0", id: "M106" },
+      { title: "Mrln: M42 P{pin} S0", id: "M42" },
       { title: "Grbl: M9 (off)", id: "M9" },
       { title: "Use custom", id: "Use custom" }
     ],
     value      : "M9",
+    scope      : "post"
+  },
+  // 45 and 65: each channel's number sits under the pair that reads it. Same trade as jobSpindlePinFan.
+  coolantChannelAPinFan: {
+    title      : "Channel A Pin/Fan #",
+    description: "The output number channel A's two Marlin values use, and read by both of them so the channel closes what it opened. Four different things depending on which value and which firmware -- re-check it whenever you change either. M106: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). M42: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored on the GRBL values and on Use custom. THE NUMBER IS BOARD-SPECIFIC AND THIS POST CANNOT CHECK IT: the 6 and 11 this field replaces were the RAMPS servo header, and on a Rambo the same two numbers are HEATER_2 and Y_MIN -- both of which Marlin refuses as protected pins, so the coolant would never switch and nothing in the file would say so. M42 carries two conditions besides: it is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses it on any protected pin -- every FANn_PIN, every heater and every endstop among them. Use the M106 value for a fan header and M42 for a spare output your board's pin map says is free.",
+    group      : "coolant",
+    order      : 45,
+    type       : "integer",
+    value      : 0,
     scope      : "post"
   },
   coolantChannelBOn: {
@@ -780,8 +808,8 @@ properties = {
     order      : 50,
     type       : "enum",
     values: [
-      { title: "Mrln: M42 P11 S255", id: "M42 P11 S255" },
-      { title: "Mrln: M42 P6 S255", id: "M42 P6 S255" },
+      { title: "Mrln: M106 P{n} S255", id: "M106" },
+      { title: "Mrln: M42 P{pin} S255", id: "M42" },
       { title: "Grbl: M7 (mist)", id: "M7" },
       { title: "Grbl: M8 (flood)", id: "M8" },
       { title: "Use custom", id: "Use custom" }
@@ -791,17 +819,26 @@ properties = {
   },
   coolantChannelBOff: {
     title      : "Turn Channel B Off",
-    description: "The g-code that switches channel B off. Same dialect as Turn Channel B On.",
+    description: "The g-code that switches channel B off. Same dialect and, on the two Marlin values, the same output as Turn Channel B On -- both read Channel B Pin/Fan # below.",
     group      : "coolant",
     order      : 60,
     type       : "enum",
     values: [
-      { title: "Mrln: M42 P11 S0", id: "M42 P11 S0" },
-      { title: "Mrln: M42 P6 S0", id: "M42 P6 S0" },
+      { title: "Mrln: M106 P{n} S0", id: "M106" },
+      { title: "Mrln: M42 P{pin} S0", id: "M42" },
       { title: "Grbl: M9 (off)", id: "M9" },
       { title: "Use custom", id: "Use custom" }
     ],
     value      : "M9",
+    scope      : "post"
+  },
+  coolantChannelBPinFan: {
+    title      : "Channel B Pin/Fan #",
+    description: "The output number channel B's two Marlin values use, read by both of them. Every condition stated under Channel A Pin/Fan # applies here unchanged -- the four readings, the board-specific numbering, and M42's DIRECT_PIN_CONTROL and protected-pin conditions. The two channels MAY share one number: this post takes both channels off before it switches either on, so a shared output is switched off and back on rather than left in whichever state the last channel wrote.",
+    group      : "coolant",
+    order      : 65,
+    type       : "integer",
+    value      : 0,
     scope      : "post"
   },
   coolantChannelAOnCustom: {
@@ -1230,6 +1267,18 @@ function isSafeToRapid(x, y, z) {
   return false;
 }
 
+//---------------- Switched outputs -- fan and pin ----------------
+
+// The one emission groups 1, 8 and 9 share -- spindle, laser and both coolant channels.
+//
+// S on every arm, off included: a bare M106 P{n} is a status REPORT on RepRapFirmware and switches
+// nothing (Fan::Configure, src/Fans/Fan.cpp 3.5-dev), and its M42 does gb.MustSee('S').
+// No M107 anywhere: RRF's ignores P and zeroes the current tool's mapped fans (GCodes2.cpp case 107),
+// and S0 is what M107 does on Marlin.
+function writeFanOrPinOutput(mode, number, pwm) {
+  writeBlock(mFormat.format(mode == "M42" ? 42 : 106), pFormat.format(number), sFormat.format(pwm));
+}
+
 //---------------- Coolant ----------------
 
 // The four "... Custom" coolant properties name a FILE in the nc output folder, as their own tooltips
@@ -1245,28 +1294,37 @@ function writeCustomCoolantFile(channel, on, file) {
   loadFile(file);
 }
 
-function CoolantA(on) {
-  var coolantText = on ? getProperty(properties.coolantChannelAOn) : getProperty(properties.coolantChannelAOff);
+// One body for both channels: the third branch below would otherwise have been written twice.
+// Three kinds of value -- "Use custom" names a file, "M106"/"M42" name an output whose number is the
+// channel's own field, and any other id IS the g-code. The GRBL ids stay literal for that last reason.
+function writeCoolantChannel(channel, on, codeProp, fileProp, pinProp) {
+  var code = getProperty(codeProp);
 
-  if (coolantText == "Use custom") {
-    writeCustomCoolantFile("A", on, on ? getProperty(properties.coolantChannelAOnCustom)
-                                       : getProperty(properties.coolantChannelAOffCustom));
+  if (code == "Use custom") {
+    writeCustomCoolantFile(channel, on, getProperty(fileProp));
     return;
   }
 
-  writeBlock(coolantText);
+  if (code == "M106" || code == "M42") {
+    writeFanOrPinOutput(code, getProperty(pinProp), on ? 255 : 0);
+    return;
+  }
+
+  writeBlock(code);
+}
+
+function CoolantA(on) {
+  writeCoolantChannel("A", on,
+    on ? properties.coolantChannelAOn : properties.coolantChannelAOff,
+    on ? properties.coolantChannelAOnCustom : properties.coolantChannelAOffCustom,
+    properties.coolantChannelAPinFan);
 }
 
 function CoolantB(on) {
-  var coolantText = on ? getProperty(properties.coolantChannelBOn) : getProperty(properties.coolantChannelBOff);
-
-  if (coolantText == "Use custom") {
-    writeCustomCoolantFile("B", on, on ? getProperty(properties.coolantChannelBOnCustom)
-                                       : getProperty(properties.coolantChannelBOffCustom));
-    return;
-  }
-
-  writeBlock(coolantText);
+  writeCoolantChannel("B", on,
+    on ? properties.coolantChannelBOn : properties.coolantChannelBOff,
+    on ? properties.coolantChannelBOnCustom : properties.coolantChannelBOffCustom,
+    properties.coolantChannelBPinFan);
 }
 
 // Manage two channels of coolant by tracking which coolant is being using for
@@ -1355,19 +1413,19 @@ function laserOn(power) {
   else {
     var laser_pwm = power / 100 * 255;
 
-    switch (getProperty(properties.laserMarlinMode)) {
-      case "106":
-        writeBlock(mFormat.format(106), sFormat.format(laser_pwm));
+    var marlinMode = getProperty(properties.laserMarlinMode);
+
+    switch (marlinMode) {
+      case "M106":
+      case "M42":
+        writeFanOrPinOutput(marlinMode, getProperty(properties.laserMarlinPinFan), laser_pwm);
         break;
-      case "3":
+      case "M3":
         if (fw == eFirmware.REPRAP) {
           writeBlock(mFormat.format(3), sFormat.format(laser_pwm));
         } else {
           writeBlock(mFormat.format(3), oFormat.format(laser_pwm));
         }
-        break;
-      case "42":
-        writeBlock(mFormat.format(42), pFormat.format(getProperty(properties.laserMarlinPin)), sFormat.format(laser_pwm));
         break;
     }
   }
@@ -1381,15 +1439,15 @@ function laserOff() {
 
   // Default
   else {
-    switch (getProperty(properties.laserMarlinMode)) {
-      case "106":
-        writeBlock(mFormat.format(107));
+    var marlinMode = getProperty(properties.laserMarlinMode);
+
+    switch (marlinMode) {
+      case "M106":
+      case "M42":
+        writeFanOrPinOutput(marlinMode, getProperty(properties.laserMarlinPinFan), 0);
         break;
-      case "3":
+      case "M3":
         writeBlock(mFormat.format(5));
-        break;
-      case "42":
-        writeBlock(mFormat.format(42), pFormat.format(getProperty(properties.laserMarlinPin)), sFormat.format(0));
         break;
     }
   }
@@ -1484,6 +1542,18 @@ function coolantCodeFirmware(prop) {
     }
   }
   return undefined;
+}
+
+// The display text of a coolant code's current value. Since GH-16d the Marlin ids are names rather
+// than g-code, so a message quoting the id tells the operator nothing.
+function coolantCodeTitle(prop) {
+  var id = getProperty(prop);
+  for (var i = 0; i < prop.values.length; ++i) {
+    if (prop.values[i].id == id) {
+      return prop.values[i].title;
+    }
+  }
+  return id;
 }
 
 // Every coolant level this job asks for that NEITHER channel Mode carries, with the operations that
@@ -1968,8 +2038,8 @@ function validateJob() {
     }
   }
 
-  // The code is emitted unchanged, CoolantA()/CoolantB() handing the enum id to writeBlock() with no
-  // firmware test. Gated on the channel mode, CR-24's gate: it ships Off, so a configured channel is the
+  // The chosen value is emitted with no firmware test -- writeCoolantChannel() writes the GRBL ids
+  // verbatim and builds the two Marlin forms from the channel's own number. Gated on the channel mode, CR-24's gate: it ships Off, so a configured channel is the
   // operator's opt-in and is what the emission reads. Warned and not refused -- the label says which
   // firmware this post SHIPPED the code for, not that no other takes it. RepRapFirmware is deliberately
   // not reached, the post labelling no value for it. PV-12.
@@ -1986,7 +2056,8 @@ function validateJob() {
     for (var cd = 0; cd < coolantCodeProps.length; ++cd) {
       var codeFw = coolantCodeFirmware(coolantCodeProps[cd]);
       if (codeFw != undefined && codeFw != fw) {
-        wrongDialect.push("\"" + coolantCodeProps[cd].title + "\" is \"" + getProperty(coolantCodeProps[cd])
+        // The title, not the id: since GH-16d the Marlin ids are names rather than g-code.
+        wrongDialect.push("\"" + coolantCodeProps[cd].title + "\" is \"" + coolantCodeTitle(coolantCodeProps[cd])
           + "\", which this post lists as " + codeFw);
       }
     }
@@ -1996,8 +2067,8 @@ function validateJob() {
       warning(localize("This job is posted for " + fw + ", and "
         + (wrongDialect.length == 1 ? "a coolant code it will emit belongs"
                                     : "coolant codes it will emit belong")
-        + " to another firmware: " + wrongDialect.join("; ") + ". The post emits the code exactly as it "
-        + "stands, so a controller that does not implement it answers the line as an unsupported command "
+        + " to another firmware: " + wrongDialect.join("; ") + ". The post emits what you picked, so a "
+        + "controller that does not implement it answers the line as an unsupported command "
         + "and the job stops mid-operation with the tool in the cut. Choose the \"" + jobDialect
         + ":\" values in \"9 - Coolant\", or \"Use custom\" and a file of your own if your controller "
         + "takes something this post does not list."));
@@ -2046,6 +2117,80 @@ function validateJob() {
 
   // --- Guards -----------------------------------------------------------------------------------
   // Every guard below applies on every firmware, and the order is about which complaint is more basic.
+
+  // The fan and pin output modes, in one table because groups 1, 8 and 9 own the same mistakes.
+  //
+  // skipOnGrbl: laserOn() reads laserGrblMode on GRBL and never sees the Marlin/Reprap mode, which
+  // ships "M106" -- so a GRBL job on the shipped default must post.
+  // refuseOnGrbl: group 9 warns instead, and that is PV-16's ruling -- the labels say which firmware
+  // a value was shipped for, not that no other takes it. The dialect warning above is that channel.
+  var outputModeProps = [
+    { mode: properties.jobSpindleControl, number: properties.jobSpindlePinFan, group: "1 - Job",
+      skipOnGrbl: false, refuseOnGrbl: true },
+    { mode: properties.laserMarlinMode, number: properties.laserMarlinPinFan, group: "8 - Laser",
+      skipOnGrbl: true, refuseOnGrbl: true },
+    { mode: properties.coolantChannelAOn, off: properties.coolantChannelAOff,
+      number: properties.coolantChannelAPinFan, group: "9 - Coolant",
+      skipOnGrbl: false, refuseOnGrbl: false, gate: properties.coolantChannelAMode },
+    { mode: properties.coolantChannelBOn, off: properties.coolantChannelBOff,
+      number: properties.coolantChannelBPinFan, group: "9 - Coolant",
+      skipOnGrbl: false, refuseOnGrbl: false, gate: properties.coolantChannelBMode }
+  ];
+  for (var om = 0; om < outputModeProps.length; ++om) {
+    // CR-24's gate: a channel whose Mode ships Off is not configured, and its codes were never chosen.
+    if (outputModeProps[om].gate != undefined
+        && getProperty(outputModeProps[om].gate) == eCoolant.Off) {
+      continue;
+    }
+
+    var omMode = getProperty(outputModeProps[om].mode);
+    if (omMode != "M106" && omMode != "M42") {
+      continue;
+    }
+    if (outputModeProps[om].skipOnGrbl && fw == eFirmware.GRBL) {
+      continue;
+    }
+
+    // On and off share the number since GH-16d, so the pin cannot differ -- but the form still can,
+    // and M106 on with M42 off never closes what it opened. A dialect-mixed pair is the warning's.
+    if (outputModeProps[om].off != undefined) {
+      var omOff = getProperty(outputModeProps[om].off);
+      if ((omOff == "M106" || omOff == "M42") && omOff != omMode) {
+        error("\"" + outputModeProps[om].mode.title + "\" and \"" + outputModeProps[om].off.title
+          + "\" are set to different outputs -- " + coolantCodeTitle(outputModeProps[om].mode) + " and "
+          + coolantCodeTitle(outputModeProps[om].off) + ". The channel would be switched on with one"
+          + " command and off with another, so the output it opened is never closed and stays on for the"
+          + " rest of the job. Set both to the same form in \"" + outputModeProps[om].group
+          + "\"; they share \"" + outputModeProps[om].number.title + "\", so the same form is the same"
+          + " output.");
+        return;
+      }
+    }
+
+    // Neither code is GRBL's: grbl 1.1 answers an M word it was not compiled with as error:20 and stops
+    // there, and FluidNC implements neither.
+    if (fw == eFirmware.GRBL && outputModeProps[om].refuseOnGrbl) {
+      error("\"" + outputModeProps[om].mode.title + "\" is set to a "
+        + (omMode == "M106" ? "fan (M106)" : "pin (M42)") + " output and this job is posted for GRBL,"
+        + " which has neither command. The controller answers the line with error:20 and stops the job"
+        + " there, with the tool in the cut and the output never switched on. Those two modes are"
+        + " Marlin and RepRapFirmware only -- in \"" + outputModeProps[om].group + "\", choose a mode"
+        + " your firmware has, or set \"CNC Firmware\" to the one this machine actually runs.");
+      return;
+    }
+
+    // Pin mode only. Fan 0 is a real fan and the default, so the same test on the fan arm would refuse
+    // the commonest correct setting; pin 0 is nobody's laser or router, and Marlin protects it anyway.
+    if (omMode == "M42" && getProperty(outputModeProps[om].number) == 0) {
+      error("\"" + outputModeProps[om].mode.title + "\" is set to a pin (M42) output and \""
+        + outputModeProps[om].number.title + "\" is still 0, which names no output this post can"
+        + " believe you chose. M42 would be emitted against pin 0 -- refused by Marlin as a protected"
+        + " pin on most boards, and an output nobody picked on the rest. Set \""
+        + outputModeProps[om].number.title + "\" to the pin your hardware is wired to, or choose the"
+        + " fan mode if it is on a fan header, which M42 cannot reach at all.");
+      return;
+    }
+  }
 
   // Refused rather than warned, and here rather than at the boundary: the alternative is a file that
   // cuts every operation with whichever tool is in the spindle, at the other tools' feeds and speeds.
@@ -4016,7 +4161,7 @@ function writeCommentLine(text) {
 
 // Every ">>> WARNING:" goes through here, ignoring Comment Level -- Off means less commentary, not
 // fewer warnings. No parentheses in the text: writeCommentLine() replaces them with a space, a grbl
-// comment being unable to nest. Every call site carries a TWIN verdict; findings.md §2 defines them.
+// comment being unable to nest. Every call site carries a TWIN verdict; findings.md ï¿½2 defines them.
 function writeWarning(text) {
   writeCommentLine(" >>> WARNING: " + text);
 }
@@ -4304,7 +4449,9 @@ var lastPromptedClockwise = true;
 // Start the spindle, or -- under "Manual Spindle On/Off" -- ask the operator to, and only when the
 // speed or direction has changed since the last time they were asked.
 function spindleOn(_spindleSpeed, _clockwise) {
-  if (getProperty(properties.jobManualSpindlePowerControl)) {
+  var mode = getProperty(properties.jobSpindleControl);
+
+  if (mode == "manual") {
     var rpm = speedFormat.format(_spindleSpeed);
 
     // Under manual control any positive speed just means "on": there is no S word to command.
@@ -4327,7 +4474,27 @@ function spindleOn(_spindleSpeed, _clockwise) {
 
     lastPromptedSpeed = rpm;
     lastPromptedClockwise = _clockwise;
-  } else {
+  }
+
+  // A switched output: on or off. S255 is that flag and not a speed -- M106 clamps S to 255 and M42
+  // truncates it to a byte, so the RPM goes to the comment. Direction is ignored; a relay has no M4.
+  // No parentheses in these comments: writeCommentLine() collapses them.
+  else if (mode == "M106" || mode == "M42") {
+    if (!spindleEnabled) {
+      writeComment(eComment.Important, " >>> Spindle ON -- " + speedFormat.format(_spindleSpeed)
+        + " RPM requested, and this output carries no speed");
+      writeFanOrPinOutput(mode, getProperty(properties.jobSpindlePinFan), 255);
+    }
+
+    // setSpindeSpeed() reaches us on a later speed change too. Nothing to emit -- but the file must not
+    // go silent about a speed the job asked for and cannot get.
+    else {
+      writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed)
+        + " RPM requested and NOT commanded -- this output is on/off only");
+    }
+  }
+
+  else {
     writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed));
     writeBlock(mFormat.format(_clockwise ? 3 : 4), sOutput.format(_spindleSpeed));
   }
@@ -4337,15 +4504,19 @@ function spindleOn(_spindleSpeed, _clockwise) {
 
 // Stop the spindle, or ask the operator to and beep where the firmware has M300.
 function spindleOff() {
+  var mode = getProperty(properties.jobSpindleControl);
+
   // Manual control describes the MACHINE -- a hand-switched router -- not the dialect, so the branch is
   // on the property first. GRBL used to emit a bare M5, which does nothing to a hand-switched router.
-  if (getProperty(properties.jobManualSpindlePowerControl)) {
+  if (mode == "manual") {
     // No M5 on this path, mirroring spindleOn(), which emits no M3 under manual control: the post
     // does not command a spindle the operator owns, it asks them.
     if (fw != eFirmware.GRBL) {
       writeBlock(mFormat.format(300), sFormat.format(300), pFormat.format(3000));   // beep -- no M300 on GRBL
     }
     askUser("Turn OFF spindle", "Spindle", false);
+  } else if (mode == "M106" || mode == "M42") {
+    writeFanOrPinOutput(mode, getProperty(properties.jobSpindlePinFan), 0);
   } else {
     writeBlock(mFormat.format(5));
   }

@@ -91,8 +91,8 @@ node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.0_Beta3.cps "$CNC" out/cor
 node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.0_Beta3.cps "$CNC" out/gcode-structure
 ```
 
-**190 cases — 37 hobbyist, 46 professional, 39 WCS, 11 personal, 41 CorrectGcode, 16 GCodeStructure —
-over 42 job files, and all 190 pass as of 2026-08-17.** The whole run is under a minute.
+**207 cases — 37 hobbyist, 46 professional, 39 WCS, 11 personal, 57 CorrectGcode, 17 GCodeStructure —
+over 42 job files, and all 207 pass as of 2026-08-20.** The whole run is under a minute.
 
 **The six are independent by design and stay that way.** The first four encode personas that disagree
 about what the factory defaults should do, so a shared baseline would have to pick one; the last two
@@ -659,7 +659,7 @@ correction rather than a case.
 
 | Residue | Closed by | What it asserts |
 |---|---|---|
-| `jobManualSpindlePowerControl` = `false` | `CG32` | `M3 S5000` and `M5` **replace** the two prompts — both halves, because a case that asserted only the `M3` would pass on a post that commanded the spindle *and* still stopped to ask |
+| `jobSpindleControl` = `M3` | `CG32` | `M3 S5000` and `M5` **replace** the two prompts — both halves, because a case that asserted only the `M3` would pass on a post that commanded the spindle *and* still stopped to ask |
 | `probeG382orG28` = `false` | `CG35` | `G28 Z` in place of `G38.2`, **on Marlin** — a GRBL case would assert nothing, that arm emitting `G38.2` unconditionally |
 | `duetMillingMode`, `duetLaserMode` | `CG36` | both tokens, from one job: they are written at a section-type **change**, so `mill-then-jet.cnc` is the shape that emits the pair. The table's old note said the default was `T0`; it is `M453` |
 | `machineHomeAtStart` = `Pause & Home` | `CG33` | the stop **above** the homing cycle — a stop below it prepares the machine for a cycle that has already run |

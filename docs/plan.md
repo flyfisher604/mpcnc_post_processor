@@ -15,7 +15,10 @@ the file that computes it is named instead.
 `release-notes-v4.0-beta3.md`. **Next: Step 8 — cut the release.**
 
 Step 7 is done: the four user documents describe the post as it now is, and `guide-pro.md` states
-plainly what is not verified. **`findings.md` §2 is empty.**
+plainly what is not verified. **What is open stands in `findings.md` §2**, which owns that count.
+
+**Issue 16 is answered on branch `Issue16`** — `findings.md` `GH-16a` to `GH-16d`, the last two being
+what reading group 9 beside it turned up. **It is not merged and not pushed.**
 
 **No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §2, and `PV-14`
 is the row.
