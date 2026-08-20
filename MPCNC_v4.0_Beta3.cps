@@ -647,25 +647,25 @@ properties = {
   },
   laserMarlinMode: {
     title      : "Laser: Marlin/Reprap Mode",
-    description: "Marlin/Reprap mode of the laser/plasma cutter.",
+    description: "Marlin/Reprap mode of the laser/plasma cutter. Fan and Pin both take their output number from Pin/Fan # below. No mode emits M107: RepRapFirmware ignores its P word and zeroes whatever fans the current tool maps, so the off code is M106 with S0 -- which is what M107 does on Marlin anyway.",
     group      : "laser",
     order      : 40,
     type       : "enum",
     values: [
-      { title: "Fan - M106 S{PWM}/M107", id: "106" },
+      { title: "Fan - M106 P{n} S{PWM}/S0", id: "106" },
       { title: "Spindle - M3 O{PWM}/M5", id: "3" },
       { title: "Pin - M42 P{pin} S{PWM}", id: "42" }
     ],
     value: "106",
     scope: "post"
   },
-  laserMarlinPin: {
-    title      : "Laser: Marlin M42 Pin",
-    description: "Marlin custom pin number for the laser/plasma cutter. Read only in Pin mode.",
+  laserMarlinPinFan: {
+    title      : "Laser: Marlin Pin/Fan #",
+    description: "The output number the mode above uses, and FOUR different things depending on mode and firmware -- re-check it whenever you change either. Fan mode: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). Pin mode: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored in Spindle mode. A wrong number is not equally visible on the two firmwares: Marlin returns silently for an index it does not have, so the laser never fires and no error says so, while RepRapFirmware answers \"Fan number not found\" or refuses the port. Pin mode carries two more conditions of its own -- M42 is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses M42 on a protected pin, which includes every FANn_PIN, so a fan header cannot be reached this way. Use Fan mode for a fan header and Pin mode for a spare output.",
     group      : "laser",
     order      : 50,
     type       : "integer",
-    value      : 4,
+    value      : 0,
     scope      : "post"
   },
   laserGrblMode: {
@@ -1341,6 +1341,24 @@ function setCoolant(coolant) {
 
 var cutterOnCurrentPower;
 
+// Switch a fan or a pin output. The ONE emission the laser and the spindle share, so it is one
+// function: the two would otherwise drift, and the drift is silent -- a wrong S or a dropped P is a
+// file that posts and an output that never moves.
+//
+// S is written on EVERY arm, on and off alike, and that is not decoration. On Marlin an absent S
+// means 255, so a bare M106 P0 would be full on -- but on RepRapFirmware a bare M106 P{n} is a
+// status REPORT and switches nothing (`Fan::Configure` reports whenever neither R nor S is seen,
+// src/Fans/Fan.cpp 3.5-dev), and RRF's M42 does `gb.MustSee('S')` and throws without it
+// (src/GCodes/GCodes2.cpp case 42). One form that works on both firmwares is worth more than the
+// shortest form that works on one.
+//
+// M107 is deliberately not reachable from here: RRF's `case 107` is SetMappedFanSpeed(gb, 0.0),
+// which ignores P entirely and zeroes whatever fans the CURRENT TOOL maps, so an on that addresses
+// fan n paired with that off is worse than either alone. S0 is what M107 does on Marlin anyway.
+function writeFanOrPinOutput(mode, number, pwm) {
+  writeBlock(mFormat.format(mode == "42" ? 42 : 106), pFormat.format(number), sFormat.format(pwm));
+}
+
 function laserOn(power) {
   // Firmware is Grbl
   if (fw == eFirmware.GRBL) {
@@ -1355,9 +1373,12 @@ function laserOn(power) {
   else {
     var laser_pwm = power / 100 * 255;
 
-    switch (getProperty(properties.laserMarlinMode)) {
+    var marlinMode = getProperty(properties.laserMarlinMode);
+
+    switch (marlinMode) {
       case "106":
-        writeBlock(mFormat.format(106), sFormat.format(laser_pwm));
+      case "42":
+        writeFanOrPinOutput(marlinMode, getProperty(properties.laserMarlinPinFan), laser_pwm);
         break;
       case "3":
         if (fw == eFirmware.REPRAP) {
@@ -1365,9 +1386,6 @@ function laserOn(power) {
         } else {
           writeBlock(mFormat.format(3), oFormat.format(laser_pwm));
         }
-        break;
-      case "42":
-        writeBlock(mFormat.format(42), pFormat.format(getProperty(properties.laserMarlinPin)), sFormat.format(laser_pwm));
         break;
     }
   }
@@ -1381,15 +1399,15 @@ function laserOff() {
 
   // Default
   else {
-    switch (getProperty(properties.laserMarlinMode)) {
+    var marlinMode = getProperty(properties.laserMarlinMode);
+
+    switch (marlinMode) {
       case "106":
-        writeBlock(mFormat.format(107));
+      case "42":
+        writeFanOrPinOutput(marlinMode, getProperty(properties.laserMarlinPinFan), 0);
         break;
       case "3":
         writeBlock(mFormat.format(5));
-        break;
-      case "42":
-        writeBlock(mFormat.format(42), pFormat.format(getProperty(properties.laserMarlinPin)), sFormat.format(0));
         break;
     }
   }
@@ -2046,6 +2064,53 @@ function validateJob() {
 
   // --- Guards -----------------------------------------------------------------------------------
   // Every guard below applies on every firmware, and the order is about which complaint is more basic.
+
+  // The fan and pin output modes, refused on the two settings that cannot produce a working file. A
+  // TABLE and not two hand-written pairs, because group 1 and group 8 own the same two mistakes and a
+  // guard added to one and not the other is the mistake this shape exists to stop.
+  //
+  // `marlinOnly` is which property the EMISSION reads, and it is the difference between a guard and a
+  // false refusal. laserOn() takes laserGrblMode on GRBL and never looks at the Marlin/Reprap mode --
+  // which ships "106" -- so a GRBL job carrying the shipped default is correct and must post. Group 1's
+  // mode is read on every firmware, so nothing skips it.
+  var outputModeProps = [
+    { mode: properties.laserMarlinMode, number: properties.laserMarlinPinFan, group: "8 - Laser",
+      marlinOnly: true }
+  ];
+  for (var om = 0; om < outputModeProps.length; ++om) {
+    var omMode = getProperty(outputModeProps[om].mode);
+    if (omMode != "106" && omMode != "42") {
+      continue;
+    }
+    if (outputModeProps[om].marlinOnly && fw == eFirmware.GRBL) {
+      continue;
+    }
+
+    // Neither code is GRBL's. Grbl 1.1 answers an M word it was not compiled with as error:20 and
+    // stops there -- the same refusal this post already states for M6 and M7 -- and FluidNC does not
+    // implement either. Refused and not warned: the emission is the whole point of the mode.
+    if (fw == eFirmware.GRBL) {
+      error("\"" + outputModeProps[om].mode.title + "\" is set to a "
+        + (omMode == "106" ? "fan (M106)" : "pin (M42)") + " output and this job is posted for GRBL,"
+        + " which has neither command. The controller answers the line with error:20 and stops the job"
+        + " there, with the tool in the cut and the output never switched on. Those two modes are"
+        + " Marlin and RepRapFirmware only -- in \"" + outputModeProps[om].group + "\", choose a mode"
+        + " your firmware has, or set \"CNC Firmware\" to the one this machine actually runs.");
+      return;
+    }
+
+    // Pin mode only. Fan 0 is a real fan and the default, so the same test on the fan arm would refuse
+    // the commonest correct setting; pin 0 is nobody's laser or router, and Marlin protects it anyway.
+    if (omMode == "42" && getProperty(outputModeProps[om].number) == 0) {
+      error("\"" + outputModeProps[om].mode.title + "\" is set to a pin (M42) output and \""
+        + outputModeProps[om].number.title + "\" is still 0, which names no output this post can"
+        + " believe you chose. M42 would be emitted against pin 0 -- refused by Marlin as a protected"
+        + " pin on most boards, and an output nobody picked on the rest. Set \""
+        + outputModeProps[om].number.title + "\" to the pin your hardware is wired to, or choose the"
+        + " fan mode if it is on a fan header, which M42 cannot reach at all.");
+      return;
+    }
+  }
 
   // Refused rather than warned, and here rather than at the boundary: the alternative is a file that
   // cuts every operation with whichever tool is in the spindle, at the other tools' feeds and speeds.
@@ -4016,7 +4081,7 @@ function writeCommentLine(text) {
 
 // Every ">>> WARNING:" goes through here, ignoring Comment Level -- Off means less commentary, not
 // fewer warnings. No parentheses in the text: writeCommentLine() replaces them with a space, a grbl
-// comment being unable to nest. Every call site carries a TWIN verdict; findings.md §2 defines them.
+// comment being unable to nest. Every call site carries a TWIN verdict; findings.md ï¿½2 defines them.
 function writeWarning(text) {
   writeCommentLine(" >>> WARNING: " + text);
 }

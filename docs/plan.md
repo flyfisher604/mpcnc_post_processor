@@ -15,7 +15,11 @@ the file that computes it is named instead.
 `release-notes-v4.0-beta3.md`. **Next: Step 8 — cut the release.**
 
 Step 7 is done: the four user documents describe the post as it now is, and `guide-pro.md` states
-plainly what is not verified. **`findings.md` §2 is empty.**
+plainly what is not verified. **What is open stands in `findings.md` §2**, which owns that count.
+
+**Issue 16 is in flight, on branch `Issue16`** — the two Marlin output modes the tracker asked for,
+laser first and the spindle after it. `findings.md` `GH-16a` and `GH-16b` own the work; `GH-16c` is what
+it turned up and left.
 
 **No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §2, and `PV-14`
 is the row.

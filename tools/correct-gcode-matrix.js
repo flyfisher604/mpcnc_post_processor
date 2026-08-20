@@ -452,6 +452,58 @@ const cases = [
   cnc:'Cutting/Waterjet/center compensation/through medium.cnc', props:{},
   must:[[/^M4 S\d+$/m,'the jet fires']] },
 
+// GH-16a. The Marlin fan mode addresses a fan INDEX, and until this landed it addressed none: a bare
+// M106 is fan `_MIN(motion.extruder, FAN_COUNT-1)` on Marlin, which is fan 0 on a CNC build -- so a
+// laser on any other output was driven by nothing and fan 0 was driven by the laser.
+{ id:'CG22a', desc:'Marlin fan mode: both power levels reach the fan the operator named, and no M107 is emitted',
+  cnc:'Cutting/Laser/center.cnc',
+  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('106'), laserMarlinPinFan:N(2) },
+  // Six Through sections and one Etch in this one file, so both power levels are proved here for the
+  // same reason CG20 uses it: 80% -> 204 and 40% -> 102 on Marlin's 0-255 scale.
+  must:[[/^M106 P2 S204$/m,'Through fires on fan 2 at 80% -> S204'],
+        [/^M106 P2 S102$/m,'Etch fires on the same fan at 40% -> S102'],
+        [/^M106 P2 S0$/m,'and the off code is S0 on that fan, not a bare M107']],
+  // M107 is gone from the post, not merely unused here: RRF ignores its P and zeroes the current
+  // tool's mapped fans, so an on addressing fan 2 with that off is worse than either alone.
+  mustNot:[[/^(N\d+ )?M107\b/m,'no M107 anywhere in the file']],
+  // BOTH HALVES, because a P on the on-code and not the off-code would light fan 2 and try to stop
+  // fan 0 -- which is the shape of the defect, and asserting only the firing would pass on it.
+  custom:ctx => {
+    const on = M.countOf(ctx.text, /^M106 P2 S(?!0$)\d+$/gm), off = M.countOf(ctx.text, /^M106 P2 S0$/gm);
+    return (on > 0 && on === off) ? [true, `${on} firings on fan 2 and ${off} matching stops`]
+                                  : [false, `${on} firings and ${off} stops on fan 2`]; } },
+
+{ id:'CG22b', desc:'... and the index is emitted even at its default of 0, rather than left implicit',
+  cnc:'Cutting/Laser/center.cnc',
+  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('106') },
+  // The control for CG22a: P0 is what a bare M106 already means on a single-extruder Marlin build, so
+  // this case is about the post SAYING which output it drives. RRF resolves an absent P differently --
+  // a bare M106 P{n} there is a status report and switches nothing -- which is why it is never omitted.
+  must:[[/^M106 P0 S204$/m,'the default names fan 0 explicitly']],
+  mustNot:[[/^(N\d+ )?M106 S\d+$/m,'and never emits the indexless form']] },
+
+{ id:'CG22c', desc:'Marlin pin mode takes the same field, and pairs its firing with S0 on that pin',
+  cnc:'Cutting/Laser/center.cnc',
+  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('42'), laserMarlinPinFan:N(7) },
+  must:[[/^M42 P7 S204$/m,'Through fires on pin 7'],
+        [/^M42 P7 S0$/m,'and is stopped on the same pin']],
+  mustNot:[[/^(N\d+ )?M106\b/m,'no fan code in pin mode']] },
+
+// GH-16a. The other side of CG22c, and the reason the merged Pin/Fan # field can default to 0 at all:
+// 0 is a legitimate FAN index and no laser's pin, so pin mode must say what it drives or not post.
+{ id:'CG22d', desc:'pin mode with the Pin/Fan # left at 0 is refused rather than aimed at pin 0',
+  cnc:'Cutting/Laser/center.cnc',
+  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('42') },
+  refuse:[/is still 0, which names no output this post can believe you chose/,'the field is named, with both remedies'] },
+
+// The control for the guard above, and for the firmware scoping under it: the Marlin/Reprap mode ships
+// "106" and GRBL ships as the firmware, so a guard that read the property on the wrong firmware would
+// refuse every default job in this file. Thirty-odd GRBL cases here are that control; this one states it.
+{ id:'CG22e', desc:'... and a GRBL job posts untouched by it -- the Marlin/Reprap mode is not read there',
+  cnc:'Cutting/Laser/center.cnc', props:{ laserMarlinMode:S('42') },
+  must:[[/^M4 S800$/m,'the GRBL mode fires the laser and the Marlin pin mode is ignored']],
+  mustNot:[[/^(N\d+ )?M42\b/m,'no M42 on a firmware that has none']] },
+
 { id:'CG23', desc:'an Optional Stop becomes an unconditional M0, once per request, and says so',
   cnc:'Milling/2D/optional stop.cnc', props:{ toolChangeMode:S('Pause') }, trace:true,
   must:[[/an Optional Stop was requested here and is emitted as an UNCONDITIONAL M0/,'the substitution is stated']],
