@@ -74,8 +74,8 @@ the spoilboard base, which was the one thing the assessment called over-built, a
 where the post stopped being walked and started being *run*, against Autodesk's own engine —
 `integration.md` is that machinery and the bounds on what a run may claim.
 
-*`Assessment/00-08` and `10` are the analysis this plan came from, dated 2026-08-13. Read them for
-evidence, never for where things live — their file pointers predate the consolidation.*
+*`Assessment/` is the analysis this plan came from, dated 2026-08-13, and its own `README.md` is the
+index. Read it for evidence, never for where things live.*
 
 ---
 
