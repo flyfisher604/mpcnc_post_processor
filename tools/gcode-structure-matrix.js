@@ -451,7 +451,7 @@ const programs = [
   cnc:'Milling/Coolant Codes/flood.cnc', props:{ coolantChannelAMode:S('Flood') } },
 
 { id:'GS16', desc:'the hobbyist file with a commanded spindle instead of an operator prompt', cnc:face,
-  props:{ jobManualSpindlePowerControl:B(false), machineParkAtEnd:S('Off') } },
+  props:{ jobSpindleControl:S('3'), machineParkAtEnd:S('Off') } },
 ];
 
 // ---- run ------------------------------------------------------------------------------

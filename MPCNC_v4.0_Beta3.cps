@@ -122,13 +122,33 @@ properties = {
     value: eFirmware.GRBL,
     scope: "post"
   },
-  jobManualSpindlePowerControl: {
-    title      : "Manual Spindle On/Off",
-    description: "On: the post prompts you to switch the router on and off by hand and emits no M3/M5 -- for a trim router or any spindle without electronic control. Off: the post commands the spindle with M3/M5. On Marlin those codes are a build option: a stock build has neither SPINDLE_FEATURE nor LASER_FEATURE, answers M3 with an unknown-command warning and runs the whole job with the spindle never started. V1 Engineering's own V1CNC builds enable LASER_FEATURE, where M3 does switch the spindle/laser pin -- but S is read as cutter power, not RPM, and M4 is not a reversal.",
+  // Was the boolean "Manual Spindle On/Off", and the key moved with the type: a stored true/false is not
+  // an enum id, so a saved configuration answers this field with its default instead -- which is the
+  // prompt, the same behaviour the boolean shipped. Nobody's job changes who does not choose an arm.
+  jobSpindleControl: {
+    title      : "Spindle Control",
+    description: "Who switches the router or spindle on, and with what. Prompt the operator: the post emits no spindle code at all and stops (M0) to ask -- for a trim router or any spindle without electronic control. Spindle M3/M5: the post commands it, with S carrying the RPM. On Marlin those codes are a build option -- a stock build has neither SPINDLE_FEATURE nor LASER_FEATURE, answers M3 with an unknown-command warning and runs the whole job with the spindle never started; V1 Engineering's own V1CNC builds enable LASER_FEATURE, where M3 does switch the spindle/laser pin, but S is read as cutter power, not RPM, and M4 is not a reversal. Fan M106 and Pin M42 are for a router on a switched output -- a relay on a fan header or a spare pin -- and both are ON or OFF only: they carry no speed and no direction, the RPM going to a comment. Neither is GRBL's, and a job posted for GRBL with either selected is refused rather than emitted. Both take their output number from Pin/Fan # below.",
     group      : "job",
     order      : 20,
-    type       : "boolean",
-    value      : true,
+    type       : "enum",
+    values: [
+      { title: "Prompt the operator (M0)", id: "manual" },
+      { title: "Spindle - M3 S{RPM}/M5", id: "3" },
+      { title: "Fan - M106 P{n} S255/S0", id: "106" },
+      { title: "Pin - M42 P{pin} S255/S0", id: "42" }
+    ],
+    value: "manual",
+    scope: "post"
+  },
+  // 25 and not 30: group 1's orders are decades and every one was taken, and renumbering six properties
+  // to keep the pattern would move six dump lines to place one field.
+  jobSpindlePinFan: {
+    title      : "Spindle: Pin/Fan #",
+    description: "The output number Spindle Control uses in its Fan and Pin modes, and FOUR different things depending on which mode and which firmware -- re-check it whenever you change either. Fan mode: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). Pin mode: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored in the other two modes. A wrong number is not equally visible on the two firmwares: Marlin returns silently for an index it does not have, so the router never starts and the job cuts with a dead spindle, while RepRapFirmware answers \"Fan number not found\" or refuses the port. Pin mode carries two more conditions of its own -- M42 is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses M42 on a protected pin, which includes every FANn_PIN, so a fan header cannot be reached this way. Use Fan mode for a fan header and Pin mode for a spare output.",
+    group      : "job",
+    order      : 25,
+    type       : "integer",
+    value      : 0,
     scope      : "post"
   },
   jobCommentLevel: {
@@ -660,7 +680,7 @@ properties = {
     scope: "post"
   },
   laserMarlinPinFan: {
-    title      : "Laser: Marlin Pin/Fan #",
+    title      : "Laser: Pin/Fan #",
     description: "The output number the mode above uses, and FOUR different things depending on mode and firmware -- re-check it whenever you change either. Fan mode: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). Pin mode: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored in Spindle mode. A wrong number is not equally visible on the two firmwares: Marlin returns silently for an index it does not have, so the laser never fires and no error says so, while RepRapFirmware answers \"Fan number not found\" or refuses the port. Pin mode carries two more conditions of its own -- M42 is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses M42 on a protected pin, which includes every FANn_PIN, so a fan header cannot be reached this way. Use Fan mode for a fan header and Pin mode for a spare output.",
     group      : "laser",
     order      : 50,
@@ -2074,6 +2094,8 @@ function validateJob() {
   // which ships "106" -- so a GRBL job carrying the shipped default is correct and must post. Group 1's
   // mode is read on every firmware, so nothing skips it.
   var outputModeProps = [
+    { mode: properties.jobSpindleControl, number: properties.jobSpindlePinFan, group: "1 - Job",
+      marlinOnly: false },
     { mode: properties.laserMarlinMode, number: properties.laserMarlinPinFan, group: "8 - Laser",
       marlinOnly: true }
   ];
@@ -4369,7 +4391,9 @@ var lastPromptedClockwise = true;
 // Start the spindle, or -- under "Manual Spindle On/Off" -- ask the operator to, and only when the
 // speed or direction has changed since the last time they were asked.
 function spindleOn(_spindleSpeed, _clockwise) {
-  if (getProperty(properties.jobManualSpindlePowerControl)) {
+  var mode = getProperty(properties.jobSpindleControl);
+
+  if (mode == "manual") {
     var rpm = speedFormat.format(_spindleSpeed);
 
     // Under manual control any positive speed just means "on": there is no S word to command.
@@ -4392,7 +4416,34 @@ function spindleOn(_spindleSpeed, _clockwise) {
 
     lastPromptedSpeed = rpm;
     lastPromptedClockwise = _clockwise;
-  } else {
+  }
+
+  // A switched output: ON or OFF, and S255 is that flag rather than a speed. The RPM cannot go into S --
+  // M106 clamps it to 255 and M42 truncates it to a byte, so 15000 RPM would arrive as "full on" wearing
+  // a number that means nothing -- so it goes to the comment, where the operator can read it.
+  //
+  // Direction is ignored, there being no M4 for a relay. The tool's own `_clockwise` is not the post's to
+  // reinterpret and no warning is raised for it: a spindle wired to a fan header has one direction, and
+  // the operator who chose this mode already knows that.
+  else if (mode == "106" || mode == "42") {
+    if (!spindleEnabled) {
+      // No parentheses in either of these: writeCommentLine() collapses them, so a comment written with
+      // them is not the comment that reaches the file.
+      writeComment(eComment.Important, " >>> Spindle ON -- " + speedFormat.format(_spindleSpeed)
+        + " RPM requested, and this output carries no speed");
+      writeFanOrPinOutput(mode, getProperty(properties.jobSpindlePinFan), 255);
+    }
+
+    // A later operation's speed change reaches us through setSpindeSpeed() exactly as it does on the
+    // manual path. There is nothing to emit for it -- re-sending the same S255 would be a line that
+    // changes nothing -- but the file must not go silent about a speed the job asked for and cannot get.
+    else {
+      writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed)
+        + " RPM requested and NOT commanded -- this output is on/off only");
+    }
+  }
+
+  else {
     writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed));
     writeBlock(mFormat.format(_clockwise ? 3 : 4), sOutput.format(_spindleSpeed));
   }
@@ -4402,15 +4453,19 @@ function spindleOn(_spindleSpeed, _clockwise) {
 
 // Stop the spindle, or ask the operator to and beep where the firmware has M300.
 function spindleOff() {
+  var mode = getProperty(properties.jobSpindleControl);
+
   // Manual control describes the MACHINE -- a hand-switched router -- not the dialect, so the branch is
   // on the property first. GRBL used to emit a bare M5, which does nothing to a hand-switched router.
-  if (getProperty(properties.jobManualSpindlePowerControl)) {
+  if (mode == "manual") {
     // No M5 on this path, mirroring spindleOn(), which emits no M3 under manual control: the post
     // does not command a spindle the operator owns, it asks them.
     if (fw != eFirmware.GRBL) {
       writeBlock(mFormat.format(300), sFormat.format(300), pFormat.format(3000));   // beep -- no M300 on GRBL
     }
     askUser("Turn OFF spindle", "Spindle", false);
+  } else if (mode == "106" || mode == "42") {
+    writeFanOrPinOutput(mode, getProperty(properties.jobSpindlePinFan), 0);
   } else {
     writeBlock(mFormat.format(5));
   }

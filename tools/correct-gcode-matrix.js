@@ -592,8 +592,8 @@ const cases = [
 // `integration.md` 7.1 listed these as reachable with job files already on disk and unwritten. Each
 // is a property that changes WHAT THE FILE SAYS rather than what the job is, which is this category's
 // own question, so they are cases here rather than a sixth persona somewhere else.
-{ id:'CG32', desc:'Manual Spindle On/Off off: M3 and M5 REPLACE the two operator prompts',
-  cnc:face, props:{ jobManualSpindlePowerControl:B(false) },
+{ id:'CG32', desc:'Spindle Control M3/M5: the commanded codes REPLACE the two operator prompts',
+  cnc:face, props:{ jobSpindleControl:S('3') },
   must:[[/^M3 S5000$/m,'the spindle is commanded, at the speed the tool asks for'],
         [/^M5$/m,'and stopped the same way']],
   mustNot:[[/MSG,Turn ON \d+ RPM/,'no prompt to start it by hand'],
@@ -604,6 +604,58 @@ const cases = [
     const on = M.countOf(ctx.text, /^M3 S\d+$/gm), off = M.countOf(ctx.text, /^M5$/gm);
     return (on === 1 && off === 1) ? [true, 'one M3 and one M5 for a one-operation job']
                                    : [false, `${on} M3 and ${off} M5, expected one of each`]; } },
+
+// GH-16b. Issue 16's other half: one switched output carries the router and vac, and until this landed
+// the only thing the post could do about it was ask the operator to reach for a switch.
+{ id:'CG32a', desc:'Spindle Control Fan: M106 switches the router, once on and once off, with no prompt',
+  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('106') },
+  must:[[/^M106 P0 S255$/m,'the output is switched on, S255 being the full-on flag'],
+        [/^M106 P0 S0$/m,'and off on the same output'],
+        [/>>> Spindle ON -- 5000 RPM requested, and this output carries no speed/,
+         'and the RPM is stated in a comment rather than commanded']],
+  // A switched output has no speed and no direction. The last of these is the one that matters: the
+  // tool asks for 5000 RPM and M106 clamps S to 255, so an RPM reaching S would be "full on" wearing
+  // a number that means nothing.
+  mustNot:[[/MSG,Turn ON \d+ RPM/,'no prompt to start it by hand'],
+           [/MSG,Turn OFF spindle/,'and none to stop it'],
+           [/^(N\d+ )?M[345]\b/m,'no M3, M4 or M5 -- this mode replaces them'],
+           [/^(N\d+ )?M106 P0 S5000$/m,'and the tool RPM never reaches S']],
+  // BOTH HALVES, for the reason CG32 states: asserting only the on-code would pass on a post that
+  // switched the output and then stopped to ask as well.
+  custom:ctx => {
+    const on = M.countOf(ctx.text, /^M106 P0 S255$/gm), off = M.countOf(ctx.text, /^M106 P0 S0$/gm);
+    return (on === 1 && off === 1) ? [true, 'one on and one off for a one-operation job']
+                                   : [false, `${on} on and ${off} off, expected one of each`]; } },
+
+{ id:'CG32b', desc:'... and Pin mode does it with M42 on the pin named, S255 and S0',
+  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('42'), jobSpindlePinFan:N(11) },
+  must:[[/^M42 P11 S255$/m,'on'],[/^M42 P11 S0$/m,'and off, on the pin the operator named']],
+  mustNot:[[/^(N\d+ )?M106\b/m,'no fan code in pin mode'],
+           [/^(N\d+ )?M[345]\b/m,'and no spindle code either']] },
+
+{ id:'CG32c', desc:'... and a fan-mode job posted for GRBL is refused, not handed an M106 GRBL cannot answer',
+  cnc:face, props:{ jobSpindleControl:S('106') },
+  refuse:[/is set to a fan \(M106\) output and this job is posted for GRBL/,'the mode, the code and the firmware are all named'] },
+
+{ id:'CG32d', desc:'... and pin mode with the Pin/Fan # left at 0 is refused on the spindle side too',
+  cnc:face, props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('42') },
+  refuse:[/is still 0, which names no output this post can believe you chose/,'the same guard, reached through group 1'] },
+
+// The other branch of CG32a's condition, and CG17's job is the one that reaches it: onSpindleSpeed()
+// four times inside one section. A switched output cannot answer a speed change, and the failure to
+// guard against would be four more M106 P0 S255 lines that change nothing -- or, worse, silence.
+{ id:'CG32e', desc:'... and a mid-operation speed change on a switched output is stated, not re-emitted',
+  cnc:'Milling/Drilling/break through.cnc', props:{ jobSelectedFirmware:S('Marlin'), jobSpindleControl:S('106') },
+  must:[[/RPM requested and NOT commanded -- this output is on\/off only/,'the file says the change cannot be served']],
+  custom:ctx => {
+    const on = M.countOf(ctx.text, /^M106 P0 S255$/gm), off = M.countOf(ctx.text, /^M106 P0 S0$/gm);
+    const stated = M.countOf(ctx.text, /RPM requested and NOT commanded/gm);
+    // The count of statements is not asserted against what the kernel asked for -- a section start
+    // reaches the same function -- but ONE on and ONE off is: the output is switched at the ends of
+    // the job and nowhere in between, whatever the toolpath asks for in the middle.
+    return (on === 1 && off === 1 && stated > 0)
+      ? [true, `${on} on, ${off} off, ${stated} speed changes stated and none emitted`]
+      : [false, `on=${on} off=${off} stated=${stated}`]; } },
 
 { id:'CG33', desc:'Pause, then Home: the stop comes BEFORE the homing cycle, not after it',
   cnc:face, props:{ machineHomedAxes:S('XYZ'), machineHomeAtStart:S('Pause & Home'), probeOnStart:S('Skip') },

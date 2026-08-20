@@ -17,9 +17,8 @@ the file that computes it is named instead.
 Step 7 is done: the four user documents describe the post as it now is, and `guide-pro.md` states
 plainly what is not verified. **What is open stands in `findings.md` §2**, which owns that count.
 
-**Issue 16 is in flight, on branch `Issue16`** — the two Marlin output modes the tracker asked for,
-laser first and the spindle after it. `findings.md` `GH-16a` and `GH-16b` own the work; `GH-16c` is what
-it turned up and left.
+**Issue 16 is answered on branch `Issue16`**, both halves — `findings.md` `GH-16a` and `GH-16b`. **It is
+not merged and not pushed**, and `GH-16c` is what it turned up and left, in §2 and scheduled by nothing.
 
 **No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §2, and `PV-14`
 is the row.
