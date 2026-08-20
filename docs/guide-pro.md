@@ -503,6 +503,15 @@ is written. **A refusal from `onOpen()` writes no file at all;** the one excepti
   any position without *Machine Travel Z*, or X/Y without X/Y homed.
 - **`At End Park At` = `Machine X0 Y0`** without X/Y declared, or (off Marlin) without homing on.
 - **An include file named but not present** in the NC output folder.
+- **A fan (`M106`) or pin (`M42`) output selected for the spindle or the laser on a GRBL job.**
+  GRBL has neither command and answers it with `error:20`, stopping with the tool in the cut. The
+  coolant channels are the exception and warn instead — the `Mrln:`/`Grbl:` label on a coolant value
+  says which firmware the post shipped it for, not that no other firmware takes it.
+- **A pin (`M42`) output whose `Pin/Fan #` is still 0**, in any of the three groups that offer one.
+  Pin 0 names no output anyone wired deliberately, and Marlin protects it on most boards.
+- **A coolant channel switched on with one output form and off with the other** — `M106` on with
+  `M42` off. The two share the channel's `Pin/Fan #`, so a mismatched *pin* is unrepresentable, but a
+  mismatched *form* would leave the output it opened on for the rest of the job.
 - **Multi-axis toolpaths**, **cutter compensation in the control**, and **CAM probing operations**.
 - **A Setup whose Z is not the machine Z**, with the tilt named. *(This one fires after output has
   begun, so it leaves a truncated file — discard it.)*
@@ -570,7 +579,7 @@ contain. That reaches something no code review can: whether the post runs at all
   is an operator's Setup, and a file posted from Fusion is still owed.
 - **Some paths no job file on disk can reach at all**, stated as bounds rather than tested: a rapid
   that moves in X/Y and Z at once, a tool numbered 0, a dwell, and the vaporize laser power.
-- **Every property runs at its default on every run, but 18 are never *varied*** — all of them
+- **Every property runs at its default on every run, but 12 are never *varied*** — all of them
   coolant, laser or include-file settings. Their alternative values have not been posted.
 
 **And a green run is not a verified post.** Every finding this machinery has returned came from
@@ -582,6 +591,6 @@ questions were asked.
 
 ## Where next
 
-- **[Property reference](property-reference.md)** — every one of the 62 settings.
+- **[Property reference](property-reference.md)** — every one of the 65 settings.
 - **[Hobbyist guide](guide-hobbyist.md)** — the one-part job, and the two-file tool change.
 - **[README](../README.md)**

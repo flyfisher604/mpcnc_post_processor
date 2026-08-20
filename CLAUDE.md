@@ -1,7 +1,7 @@
 # MPCNC post processor — working rules
 
 A Fusion 360 post for GRBL / Marlin / RepRap hobby CNC. The deliverable is
-`MPCNC_v4.0_Beta3.cps`; everything else in the repo supports it.
+`MPCNC_v4.1_Beta3.cps`; everything else in the repo supports it.
 
 ## Read `docs/plan.md` first
 

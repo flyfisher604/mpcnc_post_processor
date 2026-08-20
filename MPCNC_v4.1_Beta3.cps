@@ -1,14 +1,14 @@
 /*
 **
-Version 4.0 (Beta 3)
+Version 4.1 (Beta 3)
 
 MPCNC posts processor for milling and laser/plasma cutting.
 
-Changed Aug 18, 2026
+Changed Aug 20, 2026
 **
 */
 
-description = "v4.0 (Beta 3) MPCNC Milling/Laser for Marlin, Grbl, RepRap";
+description = "v4.1 (Beta 3) MPCNC Milling/Laser for Marlin, Grbl, RepRap";
 vendor = "flyfisher604";
 vendorUrl = "https://github.com/flyfisher604/mpcnc_post_processor";
 longDescription = "MPCNC F360 Post processor. Supports scaling of speeds to accomidate slow Z axis. Warning: BETA review all GCode.";
@@ -2479,7 +2479,7 @@ function onClose() {
   if (getProperty(properties.includeStopFile) == "") {
     onCommand(COMMAND_COOLANT_OFF);
 
-    // Before the return traverse: under Manual Spindle On/Off this is an M0 prompt, not an M5, so
+    // Before the return traverse: in the prompt mode this is an M0, not an M5, so
     // emitted after the move it crossed the part at travel speed with the router still turning.
     onCommand(COMMAND_STOP_SPINDLE);
 
@@ -4446,7 +4446,7 @@ var spindleEnabled = false;
 var lastPromptedSpeed = "";
 var lastPromptedClockwise = true;
 
-// Start the spindle, or -- under "Manual Spindle On/Off" -- ask the operator to, and only when the
+// Start the spindle, or -- in the prompt mode -- ask the operator to, and only when the
 // speed or direction has changed since the last time they were asked.
 function spindleOn(_spindleSpeed, _clockwise) {
   var mode = getProperty(properties.jobSpindleControl);

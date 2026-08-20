@@ -1,7 +1,7 @@
 # Beta 3 forum announcement
 
 The V1 Engineering forum post announcing v4.0 Beta 3, kept as posted. **Point-in-time, not
-maintained** — `release-notes-v4.0-beta3.md` is the document that stays current.
+maintained** — `release-notes-v4.0-beta3.md`, at the `v4.0_Beta3` tag, is what it announced.
 
 ---
 

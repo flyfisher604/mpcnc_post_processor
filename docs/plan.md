@@ -11,14 +11,14 @@ the file that computes it is named instead.
 
 ## Checkpoint
 
-**The tree is Beta 3.** The deliverable is `MPCNC_v4.0_Beta3.cps`, and what the beta contains is
-`release-notes-v4.0-beta3.md`. **Next: Step 8 — cut the release.**
+**The tree is v4.1 Beta 3.** The deliverable is `MPCNC_v4.1_Beta3.cps`, and what the release
+contains is `release-notes-v4.1-beta3.md`. **Next: Step 8 — cut the release.**
 
 Step 7 is done: the four user documents describe the post as it now is, and `guide-pro.md` states
 plainly what is not verified. **What is open stands in `findings.md` §2**, which owns that count.
 
-**Issue 16 is answered on branch `Issue16`** — `findings.md` `GH-16a` to `GH-16d`, the last two being
-what reading group 9 beside it turned up. **It is not merged and not pushed.**
+**Issue 16 is answered and merged** — `findings.md` `GH-16a` to `GH-16d`. The version bump and
+the documents that followed it are on branch `v4.1beta3`.
 
 **No live risk stands.** `HR-6 (B)` was the last and it is answered — `findings.md` §2, and `PV-14`
 is the row.
@@ -38,16 +38,14 @@ version — never from a sender console, a dry run or a non-GRBL controller.
 
 | | Item | Blocked on |
 |---|---|---|
-| **8** | Cut the Beta 3 release | the author — `findings.md` §7's first item needs Fusion |
+| **8** | Cut the v4.1 Beta 3 release | the author — `findings.md` §7's first item needs Fusion |
 
 **`validateJob()` and the property block were never restructured** — Step 6 measured both and left
 them. Neither is short; whether either is too long is a judgement no measurement settles, and it is
 the author's to make against the file as it now reads.
 
-## Step 8 — Cut the Beta 3 release
+## Step 8 — Cut the v4.1 Beta 3 release
 
-- **`README.md` still calls Beta 2 current** and names the Beta 2 file in its install steps. A
-  guide is the author's to change, and this one now contradicts the tree.
 - **The tag**, once §7 is answered or accepted as outstanding at the beta.
 - **§7's first item** — a file posted from Fusion, which most of *Invalidated by landed fixes* in
   `findings.md` §5 also waits on.

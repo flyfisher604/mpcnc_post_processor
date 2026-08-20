@@ -58,7 +58,7 @@ $ext = Get-ChildItem "$env:USERPROFILE\.vscode\extensions" -Directory -Filter 'a
 if (-not $ext) { throw "The Autodesk HSM Post Processor extension is not installed, so there are no .cnc files to run." }
 $cncRoot = Join-Path $ext.FullName 'res\CNC files'
 
-if (-not $Post)   { $Post   = Join-Path (Split-Path -Parent $here) 'MPCNC_v4.0_Beta3.cps' }
+if (-not $Post)   { $Post   = Join-Path (Split-Path -Parent $here) 'MPCNC_v4.1_Beta3.cps' }
 if (-not $OutDir) { $OutDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Fusion 360\NC Programs\post-utility' }
 
 $cncPath = if (Test-Path $Cnc) { (Resolve-Path $Cnc).Path } else { Join-Path $cncRoot $Cnc }

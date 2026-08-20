@@ -29,7 +29,7 @@ vendor = "MPCNC post tooling";
 extension = "trace";
 setCodePage("ascii");
 
-// ---- copied from MPCNC_v4.0_Beta3.cps, and the whole instrument rests on it -----------------
+// ---- copied from MPCNC_v4.1_Beta3.cps, and the whole instrument rests on it -----------------
 capabilities = CAPABILITY_MILLING | CAPABILITY_JET;
 tolerance = spatial(0.002, MM);
 
