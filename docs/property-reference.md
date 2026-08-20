@@ -1,7 +1,7 @@
 Property reference — every setting in the dialog
 ====
 
-All **62 properties**, in **10 groups**, in the order the Fusion dialog shows them. **This is the
+All **65 properties**, in **10 groups**, in the order the Fusion dialog shows them. **This is the
 only copy** — the [hobbyist guide](guide-hobbyist.md) and the [pro guide](guide-pro.md) link here
 rather than repeat it, so there is one place for a default to be right or wrong.
 
@@ -34,7 +34,8 @@ the file's output units.
 | Title | What it does | Default |
 |---|---|---|
 | CNC Firmware | Which g-code dialect to write: `Marlin`, `Grbl` or `RepRap`. FluidNC is `Grbl`. Many other settings change meaning with this, so set it first. | **Grbl** |
-| Manual Spindle On/Off | On: the post **prompts** you to start, change and stop the router by hand and emits no `M3`/`M5`. Off: it **commands** the spindle. On Marlin those codes are a build option — a stock build has neither `SPINDLE_FEATURE` nor `LASER_FEATURE`, answers `M3` with an unknown-command warning, and runs the whole job with the spindle never started. | **true** |
+| Spindle Control | Who switches the router on, and with what. `Prompt the operator (M0)`: no spindle code at all, the post stops and asks. `Spindle - M3 S{RPM}/M5`: commanded, with `S` carrying the RPM — on Marlin those codes are a build option, a stock build having neither `SPINDLE_FEATURE` nor `LASER_FEATURE` and answering `M3` with an unknown-command warning. `Fan - M106 P{n}` and `Pin - M42 P{pin}`: a relay on a fan header or a spare pin, **on or off only** — no speed, no direction, and the RPM goes to a comment. Neither is GRBL's, and a GRBL job with either selected is refused. | **Prompt the operator (M0)** |
+| Spindle: Pin/Fan # | The output number the `Fan` and `Pin` modes use. Four different things depending on mode and firmware: a Marlin fan index, an RRF fan number (`M950 F<n>`), a Marlin board pin, or an RRF GpOut port (`M950 P<n>`). **The numbering is your board's and the post cannot check it** — `M42` also needs `DIRECT_PIN_CONTROL`, which stock Marlin ships off, and is refused on any protected pin. | **0** |
 | Comment Level | How much commentary the file carries: `Off`, `Important`, `Info`, `Debug`. `Info` is what puts the property dump in the file. **On GRBL, leave this at `Info` or above** — see the note below. | **Info** |
 | Use Arcs | Emit `G2`/`G3` for circular moves instead of many short lines. | **true** |
 | Enable Line #s | Put a sequence number on every line. | **false** |
@@ -159,8 +160,8 @@ cutting modes collapse to three power levels below; a mode the post does not rec
 | Laser: On - Vaporize | Power percentage in vaporize mode. | **100** |
 | Laser: On - Through | Power percentage in through mode. | **80** |
 | Laser: On - Etch | Power percentage in etch mode. | **40** |
-| Laser: Marlin/Reprap Mode | `Fan` (`M106`/`M107`), `Spindle` (`M3`/`M5`) or `Pin` (`M42`). | **Fan — M106 S{PWM}/M107** |
-| Laser: Marlin M42 Pin | The pin number, read only in `Pin` mode. | **4** |
+| Laser: Marlin/Reprap Mode | `Fan` (`M106 P{n} S{PWM}` / `S0`), `Spindle` (`M3`/`M5`) or `Pin` (`M42 P{pin}`). **No mode emits `M107`** — RepRapFirmware applies that to the current tool's mapped fans rather than to `P`, so the off code is `M106` with `S0`. | **Fan — M106 P{n} S{PWM}/S0** |
+| Laser: Pin/Fan # | The output number the `Fan` and `Pin` modes use, read by both the on and the off code. The same four readings, and the same two `M42` conditions, as *Spindle: Pin/Fan #* above. | **0** |
 | Laser: GRBL Mode | `M4` dynamic power, which scales with speed so corners are not over-burned, or `M3` static. | **M4 dynamic** |
 | Laser: Coolant | Force a coolant for laser operations — an air assist, usually. | **Off** |
 
@@ -191,10 +192,12 @@ block of g-code. Left empty, nothing is emitted for that code and the post warns
 |---|---|---|
 | Channel A Mode | Which Fusion coolant mode switches channel A on. Both channels `Off` means the group does nothing. | **Off** |
 | Channel B Mode | The same for channel B — a second, independent output. | **Off** |
-| Turn Channel A On | The g-code that switches channel A on. | **Grbl: M8 (flood)** |
-| Turn Channel A Off | The g-code that switches channel A off. **On GRBL, `M9` is the only off code and it stops every coolant output at once.** | **Grbl: M9 (off)** |
-| Turn Channel B On | The g-code that switches channel B on. | **Grbl: M7 (mist)** |
-| Turn Channel B Off | The g-code that switches channel B off. | **Grbl: M9 (off)** |
+| Turn Channel A On | The code that switches channel A on: `Mrln: M106 P{n} S255`, `Mrln: M42 P{pin} S255`, `Grbl: M7`/`M8`, or `Use custom` and a file. The two Marlin forms take their output number from *Channel A Pin/Fan #*. | **Grbl: M8 (flood)** |
+| Turn Channel A Off | The code that switches channel A off — the same form as the on code, or the job is refused, since a channel opened with one command and closed with another is never closed. **On GRBL, `M9` is the only off code and it stops every coolant output at once**, which is harmless here because the post takes both channels off before it switches either on. | **Grbl: M9 (off)** |
+| Turn Channel B On | The same for channel B. | **Grbl: M7 (mist)** |
+| Turn Channel B Off | The same for channel B. | **Grbl: M9 (off)** |
+| Channel A Pin/Fan # | The output number channel A's two Marlin forms use, read by both of them. Same four readings and same `M42` conditions as the group 1 field. **The two channels may share one number** — the offs come first, so a shared output is switched off and back on rather than left as the last channel wrote it. | **0** |
+| Channel B Pin/Fan # | The same for channel B. | **0** |
 | Channel A On Custom | Filename read when *Turn Channel A On* is `Use custom`. | **empty** |
 | Channel A Off Custom | Filename read when *Turn Channel A Off* is `Use custom`. | **empty** |
 | Channel B On Custom | Filename read when *Turn Channel B On* is `Use custom`. | **empty** |

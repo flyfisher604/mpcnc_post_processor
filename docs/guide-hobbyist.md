@@ -24,12 +24,12 @@ multi-tool job does not post at all.
 
 ## The short version
 
-Out of 62 settings, **eight** decide whether your first job comes out right:
+Out of 65 settings, **eight** decide whether your first job comes out right:
 
 | Setting | Group | Why it matters |
 |---|---|---|
 | **CNC Firmware** | 1 | Everything else is written in this dialect. Set it first. |
-| **Manual Spindle On/Off** | 1 | Whether the post asks you to switch the router on, or tries to do it itself. |
+| **Spindle Control** | 1 | Whether the post asks you to switch the router on, or commands it itself. |
 | **Max XY / Max Z Cut Speed** | 2 | Your machine's real cutting limits. Cut feeds are scaled to stay inside them. |
 | **Travel Speed X/Y**, **Travel Speed Z** | 2 | How fast the machine moves when it is not cutting — **on Marlin and RepRap only.** GRBL and FluidNC ignore both. |
 | **Map G1s -> G0 Rapids** | 3 | Only on a Fusion **Personal** licence, which posts every rapid as a slow cutting move — one of which drags the bit across your work. Ships **off**; whether to turn it on is [your call](#if-you-are-on-a-personal-licence). On a full licence, leave it off. |
@@ -48,8 +48,8 @@ Then: **jog the tool to your part's corner, and post.**
 
 The groups are numbered in the order it makes sense to read them.
 
-**1 - Job.** Set **CNC Firmware** to your controller — FluidNC is `Grbl`. Leave **Manual Spindle
-On/Off** on if you switch your router on by hand; most people do. **Leave Comment Level at
+**1 - Job.** Set **CNC Firmware** to your controller — FluidNC is `Grbl`. Leave **Spindle Control** at
+*Prompt the operator* if you switch your router on by hand; most people do. **Leave Comment Level at
 `Info`.** On GRBL that is not cosmetic: gSender deletes an `M0` prompt that falls inside the first
 ten lines it sends, and at `Info` the property dump puts about seventy lines ahead of every prompt
 in the preamble. The post warns you if a lower level puts a real prompt at risk.
@@ -157,8 +157,8 @@ If none of that fits your setup, position the tool before starting the file and 
 
 ## Turning the router on and off
 
-Most MPCNC builds use a trim router with a physical switch, so **Manual Spindle On/Off** is on by
-default and the post never sends `M3` or `M5`. Instead it stops the machine and asks:
+Most MPCNC builds use a trim router with a physical switch, so **Spindle Control** ships at *Prompt
+the operator (M0)* and the post sends no spindle code at all. Instead it stops the machine and asks:
 
 - at the start — *"Turn ON 12000 RPM"*;
 - whenever the job wants a different speed or direction — *"Set spindle to 10000 RPM
@@ -166,12 +166,25 @@ default and the post never sends `M3` or `M5`. Instead it stops the machine and 
 - at the end, and at any tool change — a prompt to switch **off**. At the end this comes *before*
   the tool travels back to X0 Y0, so you switch off, resume, and it parks.
 
-If your spindle is switched by the controller, turn the property off and you get real `M3 S…` and
-`M5` with no prompts. **On Marlin, check your build first:** `M3`/`M5` are behind build options
-there, and a stock Marlin has neither `SPINDLE_FEATURE` nor `LASER_FEATURE` — it answers `M3` with
-an unknown-command warning and runs the whole job with the spindle never started. V1 Engineering's
-own V1CNC builds enable `LASER_FEATURE`, where `M3` does switch the pin, but `S` is read as cutter
-power rather than RPM.
+If your spindle is switched by the controller, one of the other three modes commands it and the
+prompts go away:
+
+- **`Spindle - M3 S{RPM}/M5`** — a real spindle, with speed and direction under the controller's
+  control. **On Marlin, check your build first:** `M3`/`M5` are behind build options there, and a
+  stock Marlin has neither `SPINDLE_FEATURE` nor `LASER_FEATURE` — it answers `M3` with an
+  unknown-command warning and runs the whole job with the spindle never started. V1 Engineering's own
+  V1CNC builds enable `LASER_FEATURE`, where `M3` does switch the pin, but `S` is read as cutter
+  power rather than RPM.
+- **`Fan - M106 P{n} S255/S0`** — a relay wired to a fan header.
+- **`Pin - M42 P{pin} S255/S0`** — a relay on a spare output pin. `M42` is compiled only where
+  `DIRECT_PIN_CONTROL` is enabled, which stock Marlin ships commented out, and Marlin refuses it on a
+  protected pin — which every fan pin is, so a fan header needs the mode above, not this one.
+
+The two switched-output modes are **on or off only**: they carry no speed and no direction, and the
+RPM goes to a comment. Both take their output number from **Spindle: Pin/Fan #**, which means
+different things on different firmware — a fan index or a board pin on Marlin, a fan or GpOut port
+created by `M950` on RepRap. Neither `M106` nor `M42` is a GRBL code, so a GRBL job with either
+selected is refused rather than posted.
 
 ---
 
@@ -265,6 +278,11 @@ knows is wrong. The message says what to change. The ones a one-part job can hit
 - **A probing operation in the CAM.** Fusion's WCS probing asks the controller to measure and store
   an offset, which none of these controllers can do. The post's own Z touch-off is unaffected.
 - **A named include file that does not exist** in the NC output folder.
+- **Spindle Control set to a fan or pin output on a GRBL job.** `M106` and `M42` are Marlin and
+  RepRap commands; GRBL answers either with `error:20` and stops with the tool in the cut. Pick a
+  mode your controller has, or set **CNC Firmware** to what the machine really runs.
+- **Spindle Control set to the pin output with Spindle: Pin/Fan # still 0.** Pin 0 names no output
+  anyone wired on purpose, so the post treats it as unset rather than emitting it.
 - **A Setup built on a tilted face of the model.** The tool only moves straight down, so a Setup
   whose Z is not the machine's Z would cut in the wrong plane. Re-orient the Setup so its Z points
   up. *(This one is caught after the file has started being written, so discard the partial file
@@ -279,6 +297,6 @@ in both. Read the dialog — a job that posts is not necessarily a job that is r
 
 ## Where next
 
-- **[Property reference](property-reference.md)** — every one of the 62 settings.
+- **[Property reference](property-reference.md)** — every one of the 65 settings.
 - **[Pro guide](guide-pro.md)** — several parts, tool changes inside one file, the machine frame.
 - **[README](../README.md)**

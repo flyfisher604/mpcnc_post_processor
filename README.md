@@ -8,8 +8,8 @@ machines. This is a modified fork of
 originally forked from
 [martindb/mpcnc_posts_processor](https://github.com/martindb/mpcnc_posts_processor).
 
-This is the **v4.0 (Beta 3)** post processor, distributed as the single file
-`MPCNC_v4.0_Beta3.cps`.
+This is the **v4.1 (Beta 3)** post processor, distributed as the single file
+`MPCNC_v4.1_Beta3.cps`.
 
 Supported firmware (set by the **Job → CNC Firmware** property):
 
@@ -76,15 +76,15 @@ multi-axis operations are rejected with a clear error.
 
 # Installation
 
-The post is a single file, `MPCNC_v4.0_Beta3.cps`.
+The post is a single file, `MPCNC_v4.1_Beta3.cps`.
 
 1. In Fusion, choose **Manage → Post Library**.
 2. Select My posts/Local in the sidebar.
 3. If an older copy is installed, select it and use the trash-can icon to remove it
-   first. **Beta 3 has a different filename from Beta 2**, so an old copy will sit
-   alongside it rather than being replaced, and the two are hard to tell apart in the
-   picker.
-4. Use the Import icon to import `MPCNC_v4.0_Beta3.cps` (or the latest version available).
+   first. **Every release so far has had a different filename**, so an old copy will sit
+   alongside the new one rather than being replaced, and the two are hard to tell apart
+   in the picker.
+4. Use the Import icon to import `MPCNC_v4.1_Beta3.cps` (or the latest version available).
 5. Close the dialog.
 6. When posting, select **Choose from library...** and select this post.
 7. Review and set the properties as needed — start with the guide for your kind of job, above.
@@ -95,7 +95,27 @@ The post is a single file, `MPCNC_v4.0_Beta3.cps`.
 
 # Release history
 
-## v4.0 Beta 3 — current
+## v4.1 Beta 3 — current
+
+v4.0 Beta 3 could ask you to switch the router on by hand, or command it with `M3`. On a stock
+Marlin build neither is much use — `M3` is behind a build option that is off — while the fan and
+pin outputs that build *can* switch were reachable only for a laser, and then only on fan 0.
+v4.1 Beta 3 lets the router, the laser and both coolant channels each name the output they switch.
+
+Two things to know before your first v4.1 job:
+
+1. **Three settings changed name or shape**, so those three fall back to their defaults: the old
+   *Manual Spindle On/Off* checkbox is now a four-way **Spindle Control**, and the laser and
+   coolant pin fields were replaced by ones you can set per output. The default is the same
+   behaviour the checkbox shipped — the post asks you to switch the router by hand — so a job
+   posts the same way it did unless you choose otherwise.
+2. **The post has a new filename again.** Remove `MPCNC_v4.0_Beta3.cps` from the Post Library
+   rather than leaving it beside this one.
+
+**[→ Full release notes for v4.1 Beta 3](docs/release-notes-v4.1-beta3.md)** — what changed, what
+it means per firmware, and what is *not* verified.
+
+## v4.0 Beta 3
 
 Beta 2 gave each part its own zero. Beta 3 corrected **where those zeros come from**, rebuilt tool
 changes around what the post can actually do, and — for the first time — *ran* the post against
@@ -109,8 +129,8 @@ Two things to do before your first Beta 3 job, neither of them optional:
 2. **The post has a new filename**, and Fusion identifies a post by filename. Remove
    `MPCNC_v4.0_Beta2.cps` from the Post Library rather than leaving it beside Beta 3.
 
-**[→ Full release notes for Beta 3](docs/release-notes-v4.0-beta3.md)** — what changed, per firmware,
-and what is *not* verified.
+**[→ Full release notes for v4.0 Beta 3](https://github.com/flyfisher604/mpcnc_post_processor/blob/v4.0_Beta3/docs/release-notes-v4.0-beta3.md)**
+— kept at the tag it describes, not in the working tree.
 
 ## v4.0 Beta 2
 

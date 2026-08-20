@@ -1,7 +1,7 @@
 # MPCNC post processor — working rules
 
 A Fusion 360 post for GRBL / Marlin / RepRap hobby CNC. The deliverable is
-`MPCNC_v4.0_Beta3.cps`; everything else in the repo supports it.
+`MPCNC_v4.1_Beta3.cps`; everything else in the repo supports it.
 
 ## Read `docs/plan.md` first
 
@@ -53,5 +53,8 @@ side effect of another task. Repo docs are reviewed in a diff; memories go stale
 - **`Personal.cps`** — a git-excluded copy of the post, **superseded and dead**. The Personal-licence
   simulation is now a `visible: false` property inside the post itself; `design.md` says why, and
   `integration.md` §6.5 is the machinery. Do not revive the copy.
-- **`Assessment/`** — the analysis this plan came from, dated 2026-08-13. Read it for evidence, never for
-  where things live: its file pointers predate the document consolidation.
+- **`Assessment/`** — the analysis this plan came from, dated 2026-08-13. **Four pages, and
+  `Assessment/README.md` is the index**: read them for evidence and for what the post is *for*, never
+  for where things live — their file pointers predate two consolidations and a version. Six pages were
+  retired 2026-08-20; a reference to one of them is a dead pointer, and the index says where each
+  one's conclusions went.

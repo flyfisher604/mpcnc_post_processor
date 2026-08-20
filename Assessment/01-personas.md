@@ -165,3 +165,32 @@ not make it verified. Those are separate, and the second is now the priority.
 - Machine brand is not an axis. Nothing so far suggests a Shapeoko owner needs
   different output from a LowRider owner on the same firmware — which argues
   against any brand-shaped configurability, if any exists.
+
+---
+
+## Operator practice — four questions no source can settle
+
+**Moved here 2026-08-20 from `00-facts-needed.md`, which is retired.** Everything else on
+that page has since been answered — by the integration suite, which drives `post.exe` over
+Autodesk's own `.cnc` files and records every callback the kernel raises (`tools/trace.cps`),
+and by re-reading firmware source. These four cannot be: they are what an experienced
+multi-setup operator *does*, and no post, no source and no job file contains it. They are
+kept with the personas because each one decides what P7 actually is.
+
+| # | Question | State |
+|---|---|---|
+| D1 | When you run a job with two setups on a hobby machine, do you actually use two different work offsets, or do you re-zero to the same `G54` between setups? | OPEN |
+| D2 | If you probe a part's corner, where does the number end up — do you write it into `G54` with `G10`, or jog-and-zero by hand in the sender? | OPEN |
+| D3 | For a manual tool change mid-job, what do you physically do, and what do you need the g-code to have done before it pauses? | OPEN |
+| D4 | Do you trust your machine's Z position after a manual tool change? What do you re-establish, and how? | OPEN |
+
+**D1 is the load-bearing one.** `[AUTHOR]` has already ruled that the multi-part
+*orchestration* is the user's problem, which makes P7 someone who sets their own offsets —
+but if hobby operators in fact re-zero into one register between setups, then P7's real
+workflow is a sequence of single-offset jobs and the multi-WCS machinery serves a persona
+that does not post that way. **A paragraph each is enough**, and none of them needs a
+machine.
+
+*The one ruling of this kind that is scheduled rather than open is the coolant persona —
+`plan.md` parks group 9 on it, and the same shape of answer would settle it: not an
+artifact, a statement of what a hobby machine should serve.*

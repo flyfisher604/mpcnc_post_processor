@@ -362,7 +362,7 @@ const cases = [
 
 { id:'CG15', desc:'a tap reverses the spindle, and a manual spindle is ASKED to reverse',
   cnc:'Milling/Drilling/left tapping.cnc', props:{},
-  // Left tapping runs the spindle counterclockwise, which under Manual Spindle On/Off is the one
+  // Left tapping runs the spindle counterclockwise, which in the prompt mode is the one
   // path that names a direction in a prompt at all.
   must:[[/M0 \(MSG,[^)]*counterclockwise[^)]*\)/,'the operator is told which way to run it']],
   mustNot:[[/^(N\d+ )?M4\b/m,'nothing commands a spindle the operator owns']] },
