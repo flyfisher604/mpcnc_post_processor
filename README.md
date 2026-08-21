@@ -1,9 +1,9 @@
-Fusion 360 CAM Post Processor for MPCNC / LowRider
+Fusion 360 CAM Post Processor for GRBL, Marlin, RepRap & FluidNC
 ====
 
-CAM post processor for [Fusion 360](https://www.autodesk.com/products/fusion-360)
-and the [V1 Engineering](https://www.v1engineering.com) MPCNC / LowRider family of
-machines. This is a modified fork of
+A Fusion 360 CAM post processor for hobby-class CNC machines running GRBL, Marlin, RepRap (Duet3D), or FluidNC firmware — including the V1 Engineering MPCNC and LowRider, and similar 3-axis builds.
+
+This is a modified fork of
 [guffy1234/mpcnc_posts_processor](https://github.com/guffy1234/mpcnc_posts_processor),
 originally forked from
 [martindb/mpcnc_posts_processor](https://github.com/martindb/mpcnc_posts_processor).
