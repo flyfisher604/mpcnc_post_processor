@@ -526,8 +526,8 @@ const cases = [
 { id:'CG24a', desc:'coolant on a fan: the channel switches the fan the operator named, and closes it',
   cnc:'Milling/Coolant Codes/flood.cnc',
   props:{ jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'),
-          coolantChannelAOn:S('M106'), coolantChannelAOff:S('M106'), coolantChannelAPinFan:N(2) },
-  must:[[/^M106 P2 S255$/m,'on'],[/^M106 P2 S0$/m,'and off, on the same fan']],
+          coolantChannelAOn:S('M106'), coolantChannelAPinFan:N(2) },
+  must:[[/^M106 P2 S255$/m,'on'],[/^M106 P2 S0$/m,'and off, on the same fan - one field chose both']],
   mustNot:[[/^(N\d+ )?M[789]\b/m,'no GRBL coolant code on a Marlin job']],
   custom:ctx => {
     const on = M.countOf(ctx.text, /^M106 P2 S255$/gm), off = M.countOf(ctx.text, /^M106 P2 S0$/gm);
@@ -536,21 +536,30 @@ const cases = [
 { id:'CG24b', desc:'... and on a pin, from the same field',
   cnc:'Milling/Coolant Codes/flood.cnc',
   props:{ jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'),
-          coolantChannelAOn:S('M42'), coolantChannelAOff:S('M42'), coolantChannelAPinFan:N(6) },
+          coolantChannelAOn:S('M42'), coolantChannelAPinFan:N(6) },
   must:[[/^M42 P6 S255$/m,'on'],[/^M42 P6 S0$/m,'and off, on the pin named']],
   mustNot:[[/^(N\d+ )?M106\b/m,'no fan code when the pin form is chosen']] },
 
 { id:'CG24c', desc:'... and the pin form with the number left at 0 is refused',
   cnc:'Milling/Coolant Codes/flood.cnc',
   props:{ jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'),
-          coolantChannelAOn:S('M42'), coolantChannelAOff:S('M42') },
+          coolantChannelAOn:S('M42') },
   refuse:[/is still 0, which names no output this post can believe you chose/,'the guard reaches group 9 too'] },
 
-{ id:'CG24d', desc:'... and a channel opened with one form and closed with another is refused',
+// PC-3. The refusal that stood here - a channel opened with one form and closed with another - has no
+// state left to fire on: one field per channel, and coolantOffCode() derives the off code from it. What
+// replaces it is the derivation itself on the one on-value nothing else in the suite posts. M7 must
+// close with M9 and NOT with M7: GRBL's mist code is not its own off code, and it is the arm of
+// coolantOffCode() that returns something other than what it was handed.
+{ id:'CG24d', desc:'... and the off code is derived: M7 closes with M9, which is not the code it opened with',
   cnc:'Milling/Coolant Codes/flood.cnc',
-  props:{ jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'),
-          coolantChannelAOn:S('M106'), coolantChannelAOff:S('M42'), coolantChannelAPinFan:N(2) },
-  refuse:[/are set to different outputs/,'the pair is named, and so is the output left running'] },
+  props:{ coolantChannelAMode:S('Flood'), coolantChannelAOn:S('M7') },
+  must:[[/^M7$/m,'the channel opens on the mist code the operator chose']],
+  mustNot:[[/^(N\d+ )?M8$/m,'nothing emits the flood code - channel B is Off and A is on M7']],
+  custom:ctx => {
+    const on = M.countOf(ctx.text, /^M7$/gm), off = M.countOf(ctx.text, /^M9$/gm);
+    return on === off && on > 0 ? [true, `${on} M7 on, ${off} M9 off -- paired, from one field`]
+                                : [false, `${on} M7 against ${off} M9`]; } },
 
 // Both channels on ONE level, the only way a shipped job reaches the two-channel path. The claim is the
 // ORDER: setCoolant() takes both channels off before switching either on, which is what makes GRBL's
@@ -571,8 +580,8 @@ const cases = [
 { id:'CG24f', desc:'... and two channels may share one output, because the offs come first',
   cnc:'Milling/Coolant Codes/flood.cnc',
   props:{ jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'), coolantChannelBMode:S('Flood'),
-          coolantChannelAOn:S('M42'), coolantChannelAOff:S('M42'), coolantChannelAPinFan:N(6),
-          coolantChannelBOn:S('M42'), coolantChannelBOff:S('M42'), coolantChannelBPinFan:N(6) },
+          coolantChannelAOn:S('M42'), coolantChannelAPinFan:N(6),
+          coolantChannelBOn:S('M42'), coolantChannelBPinFan:N(6) },
   must:[[/^M42 P6 S255$/m,'the shared output is switched on']],
   custom:ctx => {
     const at = re => ctx.lines.filter(l => re.test(l.raw)).map(l => l.i);

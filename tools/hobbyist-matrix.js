@@ -248,8 +248,12 @@ const cases = [
   props:{laserCoolant:S('Mist'), coolantChannelAMode:S('Mist'), coolantChannelAOn:S('Use custom')},
   must:[[/coolant channel A is set to "Use custom" but no custom file is named -- nothing emitted/,
          'the emitter still says it, unchanged']],
-  mustLog:[[/"Turn Channel A On" is "Use custom".*"Channel A On Custom".*is\s+empty/s,
-            'the dialog names the channel AND the field to fill']],
+  // ONE answer reaches both files now, so both unnamed files are reported off the one selector. The
+  // second line is what a single "Use custom" could not say while the off code had a dropdown of its own.
+  mustLog:[[/"Channel A Output" is "Use custom".*"Channel A On Custom" is\s+empty/s,
+            'the dialog names the channel AND the on file to fill'],
+           [/"Channel A Output" is "Use custom".*"Channel A Off Custom" is\s+empty/s,
+            'and the off file, which the same one answer now reaches']],
   mustNotLog:[[/asks for "Mist" coolant/,'the level IS matched here - only the file behind it is missing']] },
 
 // --- PV-16, a coolant code posted into the wrong dialect -------------------------------
@@ -268,15 +272,19 @@ const cases = [
   must:[[/^M42 P6 S255$/m,'the wrong-dialect code really is emitted, into a Grbl file']],
   mustLog:[[/posted for Grbl, and a coolant code it will emit belongs to another firmware/,
             'singular - one field is wrong, and the job dialect is named'],
-           [/"Turn Channel A On" is "Mrln: M42 P\{pin\} S255", which this post lists as Marlin/,
+           [/"Channel A Output" is "Mrln: M42 P\{pin\} S255", which this post lists as Marlin/,
             'names the field, its value and the dialect the value was shipped for'],
            [/Choose the "Grbl:" values/,'and names the prefix to pick from instead']],
-  mustNotLog:[[/"Turn Channel A Off"/,'the off code is M9 and correct - a paired warning would name it too']] },
+  // The deleted field, asserted absent. Its off code was M9 and correct, so a paired warning naming it
+  // was always wrong; now there is no field to name, and this is the check that no vestige survives.
+  mustNotLog:[[/"Turn Channel A Off"/,'no vestige of the deleted off-code field']] },
 
-// THE REAL SHAPE OF THE MISTAKE: the firmware is changed and the coolant group is left alone. All four
-// shipped code defaults are GRBL's, so a Marlin job with both channels configured has four wrong fields
+// THE REAL SHAPE OF THE MISTAKE: the firmware is changed and the coolant group is left alone. Both
+// shipped code defaults are GRBL's, so a Marlin job with both channels configured has two wrong fields
 // and gets ONE warning naming each -- which is the count assertion, not the presence of the text.
-{ id:'H34', desc:'PV-16 - firmware switched to Marlin, coolant defaults left: four fields, one warning',
+// It was FOUR fields before the off codes were derived rather than asked for; the claim is unchanged
+// in kind, and halving it is what PC-3 did to the dialog.
+{ id:'H34', desc:'PV-16 - firmware switched to Marlin, coolant defaults left: two fields, one warning',
   cnc:'Milling/2D/face.cnc',
   props:{jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'), coolantChannelBMode:S('Mist')},
   mustLog:[[/posted for Marlin, and coolant codes it will emit belong to another firmware/,'plural'],
@@ -284,14 +292,14 @@ const cases = [
   // COUNTED PER LINE AND NOT PER LOG. The harness's logText is the log file plus stdout plus stderr and
   // post.exe echoes each warning to both, so a raw occurrence count reads one warning as two -- which
   // is how this check failed on its first run. The claim is about ONE warning carrying four fields, so
-  // it is asked of each warning line: four separate warnings would put one field on each.
+  // it is asked of each warning line: two separate warnings would put one field on each.
   custom:(t,ref,log)=>{
-    const fields = ['Turn Channel A On','Turn Channel A Off','Turn Channel B On','Turn Channel B Off'];
+    const fields = ['Channel A Output','Channel B Output'];
     const lines = log.split(/\r?\n/).filter(l => l.includes('belong to another firmware'));
     const whole = lines.filter(l => fields.every(f => l.includes(`"${f}" is "`)));
     return (lines.length > 0 && whole.length === lines.length)
-      ? [true,`all four fields in one warning, on each of ${lines.length} channel(s) that carried it`]
-      : [false,`${lines.length} warning line(s), ${whole.length} naming all four fields`]; } },
+      ? [true,`both fields in one warning, on each of ${lines.length} channel(s) that carried it`]
+      : [false,`${lines.length} warning line(s), ${whole.length} naming both fields`]; } },
 
 // THE NEGATIVE, AND IT CARRIES THE EXEMPTION WITH IT. Channel A is the shipped GRBL pair on a GRBL job
 // -- matching, so silent -- and channel B's on code is "Use custom", which has no dialect the post can

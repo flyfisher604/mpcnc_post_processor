@@ -759,9 +759,18 @@ properties = {
     value      : eCoolant.Off,
     scope      : "post"
   },
+  // ONE field per channel and not two. The off code was never a second decision: every value here
+  // determines it -- M106 and M42 close on the same command and the same number with S0, a custom on is
+  // closed by that channel's own off FILE, and on GRBL M9 is the only off code there is. The second
+  // dropdown existed only so validateJob() could refuse the pairs it made expressible. coolantOffCode()
+  // is the derivation, stated once.
+  //
+  // The key does NOT move, unlike PC-1's and PC-2's: every stored id is still a legal value of this
+  // field and still means the same output. What changed is that it now answers for both directions,
+  // which is a widening, not a reinterpretation -- so a saved configuration is carried over intact.
   coolantChannelAOn: {
-    title      : "Turn Channel A On",
-    description: "The g-code that switches channel A on. Match it to your CNC Firmware -- the post emits what you pick, so a Marlin code sent to GRBL is rejected mid-job. The two Marlin values take their output number from Channel A Pin/Fan # below; the GRBL codes are emitted verbatim; Use custom takes the whole thing from a file set further down this group. On GRBL neither code is guaranteed: stock Grbl 1.1 compiles M7 only when ENABLE_M7 is uncommented in grbl/config.h and answers error:20 without it, while FluidNC never errors and acts on M7 or M8 only where config.yaml declares a coolant mist_pin or flood_pin -- V1 Engineering's Jackpot 1 configs declare both pins, and its Jackpot 2 and Jackpot 3 configs ship NO_PIN for both.",
+    title      : "Channel A Output",
+    description: "The g-code that switches channel A on -- and, with it, the code that switches it off, which follows from this one and has no field of its own: M106 and M42 close with S0 on the same output, M7 and M8 close with M9, and Use custom closes from the channel's own Off Custom file. Match it to your CNC Firmware -- the post emits what you pick, so a Marlin code sent to GRBL is rejected mid-job. The two Marlin values take their output number from Channel A Pin/Fan # below; the GRBL codes are emitted verbatim; Use custom takes the whole thing from the two files set further down this group. On GRBL neither code is guaranteed: stock Grbl 1.1 compiles M7 only when ENABLE_M7 is uncommented in grbl/config.h and answers error:20 without it, while FluidNC never errors and acts on M7 or M8 only where config.yaml declares a coolant mist_pin or flood_pin -- V1 Engineering's Jackpot 1 configs declare both pins, and its Jackpot 2 and Jackpot 3 configs ship NO_PIN for both.",
     group      : "coolant",
     order      : 30,
     type       : "enum",
@@ -775,22 +784,7 @@ properties = {
     value      : "M8",
     scope      : "post"
   },
-  coolantChannelAOff: {
-    title      : "Turn Channel A Off",
-    description: "The g-code that switches channel A off. Same dialect and, on the two Marlin values, the same output as Turn Channel A On -- both read Channel A Pin/Fan # below, so a channel cannot be opened on one output and closed on another. On GRBL, M9 is the only off code and stops every coolant output at once; that is harmless here because this post takes BOTH channels off before it switches either on.",
-    group      : "coolant",
-    order      : 40,
-    type       : "enum",
-    values: [
-      { title: "Mrln: M106 P{n} S0", id: "M106" },
-      { title: "Mrln: M42 P{pin} S0", id: "M42" },
-      { title: "Grbl: M9 (off)", id: "M9" },
-      { title: "Use custom", id: "Use custom" }
-    ],
-    value      : "M9",
-    scope      : "post"
-  },
-  // 45 and 65: each channel's number sits under the pair that reads it. Same trade as jobSpindlePinFan.
+  // 45 and 65: each channel's number sits under the field that reads it. Same trade as jobSpindlePinFan.
   coolantChannelAPinFan: {
     title      : "Channel A Pin/Fan #",
     description: "The output number channel A's two Marlin values use, and read by both of them so the channel closes what it opened. Four different things depending on which value and which firmware -- re-check it whenever you change either. M106: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). M42: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored on the GRBL values and on Use custom. THE NUMBER IS BOARD-SPECIFIC AND THIS POST CANNOT CHECK IT: the 6 and 11 this field replaces were the RAMPS servo header, and on a Rambo the same two numbers are HEATER_2 and Y_MIN -- both of which Marlin refuses as protected pins, so the coolant would never switch and nothing in the file would say so. M42 carries two conditions besides: it is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses it on any protected pin -- every FANn_PIN, every heater and every endstop among them. Use the M106 value for a fan header and M42 for a spare output your board's pin map says is free.",
@@ -801,8 +795,8 @@ properties = {
     scope      : "post"
   },
   coolantChannelBOn: {
-    title      : "Turn Channel B On",
-    description: "The g-code that switches channel B on -- the second, independent output. Same dialect as your CNC Firmware. M7 and M8 carry the GRBL build and config conditions stated under Turn Channel A On.",
+    title      : "Channel B Output",
+    description: "The g-code that switches channel B on, and with it the code that switches it off -- the second, independent output. The off code follows from this field exactly as channel A's does. Same dialect as your CNC Firmware. M7 and M8 carry the GRBL build and config conditions stated under Channel A Output.",
     group      : "coolant",
     order      : 50,
     type       : "enum",
@@ -816,21 +810,6 @@ properties = {
     value      : "M7",
     scope      : "post"
   },
-  coolantChannelBOff: {
-    title      : "Turn Channel B Off",
-    description: "The g-code that switches channel B off. Same dialect and, on the two Marlin values, the same output as Turn Channel B On -- both read Channel B Pin/Fan # below.",
-    group      : "coolant",
-    order      : 60,
-    type       : "enum",
-    values: [
-      { title: "Mrln: M106 P{n} S0", id: "M106" },
-      { title: "Mrln: M42 P{pin} S0", id: "M42" },
-      { title: "Grbl: M9 (off)", id: "M9" },
-      { title: "Use custom", id: "Use custom" }
-    ],
-    value      : "M9",
-    scope      : "post"
-  },
   coolantChannelBPinFan: {
     title      : "Channel B Pin/Fan #",
     description: "The output number channel B's two Marlin values use, read by both of them. Every condition stated under Channel A Pin/Fan # applies here unchanged -- the four readings, the board-specific numbering, and M42's DIRECT_PIN_CONTROL and protected-pin conditions. The two channels MAY share one number: this post takes both channels off before it switches either on, so a shared output is switched off and back on rather than left in whichever state the last channel wrote.",
@@ -842,7 +821,7 @@ properties = {
   },
   coolantChannelAOnCustom: {
     title      : "Channel A On Custom",
-    description: "File with custom GCode to turn ON coolant channel A (in nc folder). Read only when Turn Channel A On is Use custom.",
+    description: "File with custom GCode to turn ON coolant channel A (in nc folder). Read only when Channel A Output is Use custom -- which is also what reaches the Off file below, one answer covering both directions.",
     group      : "coolant",
     order      : 70,
     type       : "string",
@@ -851,7 +830,7 @@ properties = {
   },
   coolantChannelAOffCustom: {
     title      : "Channel A Off Custom",
-    description: "File with custom GCode to turn OFF coolant channel A (in nc folder). Read only when Turn Channel A Off is Use custom.",
+    description: "File with custom GCode to turn OFF coolant channel A (in nc folder). Read only when Channel A Output is Use custom -- the same answer that reaches the On file above. Name both or neither: custom is custom at both ends, and a channel switched on from a file is never closed by a g-code the post chose for you.",
     group      : "coolant",
     order      : 80,
     type       : "string",
@@ -860,7 +839,7 @@ properties = {
   },
   coolantChannelBOnCustom: {
     title      : "Channel B On Custom",
-    description: "File with custom GCode to turn ON coolant channel B (in nc folder). Read only when Turn Channel B On is Use custom.",
+    description: "File with custom GCode to turn ON coolant channel B (in nc folder). Read only when Channel B Output is Use custom -- which is also what reaches the Off file below.",
     group      : "coolant",
     order      : 90,
     type       : "string",
@@ -869,7 +848,7 @@ properties = {
   },
   coolantChannelBOffCustom: {
     title      : "Channel B Off Custom",
-    description: "File with custom GCode to turn OFF coolant channel B (in nc folder). Read only when Turn Channel B Off is Use custom.",
+    description: "File with custom GCode to turn OFF coolant channel B (in nc folder). Read only when Channel B Output is Use custom -- the same answer that reaches the On file above. Name both or neither.",
     group      : "coolant",
     order      : 100,
     type       : "string",
@@ -1294,11 +1273,35 @@ function writeCustomCoolantFile(channel, on, file) {
   loadFile(file);
 }
 
-// One body for both channels: the third branch below would otherwise have been written twice.
-// Three kinds of value -- "Use custom" names a file, "M106"/"M42" name an output whose number is the
-// channel's own field, and any other id IS the g-code. The GRBL ids stay literal for that last reason.
-function writeCoolantChannel(channel, on, codeProp, fileProp, pinProp) {
-  var code = getProperty(codeProp);
+// The off code a channel's chosen output implies, and the ONE place that derivation is stated. There is
+// no second dropdown because there was never a second decision:
+//
+//   M106 / M42     the same command on the same output, closed with S0 -- writeFanOrPinOutput() builds
+//                  the S from `on`, so the value itself does not change direction
+//   M7 / M8        M9, which is the only off code GRBL has. It stops EVERY coolant output at once, and
+//                  that is harmless here because setCoolant() takes both channels off before it
+//                  switches either on
+//   Use custom     custom, closed from that channel's own Off Custom file -- one selector, two files
+//
+// Total over the field's values, so a value added to the dropdown tomorrow gets an off code here rather
+// than falling through to a literal that was never meant as one. Pure.
+function coolantOffCode(onCode) {
+  switch (onCode) {
+    case "M106":
+    case "M42":
+    case "Use custom":
+      return onCode;
+    default:
+      return "M9";
+  }
+}
+
+// One body for both channels and both directions: the third branch below would otherwise have been
+// written twice. Three kinds of value -- "Use custom" names a file, "M106"/"M42" name an output whose
+// number is the channel's own field, and any other id IS the g-code. The GRBL ids stay literal for that
+// last reason. The channel has ONE code property and the direction picks the code off it.
+function writeCoolantChannel(channel, on, onProp, fileProp, pinProp) {
+  var code = on ? getProperty(onProp) : coolantOffCode(getProperty(onProp));
 
   if (code == "Use custom") {
     writeCustomCoolantFile(channel, on, getProperty(fileProp));
@@ -1314,15 +1317,13 @@ function writeCoolantChannel(channel, on, codeProp, fileProp, pinProp) {
 }
 
 function CoolantA(on) {
-  writeCoolantChannel("A", on,
-    on ? properties.coolantChannelAOn : properties.coolantChannelAOff,
+  writeCoolantChannel("A", on, properties.coolantChannelAOn,
     on ? properties.coolantChannelAOnCustom : properties.coolantChannelAOffCustom,
     properties.coolantChannelAPinFan);
 }
 
 function CoolantB(on) {
-  writeCoolantChannel("B", on,
-    on ? properties.coolantChannelBOn : properties.coolantChannelBOff,
+  writeCoolantChannel("B", on, properties.coolantChannelBOn,
     on ? properties.coolantChannelBOnCustom : properties.coolantChannelBOffCustom,
     properties.coolantChannelBPinFan);
 }
@@ -2102,10 +2103,10 @@ function validateJob() {
   if (jobDialect != undefined) {
     var coolantCodeProps = [];
     if (getProperty(properties.coolantChannelAMode) != eCoolant.Off) {
-      coolantCodeProps.push(properties.coolantChannelAOn, properties.coolantChannelAOff);
+      coolantCodeProps.push(properties.coolantChannelAOn);
     }
     if (getProperty(properties.coolantChannelBMode) != eCoolant.Off) {
-      coolantCodeProps.push(properties.coolantChannelBOn, properties.coolantChannelBOff);
+      coolantCodeProps.push(properties.coolantChannelBOn);
     }
     var wrongDialect = [];
     for (var cd = 0; cd < coolantCodeProps.length; ++cd) {
@@ -2116,8 +2117,10 @@ function validateJob() {
           + "\", which this post lists as " + codeFw);
       }
     }
-    // One warning and not four: a channel's on and off codes are chosen as a pair and go wrong as a
-    // pair, and the remedy is one decision.
+    // One warning and not one per channel: two channels of the same machine are configured for one
+    // firmware and go wrong together, and the remedy is one decision. It used to say "and not four",
+    // the on and off codes having been separate fields chosen as a pair; one field per channel makes
+    // half of that true structurally, and this text carries the rest.
     if (wrongDialect.length > 0) {
       warning(localize("This job is posted for " + fw + ", and "
         + (wrongDialect.length == 1 ? "a coolant code it will emit belongs"
@@ -2179,15 +2182,19 @@ function validateJob() {
   // ships "M106" -- so a GRBL job on the shipped default must post.
   // refuseOnGrbl: group 9 warns instead, and that is PV-16's ruling -- the labels say which firmware
   // a value was shipped for, not that no other takes it. The dialect warning above is that channel.
+  //
+  // There is no `off:` here any more and nothing left for it to check: a channel's off code is DERIVED
+  // from the value in this row by coolantOffCode(), so "opened with M106 and closed with M42" is not a
+  // configuration the dialog can express. The guard that refused it went with the field.
   var outputModeProps = [
     { mode: properties.jobSpindleControl, number: properties.jobSpindlePinFan, group: "1 - Job",
       skipOnGrbl: false, refuseOnGrbl: true },
     { mode: properties.laserMarlinMode, number: properties.laserMarlinPinFan, group: "8 - Laser",
       skipOnGrbl: true, refuseOnGrbl: true },
-    { mode: properties.coolantChannelAOn, off: properties.coolantChannelAOff,
+    { mode: properties.coolantChannelAOn,
       number: properties.coolantChannelAPinFan, group: "9 - Coolant",
       skipOnGrbl: false, refuseOnGrbl: false, gate: properties.coolantChannelAMode },
-    { mode: properties.coolantChannelBOn, off: properties.coolantChannelBOff,
+    { mode: properties.coolantChannelBOn,
       number: properties.coolantChannelBPinFan, group: "9 - Coolant",
       skipOnGrbl: false, refuseOnGrbl: false, gate: properties.coolantChannelBMode }
   ];
@@ -2204,22 +2211,6 @@ function validateJob() {
     }
     if (outputModeProps[om].skipOnGrbl && fw == eFirmware.GRBL) {
       continue;
-    }
-
-    // On and off share the number since GH-16d, so the pin cannot differ -- but the form still can,
-    // and M106 on with M42 off never closes what it opened. A dialect-mixed pair is the warning's.
-    if (outputModeProps[om].off != undefined) {
-      var omOff = getProperty(outputModeProps[om].off);
-      if ((omOff == "M106" || omOff == "M42") && omOff != omMode) {
-        error("\"" + outputModeProps[om].mode.title + "\" and \"" + outputModeProps[om].off.title
-          + "\" are set to different outputs -- " + coolantCodeTitle(outputModeProps[om].mode) + " and "
-          + coolantCodeTitle(outputModeProps[om].off) + ". The channel would be switched on with one"
-          + " command and off with another, so the output it opened is never closed and stays on for the"
-          + " rest of the job. Set both to the same form in \"" + outputModeProps[om].group
-          + "\"; they share \"" + outputModeProps[om].number.title + "\", so the same form is the same"
-          + " output.");
-        return;
-      }
     }
 
     // Neither code is GRBL's: grbl 1.1 answers an M word it was not compiled with as error:20 and stops
@@ -2367,23 +2358,29 @@ function validateJob() {
   // An empty field is not an error but does warn in both channels. HB-7, CR-22, PV-12.
   // TWIN #2 -- the file half is writeCustomCoolantFile()'s, on the same enum gate.
   var coolantCustom = [
-    { code: properties.coolantChannelAOn,  file: properties.coolantChannelAOnCustom },
-    { code: properties.coolantChannelAOff, file: properties.coolantChannelAOffCustom },
-    { code: properties.coolantChannelBOn,  file: properties.coolantChannelBOnCustom },
-    { code: properties.coolantChannelBOff, file: properties.coolantChannelBOffCustom }
+    { code: properties.coolantChannelAOn,
+      files: [properties.coolantChannelAOnCustom, properties.coolantChannelAOffCustom] },
+    { code: properties.coolantChannelBOn,
+      files: [properties.coolantChannelBOnCustom, properties.coolantChannelBOffCustom] }
   ];
   for (var c = 0; c < coolantCustom.length; ++c) {
     if (getProperty(coolantCustom[c].code) != "Use custom") {
       continue;
     }
-    if (getProperty(coolantCustom[c].file) == "") {
-      warning(localize("\"" + coolantCustom[c].code.title + "\" is \"Use custom\", which takes that "
-        + "code from the file named in \"" + coolantCustom[c].file.title + "\" -- and that field is "
-        + "empty. Nothing at all is emitted for it, so this channel never switches by that route. Name "
-        + "the file, or choose one of the g-codes in the dropdown."));
-      continue;
+    // TWO entries where there were four, and the pairing is the reason: one answer now reaches both of
+    // a channel's files, so an unnamed OFF file is reported on a channel whose ON file is named -- the
+    // half-configured channel the two independent selectors used to allow without either half noticing.
+    for (var cf = 0; cf < coolantCustom[c].files.length; ++cf) {
+      var customFile = coolantCustom[c].files[cf];
+      if (getProperty(customFile) == "") {
+        warning(localize("\"" + coolantCustom[c].code.title + "\" is \"Use custom\", which takes BOTH "
+          + "of this channel's codes from files of your own -- and \"" + customFile.title + "\" is "
+          + "empty. Nothing at all is emitted for it, so this channel never switches by that route. "
+          + "Name the file, or choose one of the g-codes in the dropdown."));
+        continue;
+      }
+      includeFileProps.push(customFile);
     }
-    includeFileProps.push(coolantCustom[c].file);
   }
   for (var i = 0; i < includeFileProps.length; ++i) {
     var includeName = getProperty(includeFileProps[i]);

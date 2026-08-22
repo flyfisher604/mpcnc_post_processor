@@ -473,7 +473,7 @@ const programs = [
   props:{ jobSelectedFirmware:S('Marlin'), machineParkAtEnd:S('Off'),
           jobSpindleControl:S('M106'), jobSpindlePinFan:N(0),
           coolantChannelAMode:S('Flood'), coolantChannelAOn:S('M106'),
-          coolantChannelAOff:S('M106'), coolantChannelAPinFan:N(2) } },
+          coolantChannelAPinFan:N(2) } },
 ];
 
 // ---- run ------------------------------------------------------------------------------
