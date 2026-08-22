@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.1_Beta3.cps`
 
-Every logged issue and the tests that confirm it. **94 findings — 83 fixed ·
-10 closed by design · 1 withdrawn · 0 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **95 findings — 83 fixed ·
+10 closed by design · 1 withdrawn · 1 open.** Test registers in §4 and §5.
 
 > **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
 > with the design that made them defects. `design.md` → *Tool changes* is the replacement
@@ -23,6 +23,7 @@ because commit messages cite them and must still resolve.
 | `WR-` | Walk review, 2026-08-16 — the open register re-executed against the source | `WR-1` … `WR-2` |
 | `PV-` | Post-verify pass, 2026-08-16 — the post **run**, by the post utility over Autodesk's own intermediate files; from `PV-8` over job files built for the paths those cannot reach, from `PV-11` under a simulated Personal licence for the group no job file can reach, and from `PV-14` against the toolpath the kernel delivered rather than against a pattern. **`PV-16` is the one that came off §6 rather than off a run** — a design-backlog item built, and run afterwards like any other, and **`PV-20`/`PV-21` came off a job the author posted and read the dialog of** | `PV-1` … `PV-22` |
 | `GH-` | Reports on the GitHub tracker — `flyfisher604/mpcnc_post_processor` issues, numbered as the issue is with one letter per half of it. A test row takes a further `T` | `GH-16a` … `GH-16d` |
+| `FR-` | FluidNC review, 2026-08-21 — the post's FluidNC claims re-checked against FluidNC source, and its feature surface against a published FluidNC post. §6 holds the four gaps that are design rather than defect | `FR-1` |
 
 > **The `CR-` prefix once meant two things.** The 2026-08-01 whole-file review filed
 > `CR-1 … CR-17`, dissolved into the hobbyist register at `c73726c` / `a68dd11` / `1232929`
@@ -50,8 +51,13 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**EMPTY — 0 rows.** `GH-16c` was the last, and it closed with `GH-16d` rather than on its own: the
-descriptions it asked for wording on were rewritten by the fix beside it.
+**One row.** `FR-1` is a statement the post makes about a firmware rather than a fault in what it
+emits — `CR-01`'s class, and `CR-24` is the nearest precedent for the FluidNC half of it: a dialect that
+never errors, and acts only where its own config file says to.
+
+| ID | Finding | Sev | Reproduce | Action | Status |
+|---|---|---|---|---|---|
+| **FR-1** | **The post tells a FluidNC operator that their firmware rejects `M6`. FluidNC executes it.** Two places say so, both on the gSender / CNCjs / UGS arm of the hand-over: the comment `toolChangeMacroCall()` writes into the file, and the `validateJob()` warning beside it. Both are true of stock Grbl and of grblHAL, and false of FluidNC — which the post's one `Grbl` answer also covers. FluidNC performs the change itself, through a tool changer or a macro named in its own config file, and where a tool setter is configured it probes the new tool and applies the length as a **frame** offset. **The consequence is a misconfiguration, not a bad line of g-code**: the operator forgoes a route their controller already has, or sets up sender interception that strips the token their firmware needs. **Details** — FluidNC source at v3.9.6: `src/GCode.cpp` and `src/Spindles/Spindle.cpp` for the dispatch, `src/ToolChangers/atc_manual.cpp` for what a change then does. The changer arrived at v3.9.0, so any claim the post makes about it carries a minimum version | Med | Either channel, and neither needs a controller or a run. `PRO11` (`professional-matrix.js`) and `GS5` (`gcode-structure-matrix.js`) both post this arm, and `PRO11`'s `mustLog` asserts the warning's present wording. The dialog half is `Tool Change Handled By`'s own description | **Two halves, and the first is text alone.** (a) Both channels say *GRBL* where they mean stock Grbl and grblHAL; say which, and say what FluidNC does instead. `PRO11` turns red on the reword and goes to *Invalidated by landed fixes*. (b) A fifth `Tool Change Handled By` value, for FluidNC's own changer. It emits the same token the gSender arm emits, so no writer changes — what changes is the guard set, and `toolChangeSenderIsGrblSender()` has to be split before either can move: it answers *needs a sender to intercept* for the warning and *needs the GRBL dialect* for the refusal, and FluidNC answers those two differently. **Two rulings are the author's** — whether that value beside `Tool Length Correction By` = `GCode reprobes Z0 after change` warns or refuses, being two corrections for one change; and that this is the first behavioural split between FluidNC and GRBL, which `design.md` → *Tool changes* forecloses and would have to be reopened. §6 holds the four adjacent FluidNC items | ⬜ |
 
 > **The verdict table is two greps over `MPCNC_v4.1_Beta3.cps` and lives nowhere else.**
 > `grep -n "// TWIN #"` is the paired half: **18 numbered pairs**, each number appearing **exactly
@@ -193,16 +199,20 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**EMPTY — 0 rows, for the first time.** `J1`, `J2` and `J5` closed 2026-08-17 with `PV-3`'s fix and
-are in §5; the jet workstream that was the whole of this section is run. Sixty-four rows closed
-2026-08-16 before them: **forty-eight by code walk**, §5 holding each one's argument and the four it
-corrected rather than confirmed, and **sixteen on the author's rulings**.
+**One row — `FR-1T`.** `J1`, `J2` and `J5` closed 2026-08-17 with `PV-3`'s fix and are in §5; the jet
+workstream that was the whole of this section is run, and sixty-four rows closed 2026-08-16 before it —
+**forty-eight by code walk**, §5 holding each one's argument and the four it corrected rather than
+confirmed, and **sixteen on the author's rulings**.
 
-**What an empty §4 does and does not mean.** Every registered question has been asked of the post and
-answered. It is not a claim that the post is correct, and §5's standing caveat is the reason — two
-cases were passing while asserting nothing useful. **The material below stays because §5's rows are
-written against it**: the standing configuration a row states its delta from, and the four methods
-with their bounds.
+| Test | Proves | Setup (delta) | Method | Expansion | State |
+|---|---|---|---|---|---|
+| **FR-1T** | **Both branches of the handler split** — the new value gets the firmware's contract, the three sender values keep the interception warning they already have. **On the FluidNC run:** `T2 M6` is present, and **no line anywhere says GRBL answers `error:20` or that a sender must intercept the token** — the absence is the test. The log carries the contract warning naming `atc:` and `m6_macro:`, and **not** the interception warning. **On the `gSender` run:** the interception warning is still raised, and now says *stock Grbl and grblHAL* rather than GRBL flatly. **On each mismatch:** refused, not warned | `PRO11`'s case — `change.cnc`, `toolChangeMode` = `Macro`, `probeOnStart` = `Skip` (keys and enum ids, as the property dump writes them) — run twice, once with `Tool Change Handled By` = the new FluidNC value and once left at `gSender`; then the FluidNC value again with `CNC Firmware` = `Marlin`, and once more with `RepRap` | utility | `FR-1` | ⬜ |
+
+**What §4 does and does not mean.** Every registered question has been asked of the post and answered,
+bar the row above. It is not a claim that the post is correct, and §5's standing caveat is the reason —
+two cases were passing while asserting nothing useful. **The material below stays because §5's rows are
+written against it**: the standing configuration a row states its delta from, and the four methods with
+their bounds.
 
 **Standing configuration.** GRBL, mm, `Comment Level` `Info`, probe target `Z-10`, probe
 speed `F30`, probe thickness `Z0.8`. **A row names only what it changes from that line.**
@@ -538,8 +548,74 @@ where the dialog was brought into line with it.
 
 ### Unscheduled ideas
 
-**EMPTY.** All four went 2026-08-17: *Copy first part's Z* dropped by the author, and the other three
-built or answered — `PV-16`, `PV-17` (which carried `useZeroOffset` with it), `PV-18`, `PV-19`.
+**Four, all filed 2026-08-21 by the `FR-` pass**, which read a published FluidNC post against this one —
+`540lyle/fluidnc-posts` v1.0.2, `adapters/fusion/FluidNC.cps`, 1,167 lines and 15 properties, read
+2026-08-21. It is 3-axis milling on one firmware with no `onCyclePoint`, no probing, no tool-length
+handling, no machine frame and no pre-flight refusals, so the gaps run mostly the other way; these are
+the four that do not. **Prior art is cited to be checked, not copied**: in three of the four the
+mechanism is the small part and the question under it is the work. The fifth thing that pass found is a
+defect, and it is `FR-1` in §2.
+
+**Split-file output — one file per tool.** `At a Tool Change` = `Refuse a multi-tool job` answers a
+two-tool job by refusing to post it; a further answer would post it as one file per tool. **Nothing in
+the post calls `redirectToFile()`** — `grep -c redirectToFile` returns 0. The mechanism is thirty lines
+(`openSplitOutput()`/`closeSplitOutput()` in the post named above: a master stub, then one sub-file per
+tool carrying its own header, `G5x`, retract and `M30`). **The work is that each sub-file is a program**:
+it owes `writeFirstSection()`'s origin work, and file 2's Z0 must be measured with the tool file 2 fits —
+`Tool Length Correction By` = `GCode reprobes Z0 after change` applied across a file boundary instead of
+inside one. That post's sub-files open `G53 G0 Z0`, select `G54` and cut, inheriting whatever the register
+held; `CR-17` and `PV-9` are why this post cannot. **Three questions before any code**: whether it is a
+value of `At a Tool Change` or a property beside it; whether file 2 re-probes or the operator is told to;
+and what `First Tool is Correct` means when there are several line 1s. **Not reachable on a Personal
+licence**, which emits no tool change to split at — `design.md` → *Tool changes*.
+
+**Coalescing micro-segments.** The post sets `tolerance` and `minimumChordLength` and otherwise emits
+every point the kernel hands it. The firmware fact is `planner_blocks`, config-bounded to 10–120
+(`handler.item("planner_blocks", _planner_blocks, 10, 120)`, `FluidNC/src/Machine/MachineConfig.cpp`,
+v3.9.6), so a dense finishing pass empties the lookahead faster than serial refills it and the machine
+stutters. The prior art is **decimation against a fixed anchor**, not averaging: a move shorter than the
+threshold *measured from the last emitted point* is held, each further short move overwrites the held one,
+and the first move that clears the threshold is emitted from the old anchor while the held endpoint is
+**discarded** — so deviation is bounded by the threshold and never accumulates. Their captured fixture is
+635 lines at 0, 595 at 0.05 mm and 493 at 0.1 mm on one job, every removed line a modal continuation.
+**What the design costs, and the questions under it.** A cusp inside the threshold is the point that gets
+dropped, so a corner apex can be cut across — bounded, but geometry loss rather than resampling; and a
+held move carries its feed with it, so a suppressed slow segment is executed at the *following* move's
+feedrate. **The flush points are the design.** Theirs flushes before an arc — load-bearing, since `I`/`J`
+are relative to the arc start and a machine 0.05 mm short of it makes the centre wrong rather than merely
+late — and before a rapid and at section end, but **not** before a dwell, an `M0`, an `M5`, an `S`, or
+pass-through g-code, each of which is an ordering inversion. This post would owe flushes theirs does not:
+every `askUser()` prompt, and group 3, where a move arriving as a rapid is written as a `G1` — the filter
+and the mapping would be deciding about the same block, and the order between them has to be chosen
+rather than inherited.
+
+**A dwell after the spindle starts.** `spindleOn()` commands the spindle and the next block cuts; nothing
+waits for it to reach speed on any of the four `Spindle Control` modes, and the two that most need it —
+`Fan M106` and `Pin M42` — are a relay with no feedback of any kind. **The emission exists already and is
+already dialect-split**: `onDwell()` writes `G4 P<seconds>` on GRBL and `G4 S<seconds>` elsewhere, which is
+correct in all three, and each firmware drains its planner first so the wait is real rather than queued —
+`mc_dwell()` calls `protocol_buffer_synchronize()`, and `P` is seconds there,
+`mc_dwell(int32_t(gc_block.values.p * 1000.0f))` (`FluidNC/src/MotionControl.cpp`, `FluidNC/src/GCode.cpp`,
+v3.9.6); Marlin's `G4()` calls `planner.synchronize()` and reads `S` as seconds and **`P` as
+milliseconds** (`Marlin/src/gcode/motion/G4.cpp`, bugfix-2.1.x); RRF waits for standstill and reads `S`
+seconds, `P` milliseconds (`GCodes::DoDwell()`, `src/GCodes/GCodes.cpp`, 3.6-dev). **Questions**: one
+property or per-mode; once per job or at every spindle start, a tool change included; and it must not fire
+for a jet tool — the existing `tool.isJetTool()` disjunct — a laser held three seconds over one spot
+being a burn.
+
+**Naming the FluidNC settings a posted file cannot reach.** `CR-01` and `PR-27`'s pattern, and three
+candidates, none of them in the file: `arc_tolerance_mm` (0.001–1.0) and `junction_deviation_mm`
+(0.01–1.0), which govern how the firmware chords the `G2`/`G3` this post writes and how hard it takes a
+corner, and `planner_blocks` (10–120) — same file and version as above. **The question is what earns a
+line.** `CR-01` is ungated because it is true of every GRBL job; these are true only of a job whose
+geometry stresses them, and `PR-27`'s reasoning is that a warning on every job is read by nobody. The
+candidate gate for the first two is `Use Arcs` on; for `planner_blocks` it is whatever measure the
+coalescing item settles on.
+
+**Two marginal, recorded so they are not re-discovered as gaps.** The post declares
+`CAPABILITY_MILLING | CAPABILITY_JET` and not `CAPABILITY_MACHINE_SIMULATION`; and `Enable Line #s` is a
+boolean where that post offers a third *only on a tool-change line* value. Neither has a question under
+it.
 
 ---
 
