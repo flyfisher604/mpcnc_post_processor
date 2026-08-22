@@ -13,12 +13,12 @@ the file that computes it is named instead.
 
 **The tree is v4.1.1 Beta 3 on `master`; `v4.1_Beta3` is tagged and on `origin`.** The deliverable is
 now `MPCNC_v4.1.1_Beta3.cps` — Step 9 renamed it — and what the **v4.1 Beta 3** release contains is
-`release-notes-v4.1-beta3.md`. **Step 9 is merged and not pushed**, so `master` is ahead of
-`origin/master` and v4.1.1 carries no tag and no release notes of its own.
+`release-notes-v4.1-beta3.md`. **`master` is ahead of `origin`**, and v4.1.1 carries no tag and
+no release notes of its own.
 **Next: the release page, which is the last of Step 8.**
 
-Step 7 is done: the four user documents describe the post as it now is, and `guide-pro.md` states
-plainly what is not verified. **What is open stands in `findings.md` §2**, which owns that count.
+The four user documents describe the post as it now is, and `guide-pro.md` states plainly what is
+not verified. **What is open stands in `findings.md` §2**, which owns that count.
 
 **Issue 16 is answered, and it is what v4.1 Beta 3 is** — `findings.md` `GH-16a` to `GH-16d`.
 
@@ -28,7 +28,7 @@ is the row.
 **§7 is accepted as outstanding at the beta**, which is what let the tag be cut. Its first item is a
 file posted from Fusion, which no session can supply; the release notes and the tag both say so.
 
-**`master` and `v4.1_Beta3` are on `origin`.** What is not is the release page.
+**`v4.1_Beta3` is on `origin`.** What is not is the release page.
 
 **No controller access.** Firmware questions are settled from firmware source, citing file and
 version — never from a sender console, a dry run or a non-GRBL controller.
@@ -40,7 +40,6 @@ version — never from a sender console, a dry run or a non-GRBL controller.
 | | Item | Blocked on |
 |---|---|---|
 | **8** | Publish the v4.1 Beta 3 release page | an authenticated `gh` — the merge, the tag and the push are done |
-| **9** | Decide what the four user documents owe the property reduction | the author — the code and the register are merged, and the guides are the author's call |
 
 **`validateJob()` and the property block were never restructured** — Step 6 measured both and left
 them. Neither is short; whether either is too long is a judgement no measurement settles, and it is
@@ -56,18 +55,6 @@ the author's to make against the file as it now reads.
 working tree's: `git show v4.1_Beta3:MPCNC_v4.1_Beta3.cps > MPCNC_v4.1_Beta3.cps` produces it under
 the name the download expects, from any branch. Do not upload the working tree's `.cps` — on or after
 Step 9 it is a different version under a different name.
-
-## Step 9 — The property reduction
-
-**Merged to `master`; what is left of this step is the guides.** The dialog went from **65 fields to 57** across six folds —
-`findings.md` `PC-1` to `PC-6`, each naming the configuration it costs — and the deliverable is
-`MPCNC_v4.1.1_Beta3.cps`. The suite is green and `integration.md` §6.2 carries the re-measured
-coverage.
-
-**What it does not touch is the four user documents**, which are the author's to move: `README.md`
-and `guide-hobbyist.md` / `guide-pro.md` / `property-reference.md` still describe the 65-field dialog,
-and `property-reference.md` opens by stating that count. Nothing detects that for the author, which is
-why it is a step here rather than a finding.
 
 ## Parked, and on what
 
@@ -85,13 +72,14 @@ until it appears in the table above.
 
 ## Done
 
-Phase C · Step 0 · Steps 1.1, 1.2, 1.3, 2, 3, 4, 5, 6, 7 · F2–F7 · Step V.
+Phase C · Step 0 · Steps 1.1, 1.2, 1.3, 2, 3, 4, 5, 6, 7, 9 · F2–F7 · Step V.
 
-**What each one did is its commits** — `git log --grep` by step or finding id — and what each one
-left is a row in `findings.md`. Two are worth knowing without looking them up: **Step 2** retired
-the spoilboard base, which was the one thing the assessment called over-built, and **Step V** is
-where the post stopped being walked and started being *run*, against Autodesk's own engine —
-`integration.md` is that machinery and the bounds on what a run may claim.
+**Step 9 folded the dialog and renamed the deliverable**, which is why the checkpoint above names
+a file the tag does not. **What each one did is its commits** — `git log --grep` by step or finding
+id — and what each one left is a row in `findings.md`. Two more are worth knowing without looking
+them up: **Step 2** retired the spoilboard base, which was the one thing the assessment called
+over-built, and **Step V** is where the post stopped being walked and started being *run*, against
+Autodesk's own engine — `integration.md` is that machinery and the bounds on what a run may claim.
 
 *`Assessment/` is the analysis this plan came from, dated 2026-08-13, and its own `README.md` is the
 index. Read it for evidence, never for where things live.*
