@@ -2016,16 +2016,24 @@ function validateJob() {
   }
 
   // CR-10 -- PR-17's argument on X and Y. GRBL-gated: Marlin re-homes here instead of rapiding, and an
-  // RRF machine homed to its axis minima rests AT the coordinate this asks for. $27 cannot be read.
+  // RRF machine homed to its axis minima rests AT the coordinate this asks for. Neither the pull-off nor
+  // the build can be read. ONE warning for both dialects, the post having one "Grbl" answer: FluidNC
+  // rests one pull-off inside machine zero too -- _mpos is "the mpos of the switch location" and
+  // set_mpos() writes it at the trigger point (FluidNC/src/Machine/Homing.h, Homing.cpp, v3.9.6) -- and
+  // what differs is the remedy, a rebuild on Grbl against a config line on FluidNC. FR-2.
   // TWIN #6 -- the file half is writeMachineParkXY()'s, same firmware and same property.
   if (fw == eFirmware.GRBL && getProperty(properties.machineParkAtEnd) == "Machine") {
     warning(localize("\"At End Park At\" = machine X0 Y0 sends the tool to where the homing switches "
-      + "tripped, not to where homing left the machine. On a stock Grbl build HOMING_FORCE_SET_ORIGIN "
-      + "is off, so machine zero sits at the trigger point and the axes rest one pull-off inside it -- "
-      + "$27 -- which means this park drives X and Y back onto the switches, and with hard limits "
-      + "enabled the job ends in Alarm rather than parked. Correct only on a machine built with "
-      + "HOMING_FORCE_SET_ORIGIN, which zeroes where homing leaves the axis. Otherwise park at work "
-      + "X0 Y0 -- raising the pull-off does not help, machine zero staying at the trigger point."));
+      + "tripped, not to where homing left the machine -- and that is true of both firmwares this "
+      + "\"Grbl\" answer covers. On a stock Grbl build HOMING_FORCE_SET_ORIGIN is off, so machine zero "
+      + "sits at the trigger point and the axes rest one pull-off inside it -- $27. A stock FluidNC does "
+      + "the same: mpos_mm is the machine position OF THE SWITCH and homing writes it there, then pulls "
+      + "off by pulloff_mm, which is set per motor rather than per axis. Either way this park drives X "
+      + "and Y back onto the switches, and with hard limits enabled the job ends in Alarm rather than "
+      + "parked. It is correct only where machine zero is where homing LEAVES the axis -- a Grbl built "
+      + "with HOMING_FORCE_SET_ORIGIN, or a FluidNC whose mpos_mm already accounts for the pull-off, one "
+      + "a rebuild and the other a config line, and the post can read neither. Otherwise park at work "
+      + "X0 Y0: raising the pull-off does not help, machine zero staying where the switch tripped."));
   }
 
   // set_axis_is_at_home() zeroes position_shift, never coordinate_system[] (Marlin motion.cpp,
@@ -2390,14 +2398,16 @@ function validateJob() {
     // TWIN #9 -- the file half is writeFixedZReference()'s, on the same firmware and parsed height.
     if (fw == eFirmware.GRBL && parseMachineTravelZ() >= 0) {
       warning(localize("\"Machine Travel Z\" is " + parseMachineTravelZ() + ", which is at or above "
-        + "machine zero. On a stock Grbl build (HOMING_FORCE_SET_ORIGIN off) homing leaves every "
-        + "reachable Z negative, so a positive value is above the top of travel -- it alarms at the "
-        + "first traverse with soft limits on, and drives Z into its hard stop with them off. ZERO IS "
-        + "NOT THE CEILING EITHER: it is the point at which the Z endstop tripped, because homing ends "
-        + "one pull-off below it, so a move to zero returns the axis onto the switch and soft limits do "
-        + "not reject it. Set a height below machine zero by at least the homing pull-off ($27). If "
-        + "this machine was built with HOMING_FORCE_SET_ORIGIN on, its zero is at the bed and a "
-        + "positive value is correct -- the post cannot read that and will warn every time."));
+        + "machine zero. On a stock Grbl build (HOMING_FORCE_SET_ORIGIN off) and on a stock FluidNC "
+        + "(mpos_mm at the switch) homing leaves every reachable Z negative, so a positive value is "
+        + "above the top of travel -- it alarms at the first traverse with soft limits on, and drives Z "
+        + "into its hard stop with them off. ZERO IS NOT THE CEILING EITHER: it is the point at which "
+        + "the Z endstop tripped, because homing ends one pull-off below it, so a move to zero returns "
+        + "the axis onto the switch and soft limits do not reject it. Set a height below machine zero by "
+        + "at least the homing pull-off -- $27 on Grbl, pulloff_mm on the motor on FluidNC. If your "
+        + "machine zeroes at the bed instead, either built with HOMING_FORCE_SET_ORIGIN or configured "
+        + "with an mpos_mm that puts it there, a positive value is correct -- the post can read neither "
+        + "and will warn every time."));
     }
   }
 
@@ -3003,11 +3013,12 @@ function writeMachineParkXY() {
   // block costs. Below the Marlin return, this route being the only one that rapids at a switch.
   if (fw == eFirmware.GRBL) {
     // TWIN #6
-    writeWarning("machine X0 Y0 is where the homing switches tripped, and on a stock Grbl build homing"
-      + " leaves the axes one pull-off inside that point -- so the block below drives X and Y back onto"
-      + " the switches, and with hard limits enabled this job ends in Alarm rather than parked. Correct"
-      + " only on a machine built with HOMING_FORCE_SET_ORIGIN, which zeroes where homing leaves the"
-      + " axis");
+    writeWarning("machine X0 Y0 is where the homing switches tripped, and homing leaves the axes one"
+      + " pull-off inside that point on both dialects -- $27 on a stock Grbl build, mpos_mm and"
+      + " pulloff_mm on a stock FluidNC -- so the block below drives X and Y back onto the switches, and"
+      + " with hard limits enabled this job ends in Alarm rather than parked. Correct only where machine"
+      + " zero is where homing LEAVES the axis: HOMING_FORCE_SET_ORIGIN on Grbl, or an mpos_mm that"
+      + " accounts for the pull-off on FluidNC");
   }
 
   writeComment(eComment.Info, "   Park at machine X0 Y0");
@@ -3914,10 +3925,11 @@ function writeFixedZReference() {
   if (fw == eFirmware.GRBL && parseMachineTravelZ() >= 0) {
     // TWIN #9
     writeWarning("machine Z " + xyzFormat.format(machineTravelZ()) + " is at or above machine zero --"
-      + " on a stock Grbl build homing leaves every reachable Z negative, and zero itself is where the"
-      + " Z endstop tripped, one pull-off above where homing left the axis; a move there returns it onto"
-      + " the switch and soft limits do not reject it. Correct only on a machine built with"
-      + " HOMING_FORCE_SET_ORIGIN, which zeroes at the bed");
+      + " on a stock Grbl build and on a stock FluidNC alike, homing leaves every reachable Z negative,"
+      + " and zero itself is where the Z endstop tripped, one pull-off above where homing left the axis;"
+      + " a move there returns it onto the switch and soft limits do not reject it. Correct only on a"
+      + " machine whose zero is at the bed: HOMING_FORCE_SET_ORIGIN on Grbl, or an mpos_mm that puts it"
+      + " there on FluidNC");
   }
 
   // The in-file half of validateJob()'s Marlin warning, so a file read on its own carries the

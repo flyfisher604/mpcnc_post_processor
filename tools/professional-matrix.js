@@ -255,8 +255,24 @@ const cases = [
 
 { id:'PRO25', desc:'a travel height at or above machine zero warns in BOTH channels (PR-17)',
   cnc:face, props:pro({ machineTravelZ:S('2'), probeOnStart:S('Skip') }),
-  must:[[/machine Z 2 is at or above machine zero/,'the file carries it']],
-  mustLog:[[/which is at or above machine zero/,'and so does the dialog']] },
+  must:[[/machine Z 2 is at or above machine zero/,'the file carries it'],
+        [/on a stock Grbl build and on a stock FluidNC alike/,
+         'FR-2 - one warning, both dialects, in the file half too']],
+  mustLog:[[/which is at or above machine zero/,'and so does the dialog'],
+           [/\$27 on Grbl, pulloff_mm on the motor on FluidNC/,
+            'FR-2 - and the remedy is named in the vocabulary of each']] },
+
+// FR-2: the park pair said HOMING_FORCE_SET_ORIGIN and $27 to an operator who may have neither. No case
+// asserted it in either channel before this one -- six cases set this property and none read the text.
+{ id:'PRO50', desc:'FR-2 - parking at machine X0 Y0 warns in both channels, and names both dialects',
+  cnc:face, props:pro({ probeOnStart:S('Skip'), machineParkAtEnd:S('Machine') }),
+  must:[[/machine X0 Y0 is where the homing switches tripped/,'the file half is there'],
+        [/\$27 on a stock Grbl build, mpos_mm and pulloff_mm on a stock FluidNC/,
+         'and names the parameter in each dialect rather than commanding one']],
+  mustLog:[[/that is true of both firmwares this "Grbl" answer covers/,
+            'the dialog half says why one warning covers two firmwares'],
+           [/a Grbl built with HOMING_FORCE_SET_ORIGIN, or a FluidNC whose mpos_mm already accounts for the pull-off/,
+            'and the remedy in each - one a rebuild, the other a config line']] },
 
 { id:'PRO26', desc:'the whole professional shape on Marlin - G28 per axis, the build-option warning, the park cost',
   cnc:face, props:pro({ jobSelectedFirmware:S('Marlin'), probeOnStart:S('Skip') }),
