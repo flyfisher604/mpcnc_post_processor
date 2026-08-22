@@ -6,33 +6,16 @@ performed and what it may claim is `integration.md`; what has already happened i
 
 ## Checkpoint
 
-**Next: the release page, which is the last of Step 8.** Nothing else is scheduled.
+**Nothing is scheduled.** v4.1.1 Beta 3 is released — tag, asset and release page.
 
 Branch, tag and push positions are `git status` and `git log`; what is open is `findings.md` §2;
-what the **v4.1 Beta 3** release contains is `release-notes-v4.1-beta3.md`.
+what the **v4.1.1 Beta 3** release contains is `release-notes-v4.1.1-beta3.md`.
 
 ## What is left, in order
 
-| | Item | Blocked on |
-|---|---|---|
-| **8** | Publish the v4.1 Beta 3 release page | an authenticated `gh` — the merge, the tag and the push are done |
-
-**`validateJob()` and the property block were never restructured** — Step 6 measured both and left
-them. Whether either is too long is a judgement no measurement settles, and it is the author's to
-make against the file as it now reads.
-
-## Step 8 — Publish the release page
-
-**The asset is `MPCNC_v4.1_Beta3.cps` itself, under exactly that name.** Both announcements link
-`releases/download/<tag>/MPCNC_v4.1_Beta3.cps`, so a zip uploaded there answers the download with a
-404.
-
-**Upload the tagged file, not the working tree's** — Step 9 renamed the deliverable, so on or after
-it the tree holds a different version under a different name:
-
-```
-git show v4.1_Beta3:MPCNC_v4.1_Beta3.cps > MPCNC_v4.1_Beta3.cps
-```
+Nothing. **`validateJob()` and the property block were never restructured** — Step 6 measured both
+and left them. Whether either is too long is a judgement no measurement settles, and it is the
+author's to make against the file as it now reads.
 
 ## Parked, and on what
 
@@ -48,7 +31,7 @@ appears in the table above.
 
 ## Done
 
-Phase C · Step 0 · Steps 1.1, 1.2, 1.3, 2, 3, 4, 5, 6, 7, 9 · F2–F7 · Step V.
+Phase C · Step 0 · Steps 1.1, 1.2, 1.3, 2, 3, 4, 5, 6, 7, 8, 9 · F2–F7 · Step V.
 
 **What each one did is its commits** — `git log --grep` by step or finding id. Two are worth knowing
 without looking them up: **Step 2** retired the spoilboard base, the one thing the assessment called

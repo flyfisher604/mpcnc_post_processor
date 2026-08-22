@@ -132,6 +132,9 @@ is declared. The idle-timer and homing-pull-off warnings now name FluidNC's `idl
 **The post has a new filename again.** Remove `MPCNC_v4.1_Beta3.cps` from the Post Library rather
 than leaving it beside this one.
 
+**[→ Full release notes for v4.1.1 Beta 3](docs/release-notes-v4.1.1-beta3.md)** — every fold, what
+resets, and what is *not* verified.
+
 ## v4.1 Beta 3
 
 v4.0 Beta 3 could ask you to switch the router on by hand, or command it with `M3`. On a stock
@@ -149,8 +152,8 @@ Two things to know before your first v4.1 job:
 2. **The post has a new filename again.** Remove `MPCNC_v4.0_Beta3.cps` from the Post Library
    rather than leaving it beside this one.
 
-**[→ Full release notes for v4.1 Beta 3](docs/release-notes-v4.1-beta3.md)** — what changed, what
-it means per firmware, and what is *not* verified.
+**[→ Full release notes for v4.1 Beta 3](https://github.com/flyfisher604/mpcnc_post_processor/blob/v4.1_Beta3/docs/release-notes-v4.1-beta3.md)**
+— kept at the tag it describes, not in the working tree.
 
 ## v4.0 Beta 3
 
