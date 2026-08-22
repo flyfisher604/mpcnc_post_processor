@@ -1,12 +1,11 @@
 # Findings — `MPCNC_v4.1.1_Beta3.cps`
 
-Every logged issue and the tests that confirm it. **102 findings — 91 fixed ·
-10 closed by design · 1 withdrawn · 0 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. Findings are §2 open and §3 closed;
+test registers are §4 and §5. **No count in this file is written by hand** —
+`node tools/register-tally.js` prints §3's and §5's, and `--check` fails on a disagreement.
 
-> **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
-> with the design that made them defects. `design.md` → *Tool changes* is the replacement
-> design; `PR-15` carried them until the rebuild landed, and the **`TC-` rows in §4 are the
-> register they left owing**. Recover any deleted row with `git log -p -- docs/findings.md`.
+> **Rows deleted 2026-08-13 with the tool-change rebuild** are recoverable with
+> `git log -p -- docs/findings.md`. `design.md` → *Tool changes* is the design that replaced them.
 
 ## 1. Scope & id key
 
@@ -26,27 +25,15 @@ because commit messages cite them and must still resolve.
 | `FR-` | FluidNC review, 2026-08-21 — the post's FluidNC claims re-checked against FluidNC source, and its feature surface against a published FluidNC post. §6 holds the four gaps that are design rather than defect, and `FR-2` is the same class, found while closing `FR-1` | `FR-1` … `FR-2` |
 | `PC-` | Property-consolidation review, 2026-08-21 — the dialog's 65 fields read for pairs that are **one** decision asked twice, and the `validateJob()` guards that exist only to reject the combinations such a pair makes expressible. Not defects: each row states the configuration its fold costs, which is `HB-20`'s rule applied to a merge | `PC-1` … `PC-6` |
 
-> **The `CR-` prefix once meant two things.** The 2026-08-01 whole-file review filed
-> `CR-1 … CR-17`, dissolved into the hobbyist register at `c73726c` / `a68dd11` / `1232929`
-> and all closed. Its numbers collide with the coverage review's. Its four surviving **test
-> rows** are renamed `FCR-` here — do not use zero-padding as the discriminator. Commit
-> messages and code comments dated before `c73726c` that say `CR-n` mean the older series.
-
-> **Nine `HR-` ids resolve to git only, and this predates the consolidation.** `HR-1`,
-> `HR-2`, `HR-4`, `HR-5`, `HR-11`, `HR-14`, `HR-15`, `HR-17` and `HR-23` lead commit
-> subjects but had already been dissolved out of the hobbyist register before this file was
-> built — verified against `HReview.md` at its last commit, which held none of them. They
-> are the 2026-07-31 pass, all fixed; recover any of them with `git log --grep=HR-<n>`.
-> Rows are **not** reconstructed here: the fixes are landed and the argument is in the
-> commits. Recorded so the gap is not re-discovered as a loss.
+**Two ids do not resolve to a row here, and both are landed fixes rather than losses.**
+A `CR-n` in a commit or code comment dated before `c73726c` is the retired 2026-08-01 series,
+not the coverage review's — its four surviving test rows are the `FCR-` ones. And `HR-1`,
+`HR-2`, `HR-4`, `HR-5`, `HR-11`, `HR-14`, `HR-15`, `HR-17` and `HR-23` never had a row in this
+file. `git log --grep=<id>` is where both live.
 
 **Professional** is multi-WCS, the machine Z frame, tool changes, Manual NC and the dialog
-audit. **Hobbyist** is a Personal-licence user, one part, one WCS, one tool, several
-operations. The distinction no longer routes a finding to a different file; it survives
-only as scope on the `HB-` and `PR-` passes.
-
-**No controller is available**, so every firmware claim is settled from firmware source and
-no row is proved by running one.
+audit; **hobbyist** is a Personal-licence user, one part, one WCS, one tool. The distinction
+is scope on the `HB-` and `PR-` passes and routes nothing.
 
 ---
 
@@ -71,9 +58,10 @@ stand there, `HR-6 (B)`, is answered**: `PV-14` refuses all six rotated Setups t
 
 ## 3. Closed findings
 
-**91 fixed · 10 closed by design · 1 withdrawn · 0 open in §2 — 102 rows.** Permanent: commit messages and
-code comments cite these ids and they must still resolve. `git show <ref>` holds the
-diagnosis, the diff and the argument.
+**✅ 91 · ➖ 11 — 102 rows.**
+Permanent: commit messages and code comments cite these ids and they must still resolve.
+`git show <ref>` holds the diagnosis, the diff and the argument. ➖ is closed-by-design or
+withdrawn; which one a row is, is its Resolution cell.
 
 > **Labels in these rows no longer exist, and the rows are not rewritten.** `PV-10` replaced the
 > boolean **`Re-probe Z0 After a Change`** (`toolChangeProbeAfterChange`) with the enum **`Tool Length
@@ -155,7 +143,7 @@ diagnosis, the diff and the argument.
 | **HR-22** | Should `gAbsIncModal` / `gUnitModal` / `gFeedModeModal` be reset? | Low | **Closed as a duplicate.** It asked the question `CR-21` answers: yes, and the second file in a reused context loses its whole preamble without it. Two ids for one defect is how a fix comes to be applied to one of them, and this is the id with no row of its own — `CR-21` carries the diagnosis and the six coordinate variables beside the three formatters | ➖ |
 | **WR-2** | A machine coordinate that does not parse is read as "not set", in silence | Wrong output | `parseMachineCoordinate()` answers `undefined` for a typo exactly as it does for an empty field, and `undefined` **is** the answer *no frame* / *do not move* — so `"-12mm"` in `Machine Travel Z` silently costs a single-part job its whole machine frame, and a mistyped `Tool Change Position Z` silently changes the tool at the travel height instead. A `validateJob()` warning on all four machine-coordinate fields, beside the Safe-Z loop that answers the identical question for the two expression fields — `HB-5`'s rule, *both properties fail the same way in both channels*, extended to the fields it never reached. **The X/Y refusal is not this**: it tests the raw fields for the same thing but exists only on the manual flow of a multi-tool job, so it left every other configuration silent | ✅ |
 | **WR-1** | The F360-probing refusal sent the operator to a property group that no longer exists | Wrong output | The one dialog that refusal produces named *"On WCS / Part / Fixture Changes"*, retitled in Step 4 — so `PR-12`'s whole gain, a refusal that names where to go instead, pointed at nothing. Now `"5 - Part Origins"`, the same prefix convention the two multi-part guards use for group 4. **The refusal itself is unchanged and still correct** | ✅ |
-| **PR-13** | Group 10's Duet mode strings were RRF 2.x g-code | Low-Med | **Defaults RRF 3.x actually reads, and a description naming both generations' forms** — the field is the operator's to set, so it must let them recognise which form their board wants. `M453` alone: 3.x's `case 453` tests `S` and nothing else, and refuses that one with *"Spindle management has been moved to M950"*, the spindle now being `M950 R0 C"<pin>" Q<freq> L<max rpm>` in `config.g` — `Spindle::Configure()` takes `C` `Q` `K` `L` — bound with `M563 … R0` (`src/GCodes/GCodes2.cpp`, `src/Tools/Spindle.cpp`, `3.5-dev`). `M452 R255 F200`: `case 452` reads `C` `F` `Q` `S` `R`, so `R` and `F` were landing all along and only `P2 I0` was dropped — **the pin was the loss, and no default may name one**, a missing pin costing a laser that never fires where a wrong one drives an output nobody chose, so the description demands `C"<pin>"` instead. The 2.05 forms are named beside them, being what the fields shipped. **The relocation beside the firmware selector was not taken with it** — that is the group-10 fold on `plan.md`'s delete list; the defaults were the defect | ✅ |
+| **PR-13** | Group 10's Duet mode strings were RRF 2.x g-code | Low-Med | **Defaults RRF 3.x actually reads, and a description naming both generations' forms** — the field is the operator's to set, so it must let them recognise which form their board wants. `M453` alone: 3.x's `case 453` tests `S` and nothing else, and refuses that one with *"Spindle management has been moved to M950"*, the spindle now being `M950 R0 C"<pin>" Q<freq> L<max rpm>` in `config.g` — `Spindle::Configure()` takes `C` `Q` `K` `L` — bound with `M563 … R0` (`src/GCodes/GCodes2.cpp`, `src/Tools/Spindle.cpp`, `3.5-dev`). `M452 R255 F200`: `case 452` reads `C` `F` `Q` `S` `R`, so `R` and `F` were landing all along and only `P2 I0` was dropped — **the pin was the loss, and no default may name one**, a missing pin costing a laser that never fires where a wrong one drives an output nobody chose, so the description demands `C"<pin>"` instead. The 2.05 forms are named beside them, being what the fields shipped. **The relocation beside the firmware selector was not taken with it** — that is the group-10 fold, parked on `plan.md`; the defaults were the defect | ✅ |
 | **CR-10** | Parking at machine `X0 Y0` drives back onto the homing switches | Wrong output | **Warned in both channels — `PR-17`'s argument applied to X and Y.** Machine zero is where the switch tripped and homing ends one pull-off inside it, so the park drives the axes back onto the switches, and with hard limits on the program ends in `Alarm` rather than parked. `$27` cannot be read and no number is quoted: `HOMING_FORCE_SET_ORIGIN` is named, as `$1` (`PR-27`) and `$110` (`CR-01`) already are, and the file's half says raising the pull-off does not help — machine zero stays at the trigger point. **GRBL-gated for `PR-17`'s reason**: Marlin re-homes here rather than rapiding (`PR-21`), and an RRF machine homed to its axis minima rests *at* the coordinate the block asks for. **Warned, not refused** — the build option makes the park correct and the post cannot read which build it is talking to. **The `Near Machine X0 Y0` redesign was not taken**, by the author's ruling 2026-08-16: two machine-coordinate fields through `writeMachineFrameBlock()` would answer it properly and cost two properties in the group `PR-5` and `PR-7` thinned | ✅ |
 | **CR-03** | Group 3 is not gated to the licence it exists for | Machine damage | **Closed by design — the mapper functions as designed**, by the author's ruling 2026-08-16, and no code changed. `Map G1s -> G0 Rapids` is read on every `onLinear` whichever licence posted the job, and that is the property's meaning: it is the operator's assertion about their own toolpaths, not a claim about the edition. The designed licence latch stays unapplied in git — `6304c28`, `45c612e`, `95349d6` — and `CR-04` is the same ground already withdrawn | ➖ |
 | **CR-05** | A start include file leaves `G90`, `G21`/`G20`, `G94` and `G17` unwritten | Machine damage | `Start()` is the only writer of absolute positioning, units and — on GRBL — feed mode and plane, and `writeFirstSection()` skips it entirely when `Start GCode File` is filled. A missing file is refused by `validateJob()`'s pre-flight; a file that simply **omits** `G90` has no post-time failure at all, so the precondition goes in the file: one `writeWarning()` at the replacement site, above the loaded content, naming the codes that generation of firmware actually loses — `G94`/`G17` on GRBL, the `M84 S0` stepper-timeout disable off it — and the job's own unit code, `G20` or `G21`. **The dialog half already existed** in `Start GCode File`'s description; this is the channel the operator running the job has and the dialog reader does not | ✅ |
@@ -202,16 +190,12 @@ diagnosis, the diff and the argument.
 
 ## 4. Open tests
 
-**None.** `FR-1T` closed 2026-08-21 with `FR-1` and is in §5; `J1`, `J2` and `J5` closed 2026-08-17
-with `PV-3`'s fix; the jet workstream that was the whole of this section is run, and sixty-four rows
-closed 2026-08-16 before it — **forty-eight by code walk**, §5 holding each one's argument and the four
-it corrected rather than confirmed, and **sixteen on the author's rulings**.
+**None.** Every registered question has been asked of the post and answered — which is not a claim
+that the post is correct: two cases were passing while asserting nothing useful, and §5 carries that
+caveat. `git log -- docs/findings.md` is how this section emptied.
 
-**What §4 does and does not mean.** Every registered question has been asked of the post and answered.
-It is not a claim that the post is correct, and §5's standing caveat is the reason —
-two cases were passing while asserting nothing useful. **The material below stays because §5's rows are
-written against it**: the standing configuration a row states its delta from, and the four methods with
-their bounds.
+**The material below stays because §5's rows are written against it**: the standing configuration a
+row states its delta from, and the four methods with their bounds.
 
 **Standing configuration.** GRBL, mm, `Comment Level` `Info`, probe target `Z-10`, probe
 speed `F30`, probe thickness `Z0.8`. **A row names only what it changes from that line.**
@@ -243,11 +227,12 @@ the case id, as a `utility` row names its `.cnc` and a `posted` row names its `.
 
 ## 5. Passed tests
 
-**✅ 171 PASS · ❌ 0 FAIL · ➖ 18 n/a — 189 tests in 181 rows** (an `(A)`/`(B)` pair shares a
-row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
+**✅ 172 · ➖ 17 — 189 rows.**
+An `(A)`/`(B)` pair shares a row, and no row has ever been marked ❌.
+Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
 `PR-2g`, `PR-2h`, `PR-14a`, `PR-14b`, `PB1`, `PB2`, `M2`, `PBV1`, `PBV2`, `PBV3`, `M1` and `M4`
-were posted 2026-08-14 from `c0ceb86`. Every one passed on first read; none was ever marked ❌.
+were posted 2026-08-14 from `c0ceb86`. Every one passed on first read.
 
 **Twenty-six rows closed by code walk 2026-08-14 against `e11d0c9`** — the Step 1.3 remainder and
 the whole of Steps 2 and 3. §4 states what a walk may settle; each row below names the artifact
@@ -669,37 +654,38 @@ artifacts and three property sets.
    *shorter* than it was while open. If closing it made this file longer, it was written
    wrong.
 2. **An open item carries no history.** State the problem, how to reproduce it, and the
-   action to take. Not how the project arrived at it, not what an earlier version said, not
-   which round found it, not what was rejected on the way.
+   action to take. Not how the project arrived at it, not which round found it, not what
+   was rejected on the way.
 3. **A closed item is one line** — id, subject, commit ref, plus one clause only where the
    resolution is not obvious. `git show <ref>` holds the diagnosis, the diff and the argument.
 4. **A claim this file makes about the code or the library is checked against it, or not
-   made.** Five §7 items discharged on this one failure and it is worth the space: `PV-9` sat
-   open on *"`warning()` appears only inside `validateJob()`"*, false the whole time; a
-   coverage item said nothing reached `onCommand()`'s fall-through while a library file that
-   raises it twice was on disk; and `PR-16` and `HR-26` **closed by deletion**, which names a
-   mechanism that has gone rather than the class that produced it — and both classes were
-   alive elsewhere. **Nothing closes by deletion**: say where the class went, or it did not
-   close. Prefer a claim carrying its own measurement — `grep -n "// TWIN #"`, `grep` §5 for
-   `**Walk` — to a count that rots.
+   made.** `PV-9` sat open on *"`warning()` appears only inside `validateJob()`"*, false the
+   whole time, and five §7 items discharged when it fell. **Nothing closes by
+   deletion**: say where the class of defect went, or it did not close. Prefer a claim
+   carrying its own measurement — `grep -n "// TWIN #"` — to a count.
 
-**Three mechanical rules.** The state marker is the **last** column of every table. Every
-table states its tally above itself. Every finding id resolves to a test row, with a `➖`
-pointer row where another row's matrix proves it.
+**No count in this file is written by hand.** `node tools/register-tally.js` prints §3's and
+§5's; `--check` fails on a disagreement. §5's own tally rotted undetected under the old rule
+that a person maintained it. Nothing else in this file states a count of its rows.
 
 **Running a test.** Post the job from Fusion and read the g-code. **Write the pass criterion
 in simple words** — what must be in the file, and what must be absent.
 
-**Closing a finding.**
+**Closing a finding — four steps.**
 
-1. **Read the row before the code.** It states what the fix has to be true of.
-2. **Show the diff before applying it** — every time, including one-liners. Count the call
-   sites in the code before believing the diff is complete.
-3. **Add the test row** to §4: the setup as a delta from §4's standing configuration, what to
-   do, and a pass criterion naming the one thing whose presence or absence proves it — often
-   an *absence*. Cover **both branches** of any new condition.
-4. **Flag what the change invalidates.** Any passed row whose saved `.gcode` no longer matches
-   goes in *Invalidated by landed fixes*, deleted row by row as those tests are re-posted.
-5. **Move the row from §2 to §3** and collapse it to one line.
-6. **Commit** with a message describing the code change and why — never the doc bookkeeping —
-   and lead the subject with the id. Check the tallies in the diff; nothing counts them.
+1. **Read the row, then show the diff.** The row states what the fix has to be true of.
+   Count the call sites in the code before believing the diff is complete.
+2. **Add a test row to §4 where the fix is witnessable** — the setup as a delta from §4's
+   standing configuration, and a pass criterion naming the one thing whose presence or
+   absence proves it, often an *absence*. Cover both branches of a new condition.
+   **Where nothing a run or a walk can reach would distinguish the fix, write no row**: say
+   so in the Resolution cell instead, in a clause. A row that asserts nothing costs more to
+   carry than the gap it hides.
+3. **Flag what the change invalidates.** Any passed row whose saved `.gcode` no longer
+   matches goes in *Invalidated by landed fixes*, deleted row by row as those are re-posted.
+4. **Move the row from §2 to §3**, collapsed to one line, and commit — the message
+   describing the code change and why, its subject led by the id. Run
+   `node tools/register-tally.js --check` and set the two tally lines to what it prints.
+
+**Never point two ways.** A pointer is valid in one direction only: from here toward the
+file that owns the work. This file does not point into `plan.md`.

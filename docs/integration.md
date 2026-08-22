@@ -574,7 +574,8 @@ what it decides. Six of the seven feed properties were in the same position: `H9
 ceilings at once and asserted only that the *result* stayed under one of them, so no case could have
 told you which of the three did the work — or whether any of them did. Each now has a case that
 varies it **alone** and reads the difference it alone makes. A property is genuinely covered when a
-case sets it *as its subject*, which is why the tables in §7 name the assertion, not the property.
+case sets it *as its subject*, so what a property owes is read from the case that names it in
+`tools/*-matrix.js`, not from the property list.
 
 **And a difference observed is not a formula reproduced.** No case in `personal-matrix.js` computes
 what a feedrate should be. Each one posts the same job twice and reads what moved: a rate that
@@ -661,253 +662,152 @@ eleven cases that now reach it.
 
 ---
 
-## 7. What full coverage would take, and how much of it is a job file
+## 7. What is still out of reach, and why
 
-The 11 properties no case varies (§6.3) look like one debt and are three different ones. **The
-job-file half is built** (§7.5), **the group-3 half is reached** (§6.5) **and the case half is
-closed** (§7.1); what remains is fixture files, rulings and the stated bounds. Everything below was
-run rather than reasoned, except where it says otherwise.
+The 11 properties no case varies (§6.3) are not one debt. **The job-file half is built** (§7.5), **the
+group-3 half is reached** (§7.7) **and the case half is closed** (§7.1). What remains is fixture files,
+two rulings the author owns, and four stated bounds. Each subsection below says which of those it is.
 
 ### 7.1 Needed a case, not a file — **closed, 2026-08-17**
 
-All five are `CorrectGcode` cases over job files that were already on disk, and one of them was owed a
-correction rather than a case.
+Five residues, all `CorrectGcode` cases over job files already on disk: `jobSpindleControl` = `M3`
+(`CG32`), `probeG382orG28` = `false` (`CG35`), `duetMillingMode`/`duetLaserMode` (`CG36`),
+`machineHomeAtStart` = `Pause & Home` (`CG33`), `probePause` = `Before` (`CG34`). What each asserts and
+why is the case in `tools/correct-gcode-matrix.js`. A sixth, `feedsScaleFeedrate` = `false`, closed with
+`F2`.
 
-| Residue | Closed by | What it asserts |
-|---|---|---|
-| `jobSpindleControl` = `M3` | `CG32` | `M3 S5000` and `M5` **replace** the two prompts — both halves, because a case that asserted only the `M3` would pass on a post that commanded the spindle *and* still stopped to ask |
-| `probeG382orG28` = `false` | `CG35` | `G28 Z` in place of `G38.2`, **on Marlin** — a GRBL case would assert nothing, that arm emitting `G38.2` unconditionally |
-| `duetMillingMode`, `duetLaserMode` | `CG36` | both tokens, from one job: they are written at a section-type **change**, so `mill-then-jet.cnc` is the shape that emits the pair. The table's old note said the default was `T0`; it is `M453` |
-| `machineHomeAtStart` = `Pause & Home` | `CG33` | the stop **above** the homing cycle — a stop below it prepares the machine for a cycle that has already run |
-| `probePause` = `Before` | `CG34` | the fit prompt without the removal prompt. `H15` covers `No`, the default covers `Before & After` |
+### 7.2 Needs fixture files, not job files — **open**
 
-*(A sixth residue, `feedsScaleFeedrate` = `false`, closed earlier the same day with `F2` — and it did
-not close the way this table expected. The claim written here was that unscaled feeds are faster; the
-fastest cut is `F1000` either way, and what scaling actually does to this job is slow 615 of 1067
-moves and drop the plunge from 1000 to 180. §3's twenty-first failure.)*
+Eight properties name **a file, not a value**: `includeStartFile`, `includeStopFile`,
+`includeToolFile1`, `includeToolFile2`, and the four `coolantChannel{A,B}{On,Off}Custom`.
 
-### 7.2 Needs fixture files, not job files
-
-Eight properties name **a file, not a value**, and this is worth stating plainly because half of them
-do not read that way:
-
-`includeStartFile`, `includeStopFile`, `includeToolFile1`, `includeToolFile2`, and the four
-`coolantChannel{A,B}{On,Off}Custom`.
-
-**The custom-coolant fields are include files.** Setting `coolantChannelAOnCustom` to `M42 P4 S255` —
-which looks exactly like the g-code it is meant to produce — **refuses the whole job at `onOpen()`**:
+**The custom-coolant fields are include files**, which is worth stating because they do not read that
+way. Setting `coolantChannelAOnCustom` to `M42 P4 S255` — exactly the g-code it is meant to produce —
+refuses the whole job at `onOpen()`:
 
 ```
 Error: "Channel A On Custom" names "M42 P4 S255", which is not a file in the NC output
 folder <dir> -- check the spelling and the extension, or clear the field.
 ```
 
-Put that same text in a file called `coolA-on.nc` in the output folder and it posts, emitting the
-line verbatim. All eight were verified this way with one-line fixtures, including the start file's
-`>>> WARNING` that it **replaces** the post's header and with it the only `G90`/`G21`/`G94`/`G17` the
-job sets — `CR-05`, witnessed here for the first time.
+Put that text in `coolA-on.nc` in the output folder and it posts, emitting the line verbatim. All eight
+were verified this way with one-line fixtures, the start file included — its `>>> WARNING` that it
+**replaces** the post's header, and with it the only `G90`/`G21`/`G94`/`G17` the job sets, is `CR-05`
+witnessed for the first time.
 
-So what is owed is a `tools/include-fixtures/` directory and a matrix that copies it into the output
-folder before the run. **No new `.cnc` file, and no new technique.**
+**What is owed is a `tools/include-fixtures/` directory and a matrix that copies it into the output
+folder before the run.** No new `.cnc` file, and no new technique.
 
 ### 7.3 Needs no new file — the library already has ten of them
 
-**Coolant is 10 properties and the largest block of unreached enum values, and every one is reachable
-now.**
 `Milling/Coolant Codes/` ships ten job files — `flood`, `mist`, `air`, `suction`, `through tool`,
-`flood and mist`, `flood and through`, `air through`, `air through tool`, `off` — which is one job per
-coolant request the post can be asked to serve.
+`flood and mist`, `flood and through`, `air through`, `air through tool`, `off` — one per coolant
+request the post can be asked to serve, so **all 10 coolant properties are reachable now.**
 
-Verified: `flood.cnc` with `coolantChannelAMode` = `Flood` emits `M8` … `M9`; `flood and mist.cnc`
-with a channel set to `Flood and Mist` emits `M8`. And a mismatch is **named, not silent** — channel A
-`Flood` plus channel B `Mist` against a job asking `Flood and Mist` gives
-`>>> WARNING: No matching Coolant channel : Flood and Mist requested`. So the post matches a request
-against a channel **whole** and does not compose two channels to meet it, which is a design question
-rather than a coverage one.
+One design fact fell out of reaching them: the post matches a request against a channel **whole** and
+does not compose two channels to meet it. Channel A `Flood` plus channel B `Mist` against a job asking
+`Flood and Mist` gives `>>> WARNING: No matching Coolant channel : Flood and Mist requested` — named,
+not silent.
 
-`plan.md` blocks group 9 on **a coolant persona**. That block is correct and this does not lift it:
-what is missing is a ruling on which of the ten a hobby machine should serve, not an artifact.
+**`plan.md` blocks group 9 on a coolant persona, and this does not lift it**: what is missing is a
+ruling on which of the ten a hobby machine should serve, not an artifact.
 
 ### 7.4 Needs no new file — but is a deferred workstream
 
 **Laser is 6 properties and 7 unreached values** since `PC-4` folded the two mode fields into one and
-`CG22g` closed the static-power value the old pair never posted, and
-`Cutting/Laser/` ships three jobs. The library
-is richer than the register assumes: `center.cnc` censuses as **7 sections** on one tool, not one
-operation.
+`CG22g` closed the static-power value the old pair never posted. `Cutting/Laser/` ships three jobs, and
+the library is richer than the register assumed: `center.cnc` censuses as **7 sections** on one tool.
+Percent scales ten times into GRBL's `S` range — `laserOnThrough` = 11 gives `S110`. `laserOnVaporize`
+is the exception and it is a bound, not a gap — §7.6.
 
-Verified: `laserOnThrough` = 11 and `laserOnEtch` = 22 produce `S110` and `S220` — percent scaled ten
-times into GRBL's `S` range. **`laserOnVaporize` is the exception and it is not a coverage gap but a
-bound** — §7.6.
-
-Group 8 is blocked on laser detail in `findings.md` §6, and `J1` has already run and failed here
-(`PV-3`). Again: a ruling, not an artifact.
+**Group 8 is blocked on laser detail in `findings.md` §6**, and `J1` has already run and failed here
+(`PV-3`). A ruling, not an artifact.
 
 ### 7.5 The new-file debt — **built, 2026-08-17**
 
-Four files closed it, and the suite went from 84 cases to 90.
+Four files closed it. What each reaches:
 
-**`jet-two-parts.cnc` — the multi-part half met by a tool that cannot probe.** `J2` and `J5` were the
-only two rows `findings.md` §4 said a `utility` run could not reach, blocked on *"a jet block to
-splice, `make-wcs-jobs.js` sourcing from a milling file; `Cutting/Laser/center.cnc` is one operation"*.
-**Both halves of that were wrong**, and the correction made the job cheaper: `center.cnc` is seven
-operations, so no cross-source splice was needed at all. `W25` posts it and reads the traverse
-retract, the `WCS changed: 1 -> 2`, the `G55`, the move to the stored origin — **and the arm that
-runs when nothing can probe**, reached here for the first time.
+| File | The path it reaches |
+|---|---|
+| `jet-two-parts.cnc` | the multi-part traverse met by a tool that cannot probe — `W25` reads the retract, the `WCS changed: 1 -> 2`, the `G55`, the move to the stored origin |
+| `mill-then-jet.cnc` | `PR-22`'s falsifier — `W26` reads the whole change-into-a-laser boundary in order: machine-frame retract, `M0 (MSG,Turn OFF spindle)`, the hand-over, the cannot-correct-Z0 warning, the laser firing |
+| `mid-offsets.cnc` | offsets 2, 3, 5 and 8 (`W23`, `W24`). **Offset 8 is refused on GRBL** by name, and this is the only job that *starts* on a register other than WCS 1 |
+| `jet-return.cnc` | the one arm of `writeWcsOnReturn()` nothing else reaches — a return to a part whose Z0 is stale with no way to re-measure. `W27` reads the move to the stored origin and the warning that every depth below is out by a tool length |
 
-**`mill-then-jet.cnc` — `PR-22`'s falsifier.** The spindle stop once read the **incoming** tool's jet
-guard, so a change into a laser handed the operator a still-turning cutter. It was fixed on a walk
-and nothing witnessed it. The prologue question §7.5 flagged as unproven was settled by building
-both variants (§4.2): it is cosmetic. `W26` now reads the whole boundary in order — machine-frame
-retract, `M0 (MSG,Turn OFF spindle)`, the hand-over, the warning that the arriving tool cannot
-correct Z0, and the laser firing.
+**Two of those recorded findings rather than passes**, and both are fixed: `W25b` and `W27` found
+`PV-3` and `PV-9`'s one-channel silence at three further `canProbe`-false sites. **Both cases now assert
+the presence they were written to find missing**, on the same regexes — so a `warnBothChannels()`
+reverted to `writeWarning()` turns them red again, and the closure is pinned exactly as the gap was.
 
-**`mid-offsets.cnc` — the four registers nothing else selected.** `W23` and `W24` take offsets 2, 3,
-5 and 8. Two things fell out that the arithmetic alone would not have shown: **offset 8 is refused on
-GRBL** and the refusal names the offset rather than the count, and this is the only job that
-**starts** on a register other than WCS 1 — every other file, shipped or generated, opens on `G54`.
+**`HR-6 (B)` needed no file either.** `CG26`–`CG26f` post all six rotated Setups the library ships:
+each refused by name, with `trace.cps` recording the forward vector each was refused for, against
+thirty upright posts in the same matrix as the control.
 
-**`jet-return.cnc` — the one arm of `writeWcsOnReturn()` nothing else reaches.** A milling tool sets
-part 1 up; section 2 is a change **into** the laser and a new part at once; section 3 returns to part
-1 with Z0 stale and no way to re-measure it. Every other return either can probe or has nothing
-stale. `W27` reads what is left: the move to the stored origin, and a warning that every depth below
-is out by a tool length.
+### 7.6 Four bounds — things no `.cnc` in this suite reaches
 
-**Both files recorded findings rather than passes, and both of those findings are now fixed.**
+**`laserOnVaporize`.** The post maps `currentSection.jetMode` `Vaporize` to that property, and no jet
+file in `Cutting/` produces that mode — only `Through` and `Etching`. `center.cnc`'s seventh operation
+is *named* `Vaporize_Center` and its jetMode is `Through`. **A splice cannot add it**: `jetMode` is a
+section property the kernel computes, not a word sitting in the block. Needs a Fusion job authored in
+vaporize mode.
 
-`W25b` found that at the shipped comment level the second part said nothing about the Z0 nobody
-established — no probe, correctly, but no warning in either channel. That was `PV-3` at two further
-sites, both `canProbe`-false arms of `writeWcsEstablish()`. **It closed 2026-08-17**, and the case now
-asserts the warning it was written to find missing; `W28` covers the third site on the same file and a
-different property set. Its remaining assertion — the **absence of a dialog twin** — was `PV-9`'s
-question, and `PV-9` closed on it the same day.
-
-`W27` — the return **does** warn, and it warned in the file alone. That answered the first of `PV-9`'s
-two open questions with an artifact instead of an argument: **yes, the `canProbe`-false arm carried the
-same one-channel silence** as the mode-side arm. Different reason, identical consequence — which is why
-a fix scoped to the mode would have left it behind, and why the fix went to the one
-`writeWcsOnReturn()` statement both arms fall to.
-
-**Both cases now assert the presence they were written to find missing**, on the same regexes, in the
-other channel. That inversion is deliberate: a `warnBothChannels()` reverted to `writeWarning()` turns
-them red again, so the closure is pinned exactly as the gap was.
-
-**The remaining residue is cases, not files.** `findings.md` §7 *Owed* item 2 listed five gaps; the
-jet block and the four offsets are now built, and the other three need no artifact — a jog mode on a
-stale return, Flow 2 on RepRapFirmware across a WCS change, and the change position crossed with a
-WCS traverse are all property sets over `change-then-return.cnc` and `part-then-tools.cnc`.
-
-**And the live risk needed no file at all — it is run, 2026-08-17.** `HR-6 (B)` asked whether the
-orientation guard is a no-op on exactly the case it exists to catch. The library ships five rotated
-Setups and a sixth file holding all five, and `CG26`–`CG26f` post every one of them: **each is refused
-by name, and `trace.cps` records the forward vector each was refused for** — `(0, ±0.5, 0.866)`,
-`(∓0.5, 0, 0.866)` and the compound `(0.267, -0.267, 0.926)`, so what is refused is known to be
-off-axis rather than assumed to be. The control is the rest of the matrix: thirty upright posts, so
-the guard is not simply refusing everything. `all.cnc` adds the half `PR-2c` cares about —
-five rotated sections, refused at the **first**, leaving no runnable `.gcode`.
-
-### 7.6 One more thing no job file has, and no splice can add
-
-**`laserOnVaporize` is unreachable from the entire shipped library.** The post reads
-`currentSection.jetMode` and maps `Vaporize` to that property. Every jet file in `Cutting/` was
-posted and **none produces `jetMode: Vaporize`** — only `Through` and `Etching`. `center.cnc`'s
-seventh operation is *named* `Vaporize_Center` and its jetMode is `Through`.
-
-A splice cannot add it. `jetMode` is a **section property the kernel computes**, not a parameter
-sitting in the block, so there is no word to change — unlike the work offset, which is exactly why
-that one is editable. Reaching it needs a Fusion job authored in vaporize mode.
-
-Group 8 is blocked on laser detail in any case, so this is recorded as a bound rather than pursued.
-
-**Two more things no `.cnc` in this suite reaches, found 2026-08-17 and recorded here for the same
-reason.**
-
-**A tool numbered 0.** `canProbe` is `tool.number != 0 && !tool.isJetTool()` — one expression, two
-disjuncts — and only the jet one can be posted. No file Autodesk ships carries a tool 0, and the
-splice cannot add one: `operation:tool_number` was stamped to `0` and the post reported `Tool: 1`,
-then to `7` with the same result, so the kernel does not build `tool.number` from that parameter.
-Whatever record it does read is one `make-wcs-jobs.js` decodes by guess or not at all, and its own
-header refuses to guess. The generated job was deleted rather than kept — a file named for a tool it
-does not carry is worse than no file. Like the vaporize level, this needs a Fusion-authored Setup.
-
-**`onCommand()`'s fall-through — this was recorded here as unreachable and it is not.** The claim was
-that with `PV-2` landed nothing in the suite reaches it, so `HR-13`'s warning is witnessed by nothing
-and a regression would be silent, and that it needed a Fusion-authored job carrying a Manual NC
-instruction. **The instruction did not have to be Manual NC.** `Milling/Drilling/fine boring.cnc` and
-`back boring.cnc` raise `COMMAND_ORIENTATE_SPINDLE`, which the switch does not name, so the
-fall-through fires twice in the first and four times in the second — from Autodesk's own library, on a
-file that has been on disk the whole time. `CG16` posts it and holds the count to the trace's. **Read
-that as the general case**: *unreachable* meant *not yet looked for*, and what settled it was censusing
-the library's commands rather than reasoning about the post.
-
-**Two bounds that ARE bounds, both measured 2026-08-17.**
+**A tool numbered 0.** `canProbe` is `tool.number != 0 && !tool.isJetTool()` and only the jet disjunct
+can be posted. No Autodesk file carries a tool 0, and the splice cannot add one — `operation:tool_number`
+was stamped to `0` and the post still reported `Tool: 1`, so the kernel does not build `tool.number`
+from that parameter. Needs a Fusion-authored Setup.
 
 **No job asks for a diagonal rapid.** Every `onRapid` the kernel delivers moves in X/Y or in Z, never
 both — measured over thirteen jobs including the two with the most rapids. So `rapidMovements()`'s
-ordering branch, the cross-then-descend decision that keeps the tool out of the part, **cannot be
-exercised by any file on disk**, and a mutant that reverses it turns nothing red (§5.1). `CG8` says so
-where it would otherwise be claiming to test it.
+cross-then-descend ordering branch **cannot be exercised by any file on disk**, and a mutant that
+reverses it turns nothing red (§5.1). `CG8` says so where it would otherwise claim to test it.
 
-**Nothing reaches `onDwell()`.** No shipped `.cnc` produces a dwell, `Milling/Drilling/dwell and rapid
-out.cnc` included — its counter-boring cycle expands without one. So the `G4 P<sec>` / `G4 S<sec>`
+**Nothing reaches `onDwell()`.** No shipped `.cnc` produces one, `Milling/Drilling/dwell and rapid
+out.cnc` included — its counter-boring cycle expands without a dwell. So the `G4 P<sec>` / `G4 S<sec>`
 firmware split stands on the source alone.
+
+**A fifth was recorded here and was never a bound**, and it is the reason to trust the reasoning behind
+the other four less than the measurements under them. `onCommand()`'s fall-through was called
+unreachable pending a Fusion job carrying a Manual NC instruction. The instruction did not have to be
+Manual NC: `Milling/Drilling/fine boring.cnc` and `back boring.cnc` raise `COMMAND_ORIENTATE_SPINDLE`,
+which the switch does not name, from Autodesk's own library, on files that had been on disk the whole
+time. `CG16` posts it and holds the count to the trace's. **Read that as the general case**:
+*unreachable* meant *not yet looked for*, and what settled it was censusing the library's commands
+rather than reasoning about the post.
 
 ### 7.7 Group 3 — **reached, 2026-08-17**
 
 **No `.cnc` file, shipped or built, can exercise group 3**, and that has not changed. What changed is
-that the condition it needs is not a property of the job at all, so it stopped being looked for
-there. §6.5 is the mechanism; this is what the eleven cases establish.
+that the condition it needs is not a property of the job at all. §6.5 is the mechanism; eleven cases in
+`tools/personal-matrix.js` are what it established, and two of them state bounds this file owns.
 
-**The bound, restated as a measurement.** With the hook off, switching `mapRapidsRestoreRapids` on
-alters **not one of `bore.cnc`'s 1094 emitted g-code blocks** — it adds a single comment naming the
-safe height it resolved, and converts nothing. That is `R1`, and it is a stronger statement than the
-one this section used to carry, which was measured on `face.cnc` with a positional line compare that
-would have reported any inserted comment as a whole-file change (§3, the twentieth failure).
+**`R1` is the bound, as a measurement.** With the hook off, switching `mapRapidsRestoreRapids` on
+alters **not one of `bore.cnc`'s 1094 emitted g-code blocks** — it adds one comment naming the safe
+height it resolved, and converts nothing. On full-licence output the group is inert, so nothing the
+other cases show can be an artefact of the hook.
 
-**What the four group-3 cases settle:**
+**`R7` is why the group exists.** With rapids arriving as feed moves and the group off, every Z
+traverse leaves at the Z cutting ceiling or below — 180, not the 321 it was told to travel at. Turn the
+group on and four leave as rapids at 321.
 
-| Case | Establishes |
-|---|---|
-| `R1` | the bound above — on full-licence output the group is inert, so nothing below can be an artefact of the hook |
-| `R2` | the conversions run: one first-move conversion in a one-section job, and three safe-move conversions — **and the file and the dialog both say the hook is on** |
-| `R3` | `mapRapidsRestoreRapids` is the master switch: with the hook on and the group off, nothing converts and the Z travel speed reaches one move instead of four |
-| `R4` | `mapRapidsSafeZ` decides **how many** moves convert — five at `0`, none at `100` — read on the safe-move count alone, because the first-move conversion is not gated on safe Z and would have masked it |
+**This is no longer a bound, so group 3 is no longer excluded from the coverage number** — its
+properties count as varied and §6.2's numerator includes them. `PC-6` left the group one property; the
+height it is measured against is group 5's `Safe Z` now, and `R4` varies it there.
 
-**And `R7` is why the group exists**, which none of the above shows on its own. With rapids arriving
-as feed moves and the group off, every Z traverse leaves at the **Z cutting ceiling or below** — 180,
-not the 321 it was told to travel at. Turn the group on and four of them leave as rapids at 321. That
-is the post's own stated reason for the feature, in its own words at `onLinear()`, witnessed for the
-first time: *"the first move to the start of a section will be at the slowest cutting feedrate."*
+### 7.8 What is left
 
-**This is no longer a bound, so it is no longer excluded from the coverage number** — group 3's
-properties count as varied, and §6.2's numerator includes them. It was *both* properties until `PC-6`
-left the group one: the height they are measured against is group 5's `Safe Z` now, and `R4` varies
-it there.
-
-### 7.8 The answer, by persona
+**Eight fixture files, three property sets over job files already built, two rulings the author owns,
+and four bounds.** None of it needs a new job file and none of it needs Fusion.
 
 | | Hobbyist | Professional |
 |---|---|---|
-| **New job files** | ✅ none were needed | ✅ **built** — `jet-two-parts`, `mill-then-jet`, `mid-offsets` |
-| **Groups 2 and 3** | ✅ **reached** — the feeds a slow-Z machine depends on, and the rapids a Personal licence turns into cuts | ✅ the same eleven cases; group 3 is off for this persona and `R1` is what says so |
-| **Needs a case only** | ✅ **closed** — `CG32`, `CG34` | ✅ **closed** — `CG33`, `CG35`, `CG36`; item 6's last three residues remain |
-| **Needs fixtures** | — | the four include files, the four custom coolant files |
+| **Needs fixtures** | — | the four include files, the four custom coolant files (§7.2) |
+| **Needs a property set only** | — | a jog mode on a stale return, Flow 2 on RRF across a WCS change, the change position crossed with a WCS traverse — all over files already built |
 | **Needs a ruling, not an artifact** | coolant (a persona), laser (group 8 detail) | the same |
-| **Unreachable** | — | `laserOnVaporize`, a tool numbered 0, a diagonal rapid, a dwell |
+| **Out of reach, and why** | — | §7.6's four |
 
-**The job-file debt is closed and the licence debt with it.** Every path the post has that a `.cnc`
-file can reach now has one; the one path no file could reach is reached by the post's own test hook;
-and what is still out of reach is stated as a bound with the reason, so none of it is mistaken for a
-gap someone forgot. **`onCommand()`'s fall-through has left that row** — it was never unreachable, and
-§7.6 says what that cost.
-
-The hobbyist column is now empty of artifacts and of cases. **Groups 2 and 3 are the two the hobbyist
-persona depends on most** — a machine whose Z is far slower than its XY, driven from a licence that
-emits no rapids — and both were the least witnessed in the suite until now: one unreachable, the other
-set as scenery by cases about something else.
-
-What is left is **eight fixture files, three property sets over job files already built, and two
-rulings the author owns.** None of it needs a new job file and none of it needs Fusion.
+**The job-file debt is closed and the licence debt with it.** Every path a `.cnc` file can reach has
+one; the one path no file could reach is reached by the post's own test hook; and what is still out of
+reach is §7.6, stated as a bound with its reason, so none of it is mistaken for a gap someone forgot.
 
 ---
 
