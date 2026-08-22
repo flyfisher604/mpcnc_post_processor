@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.1_Beta3.cps`
 
-Every logged issue and the tests that confirm it. **95 findings — 83 fixed ·
-10 closed by design · 1 withdrawn · 1 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **95 findings — 84 fixed ·
+10 closed by design · 1 withdrawn · 0 open.** Test registers in §4 and §5.
 
 > **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
 > with the design that made them defects. `design.md` → *Tool changes* is the replacement
@@ -51,13 +51,7 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**One row.** `FR-1` is a statement the post makes about a firmware rather than a fault in what it
-emits — `CR-01`'s class, and `CR-24` is the nearest precedent for the FluidNC half of it: a dialect that
-never errors, and acts only where its own config file says to.
-
-| ID | Finding | Sev | Reproduce | Action | Status |
-|---|---|---|---|---|---|
-| **FR-1** | **The post tells a FluidNC operator that their firmware rejects `M6`. FluidNC executes it.** Two places say so, both on the gSender / CNCjs / UGS arm of the hand-over: the comment `toolChangeMacroCall()` writes into the file, and the `validateJob()` warning beside it. Both are true of stock Grbl and of grblHAL, and false of FluidNC — which the post's one `Grbl` answer also covers. FluidNC performs the change itself, through a tool changer or a macro named in its own config file, and where a tool setter is configured it probes the new tool and applies the length as a **frame** offset. **The consequence is a misconfiguration, not a bad line of g-code**: the operator forgoes a route their controller already has, or sets up sender interception that strips the token their firmware needs. **Details** — FluidNC source at v3.9.6: `src/GCode.cpp` and `src/Spindles/Spindle.cpp` for the dispatch, `src/ToolChangers/atc_manual.cpp` for what a change then does. The changer arrived at v3.9.0, so any claim the post makes about it carries a minimum version | Med | Either channel, and neither needs a controller or a run. `PRO11` (`professional-matrix.js`) and `GS5` (`gcode-structure-matrix.js`) both post this arm, and `PRO11`'s `mustLog` asserts the warning's present wording. The dialog half is `Tool Change Handled By`'s own description | **Two halves, and the first is text alone.** (a) Both channels say *GRBL* where they mean stock Grbl and grblHAL; say which, and say what FluidNC does instead. `PRO11` turns red on the reword and goes to *Invalidated by landed fixes*. (b) A fifth `Tool Change Handled By` value, for FluidNC's own changer. It emits the same token the gSender arm emits, so no writer changes — what changes is the guard set, and `toolChangeSenderIsGrblSender()` has to be split before either can move: it answers *needs a sender to intercept* for the warning and *needs the GRBL dialect* for the refusal, and FluidNC answers those two differently. **Two rulings are the author's** — whether that value beside `Tool Length Correction By` = `GCode reprobes Z0 after change` warns or refuses, being two corrections for one change; and that this is the first behavioural split between FluidNC and GRBL, which `design.md` → *Tool changes* forecloses and would have to be reopened. §6 holds the four adjacent FluidNC items | ⬜ |
+**None.**
 
 > **The verdict table is two greps over `MPCNC_v4.1_Beta3.cps` and lives nowhere else.**
 > `grep -n "// TWIN #"` is the paired half: **18 numbered pairs**, each number appearing **exactly
@@ -68,15 +62,15 @@ never errors, and acts only where its own config file says to.
 > to number. **0 owed.** The reason clause is the point of the unpaired ones — a site marked *none*
 > says why the file is the only right channel, not merely that no twin exists.
 
-**What an empty §2 does and does not mean.** Every registered defect has been answered. It is not a
-claim that the post is correct — §7 holds what is owed and unasked. **The live risk that used to stand
-there, `HR-6 (B)`, is answered**: `PV-14` refuses all six rotated Setups the library ships.
+**What an empty §2 does and does not mean.** Every registered defect has been answered. It is
+not a claim that the post is correct — §7 holds what is owed and unasked. **The live risk that used to
+stand there, `HR-6 (B)`, is answered**: `PV-14` refuses all six rotated Setups the library ships.
 
 ---
 
 ## 3. Closed findings
 
-**82 fixed · 10 closed by design · 1 withdrawn · 0 open in §2 — 93 rows.** Permanent: commit messages and
+**84 fixed · 10 closed by design · 1 withdrawn · 0 open in §2 — 95 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -193,23 +187,20 @@ diagnosis, the diff and the argument.
 | **GH-16b** | The spindle could only be prompted for or commanded with `M3`/`M5`, so a router on a switched output — which is what a stock Marlin build can actually operate — had to be reached for by hand | Wrong output | **`jobSpindleControl`, four arms, sharing `GH-16a`'s emitter.** The prompt and `M3`/`M5` arms are the boolean's two states unchanged; `Fan` and `Pin` emit `M106 P{n} S255`/`S0` and `M42 P{pin} S255`/`S0` through `writeFanOrPinOutput()`. **`S255` is a flag, not a speed**: `M106` clamps `S` to 255 and `M42` truncates it to a byte, so the RPM goes to a comment and the file says it was requested and not commanded — including at every mid-operation change, where the alternative was a stream of identical on-codes or silence. Direction is ignored, a relay having no `M4`. **The key moved with the type**, `jobManualSpindlePowerControl` being a boolean whose stored `true`/`false` is not an enum id; the default is the prompt arm, which is what the boolean shipped, so no job changes for anyone who does not choose an arm. Group 1 joins `GH-16a`'s guard table as one entry, `marlinOnly: false`, and takes both refusals — the GRBL one being live here where group 8's is not. Issue 16's spindle half. `GH-16bT` | ✅ |
 | **GH-16c** | Group 9's Marlin coolant values documented neither of M42's build conditions, while the same descriptions covered GRBL's `ENABLE_M7` and FluidNC's pin config in detail | Low-Med | **Closed with `GH-16d`, which rewrote those descriptions anyway.** `DIRECT_PIN_CONTROL` ships commented out (`Configuration_adv.h`, bugfix-2.1.x) so M42 is absent from a stock build, and Marlin tests `pin_is_protected()` *before* the fan redirect in `src/gcode/control/M42.cpp`, the list in `src/pins/sensitive_pins.h` covering every `FANn_PIN`, heater and endstop. Both now stand on `Channel A Pin/Fan #`, where the operator picks the number they apply to. `GH-16dT` | ✅ |
 | **GH-16d** | The four coolant dropdowns offered two Marlin values with the pin frozen in — `M42 P6` and `M42 P11` — which are one 2018 contributor's RAMPS servo header and, on a Rambo, `HEATER_2` and `Y_MIN`; and nothing stopped a channel opening one pin and closing another | Wrong output | **One generic value per form, and a number per channel that both its codes read.** The pins were free-form `type: "string"` defaults when they arrived (`f6993bb`, 2018-11-30) and became the only choices when the field became an enum (`b1a5216`, 2021-02-02) — this restores what that conversion took away. On a Rambo both shipped numbers are protected pins (`sensitive_pins.h`), so `M42` was refused and the coolant silently never switched; the field's description now says the numbering is the board's and names both readings. **The mismatched pair is gone structurally**, on and off sharing one number, and a mismatched *form* — `M106` on with `M42` off, which would leave the output running — is refused. `M106` joins `M42` so all three output groups are one shape and share `writeFanOrPinOutput()`; `CoolantA`/`CoolantB` became callers of one body rather than growing a third branch each. **Defaults did not move** — all four ship GRBL codes — so no default configuration changed and an operator who had chosen a Marlin value falls back to a GRBL one, which the dialect warning announces on the next Marlin job. That warning now quotes the value's *title*, the ids no longer being g-code. `GH-16dT` | ✅ |
+| **FR-1** | Two channels told a FluidNC operator that their firmware rejects `M6`, and a third said it in passing. It executes it — `case 6` sets `ToolChange::Enable` and STEP 4 dispatches to the changer named by `atc:` or the `m6_macro:` in `config.yaml` (`FluidNC/src/GCode.cpp`, `src/Spindles/Spindle.cpp`, v3.9.6) | Med | **Both halves landed.** All three texts now name stock Grbl and grblHAL, and `Tool Change Handled By` gained a fifth value — `FluidNC -- T + M6`, the same token with its own warning: nothing intercepts it, and with neither config key declared the firmware accepts the line, changes nothing and reports nothing. `toolChangeSenderIsGrblSender()` split into `toolChangeNeedsSenderIntercept()` and `toolChangeNeedsGrblDialect()`, FluidNC answering those two differently. Its pairing with `GCode reprobes Z0 after change` **warns** rather than refuses, by the author's ruling: with only an `m6_macro:` that prompts, the post's re-probe is the job's only correction. `PRO47`–`PRO49` | ✅ |
 | **PV-22** | `integration.md` §6.2 stated three coverage measures and called them reproducible, with no script in the tree to reproduce them; two had gone stale behind `GH-16b` and `GH-16d` | Low-Med | **`tools/property-coverage.js`** — the table is now that script's own output, read from `--interrogate` and the six matrices, so a property added tomorrow moves it by being run. **The hand count does not reproduce and is not adjusted but re-measured**: the same method over the `v4.0_Beta3` tree returns 46/62 and 57/91 where §6.2 said 44/62 and 53/90, so the old numbers and the new ones are not on one scale and the doc says which produced which. `PV-22T` | ✅ |
 
 ---
 
 ## 4. Open tests
 
-**One row — `FR-1T`.** `J1`, `J2` and `J5` closed 2026-08-17 with `PV-3`'s fix and are in §5; the jet
-workstream that was the whole of this section is run, and sixty-four rows closed 2026-08-16 before it —
-**forty-eight by code walk**, §5 holding each one's argument and the four it corrected rather than
-confirmed, and **sixteen on the author's rulings**.
+**None.** `FR-1T` closed 2026-08-21 with `FR-1` and is in §5; `J1`, `J2` and `J5` closed 2026-08-17
+with `PV-3`'s fix; the jet workstream that was the whole of this section is run, and sixty-four rows
+closed 2026-08-16 before it — **forty-eight by code walk**, §5 holding each one's argument and the four
+it corrected rather than confirmed, and **sixteen on the author's rulings**.
 
-| Test | Proves | Setup (delta) | Method | Expansion | State |
-|---|---|---|---|---|---|
-| **FR-1T** | **Both branches of the handler split** — the new value gets the firmware's contract, the three sender values keep the interception warning they already have. **On the FluidNC run:** `T2 M6` is present, and **no line anywhere says GRBL answers `error:20` or that a sender must intercept the token** — the absence is the test. The log carries the contract warning naming `atc:` and `m6_macro:`, and **not** the interception warning. **On the `gSender` run:** the interception warning is still raised, and now says *stock Grbl and grblHAL* rather than GRBL flatly. **On each mismatch:** refused, not warned | `PRO11`'s case — `change.cnc`, `toolChangeMode` = `Macro`, `probeOnStart` = `Skip` (keys and enum ids, as the property dump writes them) — run twice, once with `Tool Change Handled By` = the new FluidNC value and once left at `gSender`; then the FluidNC value again with `CNC Firmware` = `Marlin`, and once more with `RepRap` | utility | `FR-1` | ⬜ |
-
-**What §4 does and does not mean.** Every registered question has been asked of the post and answered,
-bar the row above. It is not a claim that the post is correct, and §5's standing caveat is the reason —
+**What §4 does and does not mean.** Every registered question has been asked of the post and answered.
+It is not a claim that the post is correct, and §5's standing caveat is the reason —
 two cases were passing while asserting nothing useful. **The material below stays because §5's rows are
 written against it**: the standing configuration a row states its delta from, and the four methods with
 their bounds.
@@ -244,7 +235,7 @@ the case id, as a `utility` row names its `.cnc` and a `posted` row names its `.
 
 ## 5. Passed tests
 
-**✅ 163 PASS · ❌ 0 FAIL · ➖ 18 n/a — 181 tests in 174 rows** (an `(A)`/`(B)` pair shares a
+**✅ 164 PASS · ❌ 0 FAIL · ➖ 18 n/a — 182 tests in 174 rows** (an `(A)`/`(B)` pair shares a
 row). Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
 `PR-2g`, `PR-2h`, `PR-14a`, `PR-14b`, `PB1`, `PB2`, `M2`, `PBV1`, `PBV2`, `PBV3`, `M1` and `M4`
@@ -463,6 +454,7 @@ warning the fix deletes; `CR-23` retires beside them, closed on a ruling that ch
 | **P4** | ➖ Superseded by `PR-1a`: the enum it tested no longer exists |
 | **PV-20a** | ✅ `utility`, 2026-08-17 — `PRO45`/`PRO46` of `tools/professional-matrix.js`, **the same job at the same tool count, one dropdown apart**, and each asserts its own sentence *and the absence of the other's*: a single shared text cannot pass both. **The measurement is what settled it, not the reading**: `tools-across-parts.cnc` posted on the hand-over with `Spindle Control` at **`M3`/`M5`** comes back with the change block a retract, an `M5`, `T2 M6` and the resume — **no `M0` anywhere near the change** — under a dialog still saying the job pauses for one. With the property left on, the `M0 (MSG,Turn OFF spindle)` two lines above the token is what made the old sentence read true. So `PRO46` asserts `M0 (MSG,Change to Tool` **absent** where `PRO45` asserts it present: the two cases differ in the file as well as in the dialog, which is the claim. The hazard clause is asserted **present in both**, because the gate is right and must not be narrowed by a text fix. Both passed on their first run |
 | **PV-21a** | ✅ `utility`, 2026-08-17 — `W32`/`W33` of `tools/wcs-matrix.js` over `two-parts.cnc`. **Why the matrix never reached it**: all 37 cases set `First WCS / Part`, and every one of them to `Skip` or `Probe Z` — the shipped default was never posted on a multi-part job by anything in the register, `W6` being the only case that leaves it unset and a refusal. `W32` asserts both channels **and the order**: the file half must stand *above* the `G10 L20 P1 X0 Y0 Z0` it describes, a true sentence below the write being of no use to anyone. `W33` is the same job on `Jog to X0 Y0, Probe Z0` — **the identical `G10`**, reached through `M0 (MSG,Jog to X0 Y0 above Z0, probe)`, with both channels asserted **silent**. That pair is what keeps the finding about the silence rather than about the jog, and what a gate on the offset count alone would have got wrong. **190/190 across all six matrices, and no other case moved** |
+| **FR-1T** | ✅ `utility`, 2026-08-21 — `PRO47`, `PRO48` and `PRO49` of `tools/professional-matrix.js` over `Milling/2D/toolchange.cnc`, with `PRO11` extended to assert the qualified wording where it used to assert the flat one. **The FluidNC run's criterion is an absence and it holds in both channels**: `T2 M6` is emitted, and neither the file nor the log contains `error:20` or any claim that something must intercept the token — read by hand as well as by regex, `PRO47.gcode`:167-169 being the hand-over. The contract warning naming `atc:` and `m6_macro:` is raised and the interception warning is not. **Each mismatch is refused**: RepRap by the widened dialect guard, in its own sentence rather than the sender one, and Marlin by the tool-length guard above it, which is the right refusal there. 210/210 across the six matrices |
 
 ### Checked and found correct — do not re-run
 
@@ -554,7 +546,7 @@ where the dialog was brought into line with it.
 handling, no machine frame and no pre-flight refusals, so the gaps run mostly the other way; these are
 the four that do not. **Prior art is cited to be checked, not copied**: in three of the four the
 mechanism is the small part and the question under it is the work. The fifth thing that pass found is a
-defect, and it is `FR-1` in §2.
+defect, and it is `FR-1`, closed in §3.
 
 **Split-file output — one file per tool.** `At a Tool Change` = `Refuse a multi-tool job` answers a
 two-tool job by refusing to post it; a further answer would post it as one file per tool. **Nothing in

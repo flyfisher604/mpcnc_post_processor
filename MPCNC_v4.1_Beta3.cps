@@ -507,7 +507,7 @@ properties = {
   },
   toolChangeSender: {
     title      : "Tool Change Handled By",
-    description: "Who does the change after the hand-over, and so which token is emitted. Read only on Sender or firmware macro changes it. gSender: T and M6, which the sender must be set to intercept -- GRBL itself rejects M6. CNCjs: T and M6, but it only pauses, so the change and the re-zero are yours. UGS: T and M6, and its tool-change interception is OFF until you switch it on -- enabled, it removes the M6, passes the T word through so the machine state names the tool, moves to a safe height and a change position, waits for you, and can run a tool length probe if you have configured one. If you use that probe, set Tool Length Correction By to Tool change applies tool offset. RepRapFirmware tool table: T alone; your tools must be declared in config.g. Other: no token -- the file named in Sender Macro File is included instead. The post then re-asserts absolute mode, units and the work offset, and returns to Machine Travel Z.",
+    description: "Who does the change after the hand-over, and so which token is emitted. Read only on Sender or firmware macro changes it. gSender: T and M6, which the sender must be set to intercept -- stock Grbl and grblHAL reject M6. CNCjs: T and M6, but it only pauses, so the change and the re-zero are yours. UGS: T and M6, and its tool-change interception is OFF until you switch it on -- enabled, it removes the M6, passes the T word through so the machine state names the tool, moves to a safe height and a change position, waits for you, and can run a tool length probe if you have configured one. If you use that probe, set Tool Length Correction By to Tool change applies tool offset. FluidNC: T and M6, which the firmware executes itself -- no sender interception, and a sender set to strip the M6 takes away the token it acts on. It dispatches to the tool changer declared as atc: under the spindle, or runs the macro named by m6_macro:, both in config.yaml, which the post cannot read -- and where neither is declared it accepts the M6, changes nothing and reports nothing. A changer needs FluidNC 3.9.0 or later. If yours probes a tool setter and applies the length, set Tool Length Correction By to Tool change applies tool offset. RepRapFirmware tool table: T alone; your tools must be declared in config.g. Other: no token -- the file named in Sender Macro File is included instead. The post then re-asserts absolute mode, units and the work offset, and returns to Machine Travel Z.",
     group      : "toolChange",
     order      : 20,
     type       : "enum",
@@ -515,6 +515,7 @@ properties = {
       { title: "gSender (Sienci) -- T + M6",         id: "gSender" },
       { title: "CNCjs -- T + M6",                    id: "CNCjs"   },
       { title: "UGS (Universal Gcode Sender) -- T + M6", id: "UGS"  },
+      { title: "FluidNC -- T + M6",                  id: "FluidNC" },
       { title: "RepRapFirmware tool table -- T",     id: "RepRap"  },
       { title: "Other -- the macro file below",      id: "Other"   }
     ],
@@ -927,8 +928,9 @@ var fFormat = createFormat({ prefix: "F", decimals: (unit == MM ? 0 : 2) });
 
 var toolFormat = createFormat({ decimals: 0 });
 // ONE consumer, and it is not a tool change: toolChangeMacroCall(). The T word is emitted only where
-// something OTHER than this post acts on it -- a sender that intercepts the M6 beside it, or RRF, whose
-// T word IS the change. On every other route the tool is named in a prompt the operator reads.
+// something OTHER than this post acts on it -- a sender that intercepts the M6 beside it, FluidNC, which
+// executes that M6 itself, or RRF, whose T word IS the change. On every other route the tool is named in a
+// prompt the operator reads.
 var tFormat = createFormat({ prefix: "T", decimals: 0 });
 
 var taperFormat = createFormat({ decimals: 1, scale: DEG });
@@ -1880,14 +1882,31 @@ function validateJob() {
   if (toolChangeIsMacro() && countDistinctTools() > 1) {
     var senderId = getProperty(properties.toolChangeSender);
 
-    if (toolChangeSenderIsGrblSender()) {
+    if (toolChangeNeedsSenderIntercept()) {
       warning(localize("\"Tool Change Handled By\" is \"" + toolChangeSenderTitle() + "\", so this job "
-        + "hands each change over with M6 -- a command GRBL does not execute. It works only because the "
-        + "sender removes the M6 from the stream and runs its own tool-change routine instead, and the "
-        + "post cannot check that yours is set up to do it. If the sender is not configured for tool "
-        + "changes the M6 reaches the controller and answers error:20, stopping the job with the tool "
-        + "in the cut; if it is configured to IGNORE them, the change is dropped silently and the rest "
-        + "of the job is cut with the tool already fitted. Test one change on air before trusting it."));
+        + "hands each change over with M6 -- a command stock Grbl and grblHAL do not execute. It works "
+        + "only because the sender removes the M6 from the stream and runs its own tool-change routine "
+        + "instead, and the post cannot check that yours is set up to do it. If the sender is not "
+        + "configured for tool changes the M6 reaches the controller and answers error:20, stopping the "
+        + "job with the tool in the cut; if it is configured to IGNORE them, the change is dropped "
+        + "silently and the rest of the job is cut with the tool already fitted. Test one change on air "
+        + "before trusting it. If this machine runs FluidNC, choose \"FluidNC -- T + M6\" instead: that "
+        + "firmware executes the M6 itself, and a sender configured to strip it removes the one token it "
+        + "acts on."));
+    }
+
+    // FR-1's other half, and it is CR-24's shape rather than the warning above it: a dialect that never
+    // errors and acts only where its own config file says to, so the failure is silence. The version
+    // bound is the changer's -- src/ToolChangers/ exists at v3.9.0 and 404s at v3.8.0.
+    if (senderId == "FluidNC") {
+      warning(localize("\"Tool Change Handled By\" is \"FluidNC -- T + M6\", so this job hands each "
+        + "change over with an M6 the FIRMWARE executes -- nothing intercepts it, and a sender set up to "
+        + "strip it would remove the token FluidNC acts on. What the firmware then does is in "
+        + "config.yaml, which the post cannot read: it dispatches to the tool changer declared as \"atc:\" "
+        + "under the spindle, or runs the macro named by \"m6_macro:\". WITH NEITHER DECLARED it accepts "
+        + "the line, changes nothing and reports nothing -- the job cuts on with the tool already fitted "
+        + "and no line in the file says so. A changer needs FluidNC 3.9.0 or later. Confirm the config "
+        + "before this job runs, and test one change on air."));
     }
 
     if (senderId == "RepRap") {
@@ -1905,9 +1924,10 @@ function validateJob() {
       warning(localize("\"Tool Length Correction By\" is \"GCode reprobes Z0 after change\" while "
         + "changes are handed to \"" + toolChangeSenderTitle() + "\", so the post probes Z again after "
         + "the macro returns and overwrites whatever the macro measured. That is right for a handler "
-        + "that only pauses and wrong for one that re-zeroes or applies a tool offset -- there it asks "
-        + "you to fit the touch plate at every change for a measurement already made. Set it to \"Tool "
-        + "change applies tool offset\" if the macro establishes Z0."));
+        + "that only pauses and wrong for one that re-zeroes or applies a tool offset -- a FluidNC "
+        + "\"atc:\" with a tool setter is the second kind, measuring the new tool and shifting the whole Z "
+        + "frame with G43.1 -- there it asks you to fit the touch plate at every change for a measurement "
+        + "already made. Set it to \"Tool change applies tool offset\" if the macro establishes Z0."));
     }
   }
 
@@ -2197,10 +2217,10 @@ function validateJob() {
   if (countDistinctTools() > 1 && getProperty(properties.toolChangeMode) == "Refuse") {
     error("This job uses " + countDistinctTools() + " tools and \"At a Tool Change\" is \"Refuse a"
       + " multi-tool job\". This post changes no tool itself on any supported firmware -- it emits no M6"
-      + " on this setting, which a GRBL controller answers with error:20 anyway. Post one tool per file;"
-      + " or set \"At a Tool Change\" to \"Manual change at a pause\" to stop at each boundary and swap"
-      + " the tool by hand; or to \"Sender or firmware macro changes it\" if your sender or firmware owns"
-      + " a tool table and you have configured it to do the change.");
+      + " on this setting, which stock Grbl and grblHAL answer with error:20 anyway. Post one tool per"
+      + " file; or set \"At a Tool Change\" to \"Manual change at a pause\" to stop at each boundary and"
+      + " swap the tool by hand; or to \"Sender or firmware macro changes it\" if your sender or firmware"
+      + " owns a tool table and you have configured it to do the change.");
     return;
   }
 
@@ -2229,10 +2249,23 @@ function validateJob() {
       return;
     }
 
-    if (toolChangeSenderIsGrblSender() && fw != eFirmware.GRBL) {
-      error("\"Tool Change Handled By\" is \"" + toolChangeSenderTitle() + "\", which is a GRBL sender,"
-        + " but this job is posted for " + fw + ". Choose the handler that runs this machine, or"
-        + " \"Other\" with a macro file of your own.");
+    if (toolChangeNeedsGrblDialect() && fw != eFirmware.GRBL) {
+      // Two arms, because the set is no longer all senders: FluidNC needs the same dialect and no
+      // interception, so the sender sentence would name a party it does not have and offer a remedy --
+      // "Other" -- that is not the one it wants. Only RepRap reaches either arm; the Marlin guard above
+      // returns first. FR-1.
+      if (handler == "FluidNC") {
+        error("\"Tool Change Handled By\" is \"FluidNC -- T + M6\", but this job is posted for " + fw
+          + ". FluidNC speaks the dialect this post writes for \"Grbl\", which is the \"CNC Firmware\""
+          + " answer to choose for it -- and \"T<n> M6\" is not the token a change takes on " + fw
+          + ", where the T word alone IS the change. Set \"CNC Firmware\" to \"Grbl\" if this machine"
+          + " runs FluidNC, or \"Tool Change Handled By\" to \"RepRapFirmware tool table\" if it runs "
+          + fw + ".");
+      } else {
+        error("\"Tool Change Handled By\" is \"" + toolChangeSenderTitle() + "\", which is a GRBL sender,"
+          + " but this job is posted for " + fw + ". Choose the handler that runs this machine, or"
+          + " \"Other\" with a macro file of your own.");
+      }
       return;
     }
 
@@ -4723,12 +4756,24 @@ function toolChangeIsMacro() {
   return getProperty(properties.toolChangeMode) == "Macro";
 }
 
-// The handlers that are a GRBL sender, in one statement: three of the four values take "T<n> M6" over
-// GRBL and the sender removes the M6. Two places branch on this, and adding a value to one and not the
-// other is how a hand-over comes to be warned about and never refused.
-function toolChangeSenderIsGrblSender() {
+// TWO questions, and one predicate answered both while every value that needed the GRBL dialect also
+// needed a sender to strip the M6 out of it. FluidNC answers them differently -- no and yes -- so the
+// pair is split here rather than at either call site. It executes the M6 itself: case 6 sets
+// ToolChange::Enable and STEP 4 calls Spindle::tool_change(), which dispatches to the changer named by
+// "atc:" or runs the "m6_macro:" in config.yaml (FluidNC/src/GCode.cpp, FluidNC/src/Spindles/Spindle.cpp,
+// v3.9.6). A value added to one of these and not the other is a hand-over warned about and never refused
+// -- PV-18 -- or one whose operator is told to configure an interception their firmware does not want.
+// FR-1.
+function toolChangeNeedsSenderIntercept() {
   var id = getProperty(properties.toolChangeSender);
   return id == "gSender" || id == "CNCjs" || id == "UGS";
+}
+
+// The handlers whose token is GRBL's, which is a larger set: the three senders' "T<n> M6" and FluidNC's,
+// the same two words to a controller that acts on them itself. RepRap's bare T word and Other's file are
+// neither, and each has its own guard.
+function toolChangeNeedsGrblDialect() {
+  return toolChangeNeedsSenderIntercept() || getProperty(properties.toolChangeSender) == "FluidNC";
 }
 
 // The dialog title of the chosen handler, for messages that name it. Reads the enum's own titles so a
@@ -4965,6 +5010,13 @@ function toolChange(partOriginEstablishesZ0) {
 //   (ugs-core/src/com/willwinder/universalgcodesender/services/interceptor/, master, 2026-08-17).
 //   All three are OFF until the operator turns them on, and the post can verify none of it.
 //
+//   FluidNC -- the SAME "T<n> M6", byte for byte, and nothing intercepts it: case 6 sets
+//   ToolChange::Enable and STEP 4 calls spindle->tool_change(), which dispatches to the changer named by
+//   "atc:" or runs the "m6_macro:" in config.yaml -- and with neither declared returns true having done
+//   nothing, so the job cuts on with the tool already fitted (FluidNC/src/GCode.cpp,
+//   FluidNC/src/Spindles/Spindle.cpp, v3.9.6; src/ToolChangers/ exists at 3.9.0 and 404s at 3.8.0). A
+//   sender set to strip the M6 here removes the token the firmware acts on. FR-1.
+//
 //   RepRapFirmware -- "T<n>" and no M6: there the T word IS the change, running tfree/tpre/tpost.
 //   Other -- no token at all; the operator's file is the hand-over, through the usual loadFile().
 function toolChangeMacroCall() {
@@ -4988,8 +5040,17 @@ function toolChangeMacroCall() {
     return;
   }
 
+  if (sender == "FluidNC") {
+    writeComment(eComment.Important, " Hand over to FluidNC -- it executes the M6 below itself");
+    // Tool number first, and the comment only where there is one: PV-6's lesson at the RepRap arm above.
+    writeComment(eComment.Info, "   Tool #" + tool.number + (tool.comment ? " " + tool.comment : "")
+      + ", through the \"atc:\" or \"m6_macro:\" named in config.yaml");
+    writeBlock(tFormat.format(tool.number), mFormat.format(6));
+    return;
+  }
+
   writeComment(eComment.Important, " Hand over to " + sender + " -- it must intercept the M6 below;"
-    + " GRBL itself answers error:20");
+    + " stock Grbl and grblHAL answer error:20");
   writeComment(eComment.Info, "   Tool #" + tool.number + " " + tool.comment);
   writeBlock(tFormat.format(tool.number), mFormat.format(6));
 }

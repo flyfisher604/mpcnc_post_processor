@@ -91,8 +91,8 @@ node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/cor
 node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/gcode-structure
 ```
 
-**207 cases — 37 hobbyist, 46 professional, 39 WCS, 11 personal, 57 CorrectGcode, 17 GCodeStructure —
-over 42 job files, and all 207 pass as of 2026-08-20.** The whole run is under a minute.
+**210 cases — 37 hobbyist, 49 professional, 39 WCS, 11 personal, 57 CorrectGcode, 17 GCodeStructure —
+over 42 job files, and all 210 pass as of 2026-08-21.** The whole run is under a minute.
 
 **The six are independent by design and stay that way.** The first four encode personas that disagree
 about what the factory defaults should do, so a shared baseline would have to pick one; the last two
@@ -523,7 +523,7 @@ node tools/property-coverage.js schema.json
 | Measure | Reached | Total |
 |---|---|---|
 | Properties **varied** by at least one case | **53** | 65 |
-| Enum **values** reached, counting the factory default as reached | **68** | 95 |
+| Enum **values** reached, counting the factory default as reached | **69** | 96 |
 | Boolean **states** reached, both ways | **16** | 16 |
 
 **That script exists because this table used to say `44`, `53` and `18` and could not be re-run.** The
@@ -543,7 +543,7 @@ varied and asserted, which they were not before `personal-matrix.js`. Group 2 wa
 two gaps: six of its seven were *set* by earlier cases, but only as scenery.
 
 **Every enum that decides behaviour is at 100%:** `probeOnStart` 6/6, `probeOnChange` 4/4,
-`toolChangeMode` 3/3, `toolChangeSender` 5/5, `jobSelectedFirmware` 3/3, `machineHomedAxes` 4/4,
+`toolChangeMode` 3/3, `toolChangeSender` 6/6, `jobSelectedFirmware` 3/3, `machineHomedAxes` 4/4,
 `machineParkAtEnd` 3/3, `jobCommentLevel` 4/4, `jobSpindleControl` 4/4. Those nine are the post's
 decision surface — the
 properties that change *what the file is* rather than how it is spelled — and the crossing of the

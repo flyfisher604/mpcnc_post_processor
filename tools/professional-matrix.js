@@ -162,6 +162,10 @@ const cases = [
         [/^G90$/m,'absolute re-asserted'],[/^G21$/m,'units re-asserted'],
         [/^G94$/m,'feed mode re-asserted - GRBL only'],[/^G17$/m,'plane re-asserted - GRBL only']],
   mustLog:[[/hands each change over with M6/,'the post cannot verify the sender is configured'],
+           [/a command stock Grbl and grblHAL do not execute/,
+            'FR-1 - named dialects, because FluidNC executes it'],
+           [/If this machine runs FluidNC, choose "FluidNC -- T \+ M6" instead/,
+            'and the operator whose controller does is pointed at the value that fits'],
            [/overwrites whatever the macro measured/,'re-probe on top of a macro is called out']],
   custom:(t)=>{ const i=t.search(/^T2 M6$/m);
     const after=t.slice(i);
@@ -490,6 +494,47 @@ const cases = [
               [/This job pauses for a tool change on GRBL/,'nor the old text']],
   mustNot:[[/^M0 \(MSG,Change to Tool/m,
             'and the file really has no change pause: PRO45 has one, this has none, one dropdown apart']] },
+
+// ---- FR-1: FluidNC is not a GRBL sender, and both channels used to tell its operator it was ------
+// PRO11 is this configuration one dropdown away, and the TOKEN IS BYTE-IDENTICAL -- "T2 M6" either way
+// -- so nothing here tests a writer. What is tested is what the post SAYS around it, and the assertion
+// that carries the finding is an ABSENCE: on this arm no line in the file and no line in the log may
+// claim the firmware rejects the M6 or that a sender has to take it out of the stream. FluidNC executes
+// it, dispatching to its own "atc:" or "m6_macro:", and where neither is declared it does nothing at all
+// -- which is why the case also asserts the warning that says so.
+{ id:'PRO47', desc:'FR-1 - the same token to FluidNC, which executes it: no error:20, no interception',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Macro'), toolChangeSender:S('FluidNC') }),
+  must:[[/^T2 M6$/m,'the identical token - what changes is who acts on it'],
+        [/Hand over to FluidNC -- it executes the M6 below itself/,'and the file says which'],
+        [/Tool #2[^\n]*, through the "atc:" or "m6_macro:" named in config\.yaml/,
+         'naming the two config keys the operator can check'],
+        [/^G90$/m,'absolute re-asserted'],[/^G54$/m,'the work offset re-selected']],
+  mustNot:[[/error:20/,'FR-1 - nothing in the file claims this firmware rejects the M6'],
+           [/intercept/i,'nor that anything has to intercept it']],
+  mustLog:[[/"Tool Change Handled By" is "FluidNC -- T \+ M6", so this job hands each change over with an M6 the FIRMWARE executes/,
+            'the dialog names the party that acts'],
+           [/declared as "atc:" under the spindle, or runs the macro named by "m6_macro:"/,
+            'and where to look for it'],
+           [/WITH NEITHER DECLARED it accepts the line, changes nothing and reports nothing/,
+            'CR-24s shape: the failure mode is silence, so the warning has to be the noise']],
+  mustNotLog:[[/works only because the sender removes the M6 from the stream/,
+               'FR-1 - the interception warning is off this arm'],
+              [/error:20/,'and no channel says the controller answers one']],
+  custom:(t)=>{ const i=t.search(/^T2 M6$/m);
+    const after=t.slice(i);
+    return ordered(after,[['re-assert G90',/^G90$/m],['re-select G54',/^G54$/m],
+                          ['return to travel Z',/^G53 G0 Z-5 F/m]]); } },
+
+{ id:'PRO48', desc:'FR-1 - FluidNC on a RepRap job is refused, and by its own sentence rather than the sender one',
+  cnc:change, props:pro({ jobSelectedFirmware:S('RepRap'), toolChangeMode:S('Macro'),
+                        toolChangeSender:S('FluidNC') }),
+  refuse:[/FluidNC speaks the dialect this post writes for "Grbl"/,
+          'refused by the widened dialect guard - PRO15 proves the sender arm still reads as it did'] },
+
+{ id:'PRO49', desc:'FR-1 - ... and on Marlin the tool-length guard above it answers first, as it should',
+  cnc:change, props:pro({ jobSelectedFirmware:S('Marlin'), machineParkAtEnd:S('Work'),
+                        toolChangeMode:S('Macro'), toolChangeSender:S('FluidNC') }),
+  refuse:[/no tool-length offset register/,'refused, and the reason is the register rather than the dialect'] },
 ];
 
 // ---- run ------------------------------------------------------------------------------

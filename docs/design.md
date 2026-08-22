@@ -107,8 +107,11 @@ machine-Z datum needs Z and the stored-offset warning needs X/Y, and **neither i
 | FluidNC | single-axis homing is a **configuration** option, so `$HX`/`$HZ` need no rebuild |
 
 So **on GRBL the split is bookkeeping, not emission** — the post can neither emit per-axis homing nor
-corroborate the declaration. FluidNC could, and this post treats FluidNC as GRBL throughout: the one place
-that conflation costs something real.
+corroborate the declaration. FluidNC could, and here the post does not use it: the dialect is one `Grbl`
+answer and this is where that conflation costs something it cannot recover. **It is no longer *throughout*
+— the tool change is where the two part company**, `Tool Change Handled By` having a FluidNC value of its
+own because that firmware executes the `M6` the senders' route needs stripped (`findings.md` `FR-1`, and
+*Flow 2* below is the table). Homing is the conflation that stands; the change is the one that did not.
 
 **Bookkeeping is not the whole cost, and this is the trap: on GRBL the declaration does not bound what
 MOVED.** The table above reads as a limit on what the post can *emit*; it is also a limit on what the post
@@ -382,7 +385,8 @@ split on who can do the subtraction:
 | Firmware | Who can measure and apply a tool offset |
 |---|---|
 | **RepRapFirmware** | **The machine.** Meta-g-code arithmetic and a real tool table — `G10 L1 P<t> Z`, persisted with `M500 P10` — so a `tpost` macro does it, and `M6` is a genuine call into `tfree`/`tpre`/`tpost` |
-| **GRBL** | **The sender.** No arithmetic, and `G43.1` takes a literal, so the offset must be computed off-controller. `M6` reaches the controller as `error:20 Unsupported command` — the route only exists if the sender intercepts the token before the controller sees it |
+| **GRBL** | **The sender.** No arithmetic, and `G43.1` takes a literal, so the offset must be computed off-controller. On **stock Grbl and grblHAL** `M6` reaches the controller as `error:20 Unsupported command` — the route only exists if the sender intercepts the token before the controller sees it |
+| **FluidNC** | **The machine, where its own config says so** — and this is the row that broke *treats FluidNC as GRBL throughout*. `M6` is executed: `case 6` sets `ToolChange::Enable` and STEP 4 calls `Spindle::tool_change()`, which dispatches to the changer declared as `atc:` or runs the `m6_macro:`, and a `Manual_ATC` with a tool setter probes the new tool and applies the length as a **frame** offset — `G43.1`, computed on the controller from `#5063`. **With neither key declared it returns `true` having done nothing**, which is `findings.md` `CR-24`'s shape and why that value warns. `FluidNC/src/GCode.cpp`, `src/Spindles/Spindle.cpp`, `src/ToolChangers/atc_manual.cpp`, v3.9.6; the changer directory arrived at 3.9.0, so the claim carries a minimum version |
 | **Marlin** | **The operator.** No TLO register at all, so the only correction is re-probing and re-zeroing work Z by hand. *(This corrects an earlier bare "no TLO" claim.)* |
 
 **So the post's responsibilities are exactly three, and nothing else is in scope:**
