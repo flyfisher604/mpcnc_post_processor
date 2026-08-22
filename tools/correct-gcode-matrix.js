@@ -314,8 +314,7 @@ const cases = [
   must:[[/^M291 P"/m,'the RepRap prompt form']] },
 
 { id:'CG12', desc:'compact blocks and line numbers: the file is still tokenizable word by word',
-  cnc:face, props:{ jobSeparateWordsWithSpace:B(false), jobSequenceNumbers:B(true),
-                    jobSequenceNumberStart:N(100), jobSequenceNumberIncrement:N(2),
+  cnc:face, props:{ jobSeparateWordsWithSpace:B(false), jobSequenceNumbering:S('Step10'),
                     machineHomedAxes:S('XYZ'), machineHomeAtStart:S('Home') },
   // THE SPELLING CHECK IS THE POINT: with no separators a block is one run of characters, and the
   // only thing that makes it g-code rather than a string is that every letter is followed by a
@@ -325,14 +324,14 @@ const cases = [
     if (numbered.length < 10) return [false, `${numbered.length} numbered blocks -- line numbers are not on`];
     let last = null;
     for (const b of numbered) {
-      if (last !== null && b.n !== last + 2) return [false, `line ${b.i}: N${b.n} follows N${last}, and the increment is 2`];
+      if (last !== null && b.n !== last + 10) return [false, `line ${b.i}: N${b.n} follows N${last}, and the step is 10`];
       last = b.n;
     }
-    if (numbered[0].n !== 100) return [false, `the first numbered block is N${numbered[0].n}, not N100`];
+    if (numbered[0].n !== 10) return [false, `the first numbered block is N${numbered[0].n}, not N10`];
     const dollar = ctx.lines.filter(l => l.dollar);
     if (!dollar.length) return [false, 'this job does not home, so the $H claim below is untested'];
     if (dollar.some(l => l.n !== undefined)) return [false, '$H carries an N word -- GRBL reads $ only as the first character'];
-    return [true, `${numbered.length} blocks numbered from N100 by 2, and $H takes none`]; } },
+    return [true, `${numbered.length} blocks numbered from N10 by 10, and $H takes none`]; } },
 
 // === C. every operation family the post supports, posted ==============================
 { id:'CG13', desc:'a drilled hole is the cycle EXPANDED, and the expansion is what the kernel gave',

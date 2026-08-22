@@ -305,7 +305,7 @@ const cases = [
 
 // === F. what a professional sender needs out of the file =============================
 { id:'PRO29', desc:'line numbers on: every block is numbered and $H still is not - it takes no N word',
-  cnc:face, props:pro({ probeOnStart:S('Skip'), jobSequenceNumbers:B(true), jobCommentLevel:S('Important') }),
+  cnc:face, props:pro({ probeOnStart:S('Skip'), jobSequenceNumbering:S('Step1'), jobCommentLevel:S('Important') }),
   must:[[/^N\d+ G54$/m,'the WCS select is numbered'],
         [/^N\d+ G53 G0 Z-5 F\d/m,'so is the machine-frame move'],
         [/^\$H$/m,'but $H is bare - GRBL reads $ only as the first character of a line']],

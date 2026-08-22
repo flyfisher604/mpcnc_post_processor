@@ -437,7 +437,7 @@ const programs = [
               toolChangeMode:S('Macro'), toolChangeSender:S('RepRap') }) },
 
 { id:'GS7', desc:'a thousand cutting moves with line numbers and Debug commentary', cnc:bore,
-  props:{ jobSequenceNumbers:B(true), jobCommentLevel:S('Debug') } },
+  props:{ jobSequenceNumbering:S('Step1'), jobCommentLevel:S('Debug') } },
 
 { id:'GS8', desc:'two parts in one job: a traverse between fixtures in the machine frame',
   job:'two-parts.cnc', props:Object.assign({}, MP, { probeOnStart:S('Probe Z'), probeOnChange:S('Probe Z') }) },

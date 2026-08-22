@@ -173,31 +173,25 @@ properties = {
     value      : true,
     scope      : "post"
   },
-  jobSequenceNumbers: {
-    title      : "Enable Line #s",
-    description: "Include line numbers on each line.",
+  // ONE field over three answers, where there were an enabling boolean and two companions that did
+  // nothing whenever it was off -- which is the shipped default, so the dialog asked twice for numbers
+  // no file would ever carry and gave no hint that it was doing so. HB-20's shape.
+  //
+  // The key moves with the type: a stored true/false is not an enum id, so a saved configuration falls
+  // back to the default, and the default is Off -- exactly what the boolean shipped. See the note at
+  // the head of this object.
+  jobSequenceNumbering: {
+    title      : "Line #s",
+    description: "Number every block, and by how much. Off emits no N words at all, which is what this post ships. The two on values differ only in the step: N10 N11 N12 for a sender that counts blocks one by one, N10 N20 N30 for one that leaves room to insert between them. Numbering always starts at N10, and the numbers restart at every file.",
     group      : "job",
     order      : 50,
-    type       : "boolean",
-    value      : false,
-    scope      : "post"
-  },
-  jobSequenceNumberStart: {
-    title      : "First Line #",
-    description: "First line number used.",
-    group      : "job",
-    order      : 60,
-    type       : "integer",
-    value      : 10,
-    scope      : "post"
-  },
-  jobSequenceNumberIncrement: {
-    title      : "Line # Increment",
-    description: "Amount each line number rises.",
-    group      : "job",
-    order      : 70,
-    type       : "integer",
-    value      : 1,
+    type       : "enum",
+    values: [
+      { title: "Off", id: "Off" },
+      { title: "N10 N11 N12 ... step 1", id: "Step1" },
+      { title: "N10 N20 N30 ... step 10", id: "Step10" }
+    ],
+    value      : "Off",
     scope      : "post"
   },
   jobSeparateWordsWithSpace: {
@@ -931,10 +925,24 @@ var gAbsIncModal = createModal({}, gFormat); // modal group 3 // G90-91
 var gFeedModeModal = createModal({}, gFormat); // modal group 5 // G93-94
 var gUnitModal = createModal({}, gFormat); // modal group 6 // G20-21
 
+// Line numbering, read off one field so writeBlock() and resetPostState() cannot disagree about it and
+// neither carries an enum id. The start is a constant because both on-values share it: what the fold
+// cost is an arbitrary first number and an arbitrary increment, and what is left is the two
+// conventions a sender restarts a job against.
+function sequenceNumbersEnabled() {
+  return getProperty(properties.jobSequenceNumbering) != "Off";
+}
+function sequenceNumberStart() {
+  return 10;
+}
+function sequenceNumberStep() {
+  return (getProperty(properties.jobSequenceNumbering) == "Step10") ? 10 : 1;
+}
+
 function writeBlock() {
-  if (getProperty(properties.jobSequenceNumbers)) {
+  if (sequenceNumbersEnabled()) {
     writeWords2("N" + sequenceNumber, arguments);
-    sequenceNumber += getProperty(properties.jobSequenceNumberIncrement);
+    sequenceNumber += sequenceNumberStep();
   } else {
     writeWords(arguments);
   }
@@ -2509,7 +2517,7 @@ function resetPostState() {
   wcsVisited = {};                        // no part has been set up in this file
   wcsZ0Trusted = {};
   sectionsCompleted = 0;                  // nothing has been cut in this file yet -- PV-7
-  sequenceNumber = getProperty(properties.jobSequenceNumberStart);
+  sequenceNumber = sequenceNumberStart();
   forceSectionToStartWithRapid = false;
   // Left true at end of file, the NEXT file's first rapid crosses before it retracts -- the unsafe
   // order on a rising Z. Every path in one file clears it, so this is a debt, not a live defect. CR-21.

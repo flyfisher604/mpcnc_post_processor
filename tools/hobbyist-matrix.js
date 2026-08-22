@@ -62,8 +62,21 @@ const cases = [
 { id:'H5', desc:'Arcs off - a sender that mishandles G2/G3', cnc:'Milling/2D/bore.cnc', props:{jobUseArcs:B(false)},
   must:[[/^G1 /m,'cuts as straight lines']], mustNot:[[/^G[23] /m,'no arcs emitted']] },
 { id:'H6', desc:'Sequence numbers - line numbers for a sender that reports them', cnc:'Milling/2D/face.cnc',
-  props:{jobSequenceNumbers:B(true), jobSequenceNumberStart:N(10), jobSequenceNumberIncrement:N(5)},
-  must:[[/^N10 /m,'starts at 10'],[/^N15 /m,'increments by 5']], mustNot:[] },
+  props:{jobSequenceNumbering:S('Step1')},
+  // N11 AND N12, because N11 alone is the discriminator only by accident: a step of 10 reaches N20 and
+  // N30 too, so the numbers a step of 1 has that a step of 10 never does are the ones between.
+  must:[[/^N10 /m,'starts at 10'],[/^N11 /m,'and steps by 1'],[/^N12 /m,'and keeps stepping by 1']],
+  mustNot:[] },
+// PC-5's other on-value, and the assertion is that the step is the ONLY thing that differs: same start,
+// and a step of 10 is not reachable by any other answer now that the increment field is gone.
+{ id:'H6b', desc:'Sequence numbers - the step-10 convention, for a sender that inserts between blocks',
+  cnc:'Milling/2D/face.cnc', props:{jobSequenceNumbering:S('Step10')},
+  must:[[/^N10 /m,'starts at 10, as the other on-value does'],[/^N20 /m,'and steps by 10']],
+  mustNot:[[/^N11 /m,'no step-1 numbering anywhere in the file']] },
+// THE DEFAULT, asserted rather than assumed: the boolean this replaced shipped off, and so does this.
+{ id:'H6c', desc:'Sequence numbers - Off is the shipped answer and emits no N word at all',
+  cnc:'Milling/2D/face.cnc', props:{},
+  mustNot:[[/^N\d/m,'not one numbered block in the file']] },
 { id:'H7', desc:'No word separator - compact blocks', cnc:'Milling/2D/face.cnc', props:{jobSeparateWordsWithSpace:B(false)},
   must:[[/^G10L20P1X0Y0Z0$/m,'words run together']], mustNot:[[/^G10 L20/m,'no spaced form']] },
 
