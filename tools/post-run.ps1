@@ -9,11 +9,12 @@
   post.exe takes `--property NAME VALUE`, repeated once per property, and there is no
   property file. VALUE IS EVALUATED AS A JAVASCRIPT LITERAL, which is the whole trick: a
   string or an enum needs quotes INSIDE the argument -- `--property jobSelectedFirmware
-  '"Marlin"'` -- while numbers and booleans go bare. All 62 properties are reachable.
+  '"Marlin"'` -- while numbers and booleans go bare. Every property is reachable; the count
+  is whatever `--interrogate` returns, and `tools/property-coverage.js` is what states it.
 
   Getting it wrong fails in three ways and only the first is loud:
     jobSelectedFirmware Marlin  -> "Failed to set property" -- an undefined identifier
-    mapRapidsSafeZ Retract:15   -> set to a non-string; the post dies in onOpen() with
+    probeSafeZ Retract:15       -> set to a non-string; the post dies in onOpen() with
                                    "str.search is not a function"
     machineTravelZ -2           -> set to the NUMBER -2, and parseMachineCoordinate()
                                    reads the field as EMPTY. The machine frame switches
@@ -58,7 +59,7 @@ $ext = Get-ChildItem "$env:USERPROFILE\.vscode\extensions" -Directory -Filter 'a
 if (-not $ext) { throw "The Autodesk HSM Post Processor extension is not installed, so there are no .cnc files to run." }
 $cncRoot = Join-Path $ext.FullName 'res\CNC files'
 
-if (-not $Post)   { $Post   = Join-Path (Split-Path -Parent $here) 'MPCNC_v4.1_Beta3.cps' }
+if (-not $Post)   { $Post   = Join-Path (Split-Path -Parent $here) 'MPCNC_v4.1.1_Beta3.cps' }
 if (-not $OutDir) { $OutDir = Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'Fusion 360\NC Programs\post-utility' }
 
 $cncPath = if (Test-Path $Cnc) { (Resolve-Path $Cnc).Path } else { Join-Path $cncRoot $Cnc }

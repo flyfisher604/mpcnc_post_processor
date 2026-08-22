@@ -21,7 +21,7 @@
 var execFileSync = require('child_process').execFileSync;
 var path = require('path');
 
-var CPS = 'MPCNC_v4.1_Beta3.cps';
+var CPS = 'MPCNC_v4.1.1_Beta3.cps';
 
 var input = '';
 process.stdin.setEncoding('utf8');

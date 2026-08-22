@@ -11,9 +11,10 @@ the file that computes it is named instead.
 
 ## Checkpoint
 
-**The tree is v4.1 Beta 3, and `v4.1_Beta3` is tagged and on `origin`.** The deliverable is
-`MPCNC_v4.1_Beta3.cps`, and what the release contains is `release-notes-v4.1-beta3.md`.
-**Next: the release page, which is the last of Step 8.**
+**The tree is v4.1.1 Beta 3 on `PropertyReduce`; `v4.1_Beta3` is tagged and on `origin`.** The
+deliverable is now `MPCNC_v4.1.1_Beta3.cps` — Step 9 renamed it — and what the **v4.1 Beta 3** release
+contains is `release-notes-v4.1-beta3.md`.
+**Next: the release page, which is the last of Step 8, and then merging Step 9.**
 
 Step 7 is done: the four user documents describe the post as it now is, and `guide-pro.md` states
 plainly what is not verified. **What is open stands in `findings.md` §2**, which owns that count.
@@ -38,6 +39,7 @@ version — never from a sender console, a dry run or a non-GRBL controller.
 | | Item | Blocked on |
 |---|---|---|
 | **8** | Publish the v4.1 Beta 3 release page | an authenticated `gh` — the merge, the tag and the push are done |
+| **9** | Merge `PropertyReduce`, and decide what the four user documents owe it | the author — the code and the register are done, and the guides are the author's call |
 
 **`validateJob()` and the property block were never restructured** — Step 6 measured both and left
 them. Neither is short; whether either is too long is a judgement no measurement settles, and it is
@@ -48,6 +50,23 @@ the author's to make against the file as it now reads.
 **The asset is `MPCNC_v4.1_Beta3.cps` itself, under exactly that name.** Both announcements link
 `releases/download/<tag>/MPCNC_v4.1_Beta3.cps`, so a zip uploaded there answers the download with a
 404. `announce-v4.1-beta3.md` is the line that fixes the name.
+
+**Step 9 renamed the deliverable and does not block this.** The asset is the *tagged* file, not the
+working tree's: `git show v4.1_Beta3:MPCNC_v4.1_Beta3.cps > MPCNC_v4.1_Beta3.cps` produces it under
+the name the download expects, from any branch. Do not upload the working tree's `.cps` — on or after
+Step 9 it is a different version under a different name.
+
+## Step 9 — The property reduction
+
+**Done on `PropertyReduce`, unmerged.** The dialog went from **65 fields to 57** across six folds —
+`findings.md` `PC-1` to `PC-6`, each naming the configuration it costs — and the deliverable is
+`MPCNC_v4.1.1_Beta3.cps`. The suite is green and `integration.md` §6.2 carries the re-measured
+coverage.
+
+**What it does not touch is the four user documents**, which are the author's to move: `README.md`
+and `guide-hobbyist.md` / `guide-pro.md` / `property-reference.md` still describe the 65-field dialog,
+and `property-reference.md` opens by stating that count. Nothing detects that for the author, which is
+why it is a step here rather than a finding.
 
 ## Parked, and on what
 

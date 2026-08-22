@@ -513,6 +513,16 @@ const cases = [
   mustNot:[[/^(N\d+ )?M42\b/m,'no laser code anywhere - there is no jet tool to emit one for'],
            [/^(N\d+ )?M4 S/m,'and no GRBL laser code either']] },
 
+// The fifth value, and the only one the suite had never posted: laserGrblMode carried it before PC-4
+// and no case set that field either, J4 having witnessed it from a hand-posted file rather than here.
+// M3 holds power steady where M4 scales it with speed, so the discriminator is which M-code carries S.
+{ id:'CG22g', desc:'PC-4 - the GRBL static-power value: M3 carries the S, and M4 is nowhere in the file',
+  cnc:'Cutting/Laser/center.cnc', props:{ laserOutput:S('3') },
+  must:[[/^M3 S800$/m,'Through fires at 80% -> S800 on the static-power code'],
+        [/^M3 S400$/m,'and Etch at 40% -> S400, the same scaling'],
+        [/^M5$/m,'and it is stopped with M5, as the dynamic value is']],
+  mustNot:[[/^(N\d+ )?M4 /m,'no dynamic-power code - the two GRBL values are exclusive']] },
+
 { id:'CG23', desc:'an Optional Stop becomes an unconditional M0, once per request, and says so',
   cnc:'Milling/2D/optional stop.cnc', props:{ toolChangeMode:S('Pause') }, trace:true,
   must:[[/an Optional Stop was requested here and is emitted as an UNCONDITIONAL M0/,'the substitution is stated']],

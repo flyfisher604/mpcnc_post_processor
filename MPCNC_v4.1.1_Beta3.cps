@@ -1,14 +1,14 @@
 /*
 **
-Version 4.1 (Beta 3)
+Version 4.1.1 (Beta 3)
 
 MPCNC posts processor for milling and laser/plasma cutting.
 
-Changed Aug 20, 2026
+Changed Aug 22, 2026
 **
 */
 
-description = "v4.1 (Beta 3) MPCNC Milling/Laser for Marlin, Grbl, RepRap";
+description = "v4.1.1 (Beta 3) MPCNC Milling/Laser for Marlin, Grbl, RepRap";
 vendor = "flyfisher604";
 vendorUrl = "https://github.com/flyfisher604/mpcnc_post_processor";
 longDescription = "MPCNC F360 Post processor. Supports scaling of speeds to accomidate slow Z axis. Warning: BETA review all GCode.";

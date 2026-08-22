@@ -73,7 +73,7 @@ node tools/<name>-matrix.js  <post.exe>  <post.cps>  <job root>  <output dir>
 
 - **`<post.exe>`** — under `%LOCALAPPDATA%\Autodesk\webdeploy\production\<hash>\Applications\CAM360\`.
   `post-run.ps1` locates it by search rather than by a pinned path; a matrix is handed it.
-- **`<post.cps>`** — `MPCNC_v4.1_Beta3.cps`, the deliverable.
+- **`<post.cps>`** — `MPCNC_v4.1.1_Beta3.cps`, the deliverable.
 - **`<job root>`** — the `res\CNC files` directory inside the installed **Autodesk HSM Post
   Processor** VS Code extension, except for `wcs-matrix.js`, which takes `tools/wcs-jobs`.
 - **`<output dir>`** — anywhere outside the repo. Each case writes `<id>.gcode` and `<id>.log` there,
@@ -83,16 +83,16 @@ node tools/<name>-matrix.js  <post.exe>  <post.cps>  <job root>  <output dir>
 print, and the last line is the tally.
 
 ```
-node tools/hobbyist-matrix.js        "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/hobbyist
-node tools/professional-matrix.js    "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/professional
-node tools/wcs-matrix.js             "$POST" MPCNC_v4.1_Beta3.cps tools/wcs-jobs out/wcs
-node tools/personal-matrix.js        "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/personal
-node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/correct-gcode
-node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/gcode-structure
+node tools/hobbyist-matrix.js        "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/hobbyist
+node tools/professional-matrix.js    "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/professional
+node tools/wcs-matrix.js             "$POST" MPCNC_v4.1.1_Beta3.cps tools/wcs-jobs out/wcs
+node tools/personal-matrix.js        "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/personal
+node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/correct-gcode
+node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/gcode-structure
 ```
 
-**213 cases — 37 hobbyist, 52 professional, 39 WCS, 11 personal, 57 CorrectGcode, 17 GCodeStructure —
-over 42 job files, and all 213 pass as of 2026-08-21.** The whole run is under a minute.
+**222 cases — 44 hobbyist, 52 professional, 39 WCS, 11 personal, 59 CorrectGcode, 17 GCodeStructure —
+over 42 job files, and all 222 pass as of 2026-08-22.** The whole run is under a minute.
 
 **The six are independent by design and stay that way.** The first four encode personas that disagree
 about what the factory defaults should do, so a shared baseline would have to pick one; the last two
@@ -483,12 +483,12 @@ evaluated as a JavaScript literal**, which is the whole trick and the whole trap
 | number | `-5` | bare |
 | boolean | `true` / `false` | bare |
 
-All 63 properties are reachable this way, the invisible test hook of §6.5 included. Getting it wrong fails in three ways and **only the first
+All 58 properties are reachable this way, the invisible test hook of §6.5 included. Getting it wrong fails in three ways and **only the first
 is loud**:
 
 - `jobSelectedFirmware Marlin` → *"Failed to set property"*. This is the utility reporting an
   undefined identifier, not refusing enums — which is the wrong conclusion this project drew first.
-- `mapRapidsSafeZ Retract:15` → set to a non-string; the post dies in `onOpen()` with
+- `probeSafeZ Retract:15` → set to a non-string; the post dies in `onOpen()` with
   *"str.search is not a function"*.
 - `machineTravelZ -2` → set to the **number** `-2`, and `parseMachineCoordinate()` reads the field as
   **empty**. The machine frame silently switches off. Only `WR-2`'s warning shows it at all.
@@ -501,7 +501,7 @@ matrices build the literal with three one-line helpers (`S`, `N`, `B`) for the s
 The schema is the authority on what exists:
 
 ```
-post.exe --interrogate --noheader --nointeraction MPCNC_v4.1_Beta3.cps > schema.json
+post.exe --interrogate --noheader --nointeraction MPCNC_v4.1.1_Beta3.cps > schema.json
 ```
 
 **And a fourth failure, which belongs to the shell rather than to the post.** PowerShell 5.1 will not
@@ -516,15 +516,15 @@ the quoting Node's problem; anything else driving `post.exe` has to solve it one
 Measured against that schema, across all six matrices, by `tools/property-coverage.js`:
 
 ```
-post.exe --interrogate --noheader --nointeraction MPCNC_v4.1_Beta3.cps > schema.json
+post.exe --interrogate --noheader --nointeraction MPCNC_v4.1.1_Beta3.cps > schema.json
 node tools/property-coverage.js schema.json
 ```
 
 | Measure | Reached | Total |
 |---|---|---|
-| Properties **varied** by at least one case | **53** | 65 |
-| Enum **values** reached, counting the factory default as reached | **69** | 96 |
-| Boolean **states** reached, both ways | **16** | 16 |
+| Properties **varied** by at least one case | **46** | 57 |
+| Enum **values** reached, counting the factory default as reached | **70** | 91 |
+| Boolean **states** reached, both ways | **14** | 14 |
 
 **That script exists because this table used to say `44`, `53` and `18` and could not be re-run.** The
 numbers were counted by hand against an `--interrogate` dump; the method was described here and never
@@ -532,15 +532,19 @@ committed, and it does not reproduce. The three above are the script's own outpu
 tomorrow moves them by being run rather than by being remembered, and its `never varied`, `enums not
 fully reached` and `booleans set one way only` lists are what §7 is drawn from.
 
-**The denominator is 65 and the schema reports 66.** The extra one is the test hook of §6.5, which is
+**The denominator is 57 and the schema reports 58.** The extra one is the test hook of §6.5, which is
 not a coverage target: it is part of the harness that reaches the others. Counting it would inflate
 the number with the instrument — and the boolean row is why that matters: **every boolean the operator
-can reach is set both ways**, which reads as 16/16 only once the hook is out of it. It is 16 rather
-than 18 because `GH-16b` retired a boolean by making it a four-way enum.
+can reach is set both ways**, which reads as 14/14 only once the hook is out of it. It is 14 rather
+than 18 because two booleans became enums: `GH-16b`'s four-way `Spindle Control` and `PC-5`'s
+three-way `Line #s`. **The eight properties `PC-1` to `PC-6` deleted took seven varied properties with
+them** — every one of the eight but `laserGrblMode` was set by a case — which is why the numerator
+falls by seven while nothing stopped being tested.
 
-**Groups 2 and 3 are at 100%** — all seven feed properties and both rapid-mapping properties are
-varied and asserted, which they were not before `personal-matrix.js`. Group 2 was the sharper of the
-two gaps: six of its seven were *set* by earlier cases, but only as scenery.
+**Groups 2 and 3 are at 100%** — all seven feed properties, and the one rapid-mapping property group 3
+still has since `PC-6` gave it group 5's `Safe Z` to read, are varied and asserted, which they were
+not before `personal-matrix.js`. Group 2 was the sharper of the two gaps: six of its seven were *set*
+by earlier cases, but only as scenery.
 
 **Every enum that decides behaviour is at 100%:** `probeOnStart` 6/6, `probeOnChange` 4/4,
 `toolChangeMode` 3/3, `toolChangeSender` 6/6, `jobSelectedFirmware` 3/3, `machineHomedAxes` 4/4,
@@ -558,10 +562,10 @@ The two single values that used to sit outside those two groups — `machineHome
 Three distinctions, because the number above is easy to over-read.
 
 **Reached is not the same as varied.** A property left alone still runs — at its factory default, in
-every case. So the default path of all 65 is exercised on every run, and the 12 that no case *varies*
-are 12 whose **alternative** values have never been posted. That is the real gap, and it is what
-§7 lists. **All twelve are a laser setting or a file name** — §7.2's eight and §7.4's four, and nothing
-outside them. §7.3's coolant *codes* left this list with `GH-16d`; what coolant still owes is enum
+every case. So the default path of all 57 is exercised on every run, and the 11 that no case *varies*
+are 11 whose **alternative** values have never been posted. That is the real gap, and it is what
+§7 lists. **All eleven are a laser setting or a file name** — §7.2's eight and §7.4's three, and
+nothing outside them. §7.3's coolant *codes* left this list with `GH-16d`; what coolant still owes is enum
 values, not an unposted property.
 
 **Varied is not the same as asserted, and group 2 is the case that proves it.** `machineHomedAxes`
@@ -659,7 +663,7 @@ eleven cases that now reach it.
 
 ## 7. What full coverage would take, and how much of it is a job file
 
-The 18 properties no case varies (§6.3) look like one debt and are three different ones. **The
+The 11 properties no case varies (§6.3) look like one debt and are three different ones. **The
 job-file half is built** (§7.5), **the group-3 half is reached** (§6.5) **and the case half is
 closed** (§7.1); what remains is fixture files, rulings and the stated bounds. Everything below was
 run rather than reasoned, except where it says otherwise.
@@ -726,7 +730,9 @@ what is missing is a ruling on which of the ten a hobby machine should serve, no
 
 ### 7.4 Needs no new file — but is a deferred workstream
 
-**Laser is 7 properties and 9 unreached values**, and `Cutting/Laser/` ships three jobs. The library
+**Laser is 6 properties and 7 unreached values** since `PC-4` folded the two mode fields into one and
+`CG22g` closed the static-power value the old pair never posted, and
+`Cutting/Laser/` ships three jobs. The library
 is richer than the register assumes: `center.cnc` censuses as **7 sections** on one tool, not one
 operation.
 
@@ -873,8 +879,10 @@ not the 321 it was told to travel at. Turn the group on and four of them leave a
 is the post's own stated reason for the feature, in its own words at `onLinear()`, witnessed for the
 first time: *"the first move to the start of a section will be at the slowest cutting feedrate."*
 
-**This is no longer a bound, so it is no longer excluded from the coverage number** — both properties
-count as varied, and §6.2's 37 includes them.
+**This is no longer a bound, so it is no longer excluded from the coverage number** — group 3's
+properties count as varied, and §6.2's numerator includes them. It was *both* properties until `PC-6`
+left the group one: the height they are measured against is group 5's `Safe Z` now, and `R4` varies
+it there.
 
 ### 7.8 The answer, by persona
 

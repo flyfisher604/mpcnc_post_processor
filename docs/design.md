@@ -1,6 +1,6 @@
 # Design — the target, and why the shipped behaviour is what it is
 
-The **why** behind `MPCNC_v4.1_Beta3.cps`, for the parts of it the code cannot state: the frame model the
+The **why** behind `MPCNC_v4.1.1_Beta3.cps`, for the parts of it the code cannot state: the frame model the
 rest of the record reads against, the external firmware facts each decision rests on, and the arguments
 behind orderings that look arbitrary in the source.
 
@@ -373,6 +373,16 @@ the second can start where the first left off**.
   in and emit that frame — `G53`, which requires a declaration including the parked axes, or the work
   frame, which drifts per WCS. **Not both meanings on one field**, which is what the deleted
   `Tool Change X/Y/Z` did: plain `G0` words the dialog presented as absolute.
+
+  **The rule is about frames, not about readers, and `Safe Z` is where the difference shows.** One
+  property is read by group 3 and by group 5, which looks like the same violation and is not: both are
+  heights in the **same** frame — the part's work coordinates, measured from the touch-off Z0 — and both
+  mean *a height that clears the work*. Group 3 asks whether the tool is already at or above it; group 5
+  takes the tool to it. **One meaning, two readers**, and a machine on which those two heights differ is
+  one where the post is rapiding through the height it just called clear. What the rule forbids is one
+  field whose number is measured from **two different zeros** depending on who reads it, which is exactly
+  what `Tool Change X/Y/Z` was and what a `Safe Z` shared with `Machine Travel Z` would be — see
+  *Traverse clearance is not the G1→G0 plane*, which is the case where the frames really do differ.
 - **Z is the operator's to re-establish**, by re-probing at the start of the next file — the shipped default
   first-part mode already does exactly this, so Flow 1 adds no mechanism to reach it.
 - **It is an option, not a policy.** A single-tool job must not pay for it.
@@ -521,10 +531,16 @@ coordinates.
 
 ### Traverse clearance is not the G1→G0 plane
 
-**Group 3's "Safe Z to Rapid"** answers a narrower question — "within *this* operation, is Z high enough to
-re-emit a cut G1 as a G0?" It is operation-scoped and only populated when the hobby group is on, so it is
-the wrong source for an inter-op/inter-WCS retract. The cross-part retract uses a **job-level clearance in
-the machine frame** (`Machine Travel Z`).
+**`Safe Z`** answers a narrower question than a traverse does — "within *this* operation, is Z high enough
+to re-emit a cut G1 as a G0?", and "how far up after a probe". It is operation-scoped and expressed in the
+**part's** work coordinates, so it is the wrong source for an inter-op/inter-WCS retract however many
+groups read it. The cross-part retract uses a **job-level clearance in the machine frame**
+(`Machine Travel Z`).
+
+It was group 3's own `Safe Z to Rapid` until `PC-6`, which left one property serving group 3 and group 5
+alike — and **that fold makes this section's argument sharper rather than weaker**: the two readers it
+merged are in the same frame, and this one is not. A field is shared where the frame is shared and nowhere
+else.
 
 **It cannot be an F360 expression (asked and answered).** `Clearance:40` would parse today and is still the
 wrong source: every F360 height parameter is **per-operation and expressed in that operation's own WCS**,
