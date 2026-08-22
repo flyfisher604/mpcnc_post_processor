@@ -268,8 +268,11 @@ properties = {
     scope      : "post"
   },
 
-  // ONE enabling control and one field. Group 3 answers a single question -- is the Personal edition
-  // turning this job's rapids into cuts, and may the post turn them back?
+  // ONE enabling control and NO field of its own since PC-6, which is what the group's title has always
+  // claimed. Group 3 answers a single question -- is the Personal edition turning this job's rapids
+  // into cuts, and may the post turn them back? The height that answer is measured against is group 5's
+  // "Safe Z", one property read by both groups; the note above it says why that is one meaning and not
+  // two.
   mapRapidsRestoreRapids: {
     title      : "Map G1s -> G0 Rapids",
     description: "Convert G1s back to G0 rapids where it is safe. Covers the three moves Fusion's Personal edition emits as cuts: horizontal moves at or above the Safe Z below, retracts and descents that stay above it, and each operation's first move.",
@@ -277,17 +280,6 @@ properties = {
     order      : 10,
     type       : "boolean",
     value      : false,
-    scope      : "post"
-  },
-  // NO PARENTHESES IN THIS TITLE. writeSafeZFormatWarning() prints it into an in-file warning, whose
-  // text goes through sanitizeMessageText(_, "()") -- see writeWarning().
-  mapRapidsSafeZ: {
-    title      : "Safe Z to Rapid",
-    description: "Z at or above this height is treated as safe air, so a G1 there may become a G0. The height is in the part's work coordinates -- measured from the touch-off Z0 at the stock top, never from machine zero. A number in mm, or Feed:/Retract:/Clearance:<fallback> to use the operation's own Fusion level -- Retract:15 means the Fusion retract level, or 15 mm if it has none.",
-    group      : "mapRapids",
-    order      : 20,
-    type       : "string",
-    value      : "Retract:15",
     scope      : "post"
   },
 
@@ -458,9 +450,20 @@ properties = {
     value      : 30,
     scope      : "post"
   },
+  // ONE property read by TWO groups, and that is one meaning with two readers rather than design.md's
+  // "not both meanings on one field". Both are heights in the SAME frame -- the part's work
+  // coordinates, measured from the touch-off Z0 at the stock top -- and both mean the same thing: a
+  // height that clears the work. Group 3 asks "is the tool at or above it, so this G1 may become a G0";
+  // group 5 asks "take the tool to it after the probe". A machine on which those two heights differ is
+  // one where the post would be rapiding through the height it just called clear.
+  //
+  // The key does not move. It says "probe" and now serves both, but every stored value is still legal
+  // and still means the same height, so renaming it would reset a setting for nothing. NO PARENTHESES
+  // IN THE TITLE: writeSafeZFormatWarning() prints it, and its group's, into an in-file warning whose
+  // text goes through sanitizeMessageText(_, "()") -- see writeWarning().
   probeSafeZ: {
     title      : "Safe Z",
-    description: "Height the tool retracts to after probing, in the part's work coordinates -- measured from the Z0 the probe has just set at the stock top, never from machine zero. A number in mm, or Feed:/Retract:/Clearance:<fallback> to use the operation's own Fusion level -- Retract:15 means the Fusion retract level, or 15 mm if it has none.",
+    description: "A height that clears the work, in the part's work coordinates -- measured from the touch-off Z0 at the stock top, never from machine zero. Read twice: the tool retracts to it after probing, and in group 3 a Z at or above it is treated as safe air, so a G1 there may become a G0. A number in mm, or Feed:/Retract:/Clearance:<fallback> to use the operation's own Fusion level -- Retract:15 means the Fusion retract level, or 15 mm if it has none.",
     group      : "probe",
     order      : 90,
     type       : "string",
@@ -982,7 +985,7 @@ var safeZHeightDefault = 15;
 var safeZHeight;   // resolved height, in the OUTPUT unit
 
 // Parse a Safe-Z expression -- a bare number, or Feed:/Retract:/Clearance:<fallback> -- into
-// { mode, dflt }. Shared by mapRapidsSafeZ and probeSafeZ so both accept identical syntax. Pure.
+// { mode, dflt }. One property feeds it since PC-6, and the syntax outlived the pair. Pure.
 function parseSafeZExpr(str) {
   var mode;
   var dflt = 15;
@@ -1010,10 +1013,19 @@ function parseSafeZExpr(str) {
   return {mode: mode, dflt: dflt};
 }
 
+// The one parse, for the one property. Both readers take their mode and fallback from here: group 5's
+// retract after a probe, and group 3's threshold for turning a G1 back into a G0.
 function parseSafeZProperty() {
-  var parsed = parseSafeZExpr(getProperty(properties.mapRapidsSafeZ));
+  var parsed = parseSafeZExpr(getProperty(properties.probeSafeZ));
   safeZMode = parsed.mode;
   safeZHeightDefault = parsed.dflt;
+
+  // ONCE PER FILE and not once per section, which is where the map side used to raise it -- the parse
+  // is what failed, and it happens here. validateJob() carries the post-time half.
+  if (safeZMode == eSafeZ.ERROR) {
+    writeSafeZFormatWarning(properties.probeSafeZ.title, groupDefinitions.probe.title,
+      propertyMmToUnit(safeZHeightDefault));
+  }
 
   writeComment(eComment.Debug, " parseSafeZProperty: safeZMode = '" + eSafeZ.prop[safeZMode].name + "'");
   writeComment(eComment.Debug, " parseSafeZProperty: safeZHeightDefault = " + safeZHeightDefault);
@@ -1028,91 +1040,41 @@ function writeSafeZFormatWarning(title, groupTitle, heightInUnit) {
     + xyzFormat.format(heightInUnit));
 }
 
+// Group 3's per-section Safe Z, cached in safeZHeight because isSafeToRapid() is asked once per move
+// and must not re-resolve. It was seventy lines of switch that re-implemented resolveSafeZ() branch for
+// branch, against a property of its own; PC-6 left one property and this is what the duplication was
+// worth. What the collapse costs is the difference between "the operation has no level of that kind"
+// and "it has one and it is relative" -- both are now the one sentence that the level was not usable,
+// which is the same remedy either way.
 function safeZforSection(_section)
 {
-  if (getProperty(properties.mapRapidsRestoreRapids)) {
-    // The fallback is a dialog literal, so it is mm and converts; the F360 level values below are
-    // already in the output unit. Every level test asks the PASSED section, not the global context.
-    var dfltInUnit = propertyMmToUnit(safeZHeightDefault);
-    switch (safeZMode) {
-      case eSafeZ.CONST:
-        safeZHeight = dfltInUnit;
-        writeComment(eComment.Important, " SafeZ using const: " + safeZHeight);
-        break;
+  if (!getProperty(properties.mapRapidsRestoreRapids)) {
+    return;
+  }
 
-      case eSafeZ.FEED:
-        if (_section.hasParameter("operation:feedHeight_value") && _section.hasParameter("operation:feedHeight_absolute")) {
-          let feed = _section.getParameter("operation:feedHeight_value");
-          let abs = _section.getParameter("operation:feedHeight_absolute");
+  var resolved = resolveSafeZ(safeZMode, safeZHeightDefault, _section);
+  safeZHeight = resolved.height;
 
-          if (abs == 1) {
-            safeZHeight = feed;
-            writeComment(eComment.Info, " SafeZ feed level: " + safeZHeight);
-          }
-          else {
-            safeZHeight = dfltInUnit;
-            writeComment(eComment.Important, " SafeZ feed level not abs: " + safeZHeight);
-          }
-        }
-        else {
-          safeZHeight = dfltInUnit;
-          writeComment(eComment.Important, " SafeZ feed level not defined: " + safeZHeight);
-        }
-        break;
-
-      case eSafeZ.RETRACT:
-        if (_section.hasParameter("operation:retractHeight_value") && _section.hasParameter("operation:retractHeight_absolute")) {
-          let retract = _section.getParameter("operation:retractHeight_value");
-          let abs = _section.getParameter("operation:retractHeight_absolute");
-
-          if (abs == 1) {
-            safeZHeight = retract;
-            writeComment(eComment.Info, " SafeZ retract level: " + safeZHeight);
-          }
-          else {
-            safeZHeight = dfltInUnit;
-            writeComment(eComment.Important, " SafeZ retract level not abs: " + safeZHeight);
-          }
-        }
-        else {
-          safeZHeight = dfltInUnit;
-          writeComment(eComment.Important, " SafeZ: retract level not defined: " + safeZHeight);
-        }
-        break;
-
-      case eSafeZ.CLEARANCE:
-        if (_section.hasParameter("operation:clearanceHeight_value") && _section.hasParameter("operation:clearanceHeight_absolute")) {
-          let clearance = _section.getParameter("operation:clearanceHeight_value");
-          let abs = _section.getParameter("operation:clearanceHeight_absolute");
-
-          if (abs == 1) {
-            safeZHeight = clearance;
-            writeComment(eComment.Info, " SafeZ clearance level: " + safeZHeight);
-          }
-          else {
-            safeZHeight = dfltInUnit;
-            writeComment(eComment.Important, " SafeZ clearance level not abs: " + safeZHeight);
-          }
-        }
-        else {
-          safeZHeight = dfltInUnit;
-          writeComment(eComment.Important, " SafeZ clearance level not defined: " + safeZHeight);
-        }
-        break;
-        
-      case eSafeZ.ERROR:
-        safeZHeight = dfltInUnit;
-        writeSafeZFormatWarning(properties.mapRapidsSafeZ.title, groupDefinitions.mapRapids.title, safeZHeight);
-        break;
-    }
+  if (safeZMode == eSafeZ.CONST || safeZMode == eSafeZ.ERROR) {
+    writeComment(eComment.Important, " SafeZ using const: " + safeZHeight);
+  } else if (resolved.fromLevel) {
+    writeComment(eComment.Info, " SafeZ " + eSafeZ.prop[safeZMode].name.toLowerCase()
+      + " level: " + safeZHeight);
+  } else {
+    writeComment(eComment.Important, " SafeZ " + eSafeZ.prop[safeZMode].name.toLowerCase()
+      + " level not usable, falling back: " + safeZHeight);
   }
 }
 
-// Resolve a parsed Safe-Z expression against one section's F360 levels, returning a height in the
-// OUTPUT unit. Feed/Retract/Clearance pull the matching operation level when it is defined and
-// absolute, otherwise the literal fallback. The two inputs arrive in different units and only one
-// converts: an F360 level is already in the output unit, the dialog fallback is mm. Pure.
-function resolveSafeZHeight(mode, dflt, _section) {
+// Resolve a parsed Safe-Z expression against one section's F360 levels. Returns {height, fromLevel} --
+// the height in the OUTPUT unit, and whether it came from the operation's own level or from the literal
+// fallback. Feed/Retract/Clearance pull the matching operation level when it is defined and absolute,
+// otherwise the fallback. The two inputs arrive in different units and only one converts: an F360 level
+// is already in the output unit, the dialog fallback is mm. Pure.
+//
+// fromLevel exists because safeZforSection() reports it: a job silently cutting to a fallback where the
+// operator meant their own retract level is the thing the file has to say out loud.
+function resolveSafeZ(mode, dflt, _section) {
   var fallback = propertyMmToUnit(dflt);
   var valueParam;
   var absParam;
@@ -1130,15 +1092,20 @@ function resolveSafeZHeight(mode, dflt, _section) {
       absParam   = "operation:clearanceHeight_absolute";
       break;
     default:  // CONST or ERROR -- use the literal fallback
-      return fallback;
+      return {height: fallback, fromLevel: false};
   }
 
   // Ask the PASSED section, not the global context: writeResolvedValues() resolves every section from
   // the header, where no section is current and the global form would report false throughout.
   if (_section.hasParameter(valueParam) && _section.hasParameter(absParam) && _section.getParameter(absParam) == 1) {
-    return _section.getParameter(valueParam);   // already in the output unit
+    return {height: _section.getParameter(valueParam), fromLevel: true};   // already in the output unit
   }
-  return fallback;
+  return {height: fallback, fromLevel: false};
+}
+
+// The height alone, for the callers that do not care where it came from.
+function resolveSafeZHeight(mode, dflt, _section) {
+  return resolveSafeZ(mode, dflt, _section).height;
 }
 
 // Describe a parsed Safe-Z expression for the header block: its mode, its literal fallback, and what
@@ -1169,32 +1136,11 @@ function describeSafeZ(mode, dflt) {
   return name + " level, fallback " + fallbackText + ", resolves to " + resolved;
 }
 
-// ---- Probe Safe Z ----------------------------------------------------------
-// Same expression syntax and F360-level resolution as the Map-G1s Safe Z, but a fully independent
-// property so the two can be tuned separately.
-var probeSafeZMode = eSafeZ.CONST;
-var probeSafeZHeightDefault = 15;   // the parsed literal fallback, in MILLIMETRES (see safeZHeightDefault)
-
-function parseProbeSafeZProperty() {
-  var parsed = parseSafeZExpr(getProperty(properties.probeSafeZ));
-  probeSafeZMode = parsed.mode;
-  probeSafeZHeightDefault = parsed.dflt;
-
-  // Same wording as the map side on purpose: the two document each other as "same syntax" and must
-  // fail the same way. validateJob() carries the post-time half, for both.
-  if (probeSafeZMode == eSafeZ.ERROR) {
-    writeSafeZFormatWarning(properties.probeSafeZ.title, groupDefinitions.probe.title,
-      propertyMmToUnit(probeSafeZHeightDefault));
-  }
-
-  writeComment(eComment.Debug, " parseProbeSafeZProperty: probeSafeZMode = '" + eSafeZ.prop[probeSafeZMode].name + "'");
-  writeComment(eComment.Debug, " parseProbeSafeZProperty: probeSafeZHeightDefault = " + probeSafeZHeightDefault);
-}
-
-// Resolve probeSafeZ for the current operation. Returns a height in the output unit -- already
-// unit-correct, so callers must NOT wrap it in propertyMmToUnit().
-function probeSafeZ() {
-  return resolveSafeZHeight(probeSafeZMode, probeSafeZHeightDefault, currentSection);
+// The Safe Z for the CURRENT operation, in the output unit -- already unit-correct, so callers must NOT
+// wrap it in propertyMmToUnit(). Group 5 calls this; group 3 caches its own answer in safeZHeight at
+// onSection(), because it is asked once per move rather than once per probe.
+function safeZ() {
+  return resolveSafeZHeight(safeZMode, safeZHeightDefault, currentSection);
 }
 
 
@@ -2064,16 +2010,15 @@ function validateJob() {
       + "origin. Park at work X0 Y0, or establish the origin again at the start of the next file."));
   }
 
-  // Both properties, since they share a documented syntax.
+  // ONE property since PC-6, where there were two sharing a documented syntax.
   // TWIN #1 -- the file half is writeSafeZFormatWarning()'s, which names the same 15 mm fallback.
-  var safeZProps = [properties.mapRapidsSafeZ, properties.probeSafeZ];
-  for (var s = 0; s < safeZProps.length; ++s) {
-    if (parseSafeZExpr(getProperty(safeZProps[s])).mode == eSafeZ.ERROR) {
-      warning(localize("\"" + safeZProps[s].title + "\" is set to \"" + getProperty(safeZProps[s])
-        + "\", which is not a Safe Z expression the post can read, so it falls back to a fixed 15 mm "
-        + "on every operation. Give a plain number of millimetres, or Feed:, Retract: or Clearance: "
-        + "followed by one -- no sign, no unit suffix."));
-    }
+  if (parseSafeZExpr(getProperty(properties.probeSafeZ)).mode == eSafeZ.ERROR) {
+    warning(localize("\"" + properties.probeSafeZ.title + "\" is set to \""
+      + getProperty(properties.probeSafeZ)
+      + "\", which is not a Safe Z expression the post can read, so it falls back to a fixed 15 mm "
+      + "on every operation -- for the retract after a probe and for the rapid threshold in group 3 "
+      + "alike. Give a plain number of millimetres, or Feed:, Retract: or Clearance: followed by one "
+      + "-- no sign, no unit suffix."));
   }
 
   // The same class on the fields holding a single machine coordinate: parseMachineCoordinate() answers
@@ -2581,10 +2526,8 @@ function onOpen() {
   // Set the separator used between words -- set on both answers, the same leak as fOutput above.
   setWordSeparator(getProperty(properties.jobSeparateWordsWithSpace) ? " " : "");
 
+  // One property, read by group 3 and group 5 alike.
   parseSafeZProperty();
-
-  // A separate property from the rapids Safe Z above, with the same syntax.
-  parseProbeSafeZProperty();
 }
 
 function onClose() {
@@ -2736,7 +2679,7 @@ function writeWCS(section) {
     writeMachineTravelZ("Retract to the travel height in the machine frame before traverse");
   } else if (isTraverse) {
     // Unreachable behind Guard B, and an error rather than a move: with no fixed reference no height
-    // means the same thing on both sides of the traverse. probeSafeZ() stood here once -- the entering
+    // means the same thing on both sides of the traverse. safeZ() stood here once -- the entering
     // section's retract level, read in the PREVIOUS part's frame, belonging to neither part. CR-13.
     error("Internal: a WCS traverse reached output with no fixed Z reference -- Guard B should have refused this job.");
     return undefined;
@@ -3818,7 +3761,7 @@ function writeAllProperties() {
 
 // Values a reviewer needs that are NOT any property's stored value -- resolved from an expression,
 // converted to output units, or supplied by Fusion. Without these the dump misleads:
-// "probeSafeZ = Retract:15" does not tell you the retract resolved to 5.08 for this operation.
+// "probeSafeZ = Retract:15" does not tell you the height resolved to 5.08 for this operation.
 function writeResolvedValues() {
   writeComment(eComment.Info, " ");
   writeComment(eComment.Info, " Resolved Values:");
@@ -3826,8 +3769,7 @@ function writeResolvedValues() {
   // No parentheses in any label below: sanitizeMessageText() strips comment markers, which would
   // leave a double space where the parens were (the same defect fixed once in partProbe()).
   writeComment(eComment.Info, "   Firmware resolved = " + fw);
-  writeComment(eComment.Info, "   Map SafeZ = " + describeSafeZ(safeZMode, safeZHeightDefault));
-  writeComment(eComment.Info, "   Probe SafeZ = " + describeSafeZ(probeSafeZMode, probeSafeZHeightDefault));
+  writeComment(eComment.Info, "   Safe Z = " + describeSafeZ(safeZMode, safeZHeightDefault));
   // Stated even when there is NONE: the absence is what decides whether the tool can retract at all,
   // and a reviewer must be able to read it off the file rather than infer it from a missing block.
   writeComment(eComment.Info, "   Fixed Z reference = "
@@ -4223,7 +4165,7 @@ function writeWcsOnStart() {
     // The arms below keep their guards and must, each bounding a G38.2 or a provisional Z0. HR-26.
     writeComment(eComment.Info, "   Use stored work origin; move Z to Safe Z, then to X0 Y0");
     resetAll();
-    rapidMovementsZ(probeSafeZ());
+    rapidMovementsZ(safeZ());
     rapidMovementsXY(0, 0);
     flushMotions();
     return;
@@ -4276,7 +4218,7 @@ function writeWcsOnStart() {
     if (probeOffsetIsSet()) {
       writeComment(eComment.Info, "   Retract to Safe Z before the offset traverse");
       resetAll();
-      rapidMovementsZ(probeSafeZ());
+      rapidMovementsZ(safeZ());
       flushMotions();
     }
     partProbe(true);
@@ -5224,7 +5166,7 @@ function toolChangeMacroResume() {
 function probeTool() {
   var targetWcs = currentWorkOffset;
   var searchZ = propertyMmToUnit(getProperty(properties.probeG38Target));
-  var retractZ = probeSafeZ();
+  var retractZ = safeZ();
   writeComment(eComment.Important, " Probe to Zero Z");
   if (probePauseBefore) writeComment(eComment.Info, "   Ask User to Attach the Z Probe");
   writeComment(eComment.Info, "   Do Probing");

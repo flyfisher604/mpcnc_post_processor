@@ -123,9 +123,12 @@ const cases = [
     return on > off ? [true, `moves at the Z travel speed: ${off} with the group off, ${on} with it on`]
                     : [false, `F321 appears ${off} times off and ${on} times on - the group changed nothing`]; } },
 
-{ id:'R4', desc:'Safe Z to Rapid decides HOW MANY moves convert - the second group-3 property',
-  cnc:'Milling/2D/bore.cnc', props:personal({ mapRapidsRestoreRapids:B(true), mapRapidsSafeZ:S('100') }),
-  compare:{ props:personal({ mapRapidsRestoreRapids:B(true), mapRapidsSafeZ:S('0') }) },
+// PC-6. The height is group 5's "Safe Z" now, one property read by both groups -- so this case posts
+// group 3 against a property that is not in group 3, which is the finding. Group 3 keeps its boolean
+// and has no field of its own.
+{ id:'R4', desc:'Safe Z decides HOW MANY moves convert - and it is group 5s field that group 3 reads',
+  cnc:'Milling/2D/bore.cnc', props:personal({ mapRapidsRestoreRapids:B(true), probeSafeZ:S('100') }),
+  compare:{ props:personal({ mapRapidsRestoreRapids:B(true), probeSafeZ:S('0') }) },
   must:[[/\( First G1 --> G0\)/,'the first move still converts - it is not gated on safe Z']],
   custom:(t,ref) => {
     const high = countOf(t, /\( Safe G1 --> G0\)/g), low = countOf(ref, /\( Safe G1 --> G0\)/g);
