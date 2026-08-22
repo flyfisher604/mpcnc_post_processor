@@ -457,7 +457,7 @@ const cases = [
 // laser on any other output was driven by nothing and fan 0 was driven by the laser.
 { id:'CG22a', desc:'Marlin fan mode: both power levels reach the fan the operator named, and no M107 is emitted',
   cnc:'Cutting/Laser/center.cnc',
-  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('M106'), laserMarlinPinFan:N(2) },
+  props:{ jobSelectedFirmware:S('Marlin'), laserOutput:S('M106'), laserMarlinPinFan:N(2) },
   // Six Through sections and one Etch in this one file, so both power levels are proved here for the
   // same reason CG20 uses it: 80% -> 204 and 40% -> 102 on Marlin's 0-255 scale.
   must:[[/^M106 P2 S204$/m,'Through fires on fan 2 at 80% -> S204'],
@@ -475,7 +475,7 @@ const cases = [
 
 { id:'CG22b', desc:'... and the index is emitted even at its default of 0, rather than left implicit',
   cnc:'Cutting/Laser/center.cnc',
-  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('M106') },
+  props:{ jobSelectedFirmware:S('Marlin'), laserOutput:S('M106') },
   // The control for CG22a: P0 is what a bare M106 already means on a single-extruder Marlin build, so
   // this case is about the post SAYING which output it drives. RRF resolves an absent P differently --
   // a bare M106 P{n} there is a status report and switches nothing -- which is why it is never omitted.
@@ -484,7 +484,7 @@ const cases = [
 
 { id:'CG22c', desc:'Marlin pin mode takes the same field, and pairs its firing with S0 on that pin',
   cnc:'Cutting/Laser/center.cnc',
-  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('M42'), laserMarlinPinFan:N(7) },
+  props:{ jobSelectedFirmware:S('Marlin'), laserOutput:S('M42'), laserMarlinPinFan:N(7) },
   must:[[/^M42 P7 S204$/m,'Through fires on pin 7'],
         [/^M42 P7 S0$/m,'and is stopped on the same pin']],
   mustNot:[[/^(N\d+ )?M106\b/m,'no fan code in pin mode']] },
@@ -493,16 +493,26 @@ const cases = [
 // 0 is a legitimate FAN index and no laser's pin, so pin mode must say what it drives or not post.
 { id:'CG22d', desc:'pin mode with the Pin/Fan # left at 0 is refused rather than aimed at pin 0',
   cnc:'Cutting/Laser/center.cnc',
-  props:{ jobSelectedFirmware:S('Marlin'), laserMarlinMode:S('M42') },
+  props:{ jobSelectedFirmware:S('Marlin'), laserOutput:S('M42') },
   refuse:[/is still 0, which names no output this post can believe you chose/,'the field is named, with both remedies'] },
 
-// The control for the guard above, and for the firmware scoping under it: the Marlin/Reprap mode ships
-// "106" and GRBL ships as the firmware, so a guard that read the property on the wrong firmware would
-// refuse every default job in this file. Thirty-odd GRBL cases here are that control; this one states it.
-{ id:'CG22e', desc:'... and a GRBL job posts untouched by it -- the Marlin/Reprap mode is not read there',
-  cnc:'Cutting/Laser/center.cnc', props:{ laserMarlinMode:S('M42') },
-  must:[[/^M4 S800$/m,'the GRBL mode fires the laser and the Marlin pin mode is ignored']],
-  mustNot:[[/^(N\d+ )?M42\b/m,'no M42 on a firmware that has none']] },
+// PC-4. This case ASSERTED THE OPPOSITE until the two laser fields became one: a GRBL job could not see
+// a Marlin laser value, the firmware having chosen the field, so the pin mode was silently ignored and
+// the GRBL default fired. With one field the value is what GRBL is handed, and M42 is a command it
+// answers with error:20 -- so the same properties that used to post must now refuse.
+{ id:'CG22e', desc:'PC-4 - a Marlin laser value on a GRBL LASER job is refused, where it used to be ignored',
+  cnc:'Cutting/Laser/center.cnc', props:{ laserOutput:S('M42') },
+  refuse:[/is set to a pin \(M42\) output and this job is posted for GRBL/,'refused, naming the group and the remedy'] },
+
+// The control for the row above, and the whole reason group 8's guard needed a jet-tool gate: a GRBL
+// MILLING job emits no laser code whatever this field holds, so it must post untouched. Without the
+// gate the refusal above would have fired on every milling job whose operator had once chosen a Marlin
+// laser value -- a job that fires no beam being refused for the dialect of a code it never writes.
+{ id:'CG22f', desc:'PC-4 - ... and a GRBL MILLING job with the same value posts, firing no beam at all',
+  cnc:'Milling/2D/face.cnc', props:{ laserOutput:S('M42') },
+  must:[[/^M30$/m,'the program is written and ends']],
+  mustNot:[[/^(N\d+ )?M42\b/m,'no laser code anywhere - there is no jet tool to emit one for'],
+           [/^(N\d+ )?M4 S/m,'and no GRBL laser code either']] },
 
 { id:'CG23', desc:'an Optional Stop becomes an unconditional M0, once per request, and says so',
   cnc:'Milling/2D/optional stop.cnc', props:{ toolChangeMode:S('Pause') }, trace:true,

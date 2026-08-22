@@ -662,40 +662,39 @@ properties = {
     value      : 40,
     scope      : "post"
   },
-  laserMarlinMode: {
-    title      : "Laser: Marlin/Reprap Mode",
-    description: "Marlin/Reprap mode of the laser/plasma cutter. Fan and Pin both take their output number from Pin/Fan # below. No mode emits M107: RepRapFirmware ignores its P word and zeroes whatever fans the current tool maps, so the off code is M106 with S0 -- which is what M107 does on Marlin anyway.",
+  // ONE field and not two. "Laser: Marlin/Reprap Mode" and "Laser: GRBL Mode" were never both read:
+  // CNC Firmware chose one and the other was a dead field the dialog still asked about, on every job.
+  // Each value carries its dialect in its own title, exactly as group 9's codes do, and that
+  // declaration is what the checks read -- outputCodeFirmware() resolves the chosen value to a firmware
+  // off its own title rather than off a second list that would drift.
+  //
+  // The key is new because no id of either old field means what it meant: "M3" was Marlin's spindle
+  // form while "3" is GRBL's static-power one, and a stored value under either key would be read
+  // against a set that now contains both. The default is a GRBL value because CNC Firmware ships Grbl;
+  // the M106 it replaces was the Marlin default, which no GRBL job ever read.
+  laserOutput: {
+    title      : "Laser Output",
+    description: "How the laser or plasma cutter is switched, and at what power. Match it to your CNC Firmware -- the post emits what you pick. The two GRBL values drive S against $30, which this post scales 0-1000: M4 scales power with speed so corners are not over-burned, M3 holds it steady. The three Marlin/RepRapFirmware values take a 0-255 S: Fan and Pin both take their output number from Pin/Fan # below, and Spindle takes none. No value emits M107 -- RepRapFirmware ignores its P word and zeroes whatever fans the current tool maps, so the off code is M106 with S0, which is what M107 does on Marlin anyway.",
     group      : "laser",
     order      : 40,
     type       : "enum",
     values: [
-      { title: "Fan - M106 P{n} S{PWM}/S0", id: "M106" },
-      { title: "Spindle - M3 O{PWM}/M5", id: "M3" },
-      { title: "Pin - M42 P{pin} S{PWM}", id: "M42" }
+      { title: "Grbl: M4 S{PWM}/M5 dynamic power", id: "4" },
+      { title: "Grbl: M3 S{PWM}/M5 static power", id: "3" },
+      { title: "Mrln: M106 P{n} S{PWM}/S0", id: "M106" },
+      { title: "Mrln: M3 O{PWM}/M5", id: "M3" },
+      { title: "Mrln: M42 P{pin} S{PWM}", id: "M42" }
     ],
-    value: "M106",
-    scope: "post"
+    value      : "4",
+    scope      : "post"
   },
   laserMarlinPinFan: {
     title      : "Laser: Pin/Fan #",
-    description: "The output number the mode above uses, and FOUR different things depending on mode and firmware -- re-check it whenever you change either. Fan mode: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). Pin mode: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored in Spindle mode. A wrong number is not equally visible on the two firmwares: Marlin returns silently for an index it does not have, so the laser never fires and no error says so, while RepRapFirmware answers \"Fan number not found\" or refuses the port. Pin mode carries two more conditions of its own -- M42 is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses M42 on a protected pin, which includes every FANn_PIN, so a fan header cannot be reached this way. Use Fan mode for a fan header and Pin mode for a spare output.",
+    description: "The output number Laser Output above uses, and FOUR different things depending on which value and which firmware -- re-check it whenever you change either. The M106 value: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). The M42 value: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored by the M3 value and by both GRBL values. A wrong number is not equally visible on the two firmwares: Marlin returns silently for an index it does not have, so the laser never fires and no error says so, while RepRapFirmware answers \"Fan number not found\" or refuses the port. The M42 value carries two more conditions of its own -- M42 is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses M42 on a protected pin, which includes every FANn_PIN, so a fan header cannot be reached this way. Use M106 for a fan header and M42 for a spare output.",
     group      : "laser",
     order      : 50,
     type       : "integer",
     value      : 0,
-    scope      : "post"
-  },
-  laserGrblMode: {
-    title      : "Laser: GRBL Mode",
-    description: "GRBL mode of the laser/plasma cutter. M4 scales power with speed so corners are not over-burned; M3 holds it steady.",
-    group      : "laser",
-    order      : 60,
-    type       : "enum",
-    values: [
-      { title: "M4 S{PWM}/M5 dynamic power", id: "4" },
-      { title: "M3 S{PWM}/M5 static power", id: "3" }
-    ],
-    value      : "4",
     scope      : "post"
   },
   laserCoolant: {
@@ -1400,57 +1399,52 @@ function setCoolant(coolant) {
 
 var cutterOnCurrentPower;
 
+// The chosen OUTPUT is the dispatch, where the firmware used to be: with one field, `fw` no longer says
+// which arm to take, and the value does. The PWM scale goes with the dialect and not with the job --
+// GRBL's S is a spindle speed against $30, which this post has always driven 0..1000, and the Marlin
+// fan and pin values take a byte. validateJob() is what keeps a value off a firmware that cannot run it.
+function laserPwm(mode, power) {
+  return (mode == "4" || mode == "3") ? (power * 10) : (power / 100 * 255);
+}
+
 function laserOn(power) {
-  // Firmware is Grbl
-  if (fw == eFirmware.GRBL) {
-    var laser_pwm = power * 10;
+  var mode = getProperty(properties.laserOutput);
 
-    // Number(), not the raw property: laserGrblMode stores its enum id as a STRING ("4" / "3"), and
-    // every other mFormat.format() call in the file is handed a numeric literal.
-    writeBlock(mFormat.format(Number(getProperty(properties.laserGrblMode))), sFormat.format(laser_pwm));
-  }
-
-  // Default firmware
-  else {
-    var laser_pwm = power / 100 * 255;
-
-    var marlinMode = getProperty(properties.laserMarlinMode);
-
-    switch (marlinMode) {
-      case "M106":
-      case "M42":
-        writeFanOrPinOutput(marlinMode, getProperty(properties.laserMarlinPinFan), laser_pwm);
-        break;
-      case "M3":
-        if (fw == eFirmware.REPRAP) {
-          writeBlock(mFormat.format(3), sFormat.format(laser_pwm));
-        } else {
-          writeBlock(mFormat.format(3), oFormat.format(laser_pwm));
-        }
-        break;
-    }
+  switch (mode) {
+    // Number(), not the raw id: the GRBL values store theirs as STRINGS ("4" / "3"), and every other
+    // mFormat.format() call in the file is handed a numeric literal.
+    case "4":
+    case "3":
+      writeBlock(mFormat.format(Number(mode)), sFormat.format(laserPwm(mode, power)));
+      break;
+    case "M106":
+    case "M42":
+      writeFanOrPinOutput(mode, getProperty(properties.laserMarlinPinFan), laserPwm(mode, power));
+      break;
+    case "M3":
+      if (fw == eFirmware.REPRAP) {
+        writeBlock(mFormat.format(3), sFormat.format(laserPwm(mode, power)));
+      } else {
+        writeBlock(mFormat.format(3), oFormat.format(laserPwm(mode, power)));
+      }
+      break;
   }
 }
 
 function laserOff() {
-  // Firmware is Grbl
-  if (fw == eFirmware.GRBL) {
-    writeBlock(mFormat.format(5));
-  }
+  var mode = getProperty(properties.laserOutput);
 
-  // Default
-  else {
-    var marlinMode = getProperty(properties.laserMarlinMode);
-
-    switch (marlinMode) {
-      case "M106":
-      case "M42":
-        writeFanOrPinOutput(marlinMode, getProperty(properties.laserMarlinPinFan), 0);
-        break;
-      case "M3":
-        writeBlock(mFormat.format(5));
-        break;
-    }
+  switch (mode) {
+    // Every M-code arm stops with M5, GRBL's two and Marlin's spindle form alike.
+    case "4":
+    case "3":
+    case "M3":
+      writeBlock(mFormat.format(5));
+      break;
+    case "M106":
+    case "M42":
+      writeFanOrPinOutput(mode, getProperty(properties.laserMarlinPinFan), 0);
+      break;
   }
 }
 
@@ -1505,38 +1499,54 @@ function countDistinctTools() {
   return count;
 }
 
-// The one place a dialect label means a firmware. Every built-in value in the four coolant code enums
-// carries its dialect in its own title -- "Grbl: M7 (mist)", "Mrln: M42 P6 S255" -- so the check reads
-// the declaration the operator chose from rather than a second list of codes that would drift the first
-// time a value is added to a dropdown. Read in both directions: resolving a chosen code to a firmware,
-// and naming the prefix the operator should be picking from.
-var coolantDialectLabels = [
+// True where ANY section of this job cuts with a jet tool -- a laser, plasma or waterjet. It is what
+// gates group 8's checks: with two laser fields a GRBL job could never carry a Marlin value, because
+// the firmware chose the field; with one field it can, and on a milling job that fires no beam not a
+// byte of it is emitted. Counted over sections, as countDistinctTools() is, and for the same reason.
+function jetToolInJob() {
+  var n = getNumberOfSections();
+  for (var i = 0; i < n; ++i) {
+    if (getSection(i).getTool().isJetTool()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// The one place a dialect label means a firmware. Every built-in value in group 9's two coolant code
+// enums and group 8's laser output carries its dialect in its own title -- "Grbl: M7 (mist)",
+// "Mrln: M42 P6 S255" -- so the check reads the declaration the operator chose from rather than a
+// second list of codes that would drift the first time a value is added to a dropdown. Read in both
+// directions: resolving a chosen code to a firmware, and naming the prefix the operator should be
+// picking from. Named for OUTPUTS and not for coolant since PC-4 gave group 8 the same shape; the
+// bodies never were coolant-specific, reading whatever property they are handed.
+var outputDialectLabels = [
   { label: "Grbl", firmware: eFirmware.GRBL },
   { label: "Mrln", firmware: eFirmware.MARLIN }
 ];
 
-// The label this post uses for a firmware's coolant codes, or undefined where it labels none -- which
-// is RepRapFirmware, and is what scopes the warning below.
-function coolantDialectLabel(firmware) {
-  for (var i = 0; i < coolantDialectLabels.length; ++i) {
-    if (coolantDialectLabels[i].firmware == firmware) {
-      return coolantDialectLabels[i].label;
+// The label this post uses for a firmware's codes, or undefined where it labels none -- which is
+// RepRapFirmware, and is what scopes the coolant warning below.
+function outputDialectLabel(firmware) {
+  for (var i = 0; i < outputDialectLabels.length; ++i) {
+    if (outputDialectLabels[i].firmware == firmware) {
+      return outputDialectLabels[i].label;
     }
   }
   return undefined;
 }
 
-// The firmware a coolant code property's CURRENT value was shipped for, off that value's own title.
-// undefined is the answer "no dialect this post can name" and covers both "Use custom", where the file
-// is the operator's and its dialect is unknowable, and any future unlabelled value.
-function coolantCodeFirmware(prop) {
+// The firmware a code property's CURRENT value was shipped for, off that value's own title. undefined
+// is the answer "no dialect this post can name" and covers both "Use custom", where the file is the
+// operator's and its dialect is unknowable, and any future unlabelled value.
+function outputCodeFirmware(prop) {
   var id = getProperty(prop);
   for (var i = 0; i < prop.values.length; ++i) {
     if (prop.values[i].id == id) {
       var label = String(prop.values[i].title).split(":")[0];
-      for (var j = 0; j < coolantDialectLabels.length; ++j) {
-        if (coolantDialectLabels[j].label == label) {
-          return coolantDialectLabels[j].firmware;
+      for (var j = 0; j < outputDialectLabels.length; ++j) {
+        if (outputDialectLabels[j].label == label) {
+          return outputDialectLabels[j].firmware;
         }
       }
       return undefined;
@@ -1545,9 +1555,9 @@ function coolantCodeFirmware(prop) {
   return undefined;
 }
 
-// The display text of a coolant code's current value. Since GH-16d the Marlin ids are names rather
-// than g-code, so a message quoting the id tells the operator nothing.
-function coolantCodeTitle(prop) {
+// The display text of a code property's current value. Since GH-16d the Marlin coolant ids are names
+// rather than g-code, so a message quoting the id tells the operator nothing.
+function outputCodeTitle(prop) {
   var id = getProperty(prop);
   for (var i = 0; i < prop.values.length; ++i) {
     if (prop.values[i].id == id) {
@@ -2094,12 +2104,40 @@ function validateJob() {
     }
   }
 
+  // GROUP 8's half of the same question, and it exists because PC-4 made the mistake expressible: one
+  // laser field over five dialect-labelled values, where two fields meant the firmware chose one and
+  // never looked at the other. Same declaration and same reading as the coolant codes below, and the
+  // same ruling -- WARNED, the label saying which firmware this post shipped the value for.
+  //
+  // Mismatch iff exactly one side is GRBL. The "Mrln:" values are RepRapFirmware's too -- the field
+  // they came off was called "Marlin/Reprap Mode" and M106, M42 and M3 are emitted on both -- so this
+  // is NOT the coolant check's undefined-means-unlabelled scoping, which would let a GRBL value stand
+  // unremarked on an RRF job.
+  //
+  // Gated on a jet tool: a milling job emits no laser code whatever this field holds. And silent where
+  // the guard below refuses anyway, so one field draws one complaint rather than a warning and an error.
+  if (jetToolInJob()) {
+    var laserId = getProperty(properties.laserOutput);
+    var laserRefused = (fw == eFirmware.GRBL && (laserId == "M106" || laserId == "M42"));
+    var laserFw = outputCodeFirmware(properties.laserOutput);
+    if (!laserRefused && laserFw != undefined
+        && (laserFw == eFirmware.GRBL) != (fw == eFirmware.GRBL)) {
+      warning(localize("\"" + properties.laserOutput.title + "\" is \""
+        + outputCodeTitle(properties.laserOutput) + "\", which this post lists as " + laserFw
+        + ", and this job is posted for " + fw + ". The post emits what you pick, so a controller that "
+        + "does not implement it answers the line as an unsupported command and the job stops "
+        + "mid-operation with the head over the work -- and the S it carries is on the wrong scale "
+        + "besides, the GRBL values driving 0-1000 against $30 and the others a 0-255 byte. Choose the "
+        + "\"" + (fw == eFirmware.GRBL ? "Grbl" : "Mrln") + ":\" values in \"8 - Laser\"."));
+    }
+  }
+
   // The chosen value is emitted with no firmware test -- writeCoolantChannel() writes the GRBL ids
   // verbatim and builds the two Marlin forms from the channel's own number. Gated on the channel mode, CR-24's gate: it ships Off, so a configured channel is the
   // operator's opt-in and is what the emission reads. Warned and not refused -- the label says which
   // firmware this post SHIPPED the code for, not that no other takes it. RepRapFirmware is deliberately
   // not reached, the post labelling no value for it. PV-12.
-  var jobDialect = coolantDialectLabel(fw);
+  var jobDialect = outputDialectLabel(fw);
   if (jobDialect != undefined) {
     var coolantCodeProps = [];
     if (getProperty(properties.coolantChannelAMode) != eCoolant.Off) {
@@ -2110,10 +2148,10 @@ function validateJob() {
     }
     var wrongDialect = [];
     for (var cd = 0; cd < coolantCodeProps.length; ++cd) {
-      var codeFw = coolantCodeFirmware(coolantCodeProps[cd]);
+      var codeFw = outputCodeFirmware(coolantCodeProps[cd]);
       if (codeFw != undefined && codeFw != fw) {
         // The title, not the id: since GH-16d the Marlin ids are names rather than g-code.
-        wrongDialect.push("\"" + coolantCodeProps[cd].title + "\" is \"" + coolantCodeTitle(coolantCodeProps[cd])
+        wrongDialect.push("\"" + coolantCodeProps[cd].title + "\" is \"" + outputCodeTitle(coolantCodeProps[cd])
           + "\", which this post lists as " + codeFw);
       }
     }
@@ -2178,8 +2216,10 @@ function validateJob() {
 
   // The fan and pin output modes, in one table because groups 1, 8 and 9 own the same mistakes.
   //
-  // skipOnGrbl: laserOn() reads laserGrblMode on GRBL and never sees the Marlin/Reprap mode, which
-  // ships "M106" -- so a GRBL job on the shipped default must post.
+  // jetOnly: PC-4's gate, and the same reasoning one group over as CR-24's. The laser output is read
+  // only by a section that fires a beam, so a milling job carrying whatever that field happens to hold
+  // emits none of it and must post. It replaces skipOnGrbl, which said the GRBL job never READ the
+  // Marlin field -- true while there were two fields, and nothing at all with one.
   // refuseOnGrbl: group 9 warns instead, and that is PV-16's ruling -- the labels say which firmware
   // a value was shipped for, not that no other takes it. The dialect warning above is that channel.
   //
@@ -2188,15 +2228,15 @@ function validateJob() {
   // configuration the dialog can express. The guard that refused it went with the field.
   var outputModeProps = [
     { mode: properties.jobSpindleControl, number: properties.jobSpindlePinFan, group: "1 - Job",
-      skipOnGrbl: false, refuseOnGrbl: true },
-    { mode: properties.laserMarlinMode, number: properties.laserMarlinPinFan, group: "8 - Laser",
-      skipOnGrbl: true, refuseOnGrbl: true },
+      refuseOnGrbl: true },
+    { mode: properties.laserOutput, number: properties.laserMarlinPinFan, group: "8 - Laser",
+      refuseOnGrbl: true, jetOnly: true },
     { mode: properties.coolantChannelAOn,
       number: properties.coolantChannelAPinFan, group: "9 - Coolant",
-      skipOnGrbl: false, refuseOnGrbl: false, gate: properties.coolantChannelAMode },
+      refuseOnGrbl: false, gate: properties.coolantChannelAMode },
     { mode: properties.coolantChannelBOn,
       number: properties.coolantChannelBPinFan, group: "9 - Coolant",
-      skipOnGrbl: false, refuseOnGrbl: false, gate: properties.coolantChannelBMode }
+      refuseOnGrbl: false, gate: properties.coolantChannelBMode }
   ];
   for (var om = 0; om < outputModeProps.length; ++om) {
     // CR-24's gate: a channel whose Mode ships Off is not configured, and its codes were never chosen.
@@ -2204,12 +2244,12 @@ function validateJob() {
         && getProperty(outputModeProps[om].gate) == eCoolant.Off) {
       continue;
     }
+    if (outputModeProps[om].jetOnly && !jetToolInJob()) {
+      continue;
+    }
 
     var omMode = getProperty(outputModeProps[om].mode);
     if (omMode != "M106" && omMode != "M42") {
-      continue;
-    }
-    if (outputModeProps[om].skipOnGrbl && fw == eFirmware.GRBL) {
       continue;
     }
 

@@ -309,6 +309,34 @@ const cases = [
   cnc:'Milling/2D/face.cnc',
   props:{coolantChannelAMode:S('Flood'), coolantChannelBMode:S('Mist'), coolantChannelBOn:S('Use custom')},
   mustNotLog:[[/belongs? to another firmware/,'nothing to say: one pair matches and the other has no dialect']] },
+
+// --- PC-4, the same question one group over ------------------------------------------
+// Group 8 gained PV-16's shape because PC-4 made the mistake expressible: one laser field over five
+// dialect-labelled values, where two fields meant the firmware chose one and never read the other.
+// WARNED and not refused, PV-16's ruling -- except M106 and M42 on GRBL, which the guard refuses
+// because the controller answers them error:20; CG22e is that half and this pair is the rest.
+{ id:'H36', desc:'PC-4 - a Marlin laser value on a GRBL laser job: warned, and the wrong code really is emitted',
+  cnc:'Cutting/Laser/center.cnc', props:{laserOutput:S('M3')},
+  // THE FILE IS THE OTHER HALF OF THE CLAIM, as it is in H33: M3 with an O word is Marlin's spindle
+  // form and GRBL has no O at all, so the warning is about a configuration and the damage is a line.
+  must:[[/^M3 O204$/m,'the Marlin spindle form lands in a Grbl file, O word and all']],
+  mustLog:[[/"Laser Output" is "Mrln: M3 O\{PWM\}\/M5", which this post lists as Marlin/,
+            'names the field, its value and the dialect the value was shipped for'],
+           [/Choose the "Grbl:" values in "8 - Laser"/,'and names the prefix to pick from instead']] },
+
+{ id:'H37', desc:'PC-4 - ... and the other direction, where the S scale is the second thing that is wrong',
+  cnc:'Cutting/Laser/center.cnc', props:{jobSelectedFirmware:S('Marlin'), laserOutput:S('4')},
+  must:[[/^M4 S800$/m,'the Grbl value drives S on the 0-1000 scale, in a Marlin file']],
+  mustLog:[[/"Laser Output" is "Grbl: M4 S\{PWM\}\/M5 dynamic power", which this post lists as Grbl/,'named'],
+           [/Choose the "Mrln:" values in "8 - Laser"/,'the remedy follows the job, not the field']] },
+
+// THE GATE, and it is the reason group 8's checks needed one: this job has no jet tool, so the laser
+// field is read by nothing and not a byte of it is emitted. Silent in BOTH channels -- an ungated
+// warning would fire on every milling job whose operator once chose a laser value.
+{ id:'H38', desc:'PC-4 - a MILLING job on the same wrong value says nothing, and emits nothing',
+  cnc:'Milling/2D/face.cnc', props:{laserOutput:S('M3')},
+  mustNot:[[/^(N\d+ )?M3 O/m,'no laser code at all - there is no jet tool to emit one for']],
+  mustNotLog:[[/"Laser Output"/,'and the dialog does not raise a field this job never reads']] },
 ];
 
 const results = [];
