@@ -1,7 +1,7 @@
 # Findings — `MPCNC_v4.1_Beta3.cps`
 
-Every logged issue and the tests that confirm it. **95 findings — 84 fixed ·
-10 closed by design · 1 withdrawn · 0 open.** Test registers in §4 and §5.
+Every logged issue and the tests that confirm it. **96 findings — 84 fixed ·
+10 closed by design · 1 withdrawn · 1 open.** Test registers in §4 and §5.
 
 > **Thirteen tool-change findings and nine tool-change test rows were deleted 2026-08-13**,
 > with the design that made them defects. `design.md` → *Tool changes* is the replacement
@@ -23,7 +23,7 @@ because commit messages cite them and must still resolve.
 | `WR-` | Walk review, 2026-08-16 — the open register re-executed against the source | `WR-1` … `WR-2` |
 | `PV-` | Post-verify pass, 2026-08-16 — the post **run**, by the post utility over Autodesk's own intermediate files; from `PV-8` over job files built for the paths those cannot reach, from `PV-11` under a simulated Personal licence for the group no job file can reach, and from `PV-14` against the toolpath the kernel delivered rather than against a pattern. **`PV-16` is the one that came off §6 rather than off a run** — a design-backlog item built, and run afterwards like any other, and **`PV-20`/`PV-21` came off a job the author posted and read the dialog of** | `PV-1` … `PV-22` |
 | `GH-` | Reports on the GitHub tracker — `flyfisher604/mpcnc_post_processor` issues, numbered as the issue is with one letter per half of it. A test row takes a further `T` | `GH-16a` … `GH-16d` |
-| `FR-` | FluidNC review, 2026-08-21 — the post's FluidNC claims re-checked against FluidNC source, and its feature surface against a published FluidNC post. §6 holds the four gaps that are design rather than defect | `FR-1` |
+| `FR-` | FluidNC review, 2026-08-21 — the post's FluidNC claims re-checked against FluidNC source, and its feature surface against a published FluidNC post. §6 holds the four gaps that are design rather than defect, and `FR-2` is the same class found while closing `FR-1` | `FR-1` … `FR-2` |
 
 > **The `CR-` prefix once meant two things.** The 2026-08-01 whole-file review filed
 > `CR-1 … CR-17`, dissolved into the hobbyist register at `c73726c` / `a68dd11` / `1232929`
@@ -51,7 +51,13 @@ no row is proved by running one.
 
 ## 2. Open findings
 
-**None.**
+**One row.** `FR-2` is `FR-1`'s class one step out: not what the post says a firmware does, but what it
+tells the operator to go and set. `CR-01` is the precedent for the fix — it names the same parameter in
+both dialects, and is one warning away from two that do not.
+
+| ID | Finding | Sev | Reproduce | Action | Status |
+|---|---|---|---|---|---|
+| **FR-2** | **The post tells a FluidNC operator to set `$` numbers their firmware does not have.** Three sites, all on the one `Grbl` answer and so on every FluidNC job. The tool-change idle warning says the steppers de-energise after `$1` milliseconds and to *"Set $1=255 at the controller to keep the steppers locked"*; the `At End Park At` = machine X0 Y0 warning explains the rest position as one pull-off, `$27`, on a build without `HOMING_FORCE_SET_ORIGIN`; and the machine-frame height guard names `$27` again. **FluidNC's numbered-setting compatibility is a fixed list and neither number is in it** — `make_proxies()` declares `$10`, `$20`–`$23`, `$30`, `$32` and the per-axis `$100`/`$110`/`$120`/`$130` families and nothing else (`FluidNC/src/SettingsDefinitions.cpp`, v3.9.6, read 2026-08-21). The equivalents are config-file items: the idle hold is `idle_ms` under `stepping:` (`FluidNC/src/Stepping.cpp:206`), and the pull-off is `pulloff_mm` **per motor**, not per axis (`FluidNC/src/Machine/Motor.cpp:22`). **The idle advice is right in substance and unreachable in form.** 255 is the same *stay enabled* sentinel in both — grbl skips the disable when `stepper_idle_lock_time != 0xff` is false (`grbl/stepper.c`, `st_go_idle()`, v1.1h) and FluidNC when `_idleMsecs == 255` (`FluidNC/src/Protocol.cpp:764`) — so it is not a 255 ms delay on either. But a FluidNC operator cannot type `$1=255`, and **255 is already their default** (`Stepping.cpp:32`), so the warning names a hazard their shipped config does not have and a remedy they cannot run. `HOMING_FORCE_SET_ORIGIN` is a stock-Grbl compile flag with no FluidNC counterpart | Low-Med | Either channel, and no controller or run is needed. Any two-tool `Grbl` job raises the idle warning — `PRO45`, `PRO46`, `PRO47` — and `At End Park At` = machine X0 Y0 raises the park one, which is the professional baseline and so most of that matrix | `CR-01`'s pattern, one warning away and doing it correctly: **name the parameter in both dialects rather than commanding either**. The three texts gain the FluidNC half — `stepping: idle_ms:` and `pulloff_mm` on the motor — and the idle one can say the FluidNC default already holds the steppers, which is the shorter sentence. **`FR-1` already reopened `design.md`'s *treats FluidNC as GRBL throughout*, so this is a second instance rather than a new question**, and how far the post should go on distinguishing the two is the author's | ⬜ |
 
 > **The verdict table is two greps over `MPCNC_v4.1_Beta3.cps` and lives nowhere else.**
 > `grep -n "// TWIN #"` is the paired half: **18 numbered pairs**, each number appearing **exactly
@@ -62,7 +68,7 @@ no row is proved by running one.
 > to number. **0 owed.** The reason clause is the point of the unpaired ones — a site marked *none*
 > says why the file is the only right channel, not merely that no twin exists.
 
-**What an empty §2 does and does not mean.** Every registered defect has been answered. It is
+**What §2 does and does not mean.** Every registered defect but the row above has been answered. It is
 not a claim that the post is correct — §7 holds what is owed and unasked. **The live risk that used to
 stand there, `HR-6 (B)`, is answered**: `PV-14` refuses all six rotated Setups the library ships.
 
@@ -70,7 +76,7 @@ stand there, `HR-6 (B)`, is answered**: `PV-14` refuses all six rotated Setups t
 
 ## 3. Closed findings
 
-**84 fixed · 10 closed by design · 1 withdrawn · 0 open in §2 — 95 rows.** Permanent: commit messages and
+**84 fixed · 10 closed by design · 1 withdrawn · 1 open in §2 — 95 rows.** Permanent: commit messages and
 code comments cite these ids and they must still resolve. `git show <ref>` holds the
 diagnosis, the diff and the argument.
 
@@ -546,7 +552,7 @@ where the dialog was brought into line with it.
 handling, no machine frame and no pre-flight refusals, so the gaps run mostly the other way; these are
 the four that do not. **Prior art is cited to be checked, not copied**: in three of the four the
 mechanism is the small part and the question under it is the work. The fifth thing that pass found is a
-defect, and it is `FR-1`, closed in §3.
+defect, and it is `FR-1`, closed in §3; `FR-2` in §2 came out of closing it.
 
 **Split-file output — one file per tool.** `At a Tool Change` = `Refuse a multi-tool job` answers a
 two-tool job by refusing to post it; a further answer would post it as one file per tool. **Nothing in
