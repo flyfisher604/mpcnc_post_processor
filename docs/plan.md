@@ -11,10 +11,11 @@ the file that computes it is named instead.
 
 ## Checkpoint
 
-**The tree is v4.1.1 Beta 3 on `PropertyReduce`; `v4.1_Beta3` is tagged and on `origin`.** The
-deliverable is now `MPCNC_v4.1.1_Beta3.cps` — Step 9 renamed it — and what the **v4.1 Beta 3** release
-contains is `release-notes-v4.1-beta3.md`.
-**Next: the release page, which is the last of Step 8, and then merging Step 9.**
+**The tree is v4.1.1 Beta 3 on `master`; `v4.1_Beta3` is tagged and on `origin`.** The deliverable is
+now `MPCNC_v4.1.1_Beta3.cps` — Step 9 renamed it — and what the **v4.1 Beta 3** release contains is
+`release-notes-v4.1-beta3.md`. **Step 9 is merged and not pushed**, so `master` is ahead of
+`origin/master` and v4.1.1 carries no tag and no release notes of its own.
+**Next: the release page, which is the last of Step 8.**
 
 Step 7 is done: the four user documents describe the post as it now is, and `guide-pro.md` states
 plainly what is not verified. **What is open stands in `findings.md` §2**, which owns that count.
@@ -39,7 +40,7 @@ version — never from a sender console, a dry run or a non-GRBL controller.
 | | Item | Blocked on |
 |---|---|---|
 | **8** | Publish the v4.1 Beta 3 release page | an authenticated `gh` — the merge, the tag and the push are done |
-| **9** | Merge `PropertyReduce`, and decide what the four user documents owe it | the author — the code and the register are done, and the guides are the author's call |
+| **9** | Decide what the four user documents owe the property reduction | the author — the code and the register are merged, and the guides are the author's call |
 
 **`validateJob()` and the property block were never restructured** — Step 6 measured both and left
 them. Neither is short; whether either is too long is a judgement no measurement settles, and it is
@@ -58,7 +59,7 @@ Step 9 it is a different version under a different name.
 
 ## Step 9 — The property reduction
 
-**Done on `PropertyReduce`, unmerged.** The dialog went from **65 fields to 57** across six folds —
+**Merged to `master`; what is left of this step is the guides.** The dialog went from **65 fields to 57** across six folds —
 `findings.md` `PC-1` to `PC-6`, each naming the configuration it costs — and the deliverable is
 `MPCNC_v4.1.1_Beta3.cps`. The suite is green and `integration.md` §6.2 carries the re-measured
 coverage.
