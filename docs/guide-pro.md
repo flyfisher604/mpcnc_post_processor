@@ -92,11 +92,13 @@ homed. **RepRap has no such lock**, so the post warns there when the machine fra
 *First Tool is Correct* off, in which case the post arranges for it to be loaded *before* any origin
 is recorded or probed, so Z0 is measured with the tool that will cut.
 
-**5. Whoever performs a handed-over tool change is configured to perform it.** `M6` reaches a GRBL
-controller as `error:20`; the route exists only because your sender intercepts the token before the
-controller sees it. The post emits the token and **cannot see whether anything is listening.** An
-ignored token means the rest of the job is cut with the wrong tool, silently. **Test one change on
-air before trusting it.**
+**5. Whoever performs a handed-over tool change is configured to perform it.** `M6` reaches a stock
+Grbl or grblHAL controller as `error:20`, so on those the route exists only because your sender
+intercepts the token before the controller sees it. **FluidNC is the exception — it executes the
+`M6` itself**, dispatching to whatever `config.yaml` declares, and a sender set to strip the token
+takes it away. Either way the post emits the token and **cannot see whether anything is listening**,
+or whether what listens does anything. An ignored token means the rest of the job is cut with the
+wrong tool, silently. **Test one change on air before trusting it.**
 
 **6. Whoever corrects Z0 for the new tool's length actually does it.** *Tool Length Correction By*
 is an assertion about your workflow, not a capability the post verifies. Choose the one that
@@ -105,7 +107,7 @@ see [tool changes](#tool-changes).
 
 **7. The probe touch-point is on uncut material at every probe.** A re-probe that lands in a pocket
 the job already cut writes the machined depth as Z0, and every cut after it goes that much deeper.
-The post detects the common case and warns, naming the operations and the depth; **Probe X/Y Offset**
+The post detects the common case and warns, naming the operations and the depth; **Probe X Y Offset**
 is the remedy.
 
 **8. Your sender's behaviour at an `M0` is yours to know.** Whether you can jog at a pause, and
@@ -120,10 +122,11 @@ whether an `M0` early in the file survives at all, are sender properties — not
 Several operations — face, pocket, contour — on one part in one Setup, so one work offset
 throughout. This is the simplest job that is not the hobbyist's.
 
-- **Leave group 3 off.** With **Safe Z to Rapid** at its default `Retract:15` it converts nothing on
-  a full licence — a genuine cut always sits below the operation's retract level — so it only adds
-  one comment per operation. But it is **not inert by construction**: the check runs on every cut
-  move whatever your licence, and lowering that threshold makes real cutting moves eligible. Off is
+- **Leave group 3 off.** Its threshold is group 5's **Safe Z**, and at that field's default
+  `Retract:15` it converts nothing on a full licence — a genuine cut always sits below the
+  operation's retract level — so it only adds one comment per operation. But it is **not inert by
+  construction**: the check runs on every cut move whatever your licence, and lowering Safe Z for
+  the probe retract lowers this threshold with it, which makes real cutting moves eligible. Off is
   the only setting that cannot surprise you.
 - **First WCS / Part**: if this Setup's offset is a pre-set fixture offset, use **`Use WCS X0 Y0,
   Probe Z0`** — rapid to the stored X0 Y0, re-probe the stock top. Otherwise take the default
@@ -294,7 +297,9 @@ at the first traverse with soft limits on and drives Z into its hard stop with t
 the point at which the endstop tripped**, and homing ends one pull-off *below* it, so a move to zero
 returns the axis onto the switch and soft limits do not reject it. Set a height below machine zero
 by at least the pull-off (`$27`). A machine built with `HOMING_FORCE_SET_ORIGIN` on zeroes at the
-bed and takes a positive value — the post cannot read that setting and will warn every time.
+bed and takes a positive value — the post cannot read that setting and will warn every time. On
+FluidNC the same hazard has a different name: the pull-off is `pulloff_mm`, set **per motor** rather
+than per axis, and there is no `$27` to read or write.
 
 **Units.** A `G53` move is read in the active `G20`/`G21`, so the mm you type here is converted, and
 the file's *Resolved Values* block echoes the height **in output units**. Check it there.
@@ -326,9 +331,10 @@ RepRap also needs homing on. **Two firmware traps come with it**, both warned ab
   an alarm.
 - **Probe Pause** governs the attach/detach prompts, and applies to **every** probe in the job,
   tool-change re-probes included.
-- **Probe X/Y Offset** moves the touch-point away from the origin, job-wide, at every part probe.
+- **Probe X Y Offset** moves the touch-point away from the origin, job-wide, at every part probe.
   Use it when the origin is a corner in fresh air, or when the origin point is somewhere the job
-  will later cut through.
+  will later cut through. It is one field taking two comma-separated millimetre values — `30, -15` —
+  and a value it cannot read falls back to `0, 0`, with a warning.
 - **On RepRapFirmware 3.1.1 and earlier, turn *Probe with G38.2* off.** Up to that version `G38.x`
   takes a **machine-coordinate** target; this post emits a work-frame target, so leaving it on below
   3.1.2 probes to the wrong physical Z.
@@ -363,21 +369,23 @@ the part origin; it does not retrace from where you left it.
 
 ### Who the token goes to
 
-**`Tool Change Handled By`** exists because whether the hand-over route works at all is a *sender*
-fact that no firmware source can settle. `M6` is a genuine call into `tfree`/`tpre`/`tpost` on
-RepRapFirmware and reaches a GRBL controller as `error:20`.
+**`Tool Change Handled By`** exists because who acts on the token is not something the g-code can
+say. `M6` is a genuine call into `tfree`/`tpre`/`tpost` on RepRapFirmware, is executed by FluidNC
+itself, and reaches a stock Grbl or grblHAL controller as `error:20`.
 
 | Handler | Token | What it needs |
 |---|---|---|
 | gSender, CNCjs | `T` + `M6` | The sender's own GRBL filter removes the `M6` before the controller sees it. **CNCjs only pauses** — the change and the re-zero are yours |
 | UGS | `T` + `M6` | Its tool-change interception is **off until you switch it on**. Enabled, it strips the `M6`, passes the `T` through, moves to a safe height and a change position, waits for you, and can run a tool-length probe if you configured one — if you use that probe, set *Tool Length Correction By* to `Tool change applies tool offset` |
+| FluidNC | `T` + `M6` | **No sender interception at all** — the firmware runs the change, and a sender set to strip the `M6` takes the token away. It dispatches to the changer declared as `atc:` under the spindle, or the macro named by `m6_macro:`, both in `config.yaml`. **With neither declared it accepts the line, changes nothing and reports nothing.** A changer needs FluidNC 3.9.0 or later; if yours probes a tool setter, set *Tool Length Correction By* to `Tool change applies tool offset` |
 | RepRapFirmware tool table | `T` alone | Every tool number declared with `M563` in `config.g`, and a `tpost<n>.g` that applies the offset. **Both are on the machine and neither is visible to the post** |
 | Other | none — your macro file | A file in the NC output folder, included identically at every change |
 
-**A handler is listed only where its interception was read in its own source.** That is why `Other`
-exists. And the post cannot check that yours is configured: an `M6` that reaches the controller stops
-the job with the tool in the cut, and one the sender is set to *ignore* drops the change silently and
-cuts on with the wrong bit. **Test one change on air.**
+**A handler is listed only where what it does with the token was read in its own source.** That is
+why `Other` exists. And the post cannot check that yours is configured: an `M6` that reaches a stock
+Grbl controller stops the job with the tool in the cut, and one the sender is set to *ignore* — or
+that FluidNC accepts with nothing configured behind it — drops the change silently and cuts on with
+the wrong bit. **Test one change on air.**
 
 ### Who corrects Z0
 
@@ -418,12 +426,15 @@ first and position afterwards.
 
 ### Where a manual change happens
 
-**`Manual Position X` / `Y` / `Z` are absolute machine coordinates**, emitted through the same `G53`
-block as every other machine-frame move. That is the whole difference from the `Tool Change X/Y/Z`
-they replaced, which were plain `G0` words the dialog presented as absolute while the machine read
-them in whichever work offset was active — so a "fixed" change spot moved with every part origin.
+**`Manual Position X Y` and `Manual Position Z` are absolute machine coordinates**, emitted through
+the same `G53` block as every other machine-frame move. That is the whole difference from the
+`Tool Change X/Y/Z` they replaced, which were plain `G0` words the dialog presented as absolute
+while the machine read them in whichever work offset was active — so a "fixed" change spot moved
+with every part origin.
 
-- **Fill both X and Y, or neither.** One without the other is refused.
+- **X and Y are one field**, two millimetre values separated by a comma: `-10, -400`. There is no
+  half-set point to get wrong; what is left to get wrong is the syntax, and a value the post cannot
+  read stops the post rather than being taken as empty.
 - **X/Y needs X/Y declared homed**, and any position at all needs *Machine Travel Z*. Both refused
   otherwise, rather than accepted and quietly not emitted.
 - **Z may be filled alone.** Fill it only to get a spanner on the collet: the post crosses the bed at
@@ -436,13 +447,18 @@ them in whichever work offset was active — so a "fixed" change spot moved with
 
 ### One GRBL setting worth changing
 
-On GRBL the steppers de-energise once the machine has been idle for `$1` milliseconds — **25 on a
-stock build**. GRBL keeps counting position, so nothing is lost unless an axis actually moves; a
-gantry nudged while the collet is loosened, or a Z that back-drives with no holding torque, is
-enough, and every cut after the change is then offset by an amount nothing reports. **Set `$1=255`
-at the controller.** The post cannot: `$` settings are not g-code and GRBL accepts them only when
-Idle. The same exposure applies to a handed-over change, where the idle interval is not the post's
-to bound.
+On GRBL the steppers de-energise once the machine has been idle for a set interval, and the two
+dialects behind the one `Grbl` answer spell it differently: **`$1` on stock Grbl and grblHAL, 25 ms
+on a stock build**, and **`idle_ms` under `stepping:` in `config.yaml` on FluidNC**. On both, **255
+means *stay energised*** rather than a 255 ms delay — and 255 is already FluidNC's shipped value, so
+a stock FluidNC holds the axes here and a stock Grbl drops them.
+
+The controller keeps counting position, so nothing is lost unless an axis actually moves; a gantry
+nudged while the collet is loosened, or a Z that back-drives with no holding torque, is enough, and
+every cut after the change is then offset by an amount nothing reports. **Set `$1=255` on Grbl or
+grblHAL.** The post cannot: `$` settings are not g-code and GRBL accepts them only when Idle, and
+the FluidNC value is a file on the controller. The same exposure applies to a handed-over change,
+where the idle interval is not the post's to bound.
 
 ---
 
@@ -499,19 +515,19 @@ is written. **A refusal from `onOpen()` writes no file at all;** the one excepti
 - **A handler that does not match the firmware** — the RepRap tool table on a non-RepRap job, or a
   GRBL sender on a non-GRBL job.
 - **`Tool Change Handled By` = `Other` with no macro file named.**
-- **A manual change position that is half-set, or set without the frame it needs** — X without Y, or
-  any position without *Machine Travel Z*, or X/Y without X/Y homed.
+- **A manual change position the post cannot read, or set without the frame it needs** — a
+  *Manual Position X Y* that is not two comma-separated numbers, any position without
+  *Machine Travel Z*, or an X/Y position without X/Y homed.
 - **`At End Park At` = `Machine X0 Y0`** without X/Y declared, or (off Marlin) without homing on.
 - **An include file named but not present** in the NC output folder.
-- **A fan (`M106`) or pin (`M42`) output selected for the spindle or the laser on a GRBL job.**
-  GRBL has neither command and answers it with `error:20`, stopping with the tool in the cut. The
-  coolant channels are the exception and warn instead — the `Mrln:`/`Grbl:` label on a coolant value
-  says which firmware the post shipped it for, not that no other firmware takes it.
+- **A fan (`M106`) or pin (`M42`) output selected for the spindle on a GRBL job, or for the laser on
+  a GRBL job that carries a jet tool.** GRBL has neither command and answers it with `error:20`,
+  stopping with the tool in the cut. A GRBL *milling* job is not refused for a `Mrln:` laser value,
+  because no laser code is emitted there at all — it warns. The coolant channels also warn rather
+  than refuse: the `Mrln:`/`Grbl:` label on a coolant value says which firmware the post shipped it
+  for, not that no other firmware takes it.
 - **A pin (`M42`) output whose `Pin/Fan #` is still 0**, in any of the three groups that offer one.
   Pin 0 names no output anyone wired deliberately, and Marlin protects it on most boards.
-- **A coolant channel switched on with one output form and off with the other** — `M106` on with
-  `M42` off. The two share the channel's `Pin/Fan #`, so a mismatched *pin* is unrepresentable, but a
-  mismatched *form* would leave the output it opened on for the rest of the job.
 - **Multi-axis toolpaths**, **cutter compensation in the control**, and **CAM probing operations**.
 - **A Setup whose Z is not the machine Z**, with the tilt named. *(This one fires after output has
   begun, so it leaves a truncated file — discard it.)*
@@ -535,13 +551,17 @@ around thirty; the ones worth knowing:
   before homing, so the move runs against whatever machine zero the board holds.
 - **`Machine Travel Z` on Marlin**, which needs `CNC_COORDINATE_SYSTEMS`; and **at or above zero on
   GRBL**, which is above the top of travel on a stock build.
-- **A coolant code from the wrong firmware's dialect**, and **`M7`/`M8` on GRBL at all**, whose
-  build and configuration conditions the post cannot read.
+- **A coolant code, or a *Laser Output* value, from the wrong firmware's dialect**, and **`M7`/`M8`
+  on GRBL at all**, whose build and configuration conditions the post cannot read. The laser warning
+  also names the power scale, which goes with the dialect: `0`–`1000` against `$30` on GRBL, a
+  `0`–`255` byte on Marlin and RepRapFirmware.
 - **A coolant a tool asks for that no channel is configured for** — the job runs those operations
   dry, and the post names them.
-- **A Safe Z expression or machine coordinate the post cannot parse.** A bad Safe Z falls back to
-  15 mm; a bad machine coordinate is read as **empty**, which means *not set*, so the motion it
-  controls is simply not emitted.
+- **A Safe Z expression, an X Y pair or a machine coordinate the post cannot parse.** A bad Safe Z
+  falls back to 15 mm and is reported once for the file, not once per section; a bad *Probe X Y
+  Offset* falls back to `0, 0`; a bad machine coordinate is read as **empty**, which means *not set*,
+  so the motion it controls is simply not emitted. The one exception is *Manual Position X Y* on a
+  job that actually reaches a manual change, which is refused rather than silently dropped.
 
 Warnings reach two channels and it is worth knowing which: a line in **Fusion's post dialog**, read
 by whoever posts, and a `>>> WARNING:` line **in the g-code**, read by whoever opens the file — often
@@ -579,8 +599,9 @@ contain. That reaches something no code review can: whether the post runs at all
   is an operator's Setup, and a file posted from Fusion is still owed.
 - **Some paths no job file on disk can reach at all**, stated as bounds rather than tested: a rapid
   that moves in X/Y and Z at once, a tool numbered 0, a dwell, and the vaporize laser power.
-- **Every property runs at its default on every run, but 12 are never *varied*** — all of them
-  coolant, laser or include-file settings. Their alternative values have not been posted.
+- **Every property runs at its default on every run, but 11 are never *varied*** — the four custom
+  coolant filenames, the four include-file names, and the three laser power levels. Their
+  alternative values have not been posted.
 
 **And a green run is not a verified post.** Every finding this machinery has returned came from
 **reading the passing output**, not from a red case; two of its own checks were passing while
@@ -591,6 +612,6 @@ questions were asked.
 
 ## Where next
 
-- **[Property reference](property-reference.md)** — every one of the 65 settings.
+- **[Property reference](property-reference.md)** — every one of the 57 settings.
 - **[Hobbyist guide](guide-hobbyist.md)** — the one-part job, and the two-file tool change.
 - **[README](../README.md)**

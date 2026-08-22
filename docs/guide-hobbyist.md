@@ -24,7 +24,7 @@ multi-tool job does not post at all.
 
 ## The short version
 
-Out of 65 settings, **eight** decide whether your first job comes out right:
+Out of 57 settings, **eight** decide whether your first job comes out right:
 
 | Setting | Group | Why it matters |
 |---|---|---|
@@ -122,8 +122,9 @@ reach your plate and no deeper — a probe that reaches the end of its search wi
 the job with an alarm.
 
 **Probing away from the corner.** If your part origin sits off the material — a corner in fresh
-air, say — **Probe X Offset** and **Probe Y Offset** move the touch-down point somewhere solid
-while the origin stays where you put it.
+air, say — **Probe X Y Offset** moves the touch-down point somewhere solid while the origin stays
+where you put it. It takes two numbers separated by a comma, in mm: `30, -15` moves the probe 30 mm
+in +X and 15 mm in -Y.
 
 ---
 
@@ -251,14 +252,15 @@ turning it on is your decision, not the post's.** It is a workaround for a limit
 licence, and whether to use it is yours to weigh.
 
 **One switch covers all three of the moves Personal turns into cuts:** horizontal moves at or above
-**Safe Z to Rapid**, retracts and descents that stay above it, and each operation's first move —
-the "tool dragged across the work" one. A real cutting move is never converted, and the post
-already emits every rapid as two separate moves, Z then XY, ordered so the tool lifts before it
-travels and travels before it descends.
+**Safe Z**, retracts and descents that stay above it, and each operation's first move — the "tool
+dragged across the work" one. A real cutting move is never converted, and the post already emits
+every rapid as two separate moves, Z then XY, ordered so the tool lifts before it travels and
+travels before it descends.
 
-**Safe Z to Rapid is in your part's coordinates** — measured from the Z0 at the stock top, not from
-machine zero. `Retract:15` means "the operation's own Fusion retract level, or 15 mm if it hasn't
-got one".
+**The height it reads is group 5's Safe Z** — the same number the tool retracts to after probing.
+Group 3 has no height field of its own, so lowering Safe Z lowers it for both. It is in your part's
+coordinates, measured from the Z0 at the stock top, not from machine zero; `Retract:15` means "the
+operation's own Fusion retract level, or 15 mm if it hasn't got one".
 
 On a full licence you do not need it: Fusion already emits real rapids. At the default threshold it
 also converts nothing if you leave it on — but the check still runs, so a lowered threshold could
@@ -282,7 +284,11 @@ knows is wrong. The message says what to change. The ones a one-part job can hit
   RepRap commands; GRBL answers either with `error:20` and stops with the tool in the cut. Pick a
   mode your controller has, or set **CNC Firmware** to what the machine really runs.
 - **Spindle Control set to the pin output with Spindle: Pin/Fan # still 0.** Pin 0 names no output
-  anyone wired on purpose, so the post treats it as unset rather than emitting it.
+  anyone wired on purpose, so the post treats it as unset rather than emitting it. The laser and the
+  two coolant channels are refused the same way when their own pin number is still 0.
+- **Laser Output set to a `Mrln:` fan or pin value on a GRBL laser job**, for the same reason. A
+  milling job is not refused for it — no laser code is emitted there at all — but a dialect
+  mismatch of any kind warns.
 - **A Setup built on a tilted face of the model.** The tool only moves straight down, so a Setup
   whose Z is not the machine's Z would cut in the wrong plane. Re-orient the Setup so its Z points
   up. *(This one is caught after the file has started being written, so discard the partial file
@@ -297,6 +303,6 @@ in both. Read the dialog — a job that posts is not necessarily a job that is r
 
 ## Where next
 
-- **[Property reference](property-reference.md)** — every one of the 65 settings.
+- **[Property reference](property-reference.md)** — every one of the 57 settings.
 - **[Pro guide](guide-pro.md)** — several parts, tool changes inside one file, the machine frame.
 - **[README](../README.md)**

@@ -8,8 +8,8 @@ This is a modified fork of
 originally forked from
 [martindb/mpcnc_posts_processor](https://github.com/martindb/mpcnc_posts_processor).
 
-This is the **v4.1 (Beta 3)** post processor, distributed as the single file
-`MPCNC_v4.1_Beta3.cps`.
+This is the **v4.1.1 (Beta 3)** post processor, distributed as the single file
+`MPCNC_v4.1.1_Beta3.cps`.
 
 Supported firmware (set by the **Job → CNC Firmware** property):
 
@@ -25,9 +25,9 @@ Supported firmware (set by the **Job → CNC Firmware** property):
 
 | | Read this |
 |---|---|
-| **One part, one tool, zeroed by hand.** You jog to your corner, post, and cut. | **[Hobbyist guide](docs/guide-hobbyist.md)** — seven settings matter; the rest can stay as they ship |
+| **One part, one tool, zeroed by hand.** You jog to your corner, post, and cut. | **[Hobbyist guide](docs/guide-hobbyist.md)** — eight settings matter; the rest can stay as they ship |
 | **Several operations, more than one tool, or several parts on their own fixtures.** | **[Pro guide](docs/guide-pro.md)** — work offsets, the machine travel height, tool-change hand-over, the validation guards |
-| **Looking up one setting.** | **[Property reference](docs/property-reference.md)** — all 62, in dialog order |
+| **Looking up one setting.** | **[Property reference](docs/property-reference.md)** — all 57, in dialog order |
 
 ---
 
@@ -76,7 +76,7 @@ multi-axis operations are rejected with a clear error.
 
 # Installation
 
-The post is a single file, `MPCNC_v4.1_Beta3.cps`.
+The post is a single file, `MPCNC_v4.1.1_Beta3.cps`.
 
 1. In Fusion, choose **Manage → Post Library**.
 2. Select My posts/Local in the sidebar.
@@ -84,7 +84,7 @@ The post is a single file, `MPCNC_v4.1_Beta3.cps`.
    first. **Every release so far has had a different filename**, so an old copy will sit
    alongside the new one rather than being replaced, and the two are hard to tell apart
    in the picker.
-4. Use the Import icon to import `MPCNC_v4.1_Beta3.cps` (or the latest version available).
+4. Use the Import icon to import `MPCNC_v4.1.1_Beta3.cps` (or the latest version available).
 5. Close the dialog.
 6. When posting, select **Choose from library...** and select this post.
 7. Review and set the properties as needed — start with the guide for your kind of job, above.
@@ -95,7 +95,44 @@ The post is a single file, `MPCNC_v4.1_Beta3.cps`.
 
 # Release history
 
-## v4.1 Beta 3 — current
+## v4.1.1 — current
+
+**The dialog asks 57 questions where it asked 65.** Nothing was removed from the post: six places
+where two or three fields held one decision are now one field each.
+
+| Now one field | Was | What to do |
+|---|---|---|
+| **Line #s** (group 1) | *Enable Line #s*, *First Line #*, *Line # Increment* | Three answers: `Off`, `N10 N11 N12 … step 1`, `N10 N20 N30 … step 10`. Numbering starts at `N10` |
+| **Probe X Y Offset** (group 5) | *Probe X Offset*, *Probe Y Offset* | Two numbers separated by a comma — `30, -15`. Signed, and decimals now allowed where the old fields took whole mm |
+| **Safe Z** (group 5) | *Safe Z* and group 3's *Safe Z to Rapid* | One height, read by both groups. Group 3 keeps its switch and has no height field of its own |
+| **Manual Position X Y** (group 6) | *Manual Position X*, *Manual Position Y* | Two numbers separated by a comma — `-10, -400`. *Manual Position Z* is unchanged and still fills on its own |
+| **Laser Output** (group 8) | *Laser: Marlin/Reprap Mode*, *Laser: GRBL Mode* | Five values, each labelled `Grbl:` or `Mrln:`. Pick the one your firmware speaks |
+| **Channel A / B Output** (group 9) | *Turn Channel A/B On* and *Turn Channel A/B Off* | One answer sets both directions — the off code follows from the on code |
+
+Three things to know before your first v4.1.1 job:
+
+1. **Four settings reset to their defaults**, because their shape changed: *Line #s*,
+   *Probe X Y Offset*, *Manual Position X Y* and *Laser Output*. The coolant channel outputs and
+   *Safe Z* keep whatever you had set.
+2. **The laser default is now a GRBL value.** A Marlin or RepRapFirmware laser job that does not
+   answer *Laser Output* emits `M4 S…` — a command those firmwares either do not implement, or
+   implement with `S` read as a 0–255 byte rather than GRBL's 0–1000, so the power comes out wrong.
+   The post warns and names both. Set the field once and it goes away; milling jobs are unaffected.
+3. **One coolant bug went with the merge.** A channel switched on with `M106` or `M42` while its
+   off field was left at the shipped `M9` was opened with a pin write and closed with a command
+   naming no pin, so nothing the post emitted ever switched that output back off. The off code is
+   now the on code's own.
+
+**FluidNC is also corrected throughout.** *Tool Change Handled By* gains a **FluidNC — T + M6**
+value: FluidNC executes the `M6` itself rather than needing a sender to intercept it, dispatching
+to the `atc:` changer or `m6_macro:` in `config.yaml`, and accepting the line silently when neither
+is declared. The idle-timer and homing-pull-off warnings now name FluidNC's `idle_ms` and
+`pulloff_mm` alongside Grbl's `$1` and `$27`, instead of naming settings FluidNC does not have.
+
+**The post has a new filename again.** Remove `MPCNC_v4.1_Beta3.cps` from the Post Library rather
+than leaving it beside this one.
+
+## v4.1 Beta 3
 
 v4.0 Beta 3 could ask you to switch the router on by hand, or command it with `M3`. On a stock
 Marlin build neither is much use — `M3` is behind a build option that is off — while the fan and
