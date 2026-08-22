@@ -211,25 +211,28 @@ const cases = [
 // === C. the tool change position -- F3's machine-frame excursion =====================
 { id:'PRO17', desc:'a change position: X/Y crosses at the travel height, THEN Z descends, then it returns',
   cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause'),
-                        toolChangePositionX:S('-10'), toolChangePositionY:S('-400'), toolChangePositionZ:S('-20') }),
+                        toolChangePositionXY:S('-10, -400'), toolChangePositionZ:S('-20') }),
   must:[[/^G53 G0 X-10 Y-400 F\d/m,'crosses in the machine frame'],
         [/^G53 G0 Z-20 F\d/m,'descends to the change height only after arriving']],
   mustLog:[[/below the "Machine Travel Z"/,'a change height under the travel height is called out']],
   custom:(t)=>ordered(t,[['retract to travel Z',/^G53 G0 Z-5 F/m],['cross to X-10 Y-400',/^G53 G0 X-10 Y-400 F/m],
                          ['descend to Z-20',/^G53 G0 Z-20 F/m],['prompt',/Change to Tool #2/]]) },
 
-{ id:'PRO18', desc:'half a change position is refused - X and Y are read as one point',
-  cnc:change, props:pro({ toolChangeMode:S('Pause'), toolChangePositionX:S('-10') }),
-  refuse:[/read as one point/,'refused'] },
+// Half a change position cannot be expressed any more -- one field carries both halves -- so what is
+// left of that refusal is the typo, and this row is the typo. "-10" is a coordinate and not a pair,
+// and the post refuses rather than reading it as EMPTY and quietly changing the tool over the cut.
+{ id:'PRO18', desc:'a change position that is not an X Y pair is refused, not silently dropped',
+  cnc:change, props:pro({ toolChangeMode:S('Pause'), toolChangePositionXY:S('-10') }),
+  refuse:[/"Manual Position X Y" is set to "-10", which is not an X Y pair/,'refused, quoting the field and the value'] },
 
 { id:'PRO19', desc:'a change position with no machine frame is refused - there is no height to cross at',
   cnc:change, props:{ machineHomedAxes:S('XYZ'), toolChangeMode:S('Pause'),
-                    toolChangePositionX:S('-10'), toolChangePositionY:S('-400') },
+                    toolChangePositionXY:S('-10, -400') },
   refuse:[/no machine frame to move in/,'refused'] },
 
 { id:'PRO20', desc:'a change position on Flow 2 is warned and NOT emitted - the macro owns where it goes',
   cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Macro'), toolChangeSender:S('CNCjs'),
-                        toolChangePositionX:S('-10'), toolChangePositionY:S('-400') }),
+                        toolChangePositionXY:S('-10, -400') }),
   mustNot:[[/^G53 G0 X-10 Y-400/m,'the excursion is Flow 1\'s alone']],
   mustLog:[[/so the post does not use it/,'and the dialog says the fields are inert here']] },
 
@@ -325,7 +328,7 @@ const cases = [
   // The operation and the depth are named, not just the shape: "2D-Face" runs X-92.662..80
   // by Y-24.375..0.95 down to Z-1, so the box contains X0 Y0 and the touch-point is a
   // machined floor 1 mm below the datum every later depth was computed against.
-  must:[[/>>> WARNING: this probe touches off at this part's X0 Y0, "Probe X\/Y Offset" being 0/,
+  must:[[/>>> WARNING: this probe touches off at this part's X0 Y0, "Probe X Y Offset" being 0, 0/,
          'the file names the point and the field that moves it'],
         [/ALREADY CUT, down to Z-1 in "2D-Face"/,'and names the operation that cut it, and how deep']],
   mustLog:[[/This job re-probes work Z0 at a point it has already machined/,'and the dialog says it too - HB-5'],
@@ -342,7 +345,7 @@ const cases = [
                           ['re-probe',/^G38\.2 /m]]); } },
 
 { id:'PRO33', desc:'... and the remedy the warning names is what silences it - the offset moves the point off the cut',
-  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause'), probeOffsetY:N(10) }),
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause'), probeOffsetXY:S('0,10') }),
   // Y10 clears "2D-Face"'s Y maximum of 0.95, so the touch-point stands on uncut stock. The
   // OTHER branch of the same condition: the probe is unchanged and only the warning leaves.
   must:[[/^(G0 )?X0 Y10 F\d/m,'the traverse goes to the origin plus the offset']],

@@ -419,22 +419,22 @@ properties = {
     value: "Before & After",
     scope: "post"
   },
-  probeOffsetX: {
-    title      : "Probe X Offset",
-    description: "X distance from the part origin to the probe's touch-point, in whole mm -- for an origin at a corner or off the material. The same for every part. 0 probes at the origin.",
+  // ONE field and not two, because the offset is one displacement and was never two answers -- and a
+  // STRING, which costs Fusion's integer spinner and buys the same "X, Y" syntax the manual change
+  // position takes, parsed by the same parseXYPair(). Unlike that field, empty is NOT a meaning here:
+  // "0, 0" is, and an unreadable value falls back to it, which is why nothing refuses a typo and
+  // validateJob() warns instead.
+  //
+  // The key is new because the type is: a stored integer under probeOffsetX is not this field's string,
+  // and the two axes never had one key between them anyway. A saved configuration falls back to the
+  // default, which is the 0, 0 both fields shipped. See the note at the head of this object.
+  probeOffsetXY: {
+    title      : "Probe X Y Offset",
+    description: "Distance from the part origin to the probe's touch-point -- for an origin at a corner or off the material. Two numbers in mm separated by a comma: 30, -15. Whitespace around the comma is ignored, and either number may be signed and may carry decimals. The same for every part. 0, 0 probes at the origin itself.",
     group      : "probe",
     order      : 40,
-    type       : "integer",
-    value      : 0,
-    scope      : "post"
-  },
-  probeOffsetY: {
-    title      : "Probe Y Offset",
-    description: "Y distance from the part origin to the probe's touch-point, in whole mm -- for an origin at a corner or off the material. The same for every part. 0 probes at the origin.",
-    group      : "probe",
-    order      : 50,
-    type       : "integer",
-    value      : 0,
+    type       : "string",
+    value      : "0, 0",
     scope      : "post"
   },
   probeG382orG28: {
@@ -531,26 +531,24 @@ properties = {
     value      : "",
     scope      : "post"
   },
-  // Where the manual change happens. Three fields and not one because Fusion's dialog has no vector
-  // type, and STRINGS because empty is what says "do not move" -- exactly as Machine Travel Z's empty
-  // says "no frame", every numeric sentinel being a real reachable coordinate. Machine coordinates,
-  // which is the whole difference from the Tool Change X/Y/Z these replace: those were plain G0 words
-  // the dialog presented as absolute while the machine read them in whichever WCS was active, so the
-  // "fixed" change spot moved with every part origin. These are G53.
-  toolChangePositionX: {
-    title      : "Manual Position X",
-    description: "Where the tool goes in X for a manual tool change -- an absolute machine coordinate in mm. Empty: it does not move in X or Y, and the change happens above the last cut. Fill both X and Y or neither. Needs X and Y declared homed and Machine Travel Z set, and is read only on Manual change at a pause. The tool does not return to the point it left; it returns to Machine Travel Z.",
+  // Where the manual change happens. Two fields and not three: X and Y were never separate answers --
+  // the dialog asked twice and validateJob() spent a refusal putting the halves back together -- so the
+  // point is ONE field holding "X, Y", and Z stays its own because it is legitimately set alone. STRINGS
+  // because empty is what says "do not move" -- exactly as Machine Travel Z's empty says "no frame",
+  // every numeric sentinel being a real reachable coordinate. Machine coordinates, which is the whole
+  // difference from the Tool Change X/Y/Z these replace: those were plain G0 words the dialog presented
+  // as absolute while the machine read them in whichever WCS was active, so the "fixed" change spot
+  // moved with every part origin. These are G53.
+  //
+  // The key is new because the meaning is: a stored "-10" under toolChangePositionX was one axis, and
+  // under this key it is half a point the parser rejects. Renaming resets the setting to its default,
+  // which is the shipped empty -- no excursion, the change above the last cut. See the note at the head
+  // of this object.
+  toolChangePositionXY: {
+    title      : "Manual Position X Y",
+    description: "Where the tool goes for a manual tool change -- an absolute machine X and Y in mm, written as two numbers separated by a comma: -10, -400. Whitespace around the comma is ignored. Empty: it does not move in X or Y, and the change happens above the last cut. Needs X and Y declared homed and Machine Travel Z set, and is read only on Manual change at a pause. Bringing Y forward is usually what puts the spindle where you can reach it. The tool does not return to the point it left; it returns to Machine Travel Z.",
     group      : "toolChange",
     order      : 40,
-    type       : "string",
-    value      : "",
-    scope      : "post"
-  },
-  toolChangePositionY: {
-    title      : "Manual Position Y",
-    description: "Where the tool goes in Y for a manual tool change -- an absolute machine coordinate in mm. Fill it with X or not at all. Bringing Y forward is usually what puts the spindle where you can reach it.",
-    group      : "toolChange",
-    order      : 50,
     type       : "string",
     value      : "",
     scope      : "post"
@@ -1871,7 +1869,7 @@ function validateJob() {
         + " the post re-probes Z0 there: where the tool lands on that machined surface instead of the "
         + "original stock top it writes the machined depth as Z0, and every cut after it goes that much "
         + "deeper -- Fusion computed those depths against the original datum. Move the touch-point onto "
-        + "uncut material with \"Probe X/Y Offset\" in \"5 - Part Origins\", or set \"Tool Length "
+        + "uncut material with \"Probe X Y Offset\" in \"5 - Part Origins\", or set \"Tool Length "
         + "Correction By\" to \"User re-zeroed Z by hand at pause\". This pass reports every "
         + "boundary where a re-probe CAN happen; the file itself warns only at the probes that are "
         + "actually written."));
@@ -2059,12 +2057,11 @@ function validateJob() {
     }
   }
 
-  // The same class on the fields holding a machine coordinate: parseMachineCoordinate() answers
+  // The same class on the fields holding a single machine coordinate: parseMachineCoordinate() answers
   // undefined for a typo exactly as for an empty field, and undefined IS "not set" -- so "-12mm" in
-  // "Machine Travel Z" silently means NO FRAME. Not covered by the X/Y refusal below, which exists only
-  // on the manual flow of a multi-tool job; both firing together is right.
-  var coordProps = [properties.machineTravelZ, properties.toolChangePositionX,
-                    properties.toolChangePositionY, properties.toolChangePositionZ];
+  // "Machine Travel Z" silently means NO FRAME. "Manual Position Z" is here and not below because it is
+  // legitimately set alone; the X Y pair is a different syntax and has its own loop.
+  var coordProps = [properties.machineTravelZ, properties.toolChangePositionZ];
   for (var c = 0; c < coordProps.length; ++c) {
     var rawCoord = getProperty(coordProps[c]);
     if (rawCoord != "" && parseMachineCoordinate(rawCoord) == undefined) {
@@ -2072,6 +2069,27 @@ function validateJob() {
         + "signed decimal number of millimetres -- so the post reads the field as EMPTY, which is the "
         + "answer \"not set\", and the motion it controls is simply not emitted. Give a plain number "
         + "such as -12 or -12.5, with no unit suffix and no other characters."));
+    }
+  }
+
+  // The same class again on the fields holding an X Y PAIR, and the fallback differs by field, so each
+  // says its own. Both are warned and not refused here: the manual position's unreadable-pair case is
+  // refused among the guards below, but only on the multi-tool manual flow that reads it, and the probe
+  // offset has no refusal at all -- an offset of 0, 0 IS a legal configuration, and the shipped one.
+  var pairProps = [
+    { prop: properties.probeOffsetXY,
+      fallback: "the post reads the offset as 0, 0 and probes at the part origin itself" },
+    { prop: properties.toolChangePositionXY,
+      fallback: "the post reads the field as EMPTY, which is the answer \"not set\", and the tool change "
+              + "happens above the last cut with no excursion at all" }
+  ];
+  for (var pp = 0; pp < pairProps.length; ++pp) {
+    var rawPair = getProperty(pairProps[pp].prop);
+    if (rawPair != "" && parseXYPair(rawPair) == undefined) {
+      warning(localize("\"" + pairProps[pp].prop.title + "\" is set to \"" + rawPair + "\", which is not "
+        + "an X Y pair the post can read -- so " + pairProps[pp].fallback + ". Give TWO signed decimal "
+        + "numbers of millimetres separated by a comma, such as -10, -400. Whitespace around the comma "
+        + "is ignored; anything else in the field is not."));
     }
   }
 
@@ -2301,14 +2319,15 @@ function validateJob() {
     var posY = toolChangePosY();
     var posZ = toolChangePosZ();
 
-    // Tested against the RAW fields as well, so a value that does not parse draws the same complaint as
-    // one left blank: either way the axis is unset.
-    if ((getProperty(properties.toolChangePositionX) != "" || getProperty(properties.toolChangePositionY) != "")
-        && (posX == undefined || posY == undefined)) {
-      error("\"Manual Position X\" and \"Manual Position Y\" are read as one point, and this"
-        + " job sets one of them without the other -- or sets one to something that is not a signed"
-        + " decimal number of millimetres. Fill both, or empty both to change the tool where the cut"
-        + " ended.");
+    // Tested against the RAW field as well, so a value that does not parse draws the same complaint as
+    // one left blank: either way the point is unset. The half-filled point this used to catch cannot be
+    // expressed any more -- one field carries both halves -- so what is left is the typo.
+    if (getProperty(properties.toolChangePositionXY) != "" && posX == undefined) {
+      error("\"Manual Position X Y\" is set to \"" + getProperty(properties.toolChangePositionXY)
+        + "\", which is not an X Y pair this post can read, so it would be taken as EMPTY and this"
+        + " job's manual changes would happen above the last cut instead of at the position you set."
+        + " Give two signed decimal numbers of millimetres separated by a comma -- -10, -400 -- or"
+        + " empty the field to change the tool where the cut ended.");
       return;
     }
 
@@ -2914,11 +2933,30 @@ function parseMachineCoordinate(raw) {
   return Number(s);
 }
 
-// The manual change position, in MILLIMETRES, each axis independently undefined when its field is
-// empty. Nothing may read the properties directly: the all-or-nothing rule on X/Y and the "Z alone is
-// legal" rule below are enforced once, in validateJob(), against exactly these three answers.
-function toolChangePosX() { return parseMachineCoordinate(getProperty(properties.toolChangePositionX)); }
-function toolChangePosY() { return parseMachineCoordinate(getProperty(properties.toolChangePositionY)); }
+// The one reading of an X Y PAIR held as a string -- "Manual Position X Y" and "Probe X Y Offset" --
+// so a pair one field accepts cannot be rejected by the other. Returns {x, y} in MILLIMETRES, or
+// UNDEFINED for "not a pair", which includes the empty field. Built on parseMachineCoordinate(), which
+// is what makes each half take exactly the syntax the single-coordinate fields take, and what makes
+// the whitespace around the comma irrelevant: it trims each half before testing it, so "0, 0", "0,0"
+// and "-10 , -400" are one value. A pair is two numbers and no more -- "10" and "1,2,3" are both
+// rejected rather than half-read. Pure.
+function parseXYPair(raw) {
+  if (typeof raw != "string") return undefined;
+  var parts = raw.split(",");
+  if (parts.length != 2) return undefined;
+  var x = parseMachineCoordinate(parts[0]);
+  var y = parseMachineCoordinate(parts[1]);
+  if (x == undefined || y == undefined) return undefined;
+  return {x: x, y: y};
+}
+
+// The manual change position, in MILLIMETRES. X and Y come from ONE field and are therefore both set
+// or both unset -- there is no half-filled point left to police, which is why the paired-fill refusal
+// that stood in validateJob() is gone. Z is independently undefined when its own field is empty; the
+// "Z alone is legal" rule is enforced once, in validateJob(), against these answers.
+function toolChangePosXY() { return parseXYPair(getProperty(properties.toolChangePositionXY)); }
+function toolChangePosX() { var p = toolChangePosXY(); return (p == undefined) ? undefined : p.x; }
+function toolChangePosY() { var p = toolChangePosXY(); return (p == undefined) ? undefined : p.y; }
 function toolChangePosZ() { return parseMachineCoordinate(getProperty(properties.toolChangePositionZ)); }
 
 // True when this job relocates the tool for a manual change. The mode is part of the question: on the
@@ -3947,8 +3985,17 @@ function writeFixedZReference() {
 // Part-probe XY offset, in output units. The Z-probe touch-point for a PART is its WCS origin plus
 // this offset, so the origin can sit at a corner or off the material while Z is read on the stock top.
 // Applied to the first part and each added part.
-function probeOffsetX() { return propertyMmToUnit(getProperty(properties.probeOffsetX)); }
-function probeOffsetY() { return propertyMmToUnit(getProperty(properties.probeOffsetY)); }
+//
+// An unreadable field is 0, 0 -- the touch-point IS the origin, which is what the post did before the
+// field existed and what it ships doing. There is no undefined to propagate: every caller wants a
+// number, and the one that wants to know whether the operator moved the point asks probeOffsetIsSet().
+// validateJob() carries the dialog half, so a typo is stated rather than silently obeyed.
+function probeOffsetMm() {
+  var p = parseXYPair(getProperty(properties.probeOffsetXY));
+  return (p == undefined) ? {x: 0, y: 0} : p;
+}
+function probeOffsetX() { return propertyMmToUnit(probeOffsetMm().x); }
+function probeOffsetY() { return propertyMmToUnit(probeOffsetMm().y); }
 
 // True when a part probe touches off somewhere other than the part origin, i.e. when the XY offset
 // creates a traverse. One definition, so partProbe() and the first-part "... Current Pos" path -- which
@@ -4009,9 +4056,9 @@ function probePointMachinedBefore(upto, workOffset) {
 // look at -- the origin itself, or the origin plus an offset that has not moved it far enough.
 function probePointDescription() {
   return probeOffsetIsSet()
-    ? ("this part's X0 Y0 plus \"Probe X/Y Offset\" -- X" + xyzFormat.format(probeOffsetX())
+    ? ("this part's X0 Y0 plus \"Probe X Y Offset\" -- X" + xyzFormat.format(probeOffsetX())
        + " Y" + xyzFormat.format(probeOffsetY()))
-    : "this part's X0 Y0, \"Probe X/Y Offset\" being 0";
+    : "this part's X0 Y0, \"Probe X Y Offset\" being 0, 0";
 }
 
 // The two "Set ... to Current Pos" modes, whose origin is where the OPERATOR left the tool before the
@@ -4028,7 +4075,7 @@ function originIsPreJogged() {
 var probePauseBefore = true;
 var probePauseAfter = true;
 
-// Probe Z into the active WCS at the part's touch-point -- its origin plus "Probe X/Y Offset" --
+// Probe Z into the active WCS at the part's touch-point -- its origin plus "Probe X Y Offset" --
 // travelling there first where the tool is not already on it. Callers guard tool 0 and jet tools.
 //
 //   atOrigin              the tool already sits on the origin, so the reposition is emitted only where
@@ -4046,7 +4093,7 @@ function partProbe(atOrigin, zUntrusted, startsWhereHomingLeftIt) {
   var machined = probePointMachinedBefore(sectionsCompleted, currentWorkOffset);
   // PV-7's in-file half, above the traverse and the G38.2 rather than beside them: the operator has to
   // correct the datum BEFORE the probe runs. A warning and not a suppression -- an origin off the
-  // material is the common professional case, and "Probe X/Y Offset" is the remedy the text names.
+  // material is the common professional case, and "Probe X Y Offset" is the remedy the text names.
   if (machined != undefined) {
     // TWIN #11
     writeWarning("this probe touches off at " + probePointDescription() + " -- a point this job has"
@@ -4054,7 +4101,7 @@ function partProbe(atOrigin, zUntrusted, startsWhereHomingLeftIt) {
       + machined.names.join(", ") + ". Where the tool lands on that machined surface instead of the"
       + " original stock top, the Z0 written below is that much low and every depth after it cuts that"
       + " much deeper into the part -- Fusion computed them against the original datum. Move the"
-      + " touch-point onto uncut material with \"Probe X/Y Offset\" in group 5 - Part Origins, or set"
+      + " touch-point onto uncut material with \"Probe X Y Offset\" in group 5 - Part Origins, or set"
       + " Z0 by hand instead of letting this probe write it");
   }
 

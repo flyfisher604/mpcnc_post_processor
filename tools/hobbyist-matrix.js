@@ -102,8 +102,23 @@ const cases = [
   props:{probeG38Target:N(-25), probeG38Speed:N(45), probeThickness:'1.5'},
   must:[[/^G38\.2 F45 Z-25$/m,'target and speed as set'],[/^G10 L20 P1 Z1\.5$/m,'thickness as set']], mustNot:[] },
 { id:'H17', desc:'Probe offset - plate cannot sit on the part origin', cnc:'Milling/2D/face.cnc',
-  props:{probeOffsetX:N(30), probeOffsetY:N(-15)},
+  props:{probeOffsetXY:S('30, -15')},
   must:[[/X30 Y-15/,'traverses to the plate position'],[/^G38\.2 /m,'probes there']], mustNot:[] },
+// The field's own claim, tested: whitespace around the comma is ignored, so the two spellings are ONE
+// value. Everything but the property dump must match line for line -- the dump echoes the raw string
+// and is expected to differ, which is exactly why it is the one line stripped before comparing.
+{ id:'H17b', desc:'Probe offset - "30, -15" and "30,-15" are the same value', cnc:'Milling/2D/face.cnc',
+  props:{probeOffsetXY:S('30, -15')}, must:[], mustNot:[],
+  compare:{cnc:'Milling/2D/face.cnc', props:{probeOffsetXY:S('30,-15')}},
+  custom:(t,ref)=>{ const strip=s=>s.split('\n').filter(l=>!/probeOffsetXY/.test(l)).join('\n');
+    return strip(t)===strip(ref)? [true,'identical output either side of the space']
+                                : [false,'the space changed the file']; } },
+{ id:'H17c', desc:'Probe offset - a value that is not a pair falls back to the origin, and says so',
+  cnc:'Milling/2D/face.cnc', props:{probeOffsetXY:S('30')},
+  must:[[/^G38\.2 /m,'still probes']],
+  mustNot:[[/X30 Y/,'no traverse - the unreadable offset is not half-read as X30']],
+  mustLog:[[/"Probe X Y Offset" is set to "30", which is not an X Y pair/,'the dialog names the field and the value'],
+           [/reads the offset as 0, 0 and probes at the part origin itself/,'and states the fallback']] },
 
 // --- group 4, the homed hobbyist (P3) ------------------------------------------------
 { id:'H18', desc:'P3 - homed machine, machine-frame travel, park clear of the work', cnc:'Milling/2D/face.cnc',
