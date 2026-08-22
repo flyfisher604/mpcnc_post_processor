@@ -1986,9 +1986,13 @@ function validateJob() {
     }
   }
 
-  // GRBL has no g-code for this: its equivalent is the $1 step idle delay, accepted only in Idle.
-  // st_go_idle() disables the drivers after $1 ms whenever the segment buffer drains, unless $1 is 255;
-  // the stock default is 25 (stepper.c and defaults.h, Grbl 1.1). Two arms -- a sender drains it too.
+  // No g-code sets this on either dialect, and ONE warning covers both because the post cannot tell them
+  // apart -- "Grbl" is one answer. Stock Grbl and grblHAL: st_go_idle() disables the drivers $1 ms after
+  // the segment buffer drains, default 25 (stepper.c, defaults.h, Grbl 1.1). FluidNC: the same timer is
+  // idle_ms under stepping:, default 255 (Stepping.cpp, v3.9.6). 255 is a SENTINEL on both and not a
+  // duration -- st_go_idle() skips the disable while stepper_idle_lock_time != 0xff is false, and
+  // protocol_disable_steppers() returns early on _idleMsecs == 255 (Protocol.cpp:764) -- so a stock
+  // FluidNC never de-energises here and a stock Grbl does. FR-2. Two arms -- a sender drains it too.
   if (fw == eFirmware.GRBL && getProperty(properties.toolChangeMode) != "Refuse"
       && countDistinctTools() > 1) {
     warning(localize((toolChangeIsMacro()
@@ -1997,13 +2001,18 @@ function validateJob() {
           + "until whatever performs the change lets the job resume, and that interval is not the post's "
           + "to bound"
         : "This job stops the program (M0) for a manual tool change")
-      + ". On GRBL the steppers de-energise once "
-      + "the machine has been idle for $1 milliseconds -- 25 on a stock build. GRBL keeps counting "
-      + "position, so nothing is lost unless an axis actually moves; a gantry nudged while the collet "
-      + "is loosened, or a Z that back-drives with no holding torque, is enough, and every cut after "
-      + "the change is then offset by an amount nothing reports. Set $1=255 at the controller to keep "
-      + "the steppers locked. The post cannot set it for you: $ settings are not G-code and GRBL "
-      + "accepts them only when it is Idle."));
+      + ". The steppers may de-energise while it stands there, and the "
+      + "timer is the one thing your two possible firmwares spell differently: stock Grbl and grblHAL "
+      + "drop them $1 milliseconds after the motion buffer drains -- 25 on a stock build -- and FluidNC "
+      + "after idle_ms under stepping: in config.yaml, which ships at 255. ON BOTH, 255 MEANS STAY "
+      + "ENERGISED rather than a 255 ms delay, so a stock FluidNC holds the axes here and a stock Grbl "
+      + "lets go of them. Either way position is still counted, so nothing is lost unless an axis "
+      + "actually moves; a gantry nudged while the collet is loosened, or a Z that back-drives with no "
+      + "holding torque, is enough, and every cut after the change is then offset by an amount nothing "
+      + "reports. Set $1=255 on Grbl or grblHAL; on FluidNC that is idle_ms: 255, and it is already the "
+      + "default unless someone changed it. The post can set neither for you -- $ settings are not "
+      + "G-code and GRBL accepts them only when it is Idle, and the FluidNC value is a file on the "
+      + "controller."));
   }
 
   // CR-10 -- PR-17's argument on X and Y. GRBL-gated: Marlin re-homes here instead of rapiding, and an
