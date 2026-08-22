@@ -526,7 +526,8 @@ const cases = [
         [/Hand over to FluidNC -- it executes the M6 below itself/,'and the file says which'],
         [/Tool #2[^\n]*, through the "atc:" or "m6_macro:" named in config\.yaml/,
          'naming the two config keys the operator can check'],
-        [/^G90$/m,'absolute re-asserted'],[/^G54$/m,'the work offset re-selected']],
+        [/^G90$/m,'absolute re-asserted'],[/^G54$/m,'the work offset re-selected'],
+        [/^G38\.2 /m,'and the baseline correction still re-probes here - the warning below is about THIS']],
   mustNot:[[/error:20/,'FR-1 - nothing in the file claims this firmware rejects the M6'],
            [/intercept/i,'nor that anything has to intercept it']],
   mustLog:[[/"Tool Change Handled By" is "FluidNC -- T \+ M6", so this job hands each change over with an M6 the FIRMWARE executes/,
@@ -534,7 +535,10 @@ const cases = [
            [/declared as "atc:" under the spindle, or runs the macro named by "m6_macro:"/,
             'and where to look for it'],
            [/WITH NEITHER DECLARED it accepts the line, changes nothing and reports nothing/,
-            'CR-24s shape: the failure mode is silence, so the warning has to be the noise']],
+            'CR-24s shape: the failure mode is silence, so the warning has to be the noise'],
+           [/a FluidNC "atc:" with a tool setter is the second kind, measuring the new tool and shifting the whole Z frame with G43\.1/,
+            'FR-1 - re-probe over a changer that already measured WARNS rather than refusing: with only '
+            + 'an m6_macro: that prompts, the post probe is the jobs only correction']],
   mustNotLog:[[/works only because the sender removes the M6 from the stream/,
                'FR-1 - the interception warning is off this arm'],
               [/error:20/,'and no channel says the controller answers one']],
@@ -553,6 +557,38 @@ const cases = [
   cnc:change, props:pro({ jobSelectedFirmware:S('Marlin'), machineParkAtEnd:S('Work'),
                         toolChangeMode:S('Macro'), toolChangeSender:S('FluidNC') }),
   refuse:[/no tool-length offset register/,'refused, and the reason is the register rather than the dialect'] },
+
+// PRO47 is the arm the post WARNS about; this is the one it steers that operator to. An "atc:" with a
+// tool setter measures the new tool and applies it as a frame offset, so the right answer is "Tool change
+// applies tool offset" -- and it is the only arm where the FILE names the handler, writeToolChangeReturn()
+// interpolating the title into its offset warning. Nothing posted this value with any correction but the
+// baseline's, so neither that sentence nor the absence of a probe had ever been read.
+{ id:'PRO51', desc:'FR-1 - FluidNC with "Tool change applies tool offset": the file names the handler and probes nothing',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Macro'), toolChangeSender:S('FluidNC'),
+                        toolChangeZ0Correction:S('Offset') }),
+  must:[[/^T2 M6$/m,'the same token'],
+        [/a tool-length offset was applied by "FluidNC -- T \+ M6"/,
+         'the file names the party it is trusting, and on this arm that party is the firmware']],
+  mustNot:[[/^G38\.2 /m,'nothing re-probes: the changer measured, and probing again would overwrite it'],
+           [/error:20/,'still no channel claims the firmware rejects the M6']],
+  mustLog:[[/WITH NEITHER DECLARED it accepts the line, changes nothing and reports nothing/,
+            'the contract warning does not depend on the correction']],
+  mustNotLog:[[/overwrites whatever the macro measured/,
+               'and the re-probe warning is correctly off this arm - PRO47 is where it fires']] },
+
+// The gate, not the arm: toolChangeIsMacro() decides whether ANY of Flow 2 is said, and this value left
+// selected while "At a Tool Change" is a manual pause must not make the post describe a hand-over the
+// file does not contain. The operator who tried FluidNC and went back to pausing is the case.
+{ id:'PRO52', desc:'FR-1 - the FluidNC value with a manual pause says nothing about a hand-over that is not there',
+  cnc:change, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause'), toolChangeSender:S('FluidNC') }),
+  must:[[/^M0 \(MSG,Change to Tool/m,'the pause is what this job does']],
+  mustNot:[[/^T2 M6$/m,'no token is handed to anything'],
+           [/Hand over to FluidNC/,'and the file does not say one was']],
+  mustLog:[[/This job stops the program \(M0\) for a manual tool change/,
+            'the idle warning takes its manual arm, the sender value notwithstanding']],
+  mustNotLog:[[/hands each change over with an M6 the FIRMWARE executes/,
+               'FR-1 - the contract warning is gated on the macro mode, not on the value alone'],
+              [/WITH NEITHER DECLARED/,'so no config.yaml advice on a job that emits no M6']] },
 ];
 
 // ---- run ------------------------------------------------------------------------------

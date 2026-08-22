@@ -91,8 +91,8 @@ node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/cor
 node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1_Beta3.cps "$CNC" out/gcode-structure
 ```
 
-**211 cases — 37 hobbyist, 50 professional, 39 WCS, 11 personal, 57 CorrectGcode, 17 GCodeStructure —
-over 42 job files, and all 211 pass as of 2026-08-21.** The whole run is under a minute.
+**213 cases — 37 hobbyist, 52 professional, 39 WCS, 11 personal, 57 CorrectGcode, 17 GCodeStructure —
+over 42 job files, and all 213 pass as of 2026-08-21.** The whole run is under a minute.
 
 **The six are independent by design and stay that way.** The first four encode personas that disagree
 about what the factory defaults should do, so a shared baseline would have to pick one; the last two
