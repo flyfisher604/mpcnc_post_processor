@@ -41,11 +41,11 @@ is scope on the `HB-` and `PR-` passes and routes nothing.
 
 ## 2. Open findings
 
-**Ten rows, and one writes wrong g-code: `RV-01`**, a second tool cutting with the spindle stopped.
+**Nine rows, and one writes wrong g-code: `RV-01`**, a second tool cutting with the spindle stopped.
 `MR-1` and `MR-2` are `CR-01`'s class — a statement the post makes about a firmware rather than a fault
 in what it writes — and halves of one field: `MR-1` is what the post *claims* about `M7`/`M8`, `MR-2` is
-what its dropdown *calls* them. `RV-03`, `RV-04` and `RV-17` are inputs and a warning the post handles worse than it should, `RV-18`
-is the repo's own syntax gate, and the other three `RV-` rows change no g-code.
+what its dropdown *calls* them. `RV-03`, `RV-04` and `RV-17` are inputs and a warning the post handles worse than it should, and the
+other three `RV-` rows change no g-code.
 
 | ID | Finding | Sev | Reproduce | Action | Status |
 |---|---|---|---|---|---|
@@ -58,7 +58,6 @@ is the repo's own syntax gate, and the other three `RV-` rows change no g-code.
 | **RV-05** | **`limitFeedByXYZComponents()` normalises before its zero-length check** — `xyz.getNormalized()` (L4366) and the product after it run on a vector that the `if (xyz.length == 0)` arm (L4374) then discards. Harmless, the result unused on that path; the `if` is indented one level too deep | Low | None — no output changes | Move the zero-length return above the normalisation and fix the indentation | ⬜ |
 | **RV-08** | **A misspelt function, two stale descriptions, a misleading initial value and four off-convention names.** `setSpindeSpeed` — the declaration, 5 calls, 2 comment mentions — and *accomidate* in `longDescription`. `description` names Marlin, Grbl and RepRap and not FluidNC; `longDescription` describes feed scaling for a slow Z and nothing else. `var fw = eFirmware.MARLIN` against a shipped default of GRBL — `onOpen()` assigns it first, so it is never read, only misread. `CoolantA`, `CoolantB`, `Start` and `display_text` break the file's camelCase | Low | None — no g-code changes | Rename `setSpindeSpeed` after `RV-01` lands, since both touch the same lines; both descriptions brought to the current firmware set; `fw` initialised `undefined`, with the reason. No rename here moves a property key, so no saved setting resets. **Not owed**: the header's *Changed Aug 22, 2026* is the release date, and converting 278 `var` to `let` changes no behaviour | ⬜ |
 | **RV-17** | **The first part's no-Z-reference warning can tell the operator that homing chose the tool's height after a `Start File` include has moved it.** `writeWcsOnStart()` passes `startsWhereHomingLeftIt` true to `partProbe()` on its `Probe Z` arm, and `partProbe()` then writes *on this job HOMING chose that height, not you. Nothing has moved the tool since*. `writeFirstSection()` loads the start file after `writeMachineHoming()` and before that call, and the post cannot read what the file does | Low | `machineHomeAtStart` = `Home` with Z homed, `machineTravelZ` empty, `probeOnStart` = `Probe Z`, `includeStartFile` naming any file: the warning says nothing has moved the tool | Pass `false` where a start file is named, or have the text allow for one. The warning's wording only — no move changes | ⬜ |
-| **RV-18** | **The post-edit hook, the repo's one automatic check, fails on every edit under Node 24.** `.claude/hooks/post-edit.js` runs `node --check MPCNC_v4.1.1_Beta3.cps`, and Node v24.19.0 refuses a `.cps` path with `ERR_UNKNOWN_FILE_EXTENSION` before reading it — so every edit reports a syntax failure whatever the file holds, and a gate that always fails is one nobody reads | Med | Any edit to the post under Node 24 | `node --check -` with the post on stdin: it passes the post, exits 1 on a broken file, and needs no extension. **One ruling is the author's**: whether the hook also runs `tools/comment-rules.js`, which drifted from 0 breaches to 14 with nothing running it | ⬜ |
 
 > **The verdict table is two greps over `MPCNC_v4.1.1_Beta3.cps` and lives nowhere else.**
 > `grep -n "// TWIN #"` is the paired half: **18 numbered pairs**, each number appearing **exactly
@@ -78,7 +77,7 @@ ships.
 
 ## 3. Closed findings
 
-**✅ 95 · ➖ 11 — 106 rows.**
+**✅ 97 · ➖ 11 — 108 rows.**
 Permanent: commit messages and code comments cite these ids and they must still resolve.
 `git show <ref>` holds the diagnosis, the diff and the argument. ➖ is closed-by-design or
 withdrawn; which one a row is, is its Resolution cell.
@@ -209,6 +208,8 @@ withdrawn; which one a row is, is its Resolution cell.
 | **RV-14** | 38 comments stated something the code does not do — four on safety paths, among them `spindleOff()` beeping on every `M300` firmware and `partProbe()` warning *instead of* moving | Med | Each rewritten to what the code does, checked against it. The grbl comment-nesting citation is now `grbl/protocol.c, protocol_main_loop(), v1.1h`, and the GRBL boot lock carries `HOMING_INIT_LOCK, grbl/main.c, v1.1h`. **One stays**: `toolChange()`'s *onSection() restarts the spindle*, true once `RV-01` lands. Of the two open questions the boot lock held and the start file did not — `RV-17` | ✅ |
 | **RV-15** | 230 of 458 comment blocks were harder to read than they needed to be — private vocabulary, capitals for emphasis, packed sentences, narrated history | Low | **Every one rewritten, none longer than it was**: comment text 105,827 → 86,464 characters and 1,196 → 998 lines, the code identical once comments are stripped. Firmware citations and `TWIN` markers kept word for word; history that guards a removed bug restated as a constraint. No test row: no run can distinguish a comment | ✅ |
 | **RV-16** | `tools/comment-rules.js` reported 14 breaches with nothing running it, and its R1 missed an `else if` opening its own line | Low | R1 now matches an `else if` with or without the `}`, which finds 15 in the old post and none now — `RV-15`'s rewrites cleared them. Whether anything runs it is `RV-18`'s ruling | ✅ |
+| **RV-11** | Ten dialog tooltips ran past 600 characters, the longest 1,484 — a paragraph per value where each operator needs one | Low | Each cut to 257–318 characters: what the field does and the consequence that matters most. What they dropped is in `property-reference.md`'s rows for the same fields, with group 5's origin modes in one shared table, so nothing left the documentation. No g-code changes — nothing reads a description | ✅ |
+| **RV-18** | The post-edit hook ran `node --check` on the `.cps` path, which Node 24 refuses before reading, so it failed every edit | Med | The post goes to `node --check -` on stdin: the hook passes the post and returns 2 on a broken file. Whether it also runs `tools/comment-rules.js` stays the author's — §6 | ✅ |
 
 ---
 
@@ -652,7 +653,7 @@ question under it.
 
 **Five, from the `RV-` review, each a ruling before it is work.** None changes g-code.
 
-**`RV-06` — `validateJob()` is one function of about 900 lines** (L1558–L2460). Two shapes: split it by
+**`RV-06` — `validateJob()` is one function of about 860 lines**. Two shapes: split it by
 dialog group, or a rule table of `{ when, text, fileTwin }` entries, which would let a script confirm every
 TWIN pair has both halves — a check the verdict table's greps only approximate. **Either must land with no
 change to emitted g-code**, the six matrices re-run before and after.
@@ -666,10 +667,8 @@ the trace events they assert on come from `tools/trace.cps`. **The question** is
 of the post for `TWIN #n`, the id prefixes and the vocabulary that stays — new comment text, so held for
 the author rather than written under a rule that no comment grows.
 
-**`RV-11` — tooltips run long.** 10 of 58 property descriptions exceed 600 characters and the median is
-268; `toolChangeSender` (L507) is 1,484 and is a paragraph per sender value, of which each operator needs
-one. A 250-character target would rewrite 30, not 10. **The question** is where the rest goes:
-`property-reference.md` is the natural home and is the author's file.
+**Whether `tools/comment-rules.js` runs in the post-edit hook.** `RV-16` brought it to zero breaches and
+`RV-18` repaired the hook, which still runs `node --check` alone — so the count can drift again unseen.
 
 **`RV-12` — repository and release shape.** Six, none a post change: a stable filename such as `MPCNC.cps`
 with the version carried in `description`, since a new filename each release is what duplicates the entry

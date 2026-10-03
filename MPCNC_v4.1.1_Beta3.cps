@@ -122,7 +122,7 @@ properties = {
   // to the default, which behaves as the boolean shipped.
   jobSpindleControl: {
     title      : "Spindle Control",
-    description: "Who switches the router or spindle on, and with what. Prompt the operator: the post emits no spindle code at all and stops (M0) to ask -- for a trim router or any spindle without electronic control. Spindle M3/M5: the post commands it, with S carrying the RPM. On Marlin those codes are a build option -- a stock build has neither SPINDLE_FEATURE nor LASER_FEATURE, answers M3 with an unknown-command warning and runs the whole job with the spindle never started; V1 Engineering's own V1CNC builds enable LASER_FEATURE, where M3 does switch the spindle/laser pin, but S is read as cutter power, not RPM, and M4 is not a reversal. Fan M106 and Pin M42 are for a router on a switched output -- a relay on a fan header or a spare pin -- and both are ON or OFF only: they carry no speed and no direction, the RPM going to a comment. Neither is GRBL's, and a job posted for GRBL with either selected is refused rather than emitted. Both take their output number from Pin/Fan # below.",
+    description: "Who switches the router on. Prompt: no spindle code -- the post stops (M0) and asks. M3/M5: commanded, S carrying the RPM; on Marlin only a build with SPINDLE_FEATURE or LASER_FEATURE obeys it. Fan M106 and Pin M42: a relay on an output, on or off only, numbered by Pin/Fan # below; a GRBL job is refused.",
     group      : "job",
     order      : 20,
     type       : "enum",
@@ -138,7 +138,7 @@ properties = {
   // 25: it sits under Spindle Control, which reads it, without renumbering the rest of group 1.
   jobSpindlePinFan: {
     title      : "Spindle: Pin/Fan #",
-    description: "The output number Spindle Control uses in its Fan and Pin modes, and FOUR different things depending on which mode and which firmware -- re-check it whenever you change either. Fan mode: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). Pin mode: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored in the other two modes. A wrong number is not equally visible on the two firmwares: Marlin returns silently for an index it does not have, so the router never starts and the job cuts with a dead spindle, while RepRapFirmware answers \"Fan number not found\" or refuses the port. Pin mode carries two more conditions of its own -- M42 is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses M42 on a protected pin, which includes every FANn_PIN, so a fan header cannot be reached this way. Use Fan mode for a fan header and Pin mode for a spare output.",
+    description: "The output number the Fan and Pin modes use. Fan: a fan index on Marlin, a fan number on RepRapFirmware. Pin: a board pin on Marlin, a GpOut port on RepRapFirmware. The numbering is your board's and the post cannot check it -- a wrong Marlin fan index fails silently and the router never starts.",
     group      : "job",
     order      : 25,
     type       : "integer",
@@ -351,7 +351,7 @@ properties = {
 
   probeOnStart: {
     title      : "First WCS / Part",
-    description: "How the first (or only) part's origin is set. Set X0 Y0 to Current Pos, Probe Z0: X and Y from where the tool stands, Z0 probed on the stock top -- jog there first, there is no prompt. Set X0 Y0 Z0 to Current Pos: all three from where the tool stands. Use WCS X0 Y0, Probe Z0: keep the stored X0 Y0, probe Z0. Use WCS X0 Y0 Z0: use the stored origin, measure nothing. Jog to X0 Y0, Probe Z0: pause to jog there, record X and Y, probe Z0. Jog to X0 Y0 Z0: pause to jog there, record all three. WCS means the work offset this Setup names, which the post selects at job start -- not whatever your sender has active. For more parts see Each New WCS / Part.",
+    description: "How the first (or only) part's origin is set: from where the tool stands, from the stored work offset, or by jogging at a pause -- with Z0 probed or not. The Current Pos modes do not prompt, so jog there first. The work offset is the one this Setup names, which the post selects.",
     group      : "probe",
     order      : 10,
     type       : "enum",
@@ -368,7 +368,7 @@ properties = {
   },
   probeOnChange: {
     title      : "Each New WCS / Part",
-    description: "Multi-part jobs only: how each part's origin is set the first time the job reaches it. Every mode retracts to Machine Travel Z first. Use WCS X0 Y0, Probe Z0 Once per Part: move to the part's stored X0 Y0 and probe its stock top. Use WCS X0 Y0 Z0: use the stored origin, measure nothing. Jog to X0 Y0, Probe Z0: pause to jog to the part, record X and Y, probe Z0. Jog to X0 Y0 Z0: pause to jog there, record all three. Returning to a part already set up sets nothing again -- the tool moves to its stored origin and cuts, the probe point by then being a machined surface or air. Only a tool change re-opens that part's Z0. One part from several datums on one fixture is supported -- each datum is a work offset, like a part. A flip or a re-clamp is not: run those as separate jobs.",
+    description: "Multi-part jobs only: how each part's origin is set the first time the job reaches it, after a retract to Machine Travel Z. A return to a part sets nothing again -- only a tool change re-opens its Z0. A flip or re-clamp is not supported: run it as a separate job.",
     group      : "probe",
     order      : 20,
     type       : "enum",
@@ -469,7 +469,7 @@ properties = {
   // hands control to the operator or a macro, and resumes correctly. design.md -> Tool changes.
   toolChangeMode: {
     title      : "At a Tool Change",
-    description: "What the job does when the tool number changes. The post never changes the tool itself. Refuse a multi-tool job: a job with more than one tool does not post -- split it into one file per tool. Manual change at a pause: the tool retracts, moves to the Manual Position if set, the spindle and coolant stop, and the program stops (M0) for you to change the tool. Do not jog at that pause. Sender or firmware macro changes it: the same retract and stops, then the token named by Tool Change Handled By below. Test that on air -- the post cannot check anything is listening, and an ignored token cuts on with the wrong tool. Hand-over needs Machine Travel Z, and is not available on Marlin.",
+    description: "What happens when the tool number changes; the post never changes the tool itself. Refuse: the job does not post. Pause: retract, stop spindle and coolant, then M0 -- do not jog there. Macro: the same, then the Handled By token -- test it on air. Both need Machine Travel Z; Macro is not on Marlin.",
     group      : "toolChange",
     order      : 10,
     type       : "enum",
@@ -486,7 +486,7 @@ properties = {
   },
   toolChangeSender: {
     title      : "Tool Change Handled By",
-    description: "Who does the change after the hand-over, and so which token is emitted. Read only on Sender or firmware macro changes it. gSender: T and M6, which the sender must be set to intercept -- stock Grbl and grblHAL reject M6. CNCjs: T and M6, but it only pauses, so the change and the re-zero are yours. UGS: T and M6, and its tool-change interception is OFF until you switch it on -- enabled, it removes the M6, passes the T word through so the machine state names the tool, moves to a safe height and a change position, waits for you, and can run a tool length probe if you have configured one. If you use that probe, set Tool Length Correction By to Tool change applies tool offset. FluidNC: T and M6, which the firmware executes itself -- no sender interception, and a sender set to strip the M6 takes away the token it acts on. It dispatches to the tool changer declared as atc: under the spindle, or runs the macro named by m6_macro:, both in config.yaml, which the post cannot read -- and where neither is declared it accepts the M6, changes nothing and reports nothing. A changer needs FluidNC 3.9.0 or later. If yours probes a tool setter and applies the length, set Tool Length Correction By to Tool change applies tool offset. RepRapFirmware tool table: T alone; your tools must be declared in config.g. Other: no token -- the file named in Sender Macro File is included instead. The post then re-asserts absolute mode, units and the work offset, and returns to Machine Travel Z.",
+    description: "Who does the change, and so which token is emitted -- macro route only. gSender, CNCjs, UGS: T and M6, which the sender must intercept; stock Grbl and grblHAL reject M6. FluidNC: T and M6, run by the changer or macro in config.yaml. RepRapFirmware: T alone. Other: the Sender Macro File.",
     group      : "toolChange",
     order      : 20,
     type       : "enum",
@@ -554,7 +554,7 @@ properties = {
   // design.md -> Tool changes. A new key: a stored boolean is not an enum id. PV-10.
   toolChangeZ0Correction: {
     title      : "Tool Length Correction By",
-    description: "Who corrects the work Z0 for the new tool's length. This machine has no tool-length system, so something must. GCode reprobes Z0 after change: this post re-probes Z0 at every change, and marks every OTHER part's Z0 stale so a return to it is re-measured too. Tool change applies tool offset: your sender or macro applies a tool-length offset, which shifts the whole Z frame -- every part's stored Z0 stays valid and this post probes nothing. User re-zeroed Z by hand at pause: you re-zero Z by hand at the pause, which corrects the part active at that pause and no other -- every other part is marked stale and is re-measured, or warned about, when the job returns to it. The probe searches down from Machine Travel Z, so G38 Target must reach the stock from there. No probe is written for tool 0 or a laser tool.",
+    description: "Who corrects work Z0 for the new tool's length -- this machine has no tool-length system. GCode reprobes: the post re-probes at each change and marks other parts' Z0 stale. Tool offset: your sender or macro shifts the whole Z frame, and nothing is probed. Re-zeroed by hand: corrects only the part active at the pause.",
     group      : "toolChange",
     order      : 80,
     type       : "enum",
@@ -656,7 +656,7 @@ properties = {
   },
   laserMarlinPinFan: {
     title      : "Laser: Pin/Fan #",
-    description: "The output number Laser Output above uses, and FOUR different things depending on which value and which firmware -- re-check it whenever you change either. The M106 value: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). The M42 value: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored by the M3 value and by both GRBL values. A wrong number is not equally visible on the two firmwares: Marlin returns silently for an index it does not have, so the laser never fires and no error says so, while RepRapFirmware answers \"Fan number not found\" or refuses the port. The M42 value carries two more conditions of its own -- M42 is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses M42 on a protected pin, which includes every FANn_PIN, so a fan header cannot be reached this way. Use M106 for a fan header and M42 for a spare output.",
+    description: "The output number Laser Output's M106 and M42 values use. M106: a fan index on Marlin, a fan number on RepRapFirmware. M42: a board pin on Marlin, a GpOut port on RepRapFirmware. The numbering is your board's and the post cannot check it -- a wrong Marlin fan index fails silently and the laser never fires.",
     group      : "laser",
     order      : 50,
     type       : "integer",
@@ -732,7 +732,7 @@ properties = {
   // saved configuration carries over intact.
   coolantChannelAOn: {
     title      : "Channel A Output",
-    description: "The g-code that switches channel A on -- and, with it, the code that switches it off, which follows from this one and has no field of its own: M106 and M42 close with S0 on the same output, M7 and M8 close with M9, and Use custom closes from the channel's own Off Custom file. Match it to your CNC Firmware -- the post emits what you pick, so a Marlin code sent to GRBL is rejected mid-job. The two Marlin values take their output number from Channel A Pin/Fan # below; the GRBL codes are emitted verbatim; Use custom takes the whole thing from the two files set further down this group. On GRBL neither code is guaranteed: stock Grbl 1.1 compiles M7 only when ENABLE_M7 is uncommented in grbl/config.h and answers error:20 without it, while FluidNC never errors and acts on M7 or M8 only where config.yaml declares a coolant mist_pin or flood_pin -- V1 Engineering's Jackpot 1 configs declare both pins, and its Jackpot 2 and Jackpot 3 configs ship NO_PIN for both.",
+    description: "The code that switches channel A on; the off code follows from it -- S0 for M106 and M42, M9 for M7 and M8, the Off Custom file for Use custom. Match it to CNC Firmware. Stock Grbl 1.1 rejects M7 unless built with ENABLE_M7, and FluidNC ignores M7 and M8 with no coolant pin declared.",
     group      : "coolant",
     order      : 30,
     type       : "enum",
@@ -749,7 +749,7 @@ properties = {
   // 45 and 65: each channel's number sits under the field that reads it. Same trade as jobSpindlePinFan.
   coolantChannelAPinFan: {
     title      : "Channel A Pin/Fan #",
-    description: "The output number channel A's two Marlin values use, and read by both of them so the channel closes what it opened. Four different things depending on which value and which firmware -- re-check it whenever you change either. M106: a fan index on Marlin (0 .. FAN_COUNT-1, set by which FANn_PIN your board defines), a fan number on RepRapFirmware (created with M950 F<n>). M42: a board pin number on Marlin, a GpOut port number on RepRapFirmware (created with M950 P<n>). Ignored on the GRBL values and on Use custom. THE NUMBER IS BOARD-SPECIFIC AND THIS POST CANNOT CHECK IT: the 6 and 11 this field replaces were the RAMPS servo header, and on a Rambo the same two numbers are HEATER_2 and Y_MIN -- both of which Marlin refuses as protected pins, so the coolant would never switch and nothing in the file would say so. M42 carries two conditions besides: it is compiled only where DIRECT_PIN_CONTROL is enabled, which stock Marlin ships commented out, and Marlin refuses it on any protected pin -- every FANn_PIN, every heater and every endstop among them. Use the M106 value for a fan header and M42 for a spare output your board's pin map says is free.",
+    description: "The output number channel A's M106 and M42 values use, for both on and off. M106: a fan index on Marlin, a fan number on RepRapFirmware. M42: a board pin on Marlin, a GpOut port on RepRapFirmware. The numbering is your board's, and the post cannot check it.",
     group      : "coolant",
     order      : 45,
     type       : "integer",
