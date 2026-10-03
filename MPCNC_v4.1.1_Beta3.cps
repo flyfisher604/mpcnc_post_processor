@@ -6,6 +6,19 @@ MPCNC posts processor for milling and laser/plasma cutting.
 
 Changed Aug 22, 2026
 **
+
+Key to the comments
+  TWIN #n        A warning raised twice: in the post dialog by validateJob(), and in the g-code
+                 file where the job reaches it. Both halves carry the same number; change one, change
+                 the other.
+  TWIN: here     Both halves come from this one statement.
+  TWIN: none     A file-only warning, and why the dialog cannot or should not carry it.
+  CR-11, PV-9    A finding in docs/findings.md; git log --grep=<id> finds the commit.
+  W25b           A test case in docs/findings.md, sections 4 and 5.
+  machine frame  The machine's own coordinates, set by homing and addressed with G53; never a WCS.
+  establish      Set a part's origin, X0 Y0 Z0, by probing, jogging or taking the current position.
+  hand-over      The point at a tool change where the post stops and the operator, or a sender's
+                 macro, fits the tool.
 */
 
 description = "v4.1.1 (Beta 3) MPCNC Milling/Laser for Marlin, Grbl, FluidNC, RepRap";

@@ -190,7 +190,7 @@ withdrawn; which one a row is, is its Resolution cell.
 | **PV-22** | `integration.md` §6.2 stated three coverage measures and called them reproducible, with no script in the tree to reproduce them; two had gone stale behind `GH-16b` and `GH-16d` | Low-Med | **`tools/property-coverage.js`** — the table is now that script's own output, read from `--interrogate` and the six matrices, so a property added tomorrow moves it by being run. **The hand count does not reproduce and is not adjusted but re-measured**: the same method over the `v4.0_Beta3` tree returns 46/62 and 57/91 where §6.2 said 44/62 and 53/90, so the old numbers and the new ones are not on one scale and the doc says which produced which. `PV-22T` | ✅ |
 | **RV-07** | Two comments named includes group 8, and seven called an RS-274 group a *modal group* in a file where *group* means a dialog group | Low | *group-7 include*, and *RS-274 group n* at the seven — the shorter wording, so no comment grew | ✅ |
 | **RV-14** | 38 comments stated something the code does not do — four on safety paths, among them `spindleOff()` beeping on every `M300` firmware and `partProbe()` warning *instead of* moving | Med | Each rewritten to what the code does, checked against it. The grbl comment-nesting citation is now `grbl/protocol.c, protocol_main_loop(), v1.1h`, and the GRBL boot lock carries `HOMING_INIT_LOCK, grbl/main.c, v1.1h`. **One stays**: `toolChange()`'s *onSection() restarts the spindle*, true once `RV-01` lands. Of the two open questions the boot lock held and the start file did not — `RV-17` | ✅ |
-| **RV-15** | 230 of 458 comment blocks were harder to read than they needed to be — private vocabulary, capitals for emphasis, packed sentences, narrated history | Low | **Every one rewritten, none longer than it was**: comment text 105,827 → 86,464 characters and 1,196 → 998 lines, the code identical once comments are stripped. Firmware citations and `TWIN` markers kept word for word; history that guards a removed bug restated as a constraint. No test row: no run can distinguish a comment | ✅ |
+| **RV-15** | 230 of 458 comment blocks were harder to read than they needed to be — private vocabulary, capitals for emphasis, packed sentences, narrated history | Low | **Every one rewritten, none longer than it was**: comment text 105,827 → 86,464 characters and 1,196 → 998 lines, the code identical once comments are stripped. Firmware citations and `TWIN` markers kept word for word; history that guards a removed bug restated as a constraint; `RV-10`'s legend heads the post. No test row: no run can distinguish a comment | ✅ |
 | **RV-16** | `tools/comment-rules.js` reported 14 breaches with nothing running it, and its R1 missed an `else if` opening its own line | Low | R1 now matches an `else if` with or without the `}`, which finds 15 in the old post and none now — `RV-15`'s rewrites cleared them. Whether anything runs it is `RV-18`'s ruling | ✅ |
 | **RV-11** | Ten dialog tooltips ran past 600 characters, the longest 1,484 — a paragraph per value where each operator needs one | Low | Each cut to 257–318 characters: what the field does and the consequence that matters most. What they dropped is in `property-reference.md`'s rows for the same fields, with group 5's origin modes in one shared table, so nothing left the documentation. No g-code changes — nothing reads a description | ✅ |
 | **RV-18** | The post-edit hook ran `node --check` on the `.cps` path, which Node 24 refuses before reading, so it failed every edit | Med | The post goes to `node --check -` on stdin: the hook passes the post and returns 2 on a broken file. Whether it also runs `tools/comment-rules.js` stays the author's — §6 | ✅ |
@@ -642,7 +642,7 @@ question under it.
 
 ### Readability and structure
 
-**Five, from the `RV-` review, each a ruling before it is work.** None changes g-code.
+**Four, from the `RV-` review, each a ruling before it is work.** None changes g-code.
 
 **`RV-06` — `validateJob()` is one function of about 860 lines**. Two shapes: split it by
 dialog group, or a rule table of `{ when, text, fileTwin }` entries, which would let a script confirm every
@@ -653,10 +653,6 @@ change to emitted g-code**, the six matrices re-run before and after.
 write every `MOVEMENT_*` and `COMMAND_*` id — 11 of 160 lines in GS1. No matrix reads those comments;
 the trace events they assert on come from `tools/trace.cps`. **The question** is whether they move to
 `Debug`, against their one use at `Info`: they are the only trace in a file a user attaches to a report.
-
-**`RV-10` and `RV-13` were ruled and closed as `RV-15`. What is left of `RV-10` is a legend** at the head
-of the post for `TWIN #n`, the id prefixes and the vocabulary that stays — new comment text, so held for
-the author rather than written under a rule that no comment grows.
 
 **Whether `tools/comment-rules.js` runs in the post-edit hook.** `RV-16` brought it to zero breaches and
 `RV-18` repaired the hook, which still runs `node --check` alone — so the count can drift again unseen.
