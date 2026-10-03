@@ -8,10 +8,10 @@ Changed Aug 22, 2026
 **
 */
 
-description = "v4.1.1 (Beta 3) MPCNC Milling/Laser for Marlin, Grbl, RepRap";
+description = "v4.1.1 (Beta 3) MPCNC Milling/Laser for Marlin, Grbl, FluidNC, RepRap";
 vendor = "flyfisher604";
 vendorUrl = "https://github.com/flyfisher604/mpcnc_post_processor";
-longDescription = "MPCNC F360 Post processor. Supports scaling of speeds to accomidate slow Z axis. Warning: BETA review all GCode.";
+longDescription = "MPCNC post processor for Fusion: milling and laser on Marlin, GRBL, FluidNC and RepRapFirmware, with feed scaling for a slow Z, a machine-frame travel height, multi-part jobs and tool-change hand-over. Beta: review the g-code before running it.";
 
 // Internal properties
 legal = "Copyright (C) 2019 - 2026 Don Gamble.";
@@ -53,7 +53,7 @@ var eFirmware = {
     REPRAP: "RepRap",
   };
 
-var fw =  eFirmware.MARLIN; 
+var fw;   // set from "CNC Firmware" by onOpen(), before anything reads it
 
 // Priority order; compared by indexOf()
 const commentLevels = ["Off", "Important", "Info","Debug"];
@@ -732,15 +732,15 @@ properties = {
   // saved configuration carries over intact.
   coolantChannelAOn: {
     title      : "Channel A Output",
-    description: "The code that switches channel A on; the off code follows from it -- S0 for M106 and M42, M9 for M7 and M8, the Off Custom file for Use custom. Match it to CNC Firmware. Stock Grbl 1.1 rejects M7 unless built with ENABLE_M7, and FluidNC ignores M7 and M8 with no coolant pin declared.",
+    description: "The code that switches channel A on; the off code follows from it -- S0 for M106 and M42, M9 for M7 and M8, the Off Custom file for Use custom. M106 and M42 are Marlin and RepRapFirmware only. M7 and M8 work everywhere the firmware has them: Grbl built with ENABLE_M7, FluidNC or Marlin with a coolant pin, RepRap with /sys macros.",
     group      : "coolant",
     order      : 30,
     type       : "enum",
     values: [
       { title: "Mrln: M106 P{n} S255", id: "M106" },
       { title: "Mrln: M42 P{pin} S255", id: "M42" },
-      { title: "Grbl: M7 (mist)", id: "M7" },
-      { title: "Grbl: M8 (flood)", id: "M8" },
+      { title: "M7 on, M9 off", id: "M7" },
+      { title: "M8 on, M9 off", id: "M8" },
       { title: "Use custom", id: "Use custom" }
     ],
     value      : "M8",
@@ -758,15 +758,15 @@ properties = {
   },
   coolantChannelBOn: {
     title      : "Channel B Output",
-    description: "The g-code that switches channel B on, and with it the code that switches it off -- the second, independent output. The off code follows from this field exactly as channel A's does. Same dialect as your CNC Firmware. M7 and M8 carry the GRBL build and config conditions stated under Channel A Output.",
+    description: "The g-code that switches channel B on, and with it the code that switches it off -- the second, independent output. The off code follows from this field exactly as channel A's does. M7 and M8 carry the conditions stated under Channel A Output.",
     group      : "coolant",
     order      : 50,
     type       : "enum",
     values: [
       { title: "Mrln: M106 P{n} S255", id: "M106" },
       { title: "Mrln: M42 P{pin} S255", id: "M42" },
-      { title: "Grbl: M7 (mist)", id: "M7" },
-      { title: "Grbl: M8 (flood)", id: "M8" },
+      { title: "M7 on, M9 off", id: "M7" },
+      { title: "M8 on, M9 off", id: "M8" },
       { title: "Use custom", id: "Use custom" }
     ],
     value      : "M7",
@@ -1171,7 +1171,7 @@ function writeFanOrPinOutput(mode, number, pwm) {
 function writeCustomCoolantFile(channel, on, file) {
   if (file == "") {
     // TWIN #2
-    writeWarning("coolant channel " + channel + " is set to \"Use custom\""
+    writeWarning("coolant channel " + channel + " is set to " + quotedValue(properties.coolantChannelAOn, "Use custom")
       + " but no custom file is named -- nothing emitted");
     return;
   }
@@ -1212,13 +1212,13 @@ function writeCoolantChannel(channel, on, onProp, fileProp, pinProp) {
   writeBlock(code);
 }
 
-function CoolantA(on) {
+function switchCoolantA(on) {
   writeCoolantChannel("A", on, properties.coolantChannelAOn,
     on ? properties.coolantChannelAOnCustom : properties.coolantChannelAOffCustom,
     properties.coolantChannelAPinFan);
 }
 
-function CoolantB(on) {
+function switchCoolantB(on) {
   writeCoolantChannel("B", on, properties.coolantChannelBOn,
     on ? properties.coolantChannelBOnCustom : properties.coolantChannelBOffCustom,
     properties.coolantChannelBPinFan);
@@ -1254,13 +1254,13 @@ function setCoolant(coolant) {
   if (coolantChannelA != eCoolant.Off) {
     writeComment((coolant == eCoolant.Off) ? eComment.Important: eComment.Info, " >>> Coolant Channel A: " + eCoolant.Off);
     coolantChannelA = eCoolant.Off;
-    CoolantA(false);
+    switchCoolantA(false);
   }
 
   if (coolantChannelB != eCoolant.Off) {
     writeComment((coolant == eCoolant.Off) ? eComment.Important: eComment.Info, " >>> Coolant Channel B: " + eCoolant.Off);
     coolantChannelB = eCoolant.Off;
-    CoolantB(false);
+    switchCoolantB(false);
   }
 
   curCoolant = eCoolant.Off;
@@ -1273,7 +1273,7 @@ function setCoolant(coolant) {
       coolantChannelA =  coolant;
       curCoolant = coolant;
       warn = false;
-      CoolantA(true);
+      switchCoolantA(true);
     }
 
     if (getProperty(properties.coolantChannelBMode) == coolant) {
@@ -1281,7 +1281,7 @@ function setCoolant(coolant) {
       coolantChannelB =  coolant;
       curCoolant = coolant;
       warn = false;
-      CoolantB(true);
+      switchCoolantB(true);
     }
 
     if (warn) {
@@ -1322,7 +1322,16 @@ function laserOn(power) {
         writeBlock(mFormat.format(3), oFormat.format(laserPwm(mode, power)));
       }
       break;
+    default:
+      unknownLaserOutput(mode);
   }
+}
+
+// Total over the field, as coolantOffCode() is: a value the switches do not know would otherwise emit
+// nothing, and the beam would never fire -- or never stop.
+function unknownLaserOutput(mode) {
+  error(localize(quoted(properties.laserOutput) + " is \"" + mode + "\", which this post does not know. "
+    + "Choose one of its listed values."));
 }
 
 function laserOff() {
@@ -1339,6 +1348,8 @@ function laserOff() {
     case "M42":
       writeFanOrPinOutput(mode, getProperty(properties.laserMarlinPinFan), 0);
       break;
+    default:
+      unknownLaserOutput(mode);
   }
 }
 
@@ -1404,9 +1415,9 @@ function jetToolInJob() {
   return false;
 }
 
-// The one place a dialect label means a firmware. Every built-in value of group 9's coolant codes and
-// group 8's laser output carries its dialect in its title -- "Grbl: M7 (mist)", "Mrln: M42 P{pin} S255"
-// -- so the checks read the operator's own choice rather than a second list of codes that would drift.
+// The one place a dialect label means a firmware. Every firmware-specific value in groups 8 and 9 carries
+// its dialect in its title -- "Grbl: M4 S{PWM}/M5 dynamic power", "Mrln: M42 P{pin} S255" -- and M7/M8
+// carry none, every firmware taking them under its own conditions. So the checks read the operator's own choice rather than a second list of codes that would drift.
 // Used both ways: a chosen code to its firmware, and a firmware to the prefix it should be picked from.
 var outputDialectLabels = [
   { label: "Grbl", firmware: eFirmware.GRBL },
@@ -1455,6 +1466,27 @@ function outputCodeTitle(prop) {
   return id;
 }
 
+// Dialog names for messages, quoted and read from the definitions rather than copied into the text, so
+// renaming a field, a value or a group cannot leave a message naming one that no longer exists. RV-02.
+function quoted(prop) {
+  return "\"" + prop.title + "\"";
+}
+
+function quotedValue(prop, id) {
+  for (var i = 0; i < prop.values.length; ++i) {
+    if (prop.values[i].id == id) {
+      return "\"" + prop.values[i].title + "\"";
+    }
+  }
+  return "\"" + id + "\"";
+}
+
+// A group as messages name it: its title up to the second " - ", so "4 - Machine Frame", not the full
+// "4 - Machine Frame - homing, travel Z and end park".
+function quotedGroup(key) {
+  return "\"" + groupDefinitions[key].title.split(" - ").slice(0, 2).join(" - ") + "\"";
+}
+
 // Every coolant level this job asks for that NEITHER channel Mode carries, with the operations that
 // asked -- [{level, names}], or empty. setCoolant() states it per occurrence in the file; this is the
 // pre-flight half, off the same requestedCoolant().
@@ -1497,9 +1529,9 @@ function validateJob() {
   // file would otherwise carry no record that it was posted under a simulated Personal licence.
   if (getProperty(properties.mapRapidsTestPersonalLicence)) {
     // TWIN: here -- both channels in one block; personal-matrix.js R2 asserts both, so neither can go quietly.
-    writeWarning("TEST HOOK IS ON -- rapids are being delivered as feed moves to exercise group 3. "
+    writeWarning("TEST HOOK IS ON -- rapids are being delivered as feed moves to exercise " + quotedGroup("mapRapids") + ". "
       + "THIS FILE IS A TEST ARTIFACT. DO NOT CUT FROM IT.");
-    warning(localize("\"TEST ONLY -- deliver rapids as feed moves\" is enabled. Fusion's rapids are "
+    warning(localize(quoted(properties.mapRapidsTestPersonalLicence) + " is enabled. Fusion's rapids are "
       + "being delivered to the post as feed moves, which no licence you are running does. The output "
       + "is a test artifact and must not be cut."));
   }
@@ -1515,10 +1547,10 @@ function validateJob() {
   // The likeliest group-4 slip: "Home at Job Start" on, "Axes Homed and Trusted" still None.
   // TWIN #7 -- the file half is writeMachineHoming()'s.
   if (homesAtJobStart() && !homedXY && !homedZ) {
-    warning(localize("\"Home at Job Start\" asks this job to home, but \"Axes Homed and Trusted\" is "
+    warning(localize(quoted(properties.machineHomeAtStart) + " asks this job to home, but " + quoted(properties.machineHomedAxes) + " is "
       + "None, so no axis is declared homeable and the post emits no homing motion at all -- the job "
       + "starts from wherever the machine already sits. Declare which axes this machine homes to "
-      + "endstops, or set \"Home at Job Start\" to Off."));
+      + "endstops, or set " + quoted(properties.machineHomeAtStart) + " to Off."));
   }
 
   // Either axis qualifies: X/Y homing destroys the pre-jogged XY, Z homing the height recorded as Z0. Homing
@@ -1527,13 +1559,13 @@ function validateJob() {
   if (homesAtJobStart() && (homedXY || homedZ) && originIsPreJogged()) {
     // Advice rather than prohibition: with X/Y declared homed, a stored fixture offset in the active
     // WCS is repeatable across power cycles, so it is a better answer than the destroyed pre-jog.
-    warning(localize("\"Home at Job Start\" moves the tool onto the endstops of whichever axes "
-      + "\"Axes Homed and Trusted\" declares, and it runs before "
-      + "\"First WCS / Part\" records the current position as the part origin, so positioning the "
+    warning(localize(quoted(properties.machineHomeAtStart) + " moves the tool onto the endstops of whichever axes "
+      + quoted(properties.machineHomedAxes) + " declares, and it runs before "
+      + quoted(properties.probeOnStart) + " records the current position as the part origin, so positioning the "
       + "tool before starting the job has no effect on those axes. On a homed machine the stored "
-      + "offset in the active WCS is repeatable, so \"Use WCS X0 Y0, Probe Z0\" is the "
-      + "natural first-part mode here; a \"Jog to ...\" mode also works. Otherwise set \"Home at "
-      + "Job Start\" to Off."));
+      + "offset in the active WCS is repeatable, so " + quotedValue(properties.probeOnStart, "Probe Z") + " is the "
+      + "natural first-part mode here; a \"Jog to ...\" mode also works. Otherwise set " + quoted(properties.machineHomeAtStart)
+      + " to Off."));
   }
 
   // A G54-G59 offset is measured from machine zero, which moves at every reset unless X/Y homes. Only modes
@@ -1541,14 +1573,14 @@ function validateJob() {
   if (!homedXY) {
     var storedOffsetControls = [];
     if (startMode == "Probe Z" || startMode == "Skip") {
-      storedOffsetControls.push("\"First WCS / Part\"");
+      storedOffsetControls.push(quoted(properties.probeOnStart));
     }
     if ((changeMode == "Probe Z" || changeMode == "Skip") && multiWcs) {
-      storedOffsetControls.push("\"Each New WCS / Part\"");
+      storedOffsetControls.push(quoted(properties.probeOnChange));
     }
     if (storedOffsetControls.length > 0) {
       warning(localize(storedOffsetControls.join(" and ") + " trust the origin already stored in a "
-        + "work offset register, but \"Axes Homed and Trusted\" does not include X/Y. A stored offset is measured from "
+        + "work offset register, but " + quoted(properties.machineHomedAxes) + " does not include X/Y. A stored offset is measured from "
         + "machine zero, which moves at every controller reset or power cycle when nothing homes -- "
         + "so an offset written by an earlier job now points somewhere else, and the post cannot "
         + "read the register back to check. Declare X/Y homed on a machine with X/Y endstops, or "
@@ -1560,14 +1592,14 @@ function validateJob() {
   // refused: loose stock beside fixtured parts is a real workflow. CR-16.
   // TWIN #13 -- the file half is writeWcsOnStart()'s, on the same two predicates.
   if (multiWcs && originIsPreJogged()) {
-    warning(localize("\"First WCS / Part\" is a \"Set ... to Current Pos\" mode and this job cuts "
+    warning(localize(quoted(properties.probeOnStart) + " is a \"Set ... to Current Pos\" mode and this job cuts "
       + collectDistinctOffsets().length + " parts. That mode takes the first part's origin from where "
       + "you jog the tool BEFORE the file starts and writes it into that part's work offset register, "
       + "with no prompt -- while every other part is cut at the origin already stored in its own "
       + "register. So one part is cut where you parked the tool and the rest at their fixtures, and the "
       + "offset you set for the first part at the machine is overwritten. The two \"Jog to ...\" modes "
-      + "write the register too but stop and ask first; \"Use WCS X0 Y0, Probe Z0\" and \"Use WCS X0 "
-      + "Y0 Z0\" leave it alone. If every part in this job is fixtured, use one of those two."));
+      + "write the register too but stop and ask first; " + quotedValue(properties.probeOnStart, "Probe Z") + " and " + quotedValue(properties.probeOnStart, "Skip")
+      + " leave it alone. If every part in this job is fixtured, use one of those two."));
   }
 
   // Not refused: two Setups that share one fixture may be labelled this way. No file twin: the condition is
@@ -1576,7 +1608,7 @@ function validateJob() {
     warning(localize("This job names work offset 0 in one Setup and 1 in another, and they are the same "
       + "register: Fusion reports 0 for a Setup left at its default, so the post resolves both to WCS 1 "
       + "-- G54. Every section runs on ONE origin, and because the post sees a single work offset the "
-      + "per-part origin work that \"Each New WCS / Part\" controls never runs at the boundary between "
+      + "per-part origin work that " + quoted(properties.probeOnChange) + " controls never runs at the boundary between "
       + "them. If those Setups are two fixtures, number them 1 and 2 in Fusion so each part gets a "
       + "register of its own. If they are one fixture, nothing is wrong here and the two numbers are "
       + "only a labelling difference -- the post cannot tell the two cases apart."));
@@ -1604,27 +1636,27 @@ function validateJob() {
     // declared homeable -- that job emits no stop to lose, and is already warned about above.
     if (promptsBeforeHome() && (homedXY || homedZ)) {
       // "at the very top", not "the first line": on GRBL the travel-speed warning stands ahead of it.
-      earlyPrompts.push("the \"Pause, then Home\" stop, which stands at the very top of the file");
+      earlyPrompts.push("the " + quotedValue(properties.machineHomeAtStart, "Pause & Home") + " stop, which stands at the very top of the file");
     }
     // Not on a pre-jogged origin nor on the macro flow: toolChangeFirstLoad() writes no prompt on either, and
     // naming a line the file lacks sends the operator looking for it. PV-13.
     if (!getProperty(properties.toolChangeFirstToolCorrect) && !originIsPreJogged() && !toolChangeIsMacro()) {
-      earlyPrompts.push("the \"First Tool is Correct\" stop, which stands before the first part's origin is set");
+      earlyPrompts.push("the " + quoted(properties.toolChangeFirstToolCorrect) + " stop, which stands before the first part's origin is set");
     }
     if (startMode == "Jog XY & Probe Z" || startMode == "Jog XYZ") {
-      earlyPrompts.push("the \"First WCS / Part\" jog prompt");
+      earlyPrompts.push("the " + quoted(properties.probeOnStart) + " jog prompt");
     }
     if (getProperty(properties.probePause) != "No" &&
         (startMode == "Current XY & Probe Z" || startMode == "Probe Z" || startMode == "Jog XY & Probe Z")) {
       earlyPrompts.push("the \"Attach ZProbe\" prompt before the first part's probe");
     }
     if (earlyPrompts.length > 0) {
-      warning(localize("\"Comment Level\" is \"" + getProperty(properties.jobCommentLevel) + "\", which "
+      warning(localize(quoted(properties.jobCommentLevel) + " is \"" + getProperty(properties.jobCommentLevel) + "\", which "
         + "leaves this job's preamble only a few lines long -- and gSender ignores an M0 in the first "
         + "ten lines it sends, a workaround for CAM that opens its files with a meaningless one. It "
         + "comments the M0 out either way, so a prompt that early is not postponed, it is DELETED: the "
         + "job runs straight past it. At risk here: " + earlyPrompts.join("; ") + ". Post at "
-        + "\"Comment Level\" \"Info\" and the property dump puts ~70 lines ahead of every one of them. "
+        + quoted(properties.jobCommentLevel) + " \"Info\" and the property dump puts ~70 lines ahead of every one of them. "
         + "Senders that do not special-case an early M0 are unaffected, and nothing after the first "
         + "part is affected on any sender."));
     }
@@ -1632,47 +1664,47 @@ function validateJob() {
 
   // TWIN #15 -- the file half is toolChangeFirstLoad()'s, on the same originIsPreJogged().
   if (!getProperty(properties.toolChangeFirstToolCorrect) && originIsPreJogged()) {
-    warning(localize("\"First Tool is Correct\" is Off, but \"First WCS / Part\" is a \"Set ... to "
+    warning(localize(quoted(properties.toolChangeFirstToolCorrect) + " is Off, but " + quoted(properties.probeOnStart) + " is a \"Set ... to "
       + "Current Pos\" mode, which takes this part's origin from where you jog the tool BEFORE "
       + "starting the file -- so a tool is already fitted by then, and nothing is emitted to load one. "
       + "Fitting a different tool would put every depth out by the difference in tool length, and on "
-      + "\"Sender or firmware macro changes it\" the hand-over would move the tool off the position "
-      + "about to be recorded. To load the tool during the run, use \"Jog to X0 Y0, Probe Z0\" or "
-      + "\"Jog to X0 Y0 Z0\", which load first and position afterwards; otherwise turn \"First Tool is "
-      + "Correct\" on."));
+      + quotedValue(properties.toolChangeMode, "Macro") + " the hand-over would move the tool off the position "
+      + "about to be recorded. To load the tool during the run, use " + quotedValue(properties.probeOnStart, "Jog XY & Probe Z") + " or "
+      + quotedValue(properties.probeOnStart, "Jog XYZ") + ", which load first and position afterwards; otherwise turn " + quoted(properties.toolChangeFirstToolCorrect)
+      + " on."));
   }
 
-  // Two texts: where homing parks Z at its endstop the operator cannot set probe height; a macro
-  // loading the first tool moves it after homing, so gets the second. PR-16.
+  // Two texts: where homing parks Z at its endstop the operator cannot set probe height; a first-tool
+  // macro or a start file may move it after homing, so gets the second. PR-16, RV-17.
   // TWIN #12 -- the file half is partProbe()'s, covering all four of its callers.
   if (startMode == "Probe Z" && !fixedZEstablishedInFile()) {
-    if (homingMovesZ() && !firstToolChangeIsHandedOver()) {
+    if (homingMovesZ() && toolStillWhereHomingLeftIt()) {
         // Probe X/Y is the register's; only its start height is the tool's.
-      warning(localize("\"First WCS / Part\" = \"Use WCS X0 Y0, Probe Z0\" rapids to the stored X0 Y0 -- an "
+      warning(localize(quoted(properties.probeOnStart) + " = " + quotedValue(properties.probeOnStart, "Probe Z") + " rapids to the stored X0 Y0 -- an "
         + "X/Y move, made at whatever height the tool is holding -- and the G38.2 that follows searches "
         + "DOWN FROM THAT SAME HEIGHT, this job establishing no Z the post can move in. So one height "
         + "decides both whether the crossing clears your work and whether the probe can reach the stock, "
-        + "and on this job \"Home at Job Start\" is what chose it. "
+        + "and on this job " + quoted(properties.machineHomeAtStart) + " is what chose it. "
         + (fw == eFirmware.GRBL
             ? "The single \"$H\" this post emits on " + fw + " runs the build's whole homing cycle, and the "
               + "stock cycle homes Z FIRST to clear the work area -- so Z goes to its endstop here even "
-              + "though \"Axes Homed and Trusted\" declares only X and Y."
+              + "though " + quoted(properties.machineHomedAxes) + " declares only X and Y."
             : "The \"G28 Z\" this job emits leaves the tool at the Z endstop.")
         + " Positioning the tool before starting the file has no effect on that height, and nothing "
         + "between the homing and the probe brings it back to one you chose. The post cannot know which end of the travel "
         + "your Z endstop is at, and both ends are wrong here: at the top of travel the stock is the "
-        + "whole travel below, a \"G38 Target\" of " + getProperty(properties.probeG38Target) + " mm never "
+        + "whole travel below, a " + quoted(properties.probeG38Target) + " of " + getProperty(properties.probeG38Target) + " mm never "
         + "reaches it and the job stops on a probe-fail alarm; at the bed the search starts a pull-off "
-        + "above the bed and runs down into it. Enter \"Machine Travel Z\" in \"4 - Machine Frame\" so "
-        + "both moves start from a height you set, or set \"Home at Job Start\" to Off and position the "
+        + "above the bed and runs down into it. Enter " + quoted(properties.machineTravelZ) + " in " + quotedGroup("machine") + " so "
+        + "both moves start from a height you set, or set " + quoted(properties.machineHomeAtStart) + " to Off and position the "
         + "tool yourself."));
     } else {
-      warning(localize("\"First WCS / Part\" = \"Use WCS X0 Y0, Probe Z0\" rapids to the stored "
+      warning(localize(quoted(properties.probeOnStart) + " = " + quotedValue(properties.probeOnStart, "Probe Z") + " rapids to the stored "
         + "X0 Y0 before this job has established any Z the post can move in, so that traverse happens "
         + "at whatever height the tool is left at -- position it clear of the stock, clamps and "
-        + "fixtures before starting the program. The probe that follows searches \"G38 Target\" DOWN FROM "
+        + "fixtures before starting the program. The probe that follows searches " + quoted(properties.probeG38Target) + " DOWN FROM "
         + "that height, so set the target deep enough to reach the stock from where you leave the tool."
-        + " \"Machine Travel Z\" removes both, by establishing a Z the post can move in itself."));
+        + " " + quoted(properties.machineTravelZ) + " removes both, by establishing a Z the post can move in itself."));
     }
   }
 
@@ -1680,9 +1712,9 @@ function validateJob() {
   // warning and not a guard: Fusion's own retract covers an ordinary milling job.
   // TWIN #4 -- the file half is writeMachineParkXY()'s.
   if (getProperty(properties.machineParkAtEnd) == "Machine" && !fixedZEstablishedInFile()) {
-    warning(localize("\"At End Park At\" = machine X0 Y0 crosses the bed to the homing corner, but "
+    warning(localize(quoted(properties.machineParkAtEnd) + " = machine X0 Y0 crosses the bed to the homing corner, but "
       + "this job establishes no fixed Z reference to retract in, so the tool makes that crossing "
-      + "at whatever Z the last operation left it at. Enter \"Machine Travel Z\", or park at work "
+      + "at whatever Z the last operation left it at. Enter " + quoted(properties.machineTravelZ) + ", or park at work "
       + "X0 Y0."));
   }
 
@@ -1690,11 +1722,11 @@ function validateJob() {
   // decides if that is enough. Only GRBL refuses: homing on, it boots in Alarm (HOMING_INIT_LOCK, grbl/main.c,
   // v1.1h). Marlin's lock is the build option NO_MOTION_BEFORE_HOMING.
   if (fw != eFirmware.GRBL && fixedZEstablishedInFile() && !homesAtJobStart()) {
-    warning(localize("This job moves in the machine's own Z frame (G53), but \"Home at Job Start\" is "
+    warning(localize("This job moves in the machine's own Z frame (G53), but " + quoted(properties.machineHomeAtStart) + " is "
       + "Off, so those moves are measured against whatever machine zero the board currently holds "
       + "rather than one this job established. " + fw + " may well run them anyway -- unlike GRBL it "
       + "has no unconditional lock on motion before homing. Home the machine at the controller before "
-      + "starting this file, or set \"Home at Job Start\" to Home."));
+      + "starting this file, or set " + quoted(properties.machineHomeAtStart) + " to Home."));
   }
 
   // Pause or macro, and a macro-loaded first tool, as on a one-tool job. PV-13.
@@ -1703,14 +1735,14 @@ function validateJob() {
   if (getProperty(properties.toolChangeMode) != "Refuse"
       && (countDistinctTools() > 1 || firstToolChangeIsHandedOver())
       && !fixedZEstablishedInFile()) {
-    warning(localize("\"At a Tool Change\" is \"" + (toolChangeIsMacro()
+    warning(localize(quoted(properties.toolChangeMode) + " is \"" + (toolChangeIsMacro()
       ? "Sender or firmware macro changes it\", but this job establishes no fixed Z reference, so the "
         + "post can neither lift the tool before the macro runs nor return it to a known height "
         + "afterwards -- the next move starts from wherever the macro left it"
       : "Manual change at a pause\", but this job establishes no fixed Z reference, so the post cannot "
         + "lift the tool before handing it to you -- the pause happens at whatever height the last "
         + "operation ended at, and the re-probe after it rapids to the part origin from there")
-      + ". Enter \"Machine Travel Z\" in \"4 - Machine Frame\"."));
+      + ". Enter " + quoted(properties.machineTravelZ) + " in " + quotedGroup("machine") + "."));
   }
 
   // Shares probePointMachinedBefore() with the file half but counts every boundary a probe can happen at,
@@ -1762,8 +1794,8 @@ function validateJob() {
         + " the post re-probes Z0 there: where the tool lands on that machined surface instead of the "
         + "original stock top it writes the machined depth as Z0, and every cut after it goes that much "
         + "deeper -- Fusion computed those depths against the original datum. Move the touch-point onto "
-        + "uncut material with \"Probe X Y Offset\" in \"5 - Part Origins\", or set \"Tool Length "
-        + "Correction By\" to \"User re-zeroed Z by hand at pause\". This pass reports every "
+        + "uncut material with " + quoted(properties.probeOffsetXY) + " in " + quotedGroup("probe") + ", or set " + quoted(properties.toolChangeZ0Correction)
+        + " to " + quotedValue(properties.toolChangeZ0Correction, "Manual") + ". This pass reports every "
         + "boundary where a re-probe CAN happen; the file itself warns only at the probes that are "
         + "actually written."));
     }
@@ -1774,14 +1806,14 @@ function validateJob() {
     var senderId = getProperty(properties.toolChangeSender);
 
     if (toolChangeNeedsSenderIntercept()) {
-      warning(localize("\"Tool Change Handled By\" is \"" + toolChangeSenderTitle() + "\", so this job "
+      warning(localize(quoted(properties.toolChangeSender) + " is \"" + toolChangeSenderTitle() + "\", so this job "
         + "hands each change over with M6 -- a command stock Grbl and grblHAL do not execute. It works "
         + "only because the sender removes the M6 from the stream and runs its own tool-change routine "
         + "instead, and the post cannot check that yours is set up to do it. If the sender is not "
         + "configured for tool changes the M6 reaches the controller and answers error:20, stopping the "
         + "job with the tool in the cut; if it is configured to IGNORE them, the change is dropped "
         + "silently and the rest of the job is cut with the tool already fitted. Test one change on air "
-        + "before trusting it. If this machine runs FluidNC, choose \"FluidNC -- T + M6\" instead: that "
+        + "before trusting it. If this machine runs FluidNC, choose " + quotedValue(properties.toolChangeSender, "FluidNC") + " instead: that "
         + "firmware executes the M6 itself, and a sender configured to strip it removes the one token it "
         + "acts on."));
     }
@@ -1790,7 +1822,7 @@ function validateJob() {
     // so the failure is silence. The 3.9.0 bound is the changer's -- src/ToolChangers/ exists at v3.9.0 and
     // 404s at v3.8.0. FR-1.
     if (senderId == "FluidNC") {
-      warning(localize("\"Tool Change Handled By\" is \"FluidNC -- T + M6\", so this job hands each "
+      warning(localize(quoted(properties.toolChangeSender) + " is " + quotedValue(properties.toolChangeSender, "FluidNC") + ", so this job hands each "
         + "change over with an M6 the FIRMWARE executes -- nothing intercepts it, and a sender set up to "
         + "strip it would remove the token FluidNC acts on. What the firmware then does is in "
         + "config.yaml, which the post cannot read: it dispatches to the tool changer declared as \"atc:\" "
@@ -1801,7 +1833,7 @@ function validateJob() {
     }
 
     if (senderId == "RepRap") {
-      warning(localize("\"Tool Change Handled By\" is the RepRapFirmware tool table, so this job hands "
+      warning(localize(quoted(properties.toolChangeSender) + " is the RepRapFirmware tool table, so this job hands "
         + "each change over with a bare T word. That word errors unless every tool number it uses is "
         + "declared with M563 in config.g, and it corrects nothing unless tpost<n>.g applies a "
         + "tool-length offset. Both are on the machine and neither is visible to the post."));
@@ -1812,13 +1844,13 @@ function validateJob() {
     }
 
     if (changeReprobesZ0()) {
-      warning(localize("\"Tool Length Correction By\" is \"GCode reprobes Z0 after change\" while "
+      warning(localize(quoted(properties.toolChangeZ0Correction) + " is " + quotedValue(properties.toolChangeZ0Correction, "Probe") + " while "
         + "changes are handed to \"" + toolChangeSenderTitle() + "\", so the post probes Z again after "
         + "the macro returns and overwrites whatever the macro measured. That is right for a handler "
         + "that only pauses and wrong for one that re-zeroes or applies a tool offset -- a FluidNC "
         + "\"atc:\" with a tool setter is the second kind, measuring the new tool and shifting the whole Z "
         + "frame with G43.1 -- there it asks you to fit the touch plate at every change for a measurement "
-        + "already made. Set it to \"Tool change applies tool offset\" if the macro establishes Z0."));
+        + "already made. Set it to " + quotedValue(properties.toolChangeZ0Correction, "Offset") + " if the macro establishes Z0."));
     }
   }
 
@@ -1827,18 +1859,18 @@ function validateJob() {
     // Not refused: the operator may apply G43.1 through their sender by hand while the job waits, which
     // the post can no more see than a macro's tool table.
     if (toolLengthCorrection() == "Offset" && getProperty(properties.toolChangeMode) == "Pause") {
-      warning(localize("\"Tool Length Correction By\" is \"Tool change applies tool offset\" while "
-        + "\"At a Tool Change\" is \"Manual change at a pause\". A manual pause hands over to nothing "
+      warning(localize(quoted(properties.toolChangeZ0Correction) + " is " + quotedValue(properties.toolChangeZ0Correction, "Offset") + " while "
+        + quoted(properties.toolChangeMode) + " is " + quotedValue(properties.toolChangeMode, "Pause") + ". A manual pause hands over to nothing "
         + "-- the post stops the program and waits -- so unless YOU apply a tool-length offset at that "
         + "pause, no offset is applied and every part's stored Z0 still measures from the tool just "
-        + "removed. Choose \"User re-zeroed Z by hand at pause\" if that is what you do, or \"GCode "
-        + "reprobes Z0 after change\" to have it measured."));
+        + "removed. Choose " + quotedValue(properties.toolChangeZ0Correction, "Manual") + " if that is what you do, or " + quotedValue(properties.toolChangeZ0Correction, "Probe")
+        + " to have it measured."));
     }
 
     // The file says it at each change and each return, where a person reading the dialog would not look.
     // TWIN #17 -- the file half is toolChange()'s "Manual" arm, on the multi-part case alone.
     if (toolLengthCorrection() == "Manual" && collectDistinctOffsets().length > 1) {
-      warning(localize("\"Tool Length Correction By\" is \"User re-zeroed Z by hand at pause\" "
+      warning(localize(quoted(properties.toolChangeZ0Correction) + " is " + quotedValue(properties.toolChangeZ0Correction, "Manual") + " "
         + "and this job cuts " + collectDistinctOffsets().length + " parts. Re-zeroing at the pause "
         + "corrects the ONE part whose work offset is active there; every other part's stored Z0 was "
         + "measured by the tool being removed. The post marks those parts stale, so a return to one "
@@ -1858,7 +1890,7 @@ function validateJob() {
     // clears them -- that is the point of bringing the spindle down to where a person can work at it.
     if (tcz != undefined && getProperty(properties.toolChangeMode) == "Pause"
         && fixedZEstablishedInFile() && tcz < parseMachineTravelZ()) {
-      warning(localize("\"Manual Position Z\" is " + tcz + ", below the \"Machine Travel Z\" of "
+      warning(localize(quoted(properties.toolChangePositionZ) + " is " + tcz + ", below the " + quoted(properties.machineTravelZ) + " of "
         + parseMachineTravelZ() + " -- the tool is held LOWER during the change than the height you "
         + "declared clears your fixtures. That is right only if the change position itself is clear of "
         + "everything on the bed at that height; the post crosses the bed at the travel height and "
@@ -1868,10 +1900,10 @@ function validateJob() {
     // Warned, not dropped: an ignored coordinate gets trusted unseen, as the removed Tool Change X/Y/Z was for
     // years while it moved with every part origin.
     if (tcAnyPos && toolChangeIsMacro()) {
-      warning(localize("A tool change position is set, but \"At a Tool Change\" hands changes to \""
+      warning(localize("A tool change position is set, but " + quoted(properties.toolChangeMode) + " hands changes to \""
         + toolChangeSenderTitle() + "\", so the post does not use it. Moving the tool to a change "
         + "position belongs to whatever performs the change -- it knows where its changer, its sensor "
-        + "or its park is, and the post does not. The post still retracts to \"Machine Travel Z\" "
+        + "or its park is, and the post does not. The post still retracts to " + quoted(properties.machineTravelZ) + " "
         + "before the hand-over and returns there afterwards."));
     }
   }
@@ -1909,7 +1941,7 @@ function validateJob() {
   if (fw == eFirmware.GRBL && getProperty(properties.machineParkAtEnd) == "Machine") {
     // One warning for both "Grbl" firmwares: FluidNC also rests one pull-off inside machine zero, set_mpos()
     // writing _mpos at the trigger point (FluidNC/src/Machine/Homing.h, Homing.cpp, v3.9.6). FR-2.
-    warning(localize("\"At End Park At\" = machine X0 Y0 sends the tool to where the homing switches "
+    warning(localize(quoted(properties.machineParkAtEnd) + " = machine X0 Y0 sends the tool to where the homing switches "
       + "tripped, not to where homing left the machine -- and that is true of both firmwares this "
       + "\"Grbl\" answer covers. On a stock Grbl build HOMING_FORCE_SET_ORIGIN is off, so machine zero "
       + "sits at the trigger point and the axes rest one pull-off inside it -- $27. A stock FluidNC does "
@@ -1926,7 +1958,7 @@ function validateJob() {
   // 2.1.2.5) -- and a single-offset job never re-selects a register, so the next file starts zeroed.
   // TWIN #5 -- the file half is writeMachineParkXY()'s, gated on the same firmware and property.
   if (fw == eFirmware.MARLIN && getProperty(properties.machineParkAtEnd) == "Machine") {
-    warning(localize("\"At End Park At\" = machine X0 Y0 HOMES X and Y on Marlin rather than rapiding "
+    warning(localize(quoted(properties.machineParkAtEnd) + " = machine X0 Y0 HOMES X and Y on Marlin rather than rapiding "
       + "there, and homing zeroes position_shift -- the work origin this file established. The stored "
       + "G54-G59 registers survive it, but an ordinary single-offset job never re-selects one, so a "
       + "second file run after this one (the two-file answer to a tool change) starts against a zeroed "
@@ -1938,7 +1970,7 @@ function validateJob() {
     warning(localize("\"" + properties.probeSafeZ.title + "\" is set to \""
       + getProperty(properties.probeSafeZ)
       + "\", which is not a Safe Z expression the post can read, so it falls back to a fixed 15 mm "
-      + "on every operation -- for the retract after a probe and for the rapid threshold in group 3 "
+      + "on every operation -- for the retract after a probe and for the rapid threshold in " + quotedGroup("mapRapids") + " "
       + "alike. Give a plain number of millimetres, or Feed:, Retract: or Clearance: followed by one "
       + "-- no sign, no unit suffix."));
   }
@@ -1994,13 +2026,13 @@ function validateJob() {
         + "does not implement it answers the line as an unsupported command and the job stops "
         + "mid-operation with the head over the work -- and the S it carries is on the wrong scale "
         + "besides, the GRBL values driving 0-1000 against $30 and the others a 0-255 byte. Choose the "
-        + "\"" + (fw == eFirmware.GRBL ? "Grbl" : "Mrln") + ":\" values in \"8 - Laser\"."));
+        + "\"" + (fw == eFirmware.GRBL ? "Grbl" : "Mrln") + ":\" values in " + quotedGroup("laser") + "."));
     }
   }
 
   // writeCoolantChannel() emits the chosen code with no firmware test. Only configured channels (Mode not
-  // Off, the shipped value) are checked. Warned, not refused: the label says which firmware the code was
-  // shipped for, not that no other takes it. RRF is skipped -- no value is labelled for it. CR-24, PV-12.
+  // Off, the shipped value) are checked, and only labelled values: M7/M8 are every firmware's, their
+  // conditions warned below. So this fires for a Marlin value on GRBL alone. CR-24, PV-12, MR-1.
   var jobDialect = outputDialectLabel(fw);
   if (jobDialect != undefined) {
     var coolantCodeProps = [];
@@ -2027,33 +2059,55 @@ function validateJob() {
                                     : "coolant codes it will emit belong")
         + " to another firmware: " + wrongDialect.join("; ") + ". The post emits what you picked, so a "
         + "controller that does not implement it answers the line as an unsupported command "
-        + "and the job stops mid-operation with the tool in the cut. Choose the \"" + jobDialect
-        + ":\" values in \"9 - Coolant\", or \"Use custom\" and a file of your own if your controller "
-        + "takes something this post does not list."));
+        + "and the job stops mid-operation with the tool in the cut. Choose "
+        + quotedValue(properties.coolantChannelAOn, "M7") + " or " + quotedValue(properties.coolantChannelAOn, "M8")
+        + " in " + quotedGroup("coolant") + ", or " + quotedValue(properties.coolantChannelAOn, "Use custom")
+        + " and a file of your own if your controller takes something this post does not list."));
     }
   }
 
-  // Neither "Grbl" firmware guarantees M7/M8. Stock grbl 1.1 compiles M7 only under ENABLE_M7, shipped
-  // commented out, so M7 answers error:20 mid-section (grbl/gcode.c, v1.1h); FluidNC never errors, acting
-  // only where a pin is declared (hasMist(), FluidNC/src/GCode.cpp 3.9.1), and cuts dry. CR-24.
-  if (fw == eFirmware.GRBL) {
-    var grblCoolantCodes = [];
-    if (getProperty(properties.coolantChannelAMode) != eCoolant.Off) {
-      grblCoolantCodes.push(getProperty(properties.coolantChannelAOn));
-    }
-    if (getProperty(properties.coolantChannelBMode) != eCoolant.Off) {
-      grblCoolantCodes.push(getProperty(properties.coolantChannelBOn));
-    }
-    if (grblCoolantCodes.indexOf("M7") != -1 || grblCoolantCodes.indexOf("M8") != -1) {
-      warning(localize("This job switches coolant with GRBL's own codes, and neither dialect guarantees "
-        + "them. Stock Grbl 1.1 compiles M7 only when ENABLE_M7 is uncommented in grbl/config.h and it "
-        + "ships commented out -- on such a build the M7 answers error:20 and stops the job mid-operation "
-        + "with the tool in the cut, while M8 is always compiled in. FluidNC never errors here: it acts "
-        + "on M7 only where config.yaml declares a coolant mist_pin and on M8 only where it declares a "
-        + "flood_pin, and otherwise accepts the line and does nothing -- so the job cuts dry and nothing "
-        + "in the file says so. Confirm the build or the config before this job runs; the post can read "
-        + "neither."));
-    }
+  // No firmware guarantees M7/M8: each has them only under a build or config condition the post cannot
+  // read, so a job switching coolant with them is warned once, in its firmware's terms. CR-24, MR-1.
+  var coolantCodes = [];
+  if (getProperty(properties.coolantChannelAMode) != eCoolant.Off) {
+    coolantCodes.push(getProperty(properties.coolantChannelAOn));
+  }
+  if (getProperty(properties.coolantChannelBMode) != eCoolant.Off) {
+    coolantCodes.push(getProperty(properties.coolantChannelBOn));
+  }
+  var usesM7orM8 = coolantCodes.indexOf("M7") != -1 || coolantCodes.indexOf("M8") != -1;
+
+  // Stock grbl 1.1 compiles M7 only under ENABLE_M7, shipped commented out, so M7 answers error:20
+  // mid-section (grbl/gcode.c, v1.1h); FluidNC never errors, acting only where a pin is declared
+  // (hasMist(), FluidNC/src/GCode.cpp 3.9.1), and cuts dry.
+  if (usesM7orM8 && fw == eFirmware.GRBL) {
+    warning(localize("This job switches coolant with M7/M8, and neither Grbl firmware guarantees "
+      + "them. Stock Grbl 1.1 compiles M7 only when ENABLE_M7 is uncommented in grbl/config.h and it "
+      + "ships commented out -- on such a build the M7 answers error:20 and stops the job mid-operation "
+      + "with the tool in the cut, while M8 is always compiled in. FluidNC never errors here: it acts "
+      + "on M7 only where config.yaml declares a coolant mist_pin and on M8 only where it declares a "
+      + "flood_pin, and otherwise accepts the line and does nothing -- so the job cuts dry and nothing "
+      + "in the file says so. Confirm the build or the config before this job runs; the post can read "
+      + "neither."));
+  }
+
+  // Marlin has M7 under COOLANT_MIST and M8 under COOLANT_FLOOD or AIR_ASSIST, and answers a code it lacks
+  // with "echo:Unknown command" and carries on (Marlin/src/gcode/control/M7-M9.cpp, gcode.cpp, bugfix-2.1.x).
+  if (usesM7orM8 && fw == eFirmware.MARLIN) {
+    warning(localize("This job switches coolant with M7/M8, which Marlin has only when built with "
+      + "COOLANT_MIST for M7 or COOLANT_FLOOD for M8, and a COOLANT_MIST_PIN or COOLANT_FLOOD_PIN your "
+      + "board defines. A build without them answers \"Unknown command\" and carries on -- so the job cuts "
+      + "dry and nothing in the file says so. Confirm the build before this job runs; the post cannot "
+      + "read it."));
+  }
+
+  // RepRapFirmware has no case for M7/M8/M9: its default arm runs /sys/M7.g and the like where they exist,
+  // and otherwise reports the code unsupported (src/GCodes/GCodes2.cpp, 3.5-dev).
+  if (usesM7orM8 && fw == eFirmware.REPRAP) {
+    warning(localize("This job switches coolant with M7/M8, which RepRapFirmware does not implement "
+      + "itself: it runs /sys/M7.g, /sys/M8.g and /sys/M9.g where you have written them, and otherwise "
+      + "reports the code as unsupported and switches nothing -- so the job cuts dry. Confirm those "
+      + "macros are on the board before this job runs; the post cannot read them."));
   }
 
   // The same dry cut by a route the post can see: the job asks for a coolant level neither channel Mode
@@ -2063,12 +2117,12 @@ function validateJob() {
   var dryRequests = unmatchedCoolantRequests();
   for (var d = 0; d < dryRequests.length; ++d) {
     warning(localize("This job asks for \"" + dryRequests[d].level + "\" coolant and neither channel is "
-      + "set to it -- \"Channel A Mode\" is \"" + getProperty(properties.coolantChannelAMode) + "\" and "
-      + "\"Channel B Mode\" is \"" + getProperty(properties.coolantChannelBMode) + "\". "
+      + "set to it -- " + quoted(properties.coolantChannelAMode) + " is \"" + getProperty(properties.coolantChannelAMode) + "\" and "
+      + quoted(properties.coolantChannelBMode) + " is \"" + getProperty(properties.coolantChannelBMode) + "\". "
       + (dryRequests[d].names.length == 1 ? "The operation that asks" : "The operations that ask")
       + " for it: " + dryRequests[d].names.join(", ") + ". The post emits no coolant code for them and "
       + "the job runs them DRY, which is a burnt cutter or a scorched edge in the materials coolant is "
-      + "there for. Set one channel's Mode to \"" + dryRequests[d].level + "\" in \"9 - Coolant\", or "
+      + "there for. Set one channel's Mode to \"" + dryRequests[d].level + "\" in " + quotedGroup("coolant") + ", or "
       + "change what those operations ask for in Fusion."));
   }
 
@@ -2114,7 +2168,7 @@ function validateJob() {
         + " which has neither command. The controller answers the line with error:20 and stops the job"
         + " there, with the tool in the cut and the output never switched on. Those two modes are"
         + " Marlin and RepRapFirmware only -- in \"" + outputModeProps[om].group + "\", choose a mode"
-        + " your firmware has, or set \"CNC Firmware\" to the one this machine actually runs.");
+        + " your firmware has, or set " + quoted(properties.jobSelectedFirmware) + " to the one this machine actually runs.");
       return;
     }
 
@@ -2134,11 +2188,11 @@ function validateJob() {
   // Refused rather than warned, and here rather than at the boundary: the alternative is a file that
   // cuts every operation with whichever tool is in the spindle, at the other tools' feeds and speeds.
   if (countDistinctTools() > 1 && getProperty(properties.toolChangeMode) == "Refuse") {
-    error("This job uses " + countDistinctTools() + " tools and \"At a Tool Change\" is \"Refuse a"
-      + " multi-tool job\". This post changes no tool itself on any supported firmware -- it emits no M6"
+    error("This job uses " + countDistinctTools() + " tools and " + quoted(properties.toolChangeMode) + " is " + quotedValue(properties.toolChangeMode, "Refuse")
+      + ". This post changes no tool itself on any supported firmware -- it emits no M6"
       + " on this setting, which stock Grbl and grblHAL answer with error:20 anyway. Post one tool per"
-      + " file; or set \"At a Tool Change\" to \"Manual change at a pause\" to stop at each boundary and"
-      + " swap the tool by hand; or to \"Sender or firmware macro changes it\" if your sender or firmware"
+      + " file; or set " + quoted(properties.toolChangeMode) + " to " + quotedValue(properties.toolChangeMode, "Pause") + " to stop at each boundary and"
+      + " swap the tool by hand; or to " + quotedValue(properties.toolChangeMode, "Macro") + " if your sender or firmware"
       + " owns a tool table and you have configured it to do the change.");
     return;
   }
@@ -2149,10 +2203,10 @@ function validateJob() {
     // Marlin has no tool-length register at all, so there is nothing for a macro to write an offset
     // into and no sender in the list that speaks to it. design.md -> Tool changes.
     if (fw == eFirmware.MARLIN) {
-      error("\"At a Tool Change\" is \"Sender or firmware macro changes it\", but the firmware is"
+      error(quoted(properties.toolChangeMode) + " is " + quotedValue(properties.toolChangeMode, "Macro") + ", but the firmware is"
         + " Marlin, which has no tool-length offset register -- there is nothing for a macro to correct"
         + " and no supported sender intercepts a tool change for it. M6 reaches Marlin as an unknown"
-        + " command and the job carries on with the wrong cutter. Use \"Manual change at a pause\","
+        + " command and the job carries on with the wrong cutter. Use " + quotedValue(properties.toolChangeMode, "Pause") + ","
         + " which re-probes Z0 with the new tool and is the only correction Marlin has.");
       return;
     }
@@ -2160,10 +2214,10 @@ function validateJob() {
     var handler = getProperty(properties.toolChangeSender);
 
     if (handler == "RepRap" && fw != eFirmware.REPRAP) {
-      error("\"Tool Change Handled By\" is the RepRapFirmware tool table, but this job is posted for "
+      error(quoted(properties.toolChangeSender) + " is the RepRapFirmware tool table, but this job is posted for "
         + fw + ". The bare T word that route emits is a tool change on RRF and nothing on any other"
         + " firmware -- GRBL parses it and takes no action, so every change would be skipped silently."
-        + " Choose the sender that runs this machine, or \"Other\" with a macro file of your own.");
+        + " Choose the sender that runs this machine, or " + quotedValue(properties.toolChangeSender, "Other") + " with a macro file of your own.");
       return;
     }
 
@@ -2171,23 +2225,23 @@ function validateJob() {
       // Two texts: FluidNC needs the GRBL dialect but no sender, so the sender text would name a party it lacks
       // and offer the wrong remedy, "Other". Only RepRap reaches here; the Marlin guard returns first. FR-1.
       if (handler == "FluidNC") {
-        error("\"Tool Change Handled By\" is \"FluidNC -- T + M6\", but this job is posted for " + fw
-          + ". FluidNC speaks the dialect this post writes for \"Grbl\", which is the \"CNC Firmware\""
+        error(quoted(properties.toolChangeSender) + " is " + quotedValue(properties.toolChangeSender, "FluidNC") + ", but this job is posted for " + fw
+          + ". FluidNC speaks the dialect this post writes for \"Grbl\", which is the " + quoted(properties.jobSelectedFirmware)
           + " answer to choose for it -- and \"T<n> M6\" is not the token a change takes on " + fw
-          + ", where the T word alone IS the change. Set \"CNC Firmware\" to \"Grbl\" if this machine"
-          + " runs FluidNC, or \"Tool Change Handled By\" to \"RepRapFirmware tool table\" if it runs "
+          + ", where the T word alone IS the change. Set " + quoted(properties.jobSelectedFirmware) + " to \"Grbl\" if this machine"
+          + " runs FluidNC, or " + quoted(properties.toolChangeSender) + " to " + quotedValue(properties.toolChangeSender, "RepRap") + " if it runs "
           + fw + ".");
       } else {
-        error("\"Tool Change Handled By\" is \"" + toolChangeSenderTitle() + "\", which is a GRBL sender,"
+        error(quoted(properties.toolChangeSender) + " is \"" + toolChangeSenderTitle() + "\", which is a GRBL sender,"
           + " but this job is posted for " + fw + ". Choose the handler that runs this machine, or"
-          + " \"Other\" with a macro file of your own.");
+          + " " + quotedValue(properties.toolChangeSender, "Other") + " with a macro file of your own.");
       }
       return;
     }
 
     if (handler == "Other" && getProperty(properties.toolChangeMacroFile) == "") {
-      error("\"Tool Change Handled By\" is \"Other\", which hands each change over to the file named in"
-        + " \"Sender Macro File\" -- and that field is empty, so there is nothing to hand over to. Name"
+      error(quoted(properties.toolChangeSender) + " is " + quotedValue(properties.toolChangeSender, "Other") + ", which hands each change over to the file named in"
+        + " " + quoted(properties.toolChangeMacroFile) + " -- and that field is empty, so there is nothing to hand over to. Name"
         + " the file, or choose the sender that runs this machine.");
       return;
     }
@@ -2203,7 +2257,7 @@ function validateJob() {
     // The raw field is tested because a typo parses to undefined, as a blank does, and would silently drop
     // the position the operator set.
     if (getProperty(properties.toolChangePositionXY) != "" && posX == undefined) {
-      error("\"Manual Position X Y\" is set to \"" + getProperty(properties.toolChangePositionXY)
+      error(quoted(properties.toolChangePositionXY) + " is set to \"" + getProperty(properties.toolChangePositionXY)
         + "\", which is not an X Y pair this post can read, so it would be taken as EMPTY and this"
         + " job's manual changes would happen above the last cut instead of at the position you set."
         + " Give two signed decimal numbers of millimetres separated by a comma -- -10, -400 -- or"
@@ -2216,17 +2270,17 @@ function validateJob() {
       // without this guard the fields would be accepted and then quietly not happen.
       error("A tool change position is set, but this job establishes no fixed Z reference -- there is no"
         + " machine frame to move in, and no height to cross the bed at before the tool gets there."
-        + " Enter \"Machine Travel Z\" and include Z in \"Axes Homed and Trusted\", both in \"4 -"
-        + " Machine Frame\", or clear the tool change position fields.");
+        + " Enter " + quoted(properties.machineTravelZ) + " and include Z in " + quoted(properties.machineHomedAxes) + ", both in " + quotedGroup("machine")
+        + ", or clear the tool change position fields.");
       return;
     }
 
     // Guard B's requirement by a second route: a stored machine X/Y means nothing on a machine that has
     // never established one.
     if (posX != undefined && !machineHomesXY()) {
-      error("A tool change position in X and Y is an absolute machine move, but \"Axes Homed and"
-        + " Trusted\" does not include X and Y, so the machine has no X/Y frame for it to be measured"
-        + " in. Declare XY (or XYZ) in \"4 - Machine Frame\", or clear the tool change position"
+      error("A tool change position in X and Y is an absolute machine move, but " + quoted(properties.machineHomedAxes)
+        + " does not include X and Y, so the machine has no X/Y frame for it to be measured"
+        + " in. Declare XY (or XYZ) in " + quotedGroup("machine") + ", or clear the tool change position"
         + " fields.");
       return;
     }
@@ -2260,7 +2314,7 @@ function validateJob() {
     for (var cf = 0; cf < coolantCustom[c].files.length; ++cf) {
       var customFile = coolantCustom[c].files[cf];
       if (getProperty(customFile) == "") {
-        warning(localize("\"" + coolantCustom[c].code.title + "\" is \"Use custom\", which takes BOTH "
+        warning(localize("\"" + coolantCustom[c].code.title + "\" is " + quotedValue(coolantCustom[c].code, "Use custom") + ", which takes BOTH "
           + "of this channel's codes from files of your own -- and \"" + customFile.title + "\" is "
           + "empty. Nothing at all is emitted for it, so this channel never switches by that route. "
           + "Name the file, or choose one of the g-codes in the dropdown."));
@@ -2290,17 +2344,17 @@ function validateJob() {
         + "build option CNC_COORDINATE_SYSTEMS and is OFF in a stock configuration. The post assumes "
         + "your firmware was compiled with it; if it was not, Marlin reports G53 as an unknown command "
         + "and every travel-height move is silently skipped, leaving the tool wherever the last "
-        + "operation ended. Check the build before running this file, or clear \"Machine Travel Z\"."));
+        + "operation ended. Check the build before running this file, or clear " + quoted(properties.machineTravelZ) + "."));
     }
     if (!machineHomesZ()) {
-      error("\"Machine Travel Z\" is a height in the machine's own homed Z frame, so it requires \"Axes Homed and Trusted\" to include Z -- declare that this machine homes Z, or clear the field.");
+      error(quoted(properties.machineTravelZ) + " is a height in the machine's own homed Z frame, so it requires " + quoted(properties.machineHomedAxes) + " to include Z -- declare that this machine homes Z, or clear the field.");
       return;
     }
     // ">= 0" because zero is the switch, not the ceiling: limits_go_home() ends one pull-off below the
     // trigger and system_check_travel_limits() rejects only target > 0 (grbl 1.1f). PR-17.
     // TWIN #9 -- the file half is writeFixedZReference()'s, on the same firmware and parsed height.
     if (fw == eFirmware.GRBL && parseMachineTravelZ() >= 0) {
-      warning(localize("\"Machine Travel Z\" is " + parseMachineTravelZ() + ", which is at or above "
+      warning(localize(quoted(properties.machineTravelZ) + " is " + parseMachineTravelZ() + ", which is at or above "
         + "machine zero. On a stock Grbl build (HOMING_FORCE_SET_ORIGIN off) and on a stock FluidNC "
         + "(mpos_mm at the switch) homing leaves every reachable Z negative, so a positive value is "
         + "above the top of travel -- it alarms at the first traverse with soft limits on, and drives Z "
@@ -2318,11 +2372,11 @@ function validateJob() {
   // needs no earlier homing -- unlike the Z retract above.
   if (getProperty(properties.machineParkAtEnd) == "Machine") {
     if (!machineHomesXY()) {
-      error("\"At End Park At\" = machine X0 Y0 requires \"Axes Homed and Trusted\" to include X/Y -- a machine's X0 Y0 is its homing corner, which means nothing on a machine that does not home.");
+      error(quoted(properties.machineParkAtEnd) + " = machine X0 Y0 requires " + quoted(properties.machineHomedAxes) + " to include X/Y -- a machine's X0 Y0 is its homing corner, which means nothing on a machine that does not home.");
       return;
     }
     if (fw != eFirmware.MARLIN && !homesAtJobStart()) {
-      error("\"At End Park At\" = machine X0 Y0 emits G53 on " + fw + ", which measures against a machine frame this job must have established, not one a previous power cycle left behind -- set \"Home at Job Start\" to Home, or park at work X0 Y0.");
+      error(quoted(properties.machineParkAtEnd) + " = machine X0 Y0 emits G53 on " + fw + ", which measures against a machine frame this job must have established, not one a previous power cycle left behind -- set " + quoted(properties.machineHomeAtStart) + " to Home, or park at work X0 Y0.");
       return;
     }
   }
@@ -2336,11 +2390,11 @@ function validateJob() {
   // because the multi-part workflow is what needs a homed X/Y. CR-13.
   if (collectDistinctOffsets().length > 1) {
     if (!fixedZEstablishedInFile()) {
-      error("A multi-part job needs a Z frame that outlives one work offset -- the tool must clear the fixtures on its way between parts, and no single clearance height is meaningful across WCS whose origins are only known after probing at runtime. A homed machine already has that frame: set \"Axes Homed and Trusted\" to include Z in group 4 - Machine Frame, then enter \"Machine Travel Z\" beside it -- or post one job per part.");
+      error("A multi-part job needs a Z frame that outlives one work offset -- the tool must clear the fixtures on its way between parts, and no single clearance height is meaningful across WCS whose origins are only known after probing at runtime. A homed machine already has that frame: set " + quoted(properties.machineHomedAxes) + " to include Z in " + quotedGroup("machine") + ", then enter " + quoted(properties.machineTravelZ) + " beside it -- or post one job per part.");
       return;
     }
     if (!homedXY) {
-      error("A multi-part job traverses between STORED work offsets, which are repeatable only on a machine with a homed X/Y zero -- set \"Axes Homed and Trusted\" to XYZ in group 4 - Machine Frame, or post one job per part.");
+      error("A multi-part job traverses between STORED work offsets, which are repeatable only on a machine with a homed X/Y zero -- set " + quoted(properties.machineHomedAxes) + " to XYZ in " + quotedGroup("machine") + ", or post one job per part.");
       return;
     }
   }
@@ -2448,7 +2502,7 @@ function onClose() {
     }
   
     else {
-      display_text("Job end");
+      displayText("Job end");
 
       // Nothing else undoes Start()'s M84 S0. S60 restores a timeout rather than releasing now: a bare
       // M84 releases at once, and an unbalanced LowRider gantry with no brake sinks in Z when it does.
@@ -2714,7 +2768,7 @@ function writeWcsOnReturn(workOffset, mode, canProbe) {
   // TWIN: here -- PV-9's own site, reached by both arms for different reasons, one statement. W11b, W27.
   warnBothChannels("this part's stored Z0 was measured with a tool that has since been changed, and"
     + " nothing here re-measures it -- every depth below is out by the difference in tool length."
-    + " Set Z0 by hand before this part cuts, or use \"Use WCS X0 Y0, Probe Z0 Once per Part\"");
+    + " Set Z0 by hand before this part cuts, or use " + quotedValue(properties.probeOnChange, "Probe Z"));
 }
 
 // Persist the current position as WCS wcsNumber's origin; an undefined x/y/z leaves that axis alone. The
@@ -3085,7 +3139,7 @@ function onSection() {
   onCommand(COMMAND_COOLANT_ON);
 
   // Display section name in LCD
-  display_text(" " + sectionComment);
+  displayText(" " + sectionComment);
 }
 
 function onSectionEnd() {
@@ -3211,7 +3265,7 @@ function onCyclePoint(x, y, z) {
       + "several points and then COMPUTE the work offset from them; GRBL and Marlin have no arithmetic, "
       + "so there is no g-code to expand it into -- and expanding it anyway would emit plain G0/G1 moves "
       + "with no G38 at all, driving the tool into the work at feed rate. Set the work offset by hand in "
-      + "the sender, or use this post's own Z touch-off in the \"5 - Part Origins\" property group."));
+      + "the sender, or use this post's own Z touch-off in the " + quotedGroup("probe") + " property group."));
     return;
   }
   expandCyclePoint(x, y, z);
@@ -3353,7 +3407,7 @@ function onMovement(movement) {
 var currentSpindleSpeed = 0;
 var currentSpindleClockwise = true;
 
-function setSpindeSpeed(_spindleSpeed, _clockwise) {
+function setSpindleSpeed(_spindleSpeed, _clockwise) {
   if ((currentSpindleSpeed != _spindleSpeed) || (_spindleSpeed > 0 && currentSpindleClockwise != _clockwise)) {
     if (_spindleSpeed > 0) {
       spindleOn(_spindleSpeed, _clockwise);
@@ -3366,7 +3420,7 @@ function setSpindeSpeed(_spindleSpeed, _clockwise) {
 }
 
 function onSpindleSpeed(spindleSpeed) {
-  setSpindeSpeed(spindleSpeed, tool.clockwise);
+  setSpindleSpeed(spindleSpeed, tool.clockwise);
 }
 
 // One writer for the two speed-feed-synchronization cases in onCommand(), for the same reason
@@ -3387,17 +3441,17 @@ function onCommand(command) {
       return;
     case COMMAND_SPINDLE_CLOCKWISE:
       if (!tool.isJetTool()) {
-        setSpindeSpeed(spindleSpeed, true);
+        setSpindleSpeed(spindleSpeed, true);
       }
       return;
     case COMMAND_SPINDLE_COUNTERCLOCKWISE:
       if (!tool.isJetTool()) {
-        setSpindeSpeed(spindleSpeed, false);
+        setSpindleSpeed(spindleSpeed, false);
       }
       return;
     case COMMAND_STOP_SPINDLE:
       if (!tool.isJetTool()) {
-        setSpindeSpeed(0, true);
+        setSpindleSpeed(0, true);
       }
       return;
     case COMMAND_COOLANT_ON:
@@ -3659,7 +3713,7 @@ function writeMachineHoming() {
   // homes, so warn. Not an error(): it costs no safety on its own.
   if (!homeXY && !homeZ) {
     // TWIN #7
-    writeWarning("\"Home at Job Start\" is on but \"Axes Homed and Trusted\" is None -- nothing was"
+    writeWarning(quoted(properties.machineHomeAtStart) + " is on but " + quoted(properties.machineHomedAxes) + " is None -- nothing was"
       + " homed");
     return;
   }
@@ -3669,11 +3723,11 @@ function writeMachineHoming() {
   // a fixture at machine zero is rare. PV-4
   if (originIsPreJogged()) {
     // TWIN #8
-    writeWarning("the homing below runs BEFORE \"First WCS / Part\" records the current position as"
+    writeWarning("the homing below runs BEFORE " + quoted(properties.probeOnStart) + " records the current position as"
       + " the part origin, so whatever this job records as X0 Y0 is where homing left the machine --"
       + " the endstop corner -- and not where you parked the tool. Positioning the tool before"
-      + " starting this file has no effect on any axis \"Axes Homed and Trusted\" declares. Use"
-      + " \"Use WCS X0 Y0, Probe Z0\" or a \"Jog to ...\" mode, or set \"Home at Job Start\" to Off.");
+      + " starting this file has no effect on any axis " + quoted(properties.machineHomedAxes) + " declares. Use"
+      + " " + quotedValue(properties.probeOnStart, "Probe Z") + " or a \"Jog to ...\" mode, or set " + quoted(properties.machineHomeAtStart) + " to Off.");
   }
 
   // A single stop before ANY homing motion, so the operator can prepare the machine -- place a movable
@@ -3887,9 +3941,9 @@ function probePointMachinedBefore(upto, workOffset) {
 // offset that has not moved it far enough.
 function probePointDescription() {
   return probeOffsetIsSet()
-    ? ("this part's X0 Y0 plus \"Probe X Y Offset\" -- X" + xyzFormat.format(probeOffsetX())
+    ? ("this part's X0 Y0 plus " + quoted(properties.probeOffsetXY) + " -- X" + xyzFormat.format(probeOffsetX())
        + " Y" + xyzFormat.format(probeOffsetY()))
-    : "this part's X0 Y0, \"Probe X Y Offset\" being 0, 0";
+    : "this part's X0 Y0, " + quoted(properties.probeOffsetXY) + " being 0, 0";
 }
 
 // The two "Set ... to Current Pos" modes, whose origin is where the OPERATOR left the tool before the
@@ -3932,7 +3986,7 @@ function partProbe(atOrigin, zUntrusted, startsWhereHomingLeftIt) {
       + machined.names.join(", ") + ". Where the tool lands on that machined surface instead of the"
       + " original stock top, the Z0 written below is that much low and every depth after it cuts that"
       + " much deeper into the part -- Fusion computed them against the original datum. Move the"
-      + " touch-point onto uncut material with \"Probe X Y Offset\" in group 5 - Part Origins, or set"
+      + " touch-point onto uncut material with " + quoted(properties.probeOffsetXY) + " in " + quotedGroup("probe") + ", or set"
       + " Z0 by hand instead of letting this probe write it");
   }
 
@@ -3950,7 +4004,7 @@ function partProbe(atOrigin, zUntrusted, startsWhereHomingLeftIt) {
           + " neither move. Check that the crossing to X0 Y0 clears your stock, clamps and fixtures at"
           + " the height homing leaves. G38 Target is " + getProperty(properties.probeG38Target)
           + " mm here, and it is a DISTANCE measured from the endstop rather than from the stock --"
-          + " check that it reaches. Setting \"Machine Travel Z\" removes both questions.");
+          + " check that it reaches. Setting " + quoted(properties.machineTravelZ) + " removes both questions.");
       } else {
         writeWarning("no Z reference is established, so the XY move below runs at whatever height the"
           + " tool is holding -- it must be clear of the stock, clamps and fixtures before the program"
@@ -3995,7 +4049,7 @@ function writeWcsOnStart() {
   // the dialog copy (PV-4) -- by the G10 it is too late.
   if (originIsPreJogged() && collectDistinctOffsets().length > 1) {
     // TWIN #13
-    writeWarning("this file REPLACES the stored X0 Y0 of the part it starts on -- \"First WCS / Part\""
+    writeWarning("this file REPLACES the stored X0 Y0 of the part it starts on -- " + quoted(properties.probeOnStart)
       + " is a \"Set ... to Current Pos\" mode, so the G10 below writes wherever the tool is standing"
       + " when this file starts into that part's work offset register. Every other part in this job is"
       + " cut at the origin already stored in its own register, untouched. Put the tool on this part's"
@@ -4018,11 +4072,10 @@ function writeWcsOnStart() {
     // Z is stale and about to be probed, so no absolute Z move is emitted in this frame.
     writeComment(eComment.Info, "   Use stored work origin X0 Y0; probe Z");
     if (canProbe) {
-      // The one caller that can still stand where homing left the tool. Before here, writeFixedZReference()
-      // moves nothing with no Z reference -- the case the warning covers -- and toolChangeFirstLoad() moves
-      // it only on a macro hand-over, which firstToolChangeIsHandedOver() reports. A Start File include can
-      // also move it, unseen (RV-17). PR-16, PV-13.
-      partProbe(false, true, !firstToolChangeIsHandedOver());
+      // The one caller that can still stand where homing left the tool. writeFixedZReference() moves
+      // nothing with no Z reference -- the case the warning covers -- so the predicate asks only about
+      // the first load and a start file. PR-16, PV-13.
+      partProbe(false, true, toolStillWhereHomingLeftIt());
     } else {
       warnZ0NotEstablished("Set X0 Y0 Z0 to Current Pos");
       writeComment(eComment.Debug, " writeWcsOnStart: probe skipped (tool 0 or jet tool) -- moving to stored X0 Y0");
@@ -4203,21 +4256,21 @@ function limitFeedByXYZComponents(curPos, destPos, feed) {
     return feed;
 
   var xyz = Vector.diff(destPos, curPos);
-  var dir = xyz.getNormalized();
-  var xyzFeed = Vector.product(dir.abs, feed);  // Determine the effective x,y,z speed on each axis
-
   let xyLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedXY));
   let zLimit = propertyMmToUnit(getProperty(properties.feedsMaxCutSpeedZ));
 
   // Without the Rapid that normally opens a Section, current equals destination and the vector is zero
   // length, so the slower of the two axis limits is used instead.
-    if (xyz.length == 0) {
+  if (xyz.length == 0) {
     var lesserFeed = (xyLimit < zLimit) ? xyLimit : zLimit;
 
     // Never raise a feed: the axis limit only caps what was asked for. F is modal, so returning the
     // limit outright would turn an F100 move into F180 on the defaults.
     return (lesserFeed < feed) ? lesserFeed : feed;
   }
+
+  var dir = xyz.getNormalized();
+  var xyzFeed = Vector.product(dir.abs, feed);  // Determine the effective x,y,z speed on each axis
 
   if (xyzFeed.z > zLimit) {
     xyzFeed.multiply(zLimit / xyzFeed.z);
@@ -4387,7 +4440,7 @@ function spindleOn(_spindleSpeed, _clockwise) {
       askUser("Turn ON " + rpm + " RPM" + (_clockwise ? "" : " counterclockwise"), "Spindle", false);
     }
 
-    // Either change prompts: setSpindeSpeed() calls here for a later operation's new speed, and for a tapping
+    // Either change prompts: setSpindleSpeed() calls here for a later operation's new speed, and for a tapping
     // reversal at an unchanged speed.
     else if (rpm != lastPromptedSpeed || _clockwise != lastPromptedClockwise) {
       writeComment(eComment.Important, " >>> Spindle Speed: Manual change");
@@ -4411,7 +4464,7 @@ function spindleOn(_spindleSpeed, _clockwise) {
       writeFanOrPinOutput(mode, getProperty(properties.jobSpindlePinFan), 255);
     }
 
-    // setSpindeSpeed() reaches us on a later speed change too. Nothing to emit -- but the file must not
+    // setSpindleSpeed() reaches us on a later speed change too. Nothing to emit -- but the file must not
     // go silent about a speed the job asked for and cannot get.
     else {
       writeComment(eComment.Important, " >>> Spindle Speed " + speedFormat.format(_spindleSpeed)
@@ -4457,7 +4510,7 @@ function sanitizeMessageText(text, unsafeChars) {
 }
 
 // Put a line on the machine's own display.
-function display_text(txt) {
+function displayText(txt) {
   if (fw == eFirmware.GRBL) {
     // GRBL has no display command, so it gets nothing.
   }
@@ -4579,14 +4632,14 @@ function toolChangeFirstLoad() {
   // mode, and a macro change would move the tool off the position about to be recorded. Warned, not refused:
   // nothing unsafe is emitted. PV-13.
   if (originIsPreJogged()) {
-    writeComment(eComment.Debug, " toolChangeFirstLoad: suppressed -- \"First WCS / Part\" records a pre-jogged origin");
+    writeComment(eComment.Debug, " toolChangeFirstLoad: suppressed -- " + quoted(properties.probeOnStart) + " records a pre-jogged origin");
     // TWIN #15
-    writeWarning("\"First Tool is Correct\" is Off and nothing was emitted to load one -- \"First WCS /"
-      + " Part\" takes this part's origin from where you jogged the tool before starting this file, so"
+    writeWarning(quoted(properties.toolChangeFirstToolCorrect) + " is Off and nothing was emitted to load one -- " + quoted(properties.probeOnStart)
+      + " takes this part's origin from where you jogged the tool before starting this file, so"
       + " the tool that made that jog is the one this job assumes and measures from. Fitting a different"
       + " one here would put every depth out by the difference in tool length, and on a hand-over it"
       + " would move the tool off the position about to be recorded. To load the tool during the run"
-      + " instead, use \"Jog to X0 Y0, Probe Z0\" or \"Jog to X0 Y0 Z0\", which load first and position"
+      + " instead, use " + quotedValue(properties.probeOnStart, "Jog XY & Probe Z") + " or " + quotedValue(properties.probeOnStart, "Jog XYZ") + ", which load first and position"
       + " afterwards.");
     return;
   }
@@ -4595,10 +4648,10 @@ function toolChangeFirstLoad() {
   // unaffected -- a person can fit a laser. Both channels, so it can be fixed before posting. PV-13.
   if (toolChangeIsMacro() && (tool.number == 0 || tool.isJetTool())) {
     writeComment(eComment.Debug, " toolChangeFirstLoad: suppressed -- tool 0 or a jet tool cannot be handed over");
-    warnBothChannels("\"First Tool is Correct\" is Off and the first tool is a jet tool or tool 0, which"
+    warnBothChannels(quoted(properties.toolChangeFirstToolCorrect) + " is Off and the first tool is a jet tool or tool 0, which"
       + " no tool changer can fit and no supported handler can act on -- \"T0 M6\" names no tool. Nothing"
       + " was emitted to load it, so this job assumes whatever is in the spindle now. Fit it before"
-      + " starting the file, or set \"At a Tool Change\" to \"Manual change at a pause\" to be asked"
+      + " starting the file, or set " + quoted(properties.toolChangeMode) + " to " + quotedValue(properties.toolChangeMode, "Pause") + " to be asked"
       + " during the run.");
     return;
   }
@@ -4617,6 +4670,13 @@ function toolChangeFirstLoad() {
   writeComment(eComment.Important, " Load the first tool");
   writeComment(eComment.Info, "   Before this part's origin is set, so Z0 is established with the tool that cuts it");
   askUser("Load Tool #" + tool.number + " " + tool.comment, "Tool change", false);
+}
+
+// True where nothing between homing and the first part's probe can move the tool: no macro loads the
+// first tool, and no Start File include runs -- the post cannot read what one does. One definition for
+// both halves of TWIN #12, so the dialog and the file name the same height. RV-17.
+function toolStillWhereHomingLeftIt() {
+  return !firstToolChangeIsHandedOver() && getProperty(properties.includeStartFile) == "";
 }
 
 // True where the first tool is loaded by the macro hand-over, not by a prompt or not at all. One definition,
@@ -4750,8 +4810,8 @@ function toolChange(partOriginEstablishesZ0) {
   } else {
     // TWIN #16
     writeWarning("no retract before this tool change -- this job establishes no fixed Z reference, so"
-      + " the tool is handed over at whatever height the last operation ended at. Enter \"Machine"
-      + " Travel Z\" in group 4, or retract by hand before touching the tool");
+      + " the tool is handed over at whatever height the last operation ended at. Enter " + quoted(properties.machineTravelZ)
+      + " in " + quotedGroup("machine") + ", or retract by hand before touching the tool");
       // Only this arm owes the sync: the retract above ends with its own flushMotions(), and a second would
       // emit M400 twice on Marlin and RRF.
     flushMotions();
@@ -4835,7 +4895,7 @@ function toolChange(partOriginEstablishesZ0) {
       + " measured from the work Z0 already stored, and that is right only because a tool-length offset"
       + " was applied" + (toolChangeIsMacro() ? " by \"" + toolChangeSenderTitle() + "\"" : "")
       + ". An offset shifts the whole Z frame, so every part in this job stays measured correctly. If"
-      + " nothing applied one, STOP: re-zero Z by hand and set \"Tool Length Correction By\" to match"
+      + " nothing applied one, STOP: re-zero Z by hand and set " + quoted(properties.toolChangeZ0Correction) + " to match"
       + " what actually happens at your changes");
   } else {
     // "Manual": a re-zero at the pause reaches only the register active then, so an operator who did as told
@@ -4850,7 +4910,7 @@ function toolChange(partOriginEstablishesZ0) {
           ? ", which corrects THIS part and no other -- the remaining " + strandedParts + " part"
             + (strandedParts == 1 ? " is" : "s are") + " marked stale here, and re-measured, or"
             + " warned about, at the return to each"
-          : ", or set \"Tool Length Correction By\" to \"GCode reprobes Z0 after change\" to have it"
+          : ", or set " + quoted(properties.toolChangeZ0Correction) + " to " + quotedValue(properties.toolChangeZ0Correction, "Probe") + " to have it"
             + " probed"));
   }
 
@@ -4958,7 +5018,7 @@ function toolChangeMacroResume() {
     // TWIN #18
     writeWarning("the tool was NOT returned to a known height after the tool change -- this job"
       + " establishes no fixed Z reference, so wherever the macro left the tool is where the next move"
-      + " starts from. Enter \"Machine Travel Z\" in group 4");
+      + " starts from. Enter " + quoted(properties.machineTravelZ) + " in " + quotedGroup("machine"));
   }
 }
 

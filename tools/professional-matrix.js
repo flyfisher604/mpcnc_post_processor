@@ -488,6 +488,20 @@ const cases = [
   mustLog:[[/set the target deep enough to reach the stock from where you leave the tool/,
             'the general text is what a hand-over gets']] },
 
+{ id:'PRO53', desc:'RV-17 - a start file runs between the homing and the probe, so homing is not what set the height',
+  cnc:face, props:{ machineHomedAxes:S('XY'), machineHomeAtStart:S('Home'), machineParkAtEnd:S('Work'),
+                    probeOnStart:S('Probe Z'), includeStartFile:S('rv17-start.nc') },
+  files:{ 'rv17-start.nc':'G90\nG21\nG94\nG17\n' },
+  // PRO40's configuration and a start file. The post cannot read what the file does, so neither half
+  // may claim that nothing moved the tool after $H; both read toolStillWhereHomingLeftIt().
+  must:[[/^\$H$/m,'homing still runs before the start file'],
+        [/must be clear of the stock, clamps and fixtures before the program starts/,
+         'the file gives the general text']],
+  mustNot:[[/HOMING chose that height/,'and does not claim homing set the probe height']],
+  mustNotLog:[[/searches DOWN FROM THAT SAME HEIGHT/,'nor does the dialog']],
+  mustLog:[[/set the target deep enough to reach the stock from where you leave the tool/,
+            'the dialog gives the general text too']] },
+
 // --- PV-20: the $1 idle-delay warning described a pause the hand-over never writes -------------
 // THE GATE IS UNCHANGED and right: the segment buffer drains whether the post stopped the stream or a
 // sender did, so the hazard is the same on both flows. What forked is the sentence about what this job
@@ -606,6 +620,9 @@ for (const c of cases) {
   const args  = ['--noeditor','--nointeraction','--nobackup','--noprogress','--log',log];
   for (const [k,v] of Object.entries(c.props)) args.push('--property', k, v);
   args.push(CPS, path.join(CNCR, c.cnc), gcode);
+  // An include file must sit in the NC output folder, which here is OUT, so a case that names one
+  // writes it there first.
+  for (const [name, body] of Object.entries(c.files || {})) fs.writeFileSync(path.join(OUT, name), body);
 
   const r = spawnSync(POST, args, { encoding:'utf8' });
   const posted = r.status === 0 && fs.existsSync(gcode);

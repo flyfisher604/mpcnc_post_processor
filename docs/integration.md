@@ -91,8 +91,8 @@ node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/c
 node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/gcode-structure
 ```
 
-**222 cases — 44 hobbyist, 52 professional, 39 WCS, 11 personal, 59 CorrectGcode, 17 GCodeStructure —
-over 42 job files, and all 222 pass as of 2026-08-22.** The whole run is under a minute.
+**225 cases — 46 hobbyist, 53 professional, 39 WCS, 11 personal, 59 CorrectGcode, 17 GCodeStructure —
+over 42 job files, and all 225 pass as of 2026-10-02.** The whole run is under a minute.
 
 **The six are independent by design and stay that way.** The first four encode personas that disagree
 about what the factory defaults should do, so a shared baseline would have to pick one; the last two
@@ -522,7 +522,7 @@ node tools/property-coverage.js schema.json
 
 | Measure | Reached | Total |
 |---|---|---|
-| Properties **varied** by at least one case | **46** | 57 |
+| Properties **varied** by at least one case | **47** | 57 |
 | Enum **values** reached, counting the factory default as reached | **70** | 91 |
 | Boolean **states** reached, both ways | **14** | 14 |
 
@@ -562,9 +562,9 @@ The two single values that used to sit outside those two groups — `machineHome
 Three distinctions, because the number above is easy to over-read.
 
 **Reached is not the same as varied.** A property left alone still runs — at its factory default, in
-every case. So the default path of all 57 is exercised on every run, and the 11 that no case *varies*
-are 11 whose **alternative** values have never been posted. That is the real gap, and it is what
-§7 lists. **All eleven are a laser setting or a file name** — §7.2's eight and §7.4's three, and
+every case. So the default path of all 57 is exercised on every run, and the 10 that no case *varies*
+are 10 whose **alternative** values have never been posted. That is the real gap, and it is what
+§7 lists. **All ten are a laser setting or a file name** — §7.2's seven and §7.4's three, and
 nothing outside them. §7.3's coolant *codes* left this list with `GH-16d`; what coolant still owes is enum
 values, not an unposted property.
 
@@ -679,7 +679,9 @@ why is the case in `tools/correct-gcode-matrix.js`. A sixth, `feedsScaleFeedrate
 ### 7.2 Needs fixture files, not job files — **open**
 
 Eight properties name **a file, not a value**: `includeStartFile`, `includeStopFile`,
-`includeToolFile1`, `includeToolFile2`, and the four `coolantChannel{A,B}{On,Off}Custom`.
+`includeToolFile1`, `includeToolFile2`, and the four `coolantChannel{A,B}{On,Off}Custom`. **One is
+varied**: `PRO53` sets `includeStartFile`, its `files:` map writing the fixture into the output folder
+before the run (`tools/professional-matrix.js`). The other seven are not.
 
 **The custom-coolant fields are include files**, which is worth stating because they do not read that
 way. Setting `coolantChannelAOnCustom` to `M42 P4 S255` — exactly the g-code it is meant to produce —
@@ -695,8 +697,8 @@ were verified this way with one-line fixtures, the start file included — its `
 **replaces** the post's header, and with it the only `G90`/`G21`/`G94`/`G17` the job sets, is `CR-05`
 witnessed for the first time.
 
-**What is owed is a `tools/include-fixtures/` directory and a matrix that copies it into the output
-folder before the run.** No new `.cnc` file, and no new technique.
+**What is owed is cases for the other seven, through the same `files:` map** — which only
+`professional-matrix.js` has. No new `.cnc` file, and no new technique.
 
 ### 7.3 Needs no new file — the library already has ten of them
 

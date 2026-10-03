@@ -194,17 +194,22 @@ close with `S0` on the same output, `M7` and `M8` with `M9`, and `Use custom` wi
 *Off Custom* file. `M9` is GRBL's only off code and stops every coolant output at once — harmless,
 because the post switches both channels off before switching either on.
 
-**The output must match your CNC Firmware.** The post emits the code you choose **without
-checking** it, so a Marlin code sent to GRBL stops the job mid-operation with the tool in the cut.
-It warns when a code is labelled for another firmware. The defaults are the Grbl codes, matching
-the default firmware.
+**`M106` and `M42` are Marlin and RepRapFirmware codes.** The post emits the code you choose
+**without checking** it, so one sent to GRBL stops the job mid-operation with the tool in the cut,
+and the post warns.
 
-> **On GRBL neither code is guaranteed even when it matches.** Stock Grbl 1.1 has `M7` only when
-> built with `ENABLE_M7`, which ships off, and otherwise answers `error:20` and stops the job; `M8`
-> is always there. FluidNC never errors, but acts on `M7` or `M8` only where `config.yaml` declares
-> a `mist_pin` or `flood_pin` — otherwise the job cuts dry. V1 Engineering's Jackpot 1 configs
-> declare both pins; **its Jackpot 2 and Jackpot 3 configs declare neither.** The post warns
-> whenever a GRBL job switches coolant with these codes.
+**`M7` and `M8` work on every firmware — where the firmware has them.** The post warns whenever a
+job switches coolant with them:
+
+- **Grbl** — stock Grbl 1.1 has `M7` only when built with `ENABLE_M7`, which ships off, and
+  otherwise answers `error:20` and stops the job; `M8` is always there.
+- **FluidNC** — never errors, but acts on `M7` or `M8` only where `config.yaml` declares a
+  `mist_pin` or `flood_pin`; otherwise the job cuts dry. V1 Engineering's Jackpot 1 configs declare
+  both pins; **its Jackpot 2 and Jackpot 3 configs declare neither.**
+- **Marlin** — has them only when built with `COOLANT_MIST` (for `M7`) or `COOLANT_FLOOD` (for `M8`)
+  and a pin your board defines; otherwise it answers *Unknown command* and the job cuts dry.
+- **RepRapFirmware** — runs `/sys/M7.g`, `/sys/M8.g` and `/sys/M9.g` if you have written them, and
+  otherwise switches nothing.
 
 For anything else, set the channel's *Output* to **`Use custom`** and put a **filename** — as in
 group 7, not g-code — in **both** of that channel's *… Custom* fields. A field left empty emits
@@ -214,9 +219,9 @@ nothing for that code, and the post warns.
 |---|---|---|
 | Channel A Mode | Which Fusion coolant mode switches channel A on. Both channels `Off` means the group does nothing. | **Off** |
 | Channel B Mode | The same for channel B — a second, independent output. | **Off** |
-| Channel A Output | The code that switches channel A on, and with it the code that switches it off: `Mrln: M106 P{n} S255`, `Mrln: M42 P{pin} S255`, `Grbl: M7 (mist)`, `Grbl: M8 (flood)`, or `Use custom` and the two files below. The two Marlin forms take their output number from *Channel A Pin/Fan #*. | **Grbl: M8 (flood)** |
+| Channel A Output | The code that switches channel A on, and with it the code that switches it off: `Mrln: M106 P{n} S255`, `Mrln: M42 P{pin} S255`, `M7 on, M9 off`, `M8 on, M9 off`, or `Use custom` and the two files below. Which coolant level switches the channel is *Channel A Mode*'s choice, not this field's. The two Marlin forms take their output number from *Channel A Pin/Fan #*. | **M8 on, M9 off** |
 | Channel A Pin/Fan # | The output number channel A's two Marlin forms use, for both on and off. Read and checked exactly as *Spindle: Pin/Fan #* in group 1. A number taken from another board's pin map may be protected on yours — 6 and 11 are a servo header on RAMPS but `HEATER_2` and `Y_MIN` on a Rambo — and then the coolant never switches. **The two channels may share one number**: the offs come first, so a shared output is switched off and back on. | **0** |
-| Channel B Output | The same for channel B. | **Grbl: M7 (mist)** |
+| Channel B Output | The same for channel B. | **M7 on, M9 off** |
 | Channel B Pin/Fan # | The same for channel B. | **0** |
 | Channel A On Custom | Filename read when *Channel A Output* is `Use custom`. | **empty** |
 | Channel A Off Custom | Filename read when *Channel A Output* is `Use custom`. | **empty** |
