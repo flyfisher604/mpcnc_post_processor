@@ -311,9 +311,13 @@ const cases = [
         [/^\$H$/m,'but $H is bare - GRBL reads $ only as the first character of a line']],
   mustNot:[[/^N\d+ \$H/m,'no N word on the homing command']] },
 
-{ id:'PRO30', desc:'an unreadable Safe Z is warned and falls back rather than emitting a wrong height',
+{ id:'PRO30', desc:'an unreadable Safe Z is refused rather than replaced by a height nobody chose',
   cnc:face, props:pro({ probeOnStart:S('Probe Z'), probeSafeZ:S('15mm') }),
-  mustLog:[[/is not a Safe Z expression the post can read/,'named, with the accepted forms']] },
+  refuse:[/is not a Safe Z expression the post can read/,'refused, with the accepted forms'] },
+{ id:'PRO30a', desc:'... and what an operator types - padding, a space after the colon, a leading point - is read',
+  cnc:face, props:pro({ probeOnStart:S('Probe Z'), probeSafeZ:S(' Retract: .5 ') }),
+  must:[[/Safe Z = Retract level, fallback 0?\.5\b/,'parsed as Retract with a 0.5 mm fallback']],
+  mustNotLog:[[/is not a Safe Z expression/,'no refusal']] },
 
 { id:'PRO31', desc:'compensation IN THE CONTROL is refused - the professional habit these firmwares cannot serve',
   cnc:full, props:pro({ probeOnStart:S('Skip'), toolChangeMode:S('Pause') }),

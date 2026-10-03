@@ -41,14 +41,10 @@ is scope on the `HB-` and `PR-` passes and routes nothing.
 
 ## 2. Open findings
 
-**One row, and it writes no wrong g-code.** `RV-03` is an input the post handles worse than it should, and waits on the author's ruling.
-
-| ID | Finding | Sev | Reproduce | Action | Status |
-|---|---|---|---|---|---|
-| **RV-03** | **The Safe Z parser rejects inputs an operator would type, and falls back to a fixed 15 mm.** `parseSafeZExpr()`'s regexes allow no surrounding whitespace, no space after the colon and no leading decimal point: `" 15"`, `"15 "`, `"Retract: 5"`, `"Feed: 5"`, `".5"` and `"Feed:.5"` all resolve to ERROR. The fallback is warned in both channels (TWIN #1) and is usually higher than what was meant, so both readers err conservative — fewer `G1`s become rapids, the retract is higher — but a 15 mm retract over tall stock can exceed a short Z. **The 15 is written four times**: `safeZHeightDefault`, twice in `parseSafeZExpr()`, and as text, *15 mm*, in `validateJob()`'s half of the pair | Low | Dialog only: `Safe Z` = ` 15`, with the leading space, raises the format warning on any milling job; `15` does not | Trim the input, allow whitespace after the colon, accept a leading `.`, and make the fallback one named constant read by the parser and both message texts. `-5`, `15mm` and `Retract:` stay rejected. **One ruling is the author's**: whether what still fails is `error()` rather than the fallback — the value sets a G1-to-G0 threshold. If it is, TWIN #1's file half can no longer run and the pair retires | ⬜ |
+**None.**
 
 > **The verdict table is two greps over `MPCNC_v4.1.1_Beta3.cps` and lives nowhere else.**
-> `grep -n "// TWIN #"` is the paired half: **18 numbered pairs**, each number appearing **exactly
+> `grep -n "// TWIN #"` is the paired half: **17 numbered pairs**, each number appearing **exactly
 > twice** — the full account on the `validateJob()` side, which names the emitting function, and the
 > number alone at the file half, so a pair cannot half-exist. `#16` and `#18` are one dialog warning
 > over two file halves, the hand-over and the return. `grep -n "// TWIN: "` is the rest: **4
@@ -65,7 +61,7 @@ ships.
 
 ## 3. Closed findings
 
-**✅ 105 · ➖ 11 — 116 rows.**
+**✅ 106 · ➖ 11 — 117 rows.**
 Permanent: commit messages and code comments cite these ids and they must still resolve.
 `git show <ref>` holds the diagnosis, the diff and the argument. ➖ is closed-by-design or
 withdrawn; which one a row is, is its Resolution cell.
@@ -206,6 +202,7 @@ withdrawn; which one a row is, is its Resolution cell.
 | **RV-08** | A misspelt function, two stale descriptions, a misleading initial value and four off-convention names | Low | `setSpindleSpeed`, `switchCoolantA`/`switchCoolantB`, `displayText`; `description` names FluidNC and `longDescription` the current post; `fw` starts `undefined`. **`Start()` keeps its name**: `design.md` and three closed rows cite it, and the rename was not worth the dangling references | ✅ |
 | **RV-17** | The first part's no-Z-reference warning could say homing chose the tool's height after a `Start File` include had moved it | Low | `toolStillWhereHomingLeftIt()` adds *no start file* to the first-load test, read by both halves of TWIN #12. `PRO53` | ✅ |
 | **RV-01** | A tool change stopped the spindle, and a next tool at the same speed and direction cut with it stopped — both flows, every `Spindle Control` mode, and a router after a laser | High | Only `spindleOn()` and `spindleOff()` write the speed and direction, so `toolChange()`'s stop is seen by the next start. `spindleEnabled` is gone: `currentSpindleSpeed > 0` is the same fact. `RV-01T` | ✅ |
+| **RV-03** | The Safe Z parser rejected padding, a space after the colon and a leading `.`, and fell back to a fixed 15 mm | Low | The regexes allow all three; `-5`, `15mm` and `Retract:` are **refused** — the author's ruling, since no fixed height is right as both the probe retract and group 3's threshold. TWIN #1 retires with the fallback. `PRO30`, `PRO30a` | ✅ |
 
 ---
 

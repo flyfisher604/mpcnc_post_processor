@@ -443,8 +443,7 @@ properties = {
   // heights would mean rapiding through the height just called clear.
   //
   // The key keeps its "probe" name: every stored value still means the same height, and a rename would
-  // reset it. No parentheses in the title: writeSafeZFormatWarning() prints it and its group's title in an
-  // in-file warning, which strips them (sanitizeMessageText(_, "()"), via writeWarning()).
+  // reset it.
   probeSafeZ: {
     title      : "Safe Z",
     description: "A height that clears the work, in the part's work coordinates -- measured from the touch-off Z0 at the stock top, never from machine zero. Read twice: the tool retracts to it after probing, and in group 3 a Z at or above it is treated as safe air, so a G1 there may become a G0. A number in mm, or Feed:/Retract:/Clearance:<fallback> to use the operation's own Fusion level -- Retract:15 means the Fusion retract level, or 15 mm if it has none.",
@@ -932,10 +931,10 @@ var eSafeZ = {
   CLEARANCE: 3,
   ERROR: 4,
   prop: {
-    0: {name: "Const", regex: /^\d+\.?\d*$/, numRegEx: /^(\d+\.?\d*)$/, value: 0},
-    1: {name: "Feed", regex: /^Feed:/i, numRegEx: /:(\d+\.?\d*)$/, value: 1},
-    2: {name: "Retract", regex: /^Retract:/i, numRegEx: /:(\d+\.?\d*)$/, value: 2},
-    3: {name: "Clearance", regex: /^Clearance:/i, numRegEx: /:(\d+\.?\d*)$/, value: 3},
+    0: {name: "Const", regex: /^\s*(\d+\.?\d*|\.\d+)\s*$/, numRegEx: /^\s*(\d+\.?\d*|\.\d+)\s*$/, value: 0},
+    1: {name: "Feed", regex: /^\s*Feed:/i, numRegEx: /:\s*(\d+\.?\d*|\.\d+)\s*$/, value: 1},
+    2: {name: "Retract", regex: /^\s*Retract:/i, numRegEx: /:\s*(\d+\.?\d*|\.\d+)\s*$/, value: 2},
+    3: {name: "Clearance", regex: /^\s*Clearance:/i, numRegEx: /:\s*(\d+\.?\d*|\.\d+)\s*$/, value: 3},
     4: {name: "Error", regex: /^$/, numRegEx: /^$/, value: 4}
   }
 };
@@ -943,14 +942,15 @@ var eSafeZ = {
 var safeZMode = eSafeZ.CONST;
 // The literal fallback parsed out of the Safe-Z property, in MILLIMETRES -- every dialog dimension is
 // mm. Convert with propertyMmToUnit() before comparing it against, or emitting it as, a coordinate.
-var safeZHeightDefault = 15;
+var safeZHeightDefault;
 var safeZHeight;   // resolved height, in the OUTPUT unit
 
 // Parse a Safe-Z expression -- a bare number, or Feed:/Retract:/Clearance:<fallback> -- into
-// { mode, dflt }. Pure.
+// { mode, dflt }, dflt undefined on ERROR. Whitespace around the expression and after the colon is
+// ignored. Pure.
 function parseSafeZExpr(str) {
   var mode;
-  var dflt = 15;
+  var dflt;
 
   // The first regex that matches picks the mode; none matching leaves ERROR.
   for (mode = eSafeZ.CONST; mode < eSafeZ.ERROR; mode++) {
@@ -964,7 +964,6 @@ function parseSafeZExpr(str) {
 
     if ((match == null) || (match.length != 2)) {
       mode = eSafeZ.ERROR;
-      dflt = 15;
     }
     else {
       dflt = Number(match[1]);
@@ -981,23 +980,13 @@ function parseSafeZProperty() {
   safeZMode = parsed.mode;
   safeZHeightDefault = parsed.dflt;
 
-  // Warned once per file, here where the parse fails, not once per section. validateJob() warns at post
-  // time.
   if (safeZMode == eSafeZ.ERROR) {
-    writeSafeZFormatWarning(properties.probeSafeZ.title, groupDefinitions.probe.title,
-      propertyMmToUnit(safeZHeightDefault));
+    error("Internal: an unreadable Safe Z reached parseSafeZProperty() -- validateJob() should have refused it.");
+    return;
   }
 
   writeComment(eComment.Debug, " parseSafeZProperty: safeZMode = '" + eSafeZ.prop[safeZMode].name + "'");
   writeComment(eComment.Debug, " parseSafeZProperty: safeZHeightDefault = " + safeZHeightDefault);
-}
-
-// The in-file Safe-Z format warning. No brackets in the text: grbl 1.1 does not nest comments and ends
-// one at the first ")" (grbl/protocol.c, protocol_main_loop(), v1.1h).
-function writeSafeZFormatWarning(title, groupTitle, heightInUnit) {
-  // TWIN #1
-  writeWarning("\"" + title + "\" in \"" + groupTitle + "\" -- format error, falling back to "
-    + xyzFormat.format(heightInUnit));
 }
 
 // Group 3's per-section Safe Z, cached in safeZHeight because isSafeToRapid() is asked once per move
@@ -1011,7 +1000,7 @@ function safeZforSection(_section)
   var resolved = resolveSafeZ(safeZMode, safeZHeightDefault, _section);
   safeZHeight = resolved.height;
 
-  if (safeZMode == eSafeZ.CONST || safeZMode == eSafeZ.ERROR) {
+  if (safeZMode == eSafeZ.CONST) {
     writeComment(eComment.Important, " SafeZ using const: " + safeZHeight);
   } else if (resolved.fromLevel) {
     writeComment(eComment.Info, " SafeZ " + eSafeZ.prop[safeZMode].name.toLowerCase()
@@ -1046,7 +1035,7 @@ function resolveSafeZ(mode, dflt, _section) {
       valueParam = "operation:clearanceHeight_value";
       absParam   = "operation:clearanceHeight_absolute";
       break;
-    default:  // CONST or ERROR -- use the literal fallback
+    default:  // CONST -- use the literal height
       return {height: fallback, fromLevel: false};
   }
 
@@ -1069,7 +1058,7 @@ function resolveSafeZHeight(mode, dflt, _section) {
 function describeSafeZ(mode, dflt) {
   var name = eSafeZ.prop[mode].name;
   var fallbackText = xyzFormat.format(propertyMmToUnit(dflt));
-  if (mode == eSafeZ.CONST || mode == eSafeZ.ERROR) {
+  if (mode == eSafeZ.CONST) {
     return name + " = " + fallbackText + " -- a fixed height, no F360 level consulted";
   }
 
@@ -1965,16 +1954,6 @@ function validateJob() {
       + "origin. Park at work X0 Y0, or establish the origin again at the start of the next file."));
   }
 
-  // TWIN #1 -- the file half is writeSafeZFormatWarning()'s, which names the same 15 mm fallback.
-  if (parseSafeZExpr(getProperty(properties.probeSafeZ)).mode == eSafeZ.ERROR) {
-    warning(localize("\"" + properties.probeSafeZ.title + "\" is set to \""
-      + getProperty(properties.probeSafeZ)
-      + "\", which is not a Safe Z expression the post can read, so it falls back to a fixed 15 mm "
-      + "on every operation -- for the retract after a probe and for the rapid threshold in " + quotedGroup("mapRapids") + " "
-      + "alike. Give a plain number of millimetres, or Feed:, Retract: or Clearance: followed by one "
-      + "-- no sign, no unit suffix."));
-  }
-
   // The same check on single-coordinate fields: parseMachineCoordinate() answers undefined for a typo as for
   // an empty field, and undefined means "not set" -- so "-12mm" in "Machine Travel Z" silently drops the
   // frame. "Manual Position Z" may be set alone, so it is here; the X Y pair has its own loop below.
@@ -2128,6 +2107,17 @@ function validateJob() {
 
   // --- Guards -----------------------------------------------------------------------------------
   // Refusals, most basic first; each returns after its error().
+
+  // Refused, not defaulted: the value is the retract after a probe and group 3's G1-to-G0 threshold, and
+  // no fixed height is right both over tall stock and under a short Z.
+  if (parseSafeZExpr(getProperty(properties.probeSafeZ)).mode == eSafeZ.ERROR) {
+    error(localize(quoted(properties.probeSafeZ) + " is set to \"" + getProperty(properties.probeSafeZ)
+      + "\", which is not a Safe Z expression the post can read. It is the retract after a probe and the "
+      + "rapid threshold in " + quotedGroup("mapRapids") + " alike, so no fixed height can stand in for it. "
+      + "Give a plain number of millimetres, or Feed:, Retract: or Clearance: followed by one -- no sign, "
+      + "no unit suffix."));
+    return;
+  }
 
   // The fan and pin output modes, in one table because groups 1, 8 and 9 own the same mistakes.
   // jetOnly: the laser field is read only by a section that fires a beam, so a milling job posts whatever it
@@ -3417,8 +3407,8 @@ function onSpindleSpeed(spindleSpeed) {
   setSpindleSpeed(spindleSpeed, tool.clockwise);
 }
 
-// One writer for the two speed-feed-synchronization cases in onCommand(), for the same reason
-// writeSafeZFormatWarning() exists: a warning duplicated at two call sites comes to differ at one.
+// One writer for the two speed-feed-synchronization cases in onCommand(): a warning duplicated at two
+// call sites comes to differ at one.
 function writeSpeedFeedSyncWarning() {
   // TWIN: none -- the kernel raises it from the operation, and validateJob() cannot see toolpath or
   // Manual NC commands.
