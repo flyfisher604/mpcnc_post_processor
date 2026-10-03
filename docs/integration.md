@@ -91,8 +91,8 @@ node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/c
 node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/gcode-structure
 ```
 
-**225 cases — 46 hobbyist, 53 professional, 39 WCS, 11 personal, 59 CorrectGcode, 17 GCodeStructure —
-over 42 job files, and all 225 pass as of 2026-10-02.** The whole run is under a minute.
+**227 cases — 46 hobbyist, 53 professional, 39 WCS, 11 personal, 59 CorrectGcode, 19 GCodeStructure —
+over 43 job files, and all 227 pass as of 2026-10-02.** The whole run is under a minute.
 
 **The six are independent by design and stay that way.** The first four encode personas that disagree
 about what the factory defaults should do, so a shared baseline would have to pick one; the last two
@@ -310,12 +310,12 @@ data's.
 
 ### 4.2 `tools/wcs-jobs/` — job files built for the paths the library cannot reach
 
-`tools/wcs-jobs/make-wcs-jobs.js` builds **fifteen** job files. **It does not author a job.**
+`tools/wcs-jobs/make-wcs-jobs.js` builds **sixteen** job files. **It does not author a job.**
 Nothing here synthesises toolpath data, and that is deliberate: a fixture you cannot reason about
 from its source is not evidence.
 
-*(The directory is named for the work that created it. Twelve of the fifteen are about work
-offsets; `mill-then-jet.cnc` is about a tool change and `one-part.cnc` is the control that proves a
+*(The directory is named for the work that created it. Twelve of the sixteen are about work
+offsets; `mill-then-jet.cnc` and `mill-jet-mill.cnc` are about a tool change and `one-part.cnc` is the control that proves a
 suppression. Renaming it would move every path in the register for no gain.)*
 
 **The format.** A `.cnc` is CIMCO's `compact-nc`: a length-prefixed format string, a seven-byte
@@ -360,7 +360,7 @@ so every section arrives as offset 0. Verified by editing that attribute in Auto
 
 ### 4.3 Every `.cnc` file the suite uses
 
-**42 files.** Twenty-seven are Autodesk's; fifteen are generated. The two tables below are the five
+**43 files.** Twenty-seven are Autodesk's; sixteen are generated. The two tables below are the five
 the persona matrices run on; §4.4 is the twenty-two the two categories add. `A` = 2D-Face tool 1
 (which cuts **across** the part origin, so it is the block that puts a machined surface under a later
 probe); `B` = 2D-Contour tool 2; `J` = a Through-medium laser operation, tool 2; `K` = an Etch laser
@@ -395,6 +395,7 @@ operation, tool 2.
 | `mixed-default-explicit.cnc` | T1@0, T1@1 | 2 | offset `0` beside offset `1` — one register wearing two numbers, which is the only pairing the alias makes ambiguous. `PV-17` |
 | `offset-out-of-range.cnc` | T1@10 | 1 | past `G59.3`, which no supported firmware has |
 | `mill-then-jet.cnc` | T1@1, T2@1 | 1 | a change **into** a tool that cannot probe — `PR-22`'s falsifier |
+| `mill-jet-mill.cnc` | T1@1, T2@1, T1@1 | 0 | a laser between two milling operations at one speed — `RV-01`'s second shape, read by `GS19` |
 
 ### 4.4 The twenty-two the categories add, and why each one is there
 

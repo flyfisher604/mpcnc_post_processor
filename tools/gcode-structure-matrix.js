@@ -80,9 +80,9 @@ const blocksAt = (ctx, re) => M.blocks(ctx.lines).filter(b => re.test(b.raw)).ma
 
 // The spindle can be started three ways since GH-16b: M3/M4, an operator prompt, or a switched fan/pin
 // output. The last has no M-code of its own, so a rule reading only M3/M5 cannot see it running.
-const spindleOnAt  = ctx => [blockAt(ctx, /^(N\d+ )?M[34]\b/)]
-  .concat(promptsAt(ctx, 'Turn ON'), blocksAt(ctx, /^(N\d+ )?M(?:106|42) P\d+ S(?!0$)\d+$/))
-  .filter(x => x >= 0);
+// Every start, not the first: a rule about a restart reads the ones after it. RV-01.
+const spindleOnAt  = ctx => blocksAt(ctx, /^(N\d+ )?M[34]\b/)
+  .concat(promptsAt(ctx, 'Turn ON'), blocksAt(ctx, /^(N\d+ )?M(?:106|42) P\d+ S(?!0$)\d+$/));
 const spindleOffAt = ctx => blocksAt(ctx, /^(N\d+ )?M5\b/)
   .concat(promptsAt(ctx, 'Turn OFF spindle'), blocksAt(ctx, /^(N\d+ )?M(?:106|42) P\d+ S0$/));
 
@@ -174,6 +174,38 @@ const INVARIANTS = [
     const off = spindleOffAt(ctx).filter(x => x > last);
     return off.length ? ok(`the spindle is stopped at line ${Math.min.apply(null, off)}, after the last cut at line ${last}`)
                       : fail(`the last cut is at line ${last} and nothing stops the spindle after it`); } },
+
+{ name:'spindle-restarted-after-every-stop',
+  why:'a tool change stops the spindle, and a second tool that cuts before anything starts it again breaks',
+  needs:'a stop with a milling cut after it, and section banners where the program holds a jet',
+  // WRITTEN BECAUSE THE RULE ABOVE CANNOT SEE IT. A tool change between two tools at the same speed and
+  // direction stopped the spindle and never restarted it (RV-01); the first cut still followed a start, so
+  // spindle-running-before-the-first-cut passed.
+  //
+  // ONLY A MILLING CUT COUNTS. A jet section's G1 can run with the beam off -- center.cnc's etch leads in
+  // before its power-on -- and that is a link, not a cut. The banners say which section a line is in, and
+  // the trace which sections are jets; a beam's M5 is still a stop, so a router after a laser is checked.
+  run: ctx => {
+    let cuts = ctx.motions.filter(isCut).map(m => m.line);
+    if (ctx.hasJet) {
+      const begins = commentsAt(ctx, '*** SECTION begin ***');
+      if (begins.length !== ctx.trace.sections.length) return SKIP;
+      cuts = cuts.filter(c => {
+        const i = begins.filter(b => b < c).length - 1;
+        return i >= 0 && !ctx.trace.sections[i].jet;
+      });
+    }
+    const starts = spindleOnAt(ctx);
+    let checked = 0;
+    for (const stop of spindleOffAt(ctx).sort((a,b) => a-b)) {
+      const next = cuts.filter(c => c > stop)[0];
+      if (next === undefined) continue;              // the program's own last stop
+      checked++;
+      if (!starts.some(st => st > stop && st < next)) {
+        return fail(`the spindle stops at line ${stop} and line ${next} cuts with nothing starting it between`);
+      }
+    }
+    return checked ? ok(`${checked} stop(s) with a cut after them, each followed by a start before that cut`) : SKIP; } },
 
 { name:'nothing-crosses-the-part-before-the-cutter-stops',
   why:'the return traverse runs at travel speed across the work, and a cutter still turning over it is a cut nobody asked for',
@@ -465,6 +497,14 @@ const programs = [
 
 { id:'GS16', desc:'the hobbyist file with a commanded spindle instead of an operator prompt', cnc:face,
   props:{ jobSpindleControl:S('M3'), machineParkAtEnd:S('Off') } },
+
+// RV-01. GS4's job with a commanded spindle: the stop is an M5 and the restart an M3, where GS4 reads prompts.
+{ id:'GS18', desc:'two tools at one speed under a commanded spindle -- the change must restart it', cnc:change,
+  props:pro({ probeOnStart:S('Probe Z'), toolChangeMode:S('Pause'), jobSpindleControl:S('M3') }) },
+
+// RV-01's other shape: the laser leaves the stored speed alone, so the change back meets the speed it left.
+{ id:'GS19', desc:'a laser between two milling operations at one speed -- the router must start again',
+  job:'mill-jet-mill.cnc', props:Object.assign({}, MP, { probeOnStart:S('Skip'), toolChangeMode:S('Pause') }) },
 
 // GH-16d. The one program here that switches an output with the Marlin fan form. It exists because
 // switched-output-is-turned-off-again skipped every case in this file but GS15, so the widened

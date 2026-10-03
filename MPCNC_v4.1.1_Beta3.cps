@@ -2421,7 +2421,6 @@ function resetPostState() {
   coolantChannelB = eCoolant.Off;
   cutterOnCurrentPower = undefined;
   powerState = false;
-  spindleEnabled = false;
   currentSpindleSpeed = 0;
   currentSpindleClockwise = true;
   lastPromptedSpeed = "";
@@ -3404,9 +3403,6 @@ function onMovement(movement) {
   writeComment(eComment.Info, " " + id);
 }
 
-var currentSpindleSpeed = 0;
-var currentSpindleClockwise = true;
-
 function setSpindleSpeed(_spindleSpeed, _clockwise) {
   if ((currentSpindleSpeed != _spindleSpeed) || (_spindleSpeed > 0 && currentSpindleClockwise != _clockwise)) {
     if (_spindleSpeed > 0) {
@@ -3414,8 +3410,6 @@ function setSpindleSpeed(_spindleSpeed, _clockwise) {
     } else {
       spindleOff();
     }
-    currentSpindleSpeed = _spindleSpeed;
-    currentSpindleClockwise = _clockwise;
   }
 }
 
@@ -4416,7 +4410,11 @@ function Start() {
   }
 }
 
-var spindleEnabled = false;
+// What the spindle is doing. Only spindleOn() and spindleOff() write these, so a stop made outside
+// setSpindleSpeed() -- toolChange()'s -- is seen by the next start. 0 is off; the direction counts only while
+// the spindle is on. RV-01.
+var currentSpindleSpeed = 0;
+var currentSpindleClockwise = true;
 
 // Manual path only: what the operator was last asked for. The speed is kept as the formatted string, because
 // two speeds that format alike are one speed to the operator, and asking them to turn a dial to the number
@@ -4433,7 +4431,7 @@ function spindleOn(_spindleSpeed, _clockwise) {
     var rpm = speedFormat.format(_spindleSpeed);
 
     // Under manual control any positive speed just means "on": there is no S word to command.
-    if (!spindleEnabled) {
+    if (currentSpindleSpeed == 0) {
       writeComment(eComment.Important, " >>> Spindle Speed: Manual");
       // Direction is named only when counterclockwise: clockwise is the default for every tool these machines
       // hold, so naming it would add a word to every job's start prompt.
@@ -4458,7 +4456,7 @@ function spindleOn(_spindleSpeed, _clockwise) {
   // truncates it to a byte, so the RPM goes to the comment. Direction is ignored; a relay has no M4.
   // No parentheses in these comments: writeCommentLine() collapses them.
   else if (mode == "M106" || mode == "M42") {
-    if (!spindleEnabled) {
+    if (currentSpindleSpeed == 0) {
       writeComment(eComment.Important, " >>> Spindle ON -- " + speedFormat.format(_spindleSpeed)
         + " RPM requested, and this output carries no speed");
       writeFanOrPinOutput(mode, getProperty(properties.jobSpindlePinFan), 255);
@@ -4477,7 +4475,8 @@ function spindleOn(_spindleSpeed, _clockwise) {
     writeBlock(mFormat.format(_clockwise ? 3 : 4), sOutput.format(_spindleSpeed));
   }
 
-  spindleEnabled = true;
+  currentSpindleSpeed = _spindleSpeed;
+  currentSpindleClockwise = _clockwise;
 }
 
 // Stop the spindle, or ask the operator to and beep where the firmware has M300.
@@ -4498,7 +4497,7 @@ function spindleOff() {
     writeBlock(mFormat.format(5));
   }
 
-  spindleEnabled = false;
+  currentSpindleSpeed = 0;
 }
 
 // Collapse newlines and any of `unsafeChars` into a single space, so user-supplied text cannot break
@@ -4821,8 +4820,8 @@ function toolChange(partOriginEstablishesZ0) {
   onCommand(COMMAND_COOLANT_OFF);
 
   // Not onCommand(COMMAND_STOP_SPINDLE): its !tool.isJetTool() guard reads `tool`, already the incoming tool,
-  // so a router-to-laser change would leave the router turning. spindleEnabled says what is running.
-  if (spindleEnabled) {
+  // so a router-to-laser change would leave the router turning. currentSpindleSpeed says what is running.
+  if (currentSpindleSpeed > 0) {
     spindleOff();
   }
 

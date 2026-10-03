@@ -250,7 +250,14 @@ var JOBS = [
     what: 'A tool change INTO a tool that cannot probe -- PR-22\'s falsifier, and the only job ' +
           'here that is not about work offsets. The spindle stop once read the INCOMING tool\'s ' +
           'jet guard, so a change into a laser handed the operator a still-turning cutter; the ' +
-          'fix was walked and never witnessed. One offset, deliberately: the tool is the variable.' }
+          'fix was walked and never witnessed. One offset, deliberately: the tool is the variable.' },
+
+  { file: 'mill-jet-mill.cnc',
+    plan: [['A', 1], ['J', 1], ['A', 1]],
+    what: 'A laser between two milling operations at the same speed and direction -- RV-01\'s second ' +
+          'shape. The change into the laser stops the spindle and the laser section never touches ' +
+          'it, so the change back must start it again even though the speed the job asks for is the ' +
+          'one it last ran at. One offset: the tool is the variable.' }
 ];
 
 // ---------------------------------------------------------------- main
