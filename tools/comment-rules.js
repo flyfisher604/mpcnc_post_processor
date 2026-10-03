@@ -38,7 +38,7 @@ for (var i = 0; i < L.length; i++) {
 
 for (var b = 0; b < blocks.length; b++) {
   var blk = blocks[b], nx = L[blk.next] === undefined ? '' : L[blk.next];
-  if (/^\s*(\}\s*else\s+)?if\s*\(/.test(nx) && blk.len > 3) {
+  if (/^\s*(\}?\s*else\s+)?if\s*\(/.test(nx) && blk.len > 3) {
     out.push('R1 ' + (blk.start + 1) + '-' + (blk.start + blk.len) + ' (' + blk.len + ') before: ' + nx.trim().slice(0, 60));
   }
   if (/^\s*(writeWarning|warning|error)\s*\(/.test(nx) && blk.len > 3) {

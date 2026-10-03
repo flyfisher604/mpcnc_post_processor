@@ -73,7 +73,7 @@ node tools/<name>-matrix.js  <post.exe>  <post.cps>  <job root>  <output dir>
 
 - **`<post.exe>`** — under `%LOCALAPPDATA%\Autodesk\webdeploy\production\<hash>\Applications\CAM360\`.
   `post-run.ps1` locates it by search rather than by a pinned path; a matrix is handed it.
-- **`<post.cps>`** — `MPCNC_v4.1.1_Beta3.cps`, the deliverable.
+- **`<post.cps>`** — `MPCNC_v4.1.2_Beta3.cps`, the deliverable.
 - **`<job root>`** — the `res\CNC files` directory inside the installed **Autodesk HSM Post
   Processor** VS Code extension, except for `wcs-matrix.js`, which takes `tools/wcs-jobs`.
 - **`<output dir>`** — anywhere outside the repo. Each case writes `<id>.gcode` and `<id>.log` there,
@@ -83,16 +83,16 @@ node tools/<name>-matrix.js  <post.exe>  <post.cps>  <job root>  <output dir>
 print, and the last line is the tally.
 
 ```
-node tools/hobbyist-matrix.js        "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/hobbyist
-node tools/professional-matrix.js    "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/professional
-node tools/wcs-matrix.js             "$POST" MPCNC_v4.1.1_Beta3.cps tools/wcs-jobs out/wcs
-node tools/personal-matrix.js        "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/personal
-node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/correct-gcode
-node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/gcode-structure
+node tools/hobbyist-matrix.js        "$POST" MPCNC_v4.1.2_Beta3.cps "$CNC" out/hobbyist
+node tools/professional-matrix.js    "$POST" MPCNC_v4.1.2_Beta3.cps "$CNC" out/professional
+node tools/wcs-matrix.js             "$POST" MPCNC_v4.1.2_Beta3.cps tools/wcs-jobs out/wcs
+node tools/personal-matrix.js        "$POST" MPCNC_v4.1.2_Beta3.cps "$CNC" out/personal
+node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1.2_Beta3.cps "$CNC" out/correct-gcode
+node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1.2_Beta3.cps "$CNC" out/gcode-structure
 ```
 
-**222 cases — 44 hobbyist, 52 professional, 39 WCS, 11 personal, 59 CorrectGcode, 17 GCodeStructure —
-over 42 job files, and all 222 pass as of 2026-08-22.** The whole run is under a minute.
+**228 cases — 46 hobbyist, 54 professional, 39 WCS, 11 personal, 59 CorrectGcode, 19 GCodeStructure —
+over 43 job files, and all 228 pass as of 2026-10-02.** The whole run is under a minute.
 
 **The six are independent by design and stay that way.** The first four encode personas that disagree
 about what the factory defaults should do, so a shared baseline would have to pick one; the last two
@@ -310,12 +310,12 @@ data's.
 
 ### 4.2 `tools/wcs-jobs/` — job files built for the paths the library cannot reach
 
-`tools/wcs-jobs/make-wcs-jobs.js` builds **fifteen** job files. **It does not author a job.**
+`tools/wcs-jobs/make-wcs-jobs.js` builds **sixteen** job files. **It does not author a job.**
 Nothing here synthesises toolpath data, and that is deliberate: a fixture you cannot reason about
 from its source is not evidence.
 
-*(The directory is named for the work that created it. Twelve of the fifteen are about work
-offsets; `mill-then-jet.cnc` is about a tool change and `one-part.cnc` is the control that proves a
+*(The directory is named for the work that created it. Twelve of the sixteen are about work
+offsets; `mill-then-jet.cnc` and `mill-jet-mill.cnc` are about a tool change and `one-part.cnc` is the control that proves a
 suppression. Renaming it would move every path in the register for no gain.)*
 
 **The format.** A `.cnc` is CIMCO's `compact-nc`: a length-prefixed format string, a seven-byte
@@ -360,7 +360,7 @@ so every section arrives as offset 0. Verified by editing that attribute in Auto
 
 ### 4.3 Every `.cnc` file the suite uses
 
-**42 files.** Twenty-seven are Autodesk's; fifteen are generated. The two tables below are the five
+**43 files.** Twenty-seven are Autodesk's; sixteen are generated. The two tables below are the five
 the persona matrices run on; §4.4 is the twenty-two the two categories add. `A` = 2D-Face tool 1
 (which cuts **across** the part origin, so it is the block that puts a machined surface under a later
 probe); `B` = 2D-Contour tool 2; `J` = a Through-medium laser operation, tool 2; `K` = an Etch laser
@@ -395,6 +395,7 @@ operation, tool 2.
 | `mixed-default-explicit.cnc` | T1@0, T1@1 | 2 | offset `0` beside offset `1` — one register wearing two numbers, which is the only pairing the alias makes ambiguous. `PV-17` |
 | `offset-out-of-range.cnc` | T1@10 | 1 | past `G59.3`, which no supported firmware has |
 | `mill-then-jet.cnc` | T1@1, T2@1 | 1 | a change **into** a tool that cannot probe — `PR-22`'s falsifier |
+| `mill-jet-mill.cnc` | T1@1, T2@1, T1@1 | 0 | a laser between two milling operations at one speed — `RV-01`'s second shape, read by `GS19` |
 
 ### 4.4 The twenty-two the categories add, and why each one is there
 
@@ -501,7 +502,7 @@ matrices build the literal with three one-line helpers (`S`, `N`, `B`) for the s
 The schema is the authority on what exists:
 
 ```
-post.exe --interrogate --noheader --nointeraction MPCNC_v4.1.1_Beta3.cps > schema.json
+post.exe --interrogate --noheader --nointeraction MPCNC_v4.1.2_Beta3.cps > schema.json
 ```
 
 **And a fourth failure, which belongs to the shell rather than to the post.** PowerShell 5.1 will not
@@ -516,13 +517,13 @@ the quoting Node's problem; anything else driving `post.exe` has to solve it one
 Measured against that schema, across all six matrices, by `tools/property-coverage.js`:
 
 ```
-post.exe --interrogate --noheader --nointeraction MPCNC_v4.1.1_Beta3.cps > schema.json
+post.exe --interrogate --noheader --nointeraction MPCNC_v4.1.2_Beta3.cps > schema.json
 node tools/property-coverage.js schema.json
 ```
 
 | Measure | Reached | Total |
 |---|---|---|
-| Properties **varied** by at least one case | **46** | 57 |
+| Properties **varied** by at least one case | **47** | 57 |
 | Enum **values** reached, counting the factory default as reached | **70** | 91 |
 | Boolean **states** reached, both ways | **14** | 14 |
 
@@ -562,9 +563,9 @@ The two single values that used to sit outside those two groups — `machineHome
 Three distinctions, because the number above is easy to over-read.
 
 **Reached is not the same as varied.** A property left alone still runs — at its factory default, in
-every case. So the default path of all 57 is exercised on every run, and the 11 that no case *varies*
-are 11 whose **alternative** values have never been posted. That is the real gap, and it is what
-§7 lists. **All eleven are a laser setting or a file name** — §7.2's eight and §7.4's three, and
+every case. So the default path of all 57 is exercised on every run, and the 10 that no case *varies*
+are 10 whose **alternative** values have never been posted. That is the real gap, and it is what
+§7 lists. **All ten are a laser setting or a file name** — §7.2's seven and §7.4's three, and
 nothing outside them. §7.3's coolant *codes* left this list with `GH-16d`; what coolant still owes is enum
 values, not an unposted property.
 
@@ -679,7 +680,9 @@ why is the case in `tools/correct-gcode-matrix.js`. A sixth, `feedsScaleFeedrate
 ### 7.2 Needs fixture files, not job files — **open**
 
 Eight properties name **a file, not a value**: `includeStartFile`, `includeStopFile`,
-`includeToolFile1`, `includeToolFile2`, and the four `coolantChannel{A,B}{On,Off}Custom`.
+`includeToolFile1`, `includeToolFile2`, and the four `coolantChannel{A,B}{On,Off}Custom`. **One is
+varied**: `PRO53` sets `includeStartFile`, its `files:` map writing the fixture into the output folder
+before the run (`tools/professional-matrix.js`). The other seven are not.
 
 **The custom-coolant fields are include files**, which is worth stating because they do not read that
 way. Setting `coolantChannelAOnCustom` to `M42 P4 S255` — exactly the g-code it is meant to produce —
@@ -695,8 +698,8 @@ were verified this way with one-line fixtures, the start file included — its `
 **replaces** the post's header, and with it the only `G90`/`G21`/`G94`/`G17` the job sets, is `CR-05`
 witnessed for the first time.
 
-**What is owed is a `tools/include-fixtures/` directory and a matrix that copies it into the output
-folder before the run.** No new `.cnc` file, and no new technique.
+**What is owed is cases for the other seven, through the same `files:` map** — which only
+`professional-matrix.js` has. No new `.cnc` file, and no new technique.
 
 ### 7.3 Needs no new file — the library already has ten of them
 

@@ -40,7 +40,17 @@ Out of 57 settings, **eight** decide whether your first job comes out right:
 Everything else can stay as it ships. Groups **4**, **6**, **7**, **8**, **9** and **10** are for
 machines and jobs you do not have yet.
 
-Then: **jog the tool to your part's corner, and post.**
+**Your first job, step by step:**
+
+1. Set **CNC Firmware** to what your controller runs (FluidNC is `Grbl`).
+2. Set **Max XY Cut Speed** and **Max Z Cut Speed** to your machine's real limits.
+3. Pick an origin mode in **First WCS / Part** — the default if you have a wired touch plate,
+   `Set X0 Y0 Z0 to Current Pos` if you do not. See
+   [how the post learns where your part is](#how-the-post-learns-where-your-part-is).
+4. If you probe, set **Plate Thickness** to your own plate, measured.
+5. Post, and **read the post dialog** for warnings before you close it.
+6. Jog the tool to your part's corner — and, without a probe, down onto the stock top — then run
+   the file.
 
 ---
 
@@ -51,8 +61,8 @@ The groups are numbered in the order it makes sense to read them.
 **1 - Job.** Set **CNC Firmware** to your controller — FluidNC is `Grbl`. Leave **Spindle Control** at
 *Prompt the operator* if you switch your router on by hand; most people do. **Leave Comment Level at
 `Info`.** On GRBL that is not cosmetic: gSender deletes an `M0` prompt that falls inside the first
-ten lines it sends, and at `Info` the property dump puts about seventy lines ahead of every prompt
-in the preamble. The post warns you if a lower level puts a real prompt at risk.
+ten lines it sends, and at `Info` the property dump puts more than a hundred lines ahead of the
+first prompt. The post warns you if a lower level puts a real prompt at risk.
 
 **2 - Feeds and Speeds.** Set **Max XY Cut Speed** and **Max Z Cut Speed** to what your machine
 can really do while cutting. **Scale Feedrate** is on, so the post holds every cut feed inside
@@ -259,8 +269,12 @@ travels before it descends.
 
 **The height it reads is group 5's Safe Z** — the same number the tool retracts to after probing.
 Group 3 has no height field of its own, so lowering Safe Z lowers it for both. It is in your part's
-coordinates, measured from the Z0 at the stock top, not from machine zero; `Retract:15` means "the
-operation's own Fusion retract level, or 15 mm if it hasn't got one".
+coordinates, measured from the Z0 at the stock top, not from machine zero.
+
+Safe Z takes a plain number of millimetres, such as `15`, or a Fusion level with a fallback:
+`Retract:15` means "the operation's own Fusion retract level, or 15 mm if it hasn't got one".
+`Feed:` and `Clearance:` work the same way. Spaces are fine and `.5` is read as 0.5. A value the
+post cannot read, such as `-5` or `15mm`, stops the post with a message.
 
 On a full licence you do not need it: Fusion already emits real rapids. At the default threshold it
 also converts nothing if you leave it on — but the check still runs, so a lowered threshold could
@@ -280,6 +294,8 @@ knows is wrong. The message says what to change. The ones a one-part job can hit
 - **A probing operation in the CAM.** Fusion's WCS probing asks the controller to measure and store
   an offset, which none of these controllers can do. The post's own Z touch-off is unaffected.
 - **A named include file that does not exist** in the NC output folder.
+- **A Safe Z the post cannot read** — a negative number, a unit suffix such as `15mm`, or
+  `Retract:` with no number after it. Earlier releases quietly used 15 mm instead.
 - **Spindle Control set to a fan or pin output on a GRBL job.** `M106` and `M42` are Marlin and
   RepRap commands; GRBL answers either with `error:20` and stops with the tool in the cut. Pick a
   mode your controller has, or set **CNC Firmware** to what the machine really runs.

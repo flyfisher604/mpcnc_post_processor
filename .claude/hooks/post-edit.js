@@ -19,9 +19,10 @@
 // Node 10 / CommonJS / no dependencies.
 
 var execFileSync = require('child_process').execFileSync;
+var fs = require('fs');
 var path = require('path');
 
-var CPS = 'MPCNC_v4.1.1_Beta3.cps';
+var CPS = 'MPCNC_v4.1.2_Beta3.cps';
 
 var input = '';
 process.stdin.setEncoding('utf8');
@@ -41,8 +42,10 @@ function main(raw) {
   var base = path.basename(filePath);
 
   if (base === CPS) {
+    // On stdin, not by path: Node 24 refuses `--check` on a `.cps` path (ERR_UNKNOWN_FILE_EXTENSION)
+    // before reading it, which failed every edit whatever the file held. RV-18.
     try {
-      execFileSync('node', ['--check', filePath], { encoding: 'utf8', stdio: 'pipe' });
+      execFileSync('node', ['--check', '-'], { input: fs.readFileSync(filePath), encoding: 'utf8', stdio: 'pipe' });
     } catch (e) {
       problems.push('node --check failed on ' + base + ':\n' + (e.stderr || e.message).trim());
     }

@@ -44,7 +44,8 @@ const cases = [
         [/^G38\.2 F30 Z-10$/m,'probes Z at the shipped target and speed'],[/^G10 L20 P1 Z0\.8$/m,'plate thickness becomes Z0'],
         [/^M0 \(MSG,Attach ZProbe\)$/m,'prompts to fit the probe'],[/^M0 \(MSG,Turn ON 5000 RPM\)$/m,'prompts the router on'],
         [/^M30$/m,'ends the program']],
-  mustNot:[[/\$H/,'no homing'],[/G53/,'no machine frame'],[/^M3\b/m,'no commanded spindle']] },
+  mustNot:[[/\$H/,'no homing'],[/G53/,'no machine frame'],[/^M3\b/m,'no commanded spindle'],
+           [/^\( (MOVEMENT|COMMAND)_/m,'no movement or command trace at Info (RV-09)']] },
 
 // --- P2: same, Marlin ---------------------------------------------------------------
 { id:'H2', desc:'P2 baseline - Marlin dialect', cnc:'Milling/2D/face.cnc', props:{jobSelectedFirmware:S('Marlin')},
@@ -56,7 +57,8 @@ const cases = [
   must:[[/>>> WARNING/,'a warning outlives the level gate (HB-9)']],
   mustNot:[[/jobCommentLevel =/,'no property dump'],[/\*\*\* SECTION begin/,'no section banners']] },
 { id:'H4', desc:'Comment Level Debug - traces present', cnc:'Milling/2D/face.cnc', props:{jobCommentLevel:S('Debug')},
-  must:[[/writeWcsOnStart:/,'origin dispatch traced'],[/parseSafeZProperty:/,'safe-Z parse traced']], mustNot:[] },
+  must:[[/writeWcsOnStart:/,'origin dispatch traced'],[/parseSafeZProperty:/,'safe-Z parse traced'],
+        [/^\( MOVEMENT_[A-Z_]+\)$/m,'movement traced'],[/^\( COMMAND_START_SPINDLE\)$/m,'command traced']], mustNot:[] },
 
 // --- output shape the sender cares about --------------------------------------------
 { id:'H5', desc:'Arcs off - a sender that mishandles G2/G3', cnc:'Milling/2D/bore.cnc', props:{jobUseArcs:B(false)},
@@ -287,32 +289,44 @@ const cases = [
             'singular - one field is wrong, and the job dialect is named'],
            [/"Channel A Output" is "Mrln: M42 P\{pin\} S255", which this post lists as Marlin/,
             'names the field, its value and the dialect the value was shipped for'],
-           [/Choose the "Grbl:" values/,'and names the prefix to pick from instead']],
+           [/Choose "M7 on, M9 off" or "M8 on, M9 off" in "9 - Coolant"/,'and names the codes to pick instead']],
   // The deleted field, asserted absent. Its off code was M9 and correct, so a paired warning naming it
   // was always wrong; now there is no field to name, and this is the check that no vestige survives.
   mustNotLog:[[/"Turn Channel A Off"/,'no vestige of the deleted off-code field']] },
 
-// THE REAL SHAPE OF THE MISTAKE: the firmware is changed and the coolant group is left alone. Both
-// shipped code defaults are GRBL's, so a Marlin job with both channels configured has two wrong fields
-// and gets ONE warning naming each -- which is the count assertion, not the presence of the text.
-// It was FOUR fields before the off codes were derived rather than asked for; the claim is unchanged
-// in kind, and halving it is what PC-3 did to the dialog.
-{ id:'H34', desc:'PV-16 - firmware switched to Marlin, coolant defaults left: two fields, one warning',
+// The firmware changed and the coolant group left alone. The shipped M7/M8 are every firmware's codes,
+// each under its own build or config condition, so what such a job is owed is that condition -- H34 on
+// Marlin, H42 on RepRap, H43 on GRBL -- and never the dialect warning H33 keeps for a real mismatch.
+{ id:'H34', desc:'MR-1 - firmware switched to Marlin, coolant defaults left: M7/M8 are Marlin\'s too, so no dialect warning',
   cnc:'Milling/2D/face.cnc',
   props:{jobSelectedFirmware:S('Marlin'), coolantChannelAMode:S('Flood'), coolantChannelBMode:S('Mist')},
-  mustLog:[[/posted for Marlin, and coolant codes it will emit belong to another firmware/,'plural'],
-           [/Choose the "Mrln:" values/,'the remedy follows the job, not the field']],
-  // COUNTED PER LINE AND NOT PER LOG. The harness's logText is the log file plus stdout plus stderr and
-  // post.exe echoes each warning to both, so a raw occurrence count reads one warning as two -- which
-  // is how this check failed on its first run. The claim is about ONE warning carrying four fields, so
-  // it is asked of each warning line: two separate warnings would put one field on each.
-  custom:(t,ref,log)=>{
-    const fields = ['Channel A Output','Channel B Output'];
-    const lines = log.split(/\r?\n/).filter(l => l.includes('belong to another firmware'));
-    const whole = lines.filter(l => fields.every(f => l.includes(`"${f}" is "`)));
-    return (lines.length > 0 && whole.length === lines.length)
-      ? [true,`both fields in one warning, on each of ${lines.length} channel(s) that carried it`]
-      : [false,`${lines.length} warning line(s), ${whole.length} naming both fields`]; } },
+  // The shipped M8/M7 pair on a Marlin job. Marlin implements both under COOLANT_FLOOD/COOLANT_MIST
+  // (Marlin/src/gcode/control/M7-M9.cpp, bugfix-2.1.x), so the codes are not another firmware's: the
+  // warning is the build condition, and nothing predicts a mid-cut stop Marlin does not make.
+  must:[[/^M8$/m,'the flood code is emitted as chosen']],
+  mustLog:[[/which Marlin has only when built with COOLANT_MIST for M7 or COOLANT_FLOOD for M8/,
+            'the build condition, in Marlin\'s terms']],
+  mustNotLog:[[/belongs? to another firmware/,'M7/M8 are not called another firmware\'s codes'],
+              [/job stops mid-operation/,'and no mid-cut stop is predicted on a firmware that carries on'],
+              [/\((mist|flood)\)/,'MR-2 - no value names a coolant level']] },
+
+{ id:'H42', desc:'MR-1 - the same codes on RepRapFirmware: no dialect warning, and the macro condition named',
+  cnc:'Milling/Coolant Codes/flood.cnc',
+  props:{jobSelectedFirmware:S('RepRap'), coolantChannelAMode:S('Flood'), coolantChannelAOn:S('M7'),
+         coolantChannelBMode:S('Off')},
+  must:[[/^M7$/m,'M7 is emitted for the flood request, as chosen']],
+  mustLog:[[/runs \/sys\/M7\.g, \/sys\/M8\.g and \/sys\/M9\.g where you have written them/,
+            'RRF\'s condition - GCodes2.cpp has no case 7/8/9, its default arm runs the macro']],
+  mustNotLog:[[/belongs? to another firmware/,'not another firmware\'s codes'],
+              [/\((mist|flood)\)/,'MR-2 - no value names a coolant level']] },
+
+{ id:'H43', desc:'MR-1 - on GRBL the M7/M8 build-condition warning is still raised, and no dialect warning',
+  cnc:'Milling/Coolant Codes/flood.cnc',
+  props:{coolantChannelAMode:S('Flood'), coolantChannelAOn:S('M7'), coolantChannelBMode:S('Off')},
+  must:[[/^M7$/m,'M7 is emitted']],
+  mustLog:[[/Stock Grbl 1\.1 compiles M7 only when ENABLE_M7 is uncommented/,'CR-24\'s warning is untouched']],
+  mustNotLog:[[/belongs? to another firmware/,'M7 is not called another firmware\'s'],
+              [/\((mist|flood)\)/,'MR-2 - no value names a coolant level']] },
 
 // THE NEGATIVE, AND IT CARRIES THE EXEMPTION WITH IT. Channel A is the shipped GRBL pair on a GRBL job
 // -- matching, so silent -- and channel B's on code is "Use custom", which has no dialect the post can

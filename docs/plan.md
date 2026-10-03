@@ -6,10 +6,10 @@ performed and what it may claim is `integration.md`; what has already happened i
 
 ## Checkpoint
 
-**Nothing is scheduled.** v4.1.1 Beta 3 is released — tag, asset and release page.
+**Nothing is scheduled.** v4.1.2 Beta 3 is released — tag, asset and release page.
 
 Branch, tag and push positions are `git status` and `git log`; what is open is `findings.md` §2;
-what the **v4.1.1 Beta 3** release contains is `release-notes-v4.1.1-beta3.md`.
+what the **v4.1.2 Beta 3** release contains is `release-notes-v4.1.2-beta3.md`.
 
 ## What is left, in order
 
