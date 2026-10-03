@@ -23,7 +23,9 @@ because commit messages cite them and must still resolve.
 | `PV-` | Post-verify pass, 2026-08-16 — the post **run**, by the post utility over Autodesk's own intermediate files; from `PV-8` over job files built for the paths those cannot reach, from `PV-11` under a simulated Personal licence for the group no job file can reach, and from `PV-14` against the toolpath the kernel delivered rather than against a pattern. **`PV-16` is the one that came off §6 rather than off a run** — a design-backlog item built, and run afterwards like any other, and **`PV-20`/`PV-21` came off a job the author posted and read the dialog of** | `PV-1` … `PV-22` |
 | `GH-` | Reports on the GitHub tracker — `flyfisher604/mpcnc_post_processor` issues, numbered as the issue is with one letter per half of it. A test row takes a further `T` | `GH-16a` … `GH-16d` |
 | `FR-` | FluidNC review, 2026-08-21 — the post's FluidNC claims re-checked against FluidNC source, and its feature surface against a published FluidNC post. §6 holds the four gaps that are design rather than defect, and `FR-2` is the same class, found while closing `FR-1` | `FR-1` … `FR-2` |
+| `MR-` | Marlin / RepRapFirmware review, 2026-08-22 — the post's `M7`/`M8`/`M9` claims re-checked against Marlin and RRF source, after `FR-` did the same for FluidNC. Both rows are a statement the post makes about a firmware rather than a fault in what it emits | `MR-1` … `MR-2` |
 | `PC-` | Property-consolidation review, 2026-08-21 — the dialog's 65 fields read for pairs that are **one** decision asked twice, and the `validateJob()` guards that exist only to reject the combinations such a pair makes expressible. Not defects: each row states the configuration its fold costs, which is `HB-20`'s rule applied to a merge | `PC-1` … `PC-6` |
+| `RV-` | Code review of v4.1.1 Beta 3 at `776a0e5`, 2026-10-02 — a reading of the post, each claim re-checked against the code before it was registered and `RV-01` against a saved matrix artifact. §2 holds the defects; the questions that are the author's to answer are §6's *Readability and structure* | `RV-01` … `RV-13` |
 
 **Two ids do not resolve to a row here, and both are landed fixes rather than losses.**
 A `CR-n` in a commit or code comment dated before `c73726c` is the retired 2026-08-01 series,
@@ -39,7 +41,23 @@ is scope on the `HB-` and `PR-` passes and routes nothing.
 
 ## 2. Open findings
 
-**None.**
+**Nine rows, and one writes wrong g-code: `RV-01`**, a second tool cutting with the spindle stopped.
+`MR-1` and `MR-2` are `CR-01`'s class — a statement the post makes about a firmware rather than a fault
+in what it writes — and halves of one field: `MR-1` is what the post *claims* about `M7`/`M8`, `MR-2` is
+what its dropdown *calls* them. `RV-03` and `RV-04` are inputs the post handles worse than it should;
+the other four `RV-` rows change no g-code.
+
+| ID | Finding | Sev | Reproduce | Action | Status |
+|---|---|---|---|---|---|
+| **MR-1** | **The dialect warning tells a Marlin or RepRap operator that `M7`/`M8` belong to another firmware and will stop their job. Both firmwares take all three codes.** `validateJob()`'s coolant-dialect arm reads `outputCodeFirmware()`, which resolves `Grbl: M7 (mist)` to GRBL off the title's own prefix, and warns that *a controller that does not implement it answers the line as an unsupported command and the job stops mid-operation with the tool in the cut*. **Two things in that are false.** Marlin implements `M7`, `M8` and `M9` — `Marlin/src/gcode/control/M7-M9.cpp`, 2.1.x, the whole file guarded `#if ANY(COOLANT_MIST, COOLANT_FLOOD, AIR_ASSIST)`, `M7` under `COOLANT_MIST`, `M8` under `COOLANT_FLOOD` or `AIR_ASSIST`, and `M9` unguarded inside that block, closing whichever are on — so the code is a **build condition** there, exactly as it is on stock Grbl, and not a foreign dialect. And Marlin does not stop on a code it lacks: it answers `echo:Unknown command` and carries on, so the stated consequence is the wrong one even on the build that cannot serve it. **RepRapFirmware is not reached by the check at all**, `outputDialectLabel()` naming no label for it, and its condition differs again: `src/GCodes/GCodes2.cpp` (3.5-dev) has no `case 7/8/9:` in the M-code switch and its `default:` arm is `TryMacroFile(gb)`, so `M7` runs `/sys/M7.g` where the operator wrote one and is otherwise reported unsupported. **The consequence is a misconfiguration, not a bad line**: an operator warned off the code their firmware takes picks `M106`/`M42` and a pin number this post cannot check, or `Use custom` and writes a file to emit the very code they were steered away from | Med | No controller and no run. `Milling/Coolant Codes/flood.cnc`, `coolantChannelAMode` = `Flood`, `coolantChannelAOn` = `M7`, `CNC Firmware` = `Marlin` raises the dialect warning; the same job at `RepRap` raises nothing | **What is wrong is the text and the scoping, not the emission** — `writeCoolantChannel()` writes the code verbatim and that stays right. (a) The warning must stop saying *belongs to another firmware* of a code all three take, and stop predicting a mid-cut stop on a firmware that echoes and continues. (b) The Marlin and RRF conditions are `CR-24`'s shape and belong beside it rather than inside the dialect arm: `COOLANT_MIST` / `COOLANT_FLOOD` compiled in and a `COOLANT_MIST_PIN` / `COOLANT_FLOOD_PIN` the board defines; `/sys/M7.g`, `/sys/M8.g` and `/sys/M9.g` present on RRF. **`CR-24`'s GRBL arm is untouched** — stock Grbl's `error:20` and FluidNC's silent `mist_pin`/`flood_pin` inertness are correct as written. **One ruling is the author's**: whether `outputCodeFirmware()` keeps dispatching on the title prefix once `M7` is no longer one firmware's, or the dialect arm drops these two values and leaves them to a condition warning of their own | ⬜ |
+| **MR-2** | **`Grbl: M7 (mist)` and `Grbl: M8 (flood)` mislead in two different directions.** The parenthetical names a coolant *level*, and the field decides no such thing: `Channel A Mode` picks the level that fires the channel, `Channel A Output` picks the code it writes, and nothing joins them — `setCoolant()` matches the request against `Mode` alone, then `writeCoolantChannel()` writes the `Output` value verbatim, the level never reaching it. So `Suction` on `M7` and `Mist` on `M8` are both configurations the dialog offers and the post serves, and an operator reading the label believes otherwise. **The `Grbl:` prefix is the second half**, and it is load-bearing rather than decorative: `outputCodeFirmware()` splits the title on `:` and dispatches `MR-1`'s warning off what it finds, so this label cannot be corrected as text alone | Low | Dialog only. `Channel A Mode` = `Suction`, `Channel A Output` = `M7` posts and emits `M7` for a suction request, and nothing names a mismatch because there is no mismatch | **The ids do not move** — `M7` and `M8` are what is stored, not the titles, so a saved configuration survives any rewording and `PC-1`'s moved-key note does not apply. **The two halves are one edit.** Drop the level from the parenthetical, or replace it with what the code actually is — GRBL's two coolant *outputs* — and settle the prefix with `MR-1`(b): a title that no longer reads `Grbl:` returns `undefined` from `outputCodeFirmware()`, which retires the dialect warning for these two values silently. Say which is intended rather than letting the string decide. The two `Channel _ Output` descriptions carry the same reading and go with it | ⬜ |
+| **RV-01** | **A tool change stops the spindle, and where the next tool shares the outgoing one's speed and direction nothing starts it again — the second tool cuts with the spindle stopped.** `toolChange()` calls `spindleOff()` directly, which clears `spindleEnabled` and leaves `currentSpindleSpeed` standing; `onSection()`'s `COMMAND_START_SPINDLE` then reaches `setSpindeSpeed()`, which returns on an unchanged speed and direction. No `M3`, no `Turn ON` prompt, no fan or pin output. Every `Spindle Control` mode, both `At a Tool Change` flows | High | `Milling/2D/toolchange.cnc`, both tools 5000 RPM clockwise, at GS4's configuration: the saved `GS4.gcode` has `( COMMAND_SPINDLE_CLOCKWISE)` after ` Tool Change End` and nothing between it and the next `G1`. **Pass: a spindle start between every spindle stop and the next cut.** `gcode-structure-matrix.js` cannot see it — `spindle-running-before-the-first-cut` reads the first cut only, and `spindleOnAt()` returns the first `M3` only | **Give the speed and direction one owner**: `spindleOn()` and `spindleOff()` write them, and `setSpindeSpeed()` stops writing them. Call sites: `spindleOff()` 2 — `setSpindeSpeed()`, `toolChange()` — and `spindleOn()` 1; `resetPostState()`'s reset stays. In the matrix: `spindleOnAt()` returning every start, an invariant *spindle restarted after every stop*, and a program running the same job under `Spindle Control` = `M3`. `TC-3`'s walk, *`onSection()` restarting spindle*, is what the fix makes true and needs no edit | ⬜ |
+| **RV-03** | **The Safe Z parser rejects inputs an operator would type, and falls back to a fixed 15 mm.** `parseSafeZExpr()`'s regexes allow no surrounding whitespace, no space after the colon and no leading decimal point: `" 15"`, `"15 "`, `"Retract: 5"`, `"Feed: 5"`, `".5"` and `"Feed:.5"` all resolve to ERROR. The fallback is warned in both channels (TWIN #1) and is usually higher than what was meant, so both readers err conservative — fewer `G1`s become rapids, the retract is higher — but a 15 mm retract over tall stock can exceed a short Z. **The 15 is written four times**: L984, L991, L1006, and as text, *15 mm*, in `validateJob()`'s half of the pair | Low | Dialog only: `Safe Z` = ` 15`, with the leading space, raises the format warning on any milling job; `15` does not | Trim the input, allow whitespace after the colon, accept a leading `.`, and make the fallback one named constant read by the parser and both message texts. `-5`, `15mm` and `Retract:` stay rejected. **One ruling is the author's**: whether what still fails is `error()` rather than the fallback — the value sets a G1-to-G0 threshold. If it is, TWIN #1's file half can no longer run and the pair retires | ⬜ |
+| **RV-04** | **`laserOn()` and `laserOff()` are not total over `Laser Output`.** Neither switch has a `default:`, so an id outside the field's five would emit nothing: the beam never fires, or never stops. Both switches cover all five shipped ids, and the key has never carried others, so the dialog cannot reach it — a preset or a property override can. `coolantOffCode()` states the opposite rule for its field | Low | Not from the dialog. Whether `post.exe` accepts an id outside an enum's values decides whether a CorrectGcode case can witness it | A `default:` in each that calls `error()` naming the property and the value. If the engine refuses an unlisted id, the Resolution cell says so and no test row is written | ⬜ |
+| **RV-02** | **Message texts quote dialog titles as literals, so a renamed title stales them silently.** 92 quoted property titles over 83 lines of code — comments and tooltips excluded — against 3 reads of `properties.<key>.title`. Groups are named by their title in 12 places (`"4 - Machine Frame"` L1738, `"9 - Coolant"` L2122 …) and by number alone in four texts (L2019, L4091, L4937, L5158), where `groupDefinitions` holds both. **One has drifted**: L2281 quotes `"RepRapFirmware tool table"`, a value whose title is `RepRapFirmware tool table -- T` (L516) | Low | Measure: the quoted-title count against the titles in `properties`, and `grep -o 'properties\.[a-zA-Z0-9]*\.title'` | A helper returning a property's title quoted, one for a value's title — `outputCodeTitle()` is that for the current value — and the group's from `groupDefinitions`; convert the call sites. Every TWIN pair keeps identical wording on both halves | ⬜ |
+| **RV-05** | **`limitFeedByXYZComponents()` normalises before its zero-length check** — `xyz.getNormalized()` (L4366) and the product after it run on a vector that the `if (xyz.length == 0)` arm (L4374) then discards. Harmless, the result unused on that path; the `if` is indented one level too deep | Low | None — no output changes | Move the zero-length return above the normalisation and fix the indentation | ⬜ |
+| **RV-07** | **Two comments name the wrong group, and seven say *modal group* for an RS-274 group in a file where *group* means a dialog group.** L4457 and L4464 say *group-8 include*; includes are group 7, `groupDefinitions.include`. The other 36 `group <n>` references check out. *modal group* at L925–L929, L2516, L2519 | Low | `grep -noE "group[- ][0-9]+"` against `groupDefinitions` | Correct the two, and *RS-274 modal group* at the seven | ⬜ |
+| **RV-08** | **Misspellings, one encoding fault, two stale descriptions and four off-convention names.** `setSpindeSpeed` — the declaration, 5 calls, 2 comment mentions; *accomidate* L14, *documment* L3120 and L3398, *Calcualte* L3624. L4252 carries U+FFFD (`EF BF BD`) where a section sign was lost — a source comment, never emitted. `description` names Marlin, Grbl and RepRap and not FluidNC; `longDescription` describes feed scaling for a slow Z and nothing else. `var fw = eFirmware.MARLIN` (L58) against a shipped default of GRBL — `onOpen()` assigns it first, so it is never read, only misread. `CoolantA`, `CoolantB`, `Start` and `display_text` break the file's camelCase | Low | None — no g-code changes | Fix the spellings, renaming `setSpindeSpeed` after `RV-01` lands since both touch the same lines; *section 2* at L4252; both descriptions brought to the current firmware set; `fw` initialised `undefined`, with the reason. No rename here moves a property key, so no saved setting resets. **Not owed**: the header's *Changed Aug 22, 2026* is the release date, and converting 278 `var` to `let` changes no behaviour | ⬜ |
 
 > **The verdict table is two greps over `MPCNC_v4.1.1_Beta3.cps` and lives nowhere else.**
 > `grep -n "// TWIN #"` is the paired half: **18 numbered pairs**, each number appearing **exactly
@@ -50,9 +68,10 @@ is scope on the `HB-` and `PR-` passes and routes nothing.
 > to number. **0 owed.** The reason clause is the point of the unpaired ones — a site marked *none*
 > says why the file is the only right channel, not merely that no twin exists.
 
-**What an empty §2 does and does not mean.** Every registered defect has been answered. It is
-not a claim that the post is correct — §7 holds what is owed and unasked. **The live risk that used to
-stand there, `HR-6 (B)`, is answered**: `PV-14` refuses all six rotated Setups the library ships.
+**What §2 does and does not mean.** Every registered defect bar those above has been answered, and an
+answered register is not a claim that the post is correct — §7 holds what is owed and unasked. **The live
+risk that once stood here, `HR-6 (B)`, is answered**: `PV-14` refuses all six rotated Setups the library
+ships.
 
 ---
 
@@ -190,9 +209,14 @@ withdrawn; which one a row is, is its Resolution cell.
 
 ## 4. Open tests
 
-**None.** Every registered question has been asked of the post and answered — which is not a claim
-that the post is correct: two cases were passing while asserting nothing useful, and §5 carries that
-caveat. `git log -- docs/findings.md` is how this section emptied.
+**One row — `MR-1T`**, covering both open findings, one set of runs distinguishing the reworded warning
+and the reworded label together. Every other registered question has been asked of the post and answered —
+which is not a claim that the post is correct: two cases were passing while asserting nothing useful, and
+§5 carries that caveat.
+
+| Test | Proves | Setup (delta) | Method | Expansion | State |
+|---|---|---|---|---|---|
+| **MR-1T** | **On the Marlin run:** the file emits `M7` for the flood request, and **no line anywhere says the code belongs to another firmware or that the job will stop mid-operation** — the absence is the test. Where `MR-1`(b) lands a condition warning, it names `COOLANT_MIST` / `COOLANT_FLOOD` and the pin, and is raised once. **On the RepRap run:** the same, its own condition naming `/sys/M7.g`. **On the GRBL run:** `CR-24`'s existing warning is still raised and still worded as it is — the fix must not have taken it with it. **In every log:** the value quoted back at the operator reads as `MR-2` settles it, and names no coolant level | `Milling/Coolant Codes/flood.cnc`, `coolantChannelAMode` = `Flood`, `coolantChannelAOn` = `M7`, `coolantChannelBMode` = `Off` (keys and enum ids, as the property dump writes them), run at `CNC Firmware` = `Marlin`, then `RepRap`, then `GRBL` | utility | `MR-1`, `MR-2` | ⬜ |
 
 **The material below stays because §5's rows are written against it**: the standing configuration a
 row states its delta from, and the four methods with their bounds.
@@ -619,11 +643,53 @@ and two steps where that post offers a further *only on a tool-change line* valu
 field an enum for its own reasons and did not add that answer, which would be a fourth. Neither has a
 question under it.
 
+### Readability and structure
+
+**Six, from the `RV-` review, each a ruling before it is work.** None changes g-code; the two that touch
+the post's text are best done a function at a time, beside other edits to the same code, since a
+5,200-line sweep is a diff nobody can review.
+
+**`RV-06` — `validateJob()` is one function of about 900 lines** (L1558–L2460). Two shapes: split it by
+dialog group, or a rule table of `{ when, text, fileTwin }` entries, which would let a script confirm every
+TWIN pair has both halves — a check the verdict table's greps only approximate. **Either must land with no
+change to emitted g-code**, the six matrices re-run before and after.
+
+**`RV-09` — the default Comment Level writes trace ids.** At `Info`, `onMovement()` and `onCommand()`
+write every `MOVEMENT_*` and `COMMAND_*` id — 11 of 160 lines in GS1. No matrix reads those comments;
+the trace events they assert on come from `tools/trace.cps`. **The question** is whether they move to
+`Debug`, against their one use at `Info`: they are the only trace in a file a user attaches to a report.
+
+**`RV-10` — comments that narrate history.** 34 lines match
+`grep -cE "^\s*//.*\b(used to|was the|were |Was |since [A-Z]{2}-|no longer)\b"`, some of them present
+tense (L5014's *no longer fitted*); 127 finding-id references, 47 distinct, resolve only inside this
+repository. **Not all history is narration**: L2436's *Guard C is gone, and its message was the reason* is
+what stops the guard coming back. The rule worth adopting is to restate such a line as a present-tense
+constraint — *not X, because* — rather than delete it, and to add a legend at the head of the file for
+`TWIN #n` and the id prefixes.
+
+**`RV-13` — comment prose that is hard to read cold.** The reasoning is usually sound; the wording leans on
+a private vocabulary — *establish*, *strand*, *arms*, *hand-over*, *frame* — packed sentences and capitals
+for emphasis. `toolChange()`'s *What a change strands is decided by the correction ANSWER* and
+`onSection()`'s *Select, then change, then establish* are the shape. Same remedy as `RV-10`, whose legend
+can carry a short glossary.
+
+**`RV-11` — tooltips run long.** 10 of 58 property descriptions exceed 600 characters and the median is
+268; `toolChangeSender` (L507) is 1,484 and is a paragraph per sender value, of which each operator needs
+one. A 250-character target would rewrite 30, not 10. **The question** is where the rest goes:
+`property-reference.md` is the natural home and is the author's file.
+
+**`RV-12` — repository and release shape.** Six, none a post change: a stable filename such as `MPCNC.cps`
+with the version carried in `description`, since a new filename each release is what duplicates the entry
+in Fusion's Post Library; tagged GitHub Releases with the `.cps` attached; the README's release history
+moved to a `CHANGELOG.md`; the user guides separated from the maintainer documents; a check script for
+the setting counts the guides state by hand; and FluidNC as a firmware value of its own behind an
+`isGrblDialect()` predicate, which touches every `fw == eFirmware.GRBL` site.
+
 ---
 
 ## 7. Owed
 
-**Two items, and neither is a coverage gap.** §2 is empty, every finding resolves to a row, and the
+**Two items, and neither is a coverage gap.** Every finding resolves to a row, §2's open, and the
 `// TWIN` audit is a verdict beside each call site rather than a question here. What is left is
 artifacts and three property sets.
 
