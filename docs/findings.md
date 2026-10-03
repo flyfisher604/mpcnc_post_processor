@@ -25,7 +25,7 @@ because commit messages cite them and must still resolve.
 | `FR-` | FluidNC review, 2026-08-21 — the post's FluidNC claims re-checked against FluidNC source, and its feature surface against a published FluidNC post. §6 holds the four gaps that are design rather than defect, and `FR-2` is the same class, found while closing `FR-1` | `FR-1` … `FR-2` |
 | `MR-` | Marlin / RepRapFirmware review, 2026-08-22 — the post's `M7`/`M8`/`M9` claims re-checked against Marlin and RRF source, after `FR-` did the same for FluidNC. Both rows are a statement the post makes about a firmware rather than a fault in what it emits | `MR-1` … `MR-2` |
 | `PC-` | Property-consolidation review, 2026-08-21 — the dialog's 65 fields read for pairs that are **one** decision asked twice, and the `validateJob()` guards that exist only to reject the combinations such a pair makes expressible. Not defects: each row states the configuration its fold costs, which is `HB-20`'s rule applied to a merge | `PC-1` … `PC-6` |
-| `RV-` | Code review of v4.1.1 Beta 3 at `776a0e5`, 2026-10-02 — a reading of the post, each claim re-checked against the code before it was registered and `RV-01` against a saved matrix artifact. §2 holds the defects; the questions that are the author's to answer are §6's *Readability and structure* | `RV-01` … `RV-13` |
+| `RV-` | Code review of v4.1.1 Beta 3 at `776a0e5`, 2026-10-02 — a reading of the post, each claim re-checked against the code before it was registered and `RV-01` against a saved matrix artifact; `RV-14` to `RV-16` are a read of every comment, their working list `comment-review.md`. §2 holds the defects; the questions that are the author's to answer are §6's *Readability and structure* | `RV-01` … `RV-16` |
 
 **Two ids do not resolve to a row here, and both are landed fixes rather than losses.**
 A `CR-n` in a commit or code comment dated before `c73726c` is the retired 2026-08-01 series,
@@ -41,11 +41,11 @@ is scope on the `HB-` and `PR-` passes and routes nothing.
 
 ## 2. Open findings
 
-**Nine rows, and one writes wrong g-code: `RV-01`**, a second tool cutting with the spindle stopped.
+**Twelve rows, and one writes wrong g-code: `RV-01`**, a second tool cutting with the spindle stopped.
 `MR-1` and `MR-2` are `CR-01`'s class — a statement the post makes about a firmware rather than a fault
 in what it writes — and halves of one field: `MR-1` is what the post *claims* about `M7`/`M8`, `MR-2` is
 what its dropdown *calls* them. `RV-03` and `RV-04` are inputs the post handles worse than it should;
-the other four `RV-` rows change no g-code.
+the other seven `RV-` rows change no g-code, and three of them — `RV-14` to `RV-16` — are the comments.
 
 | ID | Finding | Sev | Reproduce | Action | Status |
 |---|---|---|---|---|---|
@@ -58,6 +58,9 @@ the other four `RV-` rows change no g-code.
 | **RV-05** | **`limitFeedByXYZComponents()` normalises before its zero-length check** — `xyz.getNormalized()` (L4366) and the product after it run on a vector that the `if (xyz.length == 0)` arm (L4374) then discards. Harmless, the result unused on that path; the `if` is indented one level too deep | Low | None — no output changes | Move the zero-length return above the normalisation and fix the indentation | ⬜ |
 | **RV-07** | **Two comments name the wrong group, and seven say *modal group* for an RS-274 group in a file where *group* means a dialog group.** L4457 and L4464 say *group-8 include*; includes are group 7, `groupDefinitions.include`. The other 36 `group <n>` references check out. *modal group* at L925–L929, L2516, L2519 | Low | `grep -noE "group[- ][0-9]+"` against `groupDefinitions` | Correct the two, and *RS-274 modal group* at the seven | ⬜ |
 | **RV-08** | **Misspellings, one encoding fault, two stale descriptions and four off-convention names.** `setSpindeSpeed` — the declaration, 5 calls, 2 comment mentions; *accomidate* L14, *documment* L3120 and L3398, *Calcualte* L3624. L4252 carries U+FFFD (`EF BF BD`) where a section sign was lost — a source comment, never emitted. `description` names Marlin, Grbl and RepRap and not FluidNC; `longDescription` describes feed scaling for a slow Z and nothing else. `var fw = eFirmware.MARLIN` (L58) against a shipped default of GRBL — `onOpen()` assigns it first, so it is never read, only misread. `CoolantA`, `CoolantB`, `Start` and `display_text` break the file's camelCase | Low | None — no g-code changes | Fix the spellings, renaming `setSpindeSpeed` after `RV-01` lands since both touch the same lines; *section 2* at L4252; both descriptions brought to the current firmware set; `fw` initialised `undefined`, with the reason. No rename here moves a property key, so no saved setting resets. **Not owed**: the header's *Changed Aug 22, 2026* is the release date, and converting 278 `var` to `let` changes no behaviour | ⬜ |
+| **RV-14** | **38 comments state something the code does not do.** Several sit on paths an operator's safety rests on: L4899–4912 says `spindleOff()` beeps wherever the firmware has `M300` — it beeps only under manual spindle control off GRBL; L3937–3941 says that with no Z reference `partProbe()` *warns instead of moving* — it warns and still emits the XY rapid and the `G38.2`; L4059–4061 and L5204–5205 say the tool-change re-probe takes the true/true pause default — it goes through `partProbe()`, which sets both flags from `Probe Pause`; L3266–3268 says every rapid the post makes calls `emitRapid()` — only `onRapid()` and `onLinear()` do. **Firmware facts**: L1036 cites `grbl/gcode.c, gc_execute_line()` for comment stripping, which grbl 1.1h does in `protocol_main_loop()`, `grbl/protocol.c`; L2965–2966 calls `G59.1`–`G59.3` RepRap-only, and L2971 serves Marlin too; L4667 says Marlin arcs only on XY, in a branch serving every firmware but GRBL, Marlin having `G18`/`G19` under `CNC_WORKSPACE_PLANES`. **Counts and names gone stale**: four matrices (L493, five), a 1000 s dwell ceiling (L910, 99999.999), three warnings (L1844, four), three refusals (L2246, four), five sites (L2601, six), the title `Mrln: M42 P6 S255` (L1470, no such value), *Replicate* (L2737, no such mode), three position fields (L2914, one pair and one Z), `onOpen()` resetting two globals itself (L2456, it calls `resetPostState()`). **The rest**: L142, L1229, L1284, L1287, L1356, L1368, L1512, L1897, L2127, L2167, L2306, L2349, L3057, L3120, L3769, L3856, L3908, L3972, L4272, L5013 — and L5052, true once `RV-01` lands. **Two questions the review raised and did not settle**: whether a `Start File` include, which runs between homing and the first part's Probe Z, makes L4178–4183's *only these two can move it* false — it selects a warning's wording, not a move; and whether L1761–1763 and its warning are right that GRBL boots locked, which stock grbl does only with homing enabled | Med | `docs/comment-review.md`: every entry coded `W`, each stating what the code does instead | Apply the `W` entries first, each re-read against the code at the time: they are the comments a reader acts on. Settle the two questions from the code and `grbl/config.h` before rewording either | ⬜ |
+| **RV-15** | **Half the file's comment blocks are harder to read than they need to be.** Of 458 blocks, 230 are flagged: private vocabulary a cold reader cannot decode — *establish*, *strand*, *arms*, *hand-over*, *frame*, *Flow 2* — in 80; capitals standing in for wording in 79; sentences that need a second read in 78; history narrated rather than the rule stated in 66; bare finding ids in 41; length for its own sake in 36; the code restated in 15. **The reasoning is usually sound** — the strongest comments state the rule, the reason and a firmware citation, and the rewrites keep all three | Low | `docs/comment-review.md` — 230 entries, each with its codes, the problem in one line, and the proposed text | **The author's rule, 2026-10-02: shorten, keep clear, and no comment grows.** Every proposal is no longer than its original — 71,195 characters to 52,385, counted by script — keeps firmware citations and `TWIN` markers word for word, and restates history that guards a removed bug as a constraint rather than deleting it. Apply a function at a time, beside other edits to the same code, deleting each entry as it lands; the last deletes the file. A legend at the head of the post for `TWIN #n`, the id prefixes and the vocabulary that stays is the remaining half of `RV-10` | ⬜ |
+| **RV-16** | **`tools/comment-rules.js` states four rules the post breaks 14 times, and a fifth breach it cannot see.** It reported none when it was written (`fe22963`); nothing runs it, so the count grew unseen — R1 ×5 in `validateJob()`, R3 ×9 across helper headers. **R1 misses half its own rule**: the regex matches a block before `} else if` and not before an `else if` opening its own line, so L4721–4725's five lines over `else if (fw == eFirmware.GRBL)` in `askUser()` pass | Low | `node tools/comment-rules.js MPCNC_v4.1.1_Beta3.cps` prints 14 violations | Widen R1 to an `else if` at the start of a line. `RV-15`'s proposals clear all 15. **One ruling is the author's**: whether the script runs beside `node --check` — `CLAUDE.md` says nothing else gates the documents, and these are rules about the code | ⬜ |
 
 > **The verdict table is two greps over `MPCNC_v4.1.1_Beta3.cps` and lives nowhere else.**
 > `grep -n "// TWIN #"` is the paired half: **18 numbered pairs**, each number appearing **exactly
@@ -645,9 +648,7 @@ question under it.
 
 ### Readability and structure
 
-**Six, from the `RV-` review, each a ruling before it is work.** None changes g-code; the two that touch
-the post's text are best done a function at a time, beside other edits to the same code, since a
-5,200-line sweep is a diff nobody can review.
+**Four, from the `RV-` review, each a ruling before it is work.** None changes g-code.
 
 **`RV-06` — `validateJob()` is one function of about 900 lines** (L1558–L2460). Two shapes: split it by
 dialog group, or a rule table of `{ when, text, fileTwin }` entries, which would let a script confirm every
@@ -659,19 +660,8 @@ write every `MOVEMENT_*` and `COMMAND_*` id — 11 of 160 lines in GS1. No matri
 the trace events they assert on come from `tools/trace.cps`. **The question** is whether they move to
 `Debug`, against their one use at `Info`: they are the only trace in a file a user attaches to a report.
 
-**`RV-10` — comments that narrate history.** 34 lines match
-`grep -cE "^\s*//.*\b(used to|was the|were |Was |since [A-Z]{2}-|no longer)\b"`, some of them present
-tense (L5014's *no longer fitted*); 127 finding-id references, 47 distinct, resolve only inside this
-repository. **Not all history is narration**: L2436's *Guard C is gone, and its message was the reason* is
-what stops the guard coming back. The rule worth adopting is to restate such a line as a present-tense
-constraint — *not X, because* — rather than delete it, and to add a legend at the head of the file for
-`TWIN #n` and the id prefixes.
-
-**`RV-13` — comment prose that is hard to read cold.** The reasoning is usually sound; the wording leans on
-a private vocabulary — *establish*, *strand*, *arms*, *hand-over*, *frame* — packed sentences and capitals
-for emphasis. `toolChange()`'s *What a change strands is decided by the correction ANSWER* and
-`onSection()`'s *Select, then change, then establish* are the shape. Same remedy as `RV-10`, whose legend
-can carry a short glossary.
+**`RV-10` and `RV-13` — history in comments, and prose hard to read cold — are ruled and are §2's
+`RV-15`**, the legend for `TWIN #n` and the id prefixes going with it.
 
 **`RV-11` — tooltips run long.** 10 of 58 property descriptions exceed 600 characters and the median is
 268; `toolChangeSender` (L507) is 1,484 and is a paragraph per sender value, of which each operator needs
