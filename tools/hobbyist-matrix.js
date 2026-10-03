@@ -44,7 +44,8 @@ const cases = [
         [/^G38\.2 F30 Z-10$/m,'probes Z at the shipped target and speed'],[/^G10 L20 P1 Z0\.8$/m,'plate thickness becomes Z0'],
         [/^M0 \(MSG,Attach ZProbe\)$/m,'prompts to fit the probe'],[/^M0 \(MSG,Turn ON 5000 RPM\)$/m,'prompts the router on'],
         [/^M30$/m,'ends the program']],
-  mustNot:[[/\$H/,'no homing'],[/G53/,'no machine frame'],[/^M3\b/m,'no commanded spindle']] },
+  mustNot:[[/\$H/,'no homing'],[/G53/,'no machine frame'],[/^M3\b/m,'no commanded spindle'],
+           [/^\( (MOVEMENT|COMMAND)_/m,'no movement or command trace at Info (RV-09)']] },
 
 // --- P2: same, Marlin ---------------------------------------------------------------
 { id:'H2', desc:'P2 baseline - Marlin dialect', cnc:'Milling/2D/face.cnc', props:{jobSelectedFirmware:S('Marlin')},
@@ -56,7 +57,8 @@ const cases = [
   must:[[/>>> WARNING/,'a warning outlives the level gate (HB-9)']],
   mustNot:[[/jobCommentLevel =/,'no property dump'],[/\*\*\* SECTION begin/,'no section banners']] },
 { id:'H4', desc:'Comment Level Debug - traces present', cnc:'Milling/2D/face.cnc', props:{jobCommentLevel:S('Debug')},
-  must:[[/writeWcsOnStart:/,'origin dispatch traced'],[/parseSafeZProperty:/,'safe-Z parse traced']], mustNot:[] },
+  must:[[/writeWcsOnStart:/,'origin dispatch traced'],[/parseSafeZProperty:/,'safe-Z parse traced'],
+        [/^\( MOVEMENT_[A-Z_]+\)$/m,'movement traced'],[/^\( COMMAND_START_SPINDLE\)$/m,'command traced']], mustNot:[] },
 
 // --- output shape the sender cares about --------------------------------------------
 { id:'H5', desc:'Arcs off - a sender that mishandles G2/G3', cnc:'Milling/2D/bore.cnc', props:{jobUseArcs:B(false)},

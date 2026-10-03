@@ -61,7 +61,7 @@ ships.
 
 ## 3. Closed findings
 
-**✅ 106 · ➖ 11 — 117 rows.**
+**✅ 107 · ➖ 11 — 118 rows.**
 Permanent: commit messages and code comments cite these ids and they must still resolve.
 `git show <ref>` holds the diagnosis, the diff and the argument. ➖ is closed-by-design or
 withdrawn; which one a row is, is its Resolution cell.
@@ -203,6 +203,7 @@ withdrawn; which one a row is, is its Resolution cell.
 | **RV-17** | The first part's no-Z-reference warning could say homing chose the tool's height after a `Start File` include had moved it | Low | `toolStillWhereHomingLeftIt()` adds *no start file* to the first-load test, read by both halves of TWIN #12. `PRO53` | ✅ |
 | **RV-01** | A tool change stopped the spindle, and a next tool at the same speed and direction cut with it stopped — both flows, every `Spindle Control` mode, and a router after a laser | High | Only `spindleOn()` and `spindleOff()` write the speed and direction, so `toolChange()`'s stop is seen by the next start. `spindleEnabled` is gone: `currentSpindleSpeed > 0` is the same fact. `RV-01T` | ✅ |
 | **RV-03** | The Safe Z parser rejected padding, a space after the colon and a leading `.`, and fell back to a fixed 15 mm | Low | The regexes allow all three; `-5`, `15mm` and `Retract:` are **refused** — the author's ruling, since no fixed height is right as both the probe retract and group 3's threshold. TWIN #1 retires with the fallback. `PRO30`, `PRO30a` | ✅ |
+| **RV-09** | At the default Comment Level the file carried every movement and command id Fusion raised — 11 of 160 lines in GS1 | Low | Both writers file them under `Debug`, beside the post's other traces. `RV-09T` | ✅ |
 
 ---
 
@@ -245,7 +246,7 @@ the case id, as a `utility` row names its `.cnc` and a `posted` row names its `.
 
 ## 5. Passed tests
 
-**✅ 174 · ➖ 17 — 191 rows.**
+**✅ 175 · ➖ 17 — 192 rows.**
 An `(A)`/`(B)` pair shares a row, and no row has ever been marked ❌.
 Nineteen rows are hobbyist, posted 2026-08-08 from a build proved identical to
 `e5db625`; `PR-2a` was posted 2026-08-13 from the build Step 1.1 ran on; `PR-2e`, `PR-2f`,
@@ -469,6 +470,7 @@ warning the fix deletes; `CR-23` retires beside them, closed on a ruling that ch
 | **FR-2T** | ✅ `utility`, 2026-08-21 — all three texts, in whichever channels they have. `PRO50` is new and posts the park pair, which **six cases set the property for and none had ever read**: the file half carries *"$27 on a stock Grbl build, mpos_mm and pulloff_mm on a stock FluidNC"* and the dialog half the remedy in each vocabulary. `PRO25` now asserts both dialects in both channels of the `Machine Travel Z` guard, and `PRO45`/`PRO46` the idle warning's new joint and its *"ON BOTH, 255 MEANS STAY ENERGISED"* sentence. **The criterion is that each stays one warning** — no case finds a second, dialect-gated text, and none could be written, the post having one `Grbl` answer. 213/213 across the six matrices, re-run 2026-08-21 with the FluidNC additions |
 | **MR-1T** | ✅ `utility`, 2026-10-02 — `H34` (Marlin, the shipped `M8`/`M7` defaults), `H42` (RepRap) and `H43` (GRBL), the last two over `Milling/Coolant Codes/flood.cnc` with `M7` on channel A, all in `tools/hobbyist-matrix.js`. **The absences hold in all three**: no log says *belongs to another firmware* or predicts a mid-operation stop, and none names a coolant level. Each names its own firmware's condition — `COOLANT_MIST`/`COOLANT_FLOOD` on Marlin, `/sys/M7.g` on RRF — and `H43` still raises `CR-24`'s GRBL text. `H33` keeps the real mismatch, a Marlin pin value on GRBL, with the `M7`/`M8` values as its remedy. `H33`, `H34` and `H42` fail against `66c647e`; 225/225 across the six matrices |
 | **RV-01T** | ✅ `utility`, 2026-10-02 — **`spindle-restarted-after-every-stop`**, a new invariant in `tools/gcode-structure-matrix.js`: after every stop, a start before the next milling cut. `GS4`–`GS6` read it at the change on both flows and three firmwares, `GS18` under `Spindle Control` = `M3`, and `GS19` over the new `mill-jet-mill.cnc`, a laser between two milling operations at one speed. **All five fail against `59b8e1f`.** Only milling cuts count: `GS9` showed a jet section's `G1` running beam-off, `center.cnc`'s etch leading in before its power-on. 227/227 across the six matrices |
+| **RV-09T** | ✅ `utility`, 2026-10-02 — `H1` asserts no `( MOVEMENT_` or `( COMMAND_` line at `Info` and `H4` asserts both at `Debug`. Over the six matrices' 205 files the change removes 6,118 lines from the 195 posted below `Debug` and nothing else, the 7 at `Debug` are byte-identical, and all 228 cases pass before and after |
 
 | **PC-1T** | ✅ `utility`, 2026-08-21 — `PRO17`–`PRO20` of `tools/professional-matrix.js` over `Milling/2D/toolchange.cnc`, the four cases that read the field. **`PRO17` is unchanged in what it asserts and that is the claim**: one field where there were two, and the same `G53 G0 X-10 Y-400` crossing at the travel height before the same `G53 G0 Z-20` descent, in the same order, with the below-travel-height warning still raised. **`PRO18` is the row that moved, because the state it tested no longer exists** — it posted `Manual Position X` alone and read *read as one point*; it now posts `-10`, which is a coordinate and not a pair, and reads the refusal quoting the field and the value back. That substitution is the finding: the half-filled point cannot be configured, so the only thing left to refuse there is a typo, and it still is one rather than being taken as EMPTY. `PRO19` and `PRO20` carry the pair through the no-frame refusal and the Flow 2 inertness unchanged. **215/215 across the six matrices** |
 | **PC-2T** | ✅ `utility`, 2026-08-21 — `H17`, `H17b` and `H17c` of `tools/hobbyist-matrix.js` over `Milling/2D/face.cnc`, plus `PRO32`/`PRO33` of the professional matrix, which read the field's title out of a warning. **`H17` posts the spaced form `30, -15`** and asserts the same traverse and probe the two integer fields produced. **`H17b` is the whitespace claim tested rather than asserted**: the same job posted `30, -15` and `30,-15`, compared line for line with the property-dump line stripped — the dump echoes the raw string and is the one line expected to differ, which is why stripping it is the assertion and not a hedge. **`H17c` is the branch nothing refuses**: `30` is not a pair, so the file must contain the probe and **must not** contain a traverse to `X30`, the half-read being the failure mode that matters; both halves of the dialog warning are read, the field and value it quotes and the `0, 0` fallback it names. `PRO33` posts `0,10` — the space-free form, so both spellings are exercised by the suite and not only by `H17b` — and `PRO32` reads the new *"Probe X Y Offset" being 0, 0* wording out of the file half. **215/215 across the six matrices** |
@@ -539,6 +541,7 @@ Delete a row when its test is re-posted, and delete this section when it empties
 | **every saved `.gcode` posted at `Comment Level` `Info` or `Debug`**, and `S2a`/`D5`'s enumerated dump delta once more | the `PC-` folds, which delete property **keys** and add new ones that `writeAllProperties()` prints | **The dump shrinks and every line number below its first change moves**, in every such artifact. Filled in fold by fold as they land: `PC-1` replaces `   toolChangePositionX = ` and `   toolChangePositionY = ` with one `   toolChangePositionXY = `, `PC-2` replaces `   probeOffsetX = 0` and `   probeOffsetY = 0` with `   probeOffsetXY = 0, 0`, `PC-3` deletes `   coolantChannelAOff = M9` and `   coolantChannelBOff = M9` outright, keeping the two on keys under new titles the dump does not print, and `PC-4` replaces `   laserMarlinMode = M106` and `   laserGrblMode = 4` with one `   laserOutput = 4`, and `PC-5` replaces `   jobSequenceNumbers = false`, `   jobSequenceNumberStart = 10` and `   jobSequenceNumberIncrement = 1` with one `   jobSequenceNumbering = Off`, and `PC-6` deletes `   mapRapidsSafeZ = Retract:15`, leaving `   probeSafeZ = Retract:15` to serve both groups. **`PC-6` also moves a line of the header block in every `Info` or `Debug` file**: `   Map SafeZ = ...` and `   Probe SafeZ = ...` become one `   Safe Z = ...`, so `writeResolvedValues()` is a line shorter and the dump below it moves again. **`PC-4` is the one fold that also changes g-code, and only on a laser job posted for MARLIN OR REPRAPFIRMWARE**: the shipped default is now a GRBL value, so such a job posted without answering the field emits `M4 S800` where it emitted `M106 P0 S204`, and group 8's new dialect warning says so. **`CG36` is that job and it is in the suite** — a RepRap mill-then-laser, whose Duet-token assertions are untouched by it — so what the list owes is any saved artifact of the same shape. `J4`'s five posts each set the mode and are unaffected. Delete when a Marlin or RepRap laser job is next posted on the default. **No g-code changes on any shipped default** — both new fields ship what the pairs they replace shipped — so every assertion that names a code, an order or a count stands, and what does not survive is any claim of the form *"line N"* in an `Info` or `Debug` file. Delete when a factory-default GRBL job is next posted |
 | **every saved `.gcode` posted at `Comment Level` `Info` or `Debug`** | `GH-16d` added two properties to group 9 and changed what four others store | **The dump grows by two lines and every line number below it moves**, on top of `GH-16b`'s one — `coolantChannelAPinFan` and `coolantChannelBPinFan` are new, and the four code properties print `M106`/`M42` where they printed a whole g-code line. No g-code changes on the shipped defaults, which are GRBL codes and are emitted verbatim as before. Delete when a factory-default GRBL job is next posted |
 | every saved `.gcode` whose job changes between two tools at the same speed and direction — every `toolchange.cnc` post, `PV-1a`'s among them, and the multi-tool `wcs-jobs` | `RV-01`'s restart | **Two lines are inserted after ` Tool Change End`** — `>>> Spindle Speed: Manual` and the `Turn ON` prompt, or `>>> Spindle Speed` and `M3` — and a later change gains its `Turn OFF spindle` stop, the spindle now running there. Line numbers below the first change move. The 40 suite artifacts that change all still pass. Delete when a multi-tool job is next posted |
+| every saved `.gcode` posted at `Comment Level` `Info` | `RV-09` moved the movement and command trace to `Debug` | **Every `( MOVEMENT_…)` and `( COMMAND_…)` line leaves the file**, so line numbers below the first one move. No g-code changes and no row asserts a trace line; `Debug` artifacts are unchanged |
 
 ---
 
@@ -642,17 +645,12 @@ question under it.
 
 ### Readability and structure
 
-**Four, from the `RV-` review, each a ruling before it is work.** None changes g-code.
+**Three, from the `RV-` review, each a ruling before it is work.** None changes g-code.
 
 **`RV-06` — `validateJob()` is one function of about 860 lines**. Two shapes: split it by
 dialog group, or a rule table of `{ when, text, fileTwin }` entries, which would let a script confirm every
 TWIN pair has both halves — a check the verdict table's greps only approximate. **Either must land with no
 change to emitted g-code**, the six matrices re-run before and after.
-
-**`RV-09` — the default Comment Level writes trace ids.** At `Info`, `onMovement()` and `onCommand()`
-write every `MOVEMENT_*` and `COMMAND_*` id — 11 of 160 lines in GS1. No matrix reads those comments;
-the trace events they assert on come from `tools/trace.cps`. **The question** is whether they move to
-`Debug`, against their one use at `Info`: they are the only trace in a file a user attaches to a report.
 
 **Whether `tools/comment-rules.js` runs in the post-edit hook.** `RV-16` brought it to zero breaches and
 `RV-18` repaired the hook, which still runs `node --check` alone — so the count can drift again unseen.

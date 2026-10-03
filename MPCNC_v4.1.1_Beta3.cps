@@ -3403,7 +3403,7 @@ function onMovement(movement) {
     id = String(movement);
   }
 
-  writeComment(eComment.Info, " " + id);
+  writeComment(eComment.Debug, " " + id);
 }
 
 function setSpindleSpeed(_spindleSpeed, _clockwise) {
@@ -3430,7 +3430,7 @@ function writeSpeedFeedSyncWarning() {
 }
 
 function onCommand(command) {
-  writeComment(eComment.Info, " " + getCommandStringId(command));
+  writeComment(eComment.Debug, " " + getCommandStringId(command));
 
   switch (command) {
     case COMMAND_START_SPINDLE:
