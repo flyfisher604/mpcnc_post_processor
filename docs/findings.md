@@ -1,4 +1,4 @@
-# Findings — `MPCNC_v4.1.1_Beta3.cps`
+# Findings — `MPCNC_v4.1.2_Beta3.cps`
 
 Every logged issue and the tests that confirm it. Findings are §2 open and §3 closed;
 test registers are §4 and §5. **No count in this file is written by hand** —
@@ -43,7 +43,7 @@ is scope on the `HB-` and `PR-` passes and routes nothing.
 
 **None.**
 
-> **The verdict table is two greps over `MPCNC_v4.1.1_Beta3.cps` and lives nowhere else.**
+> **The verdict table is two greps over `MPCNC_v4.1.2_Beta3.cps` and lives nowhere else.**
 > `grep -n "// TWIN #"` is the paired half: **17 numbered pairs**, each number appearing **exactly
 > twice** — the full account on the `validateJob()` side, which names the emitting function, and the
 > number alone at the file half, so a pair cannot half-exist. `#16` and `#18` are one dialog warning

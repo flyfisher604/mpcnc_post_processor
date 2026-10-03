@@ -1,10 +1,10 @@
 /*
 **
-Version 4.1.1 (Beta 3)
+Version 4.1.2 (Beta 3)
 
 MPCNC posts processor for milling and laser/plasma cutting.
 
-Changed Aug 22, 2026
+Changed Oct 2, 2026
 **
 
 Key to the comments
@@ -21,7 +21,7 @@ Key to the comments
                  macro, fits the tool.
 */
 
-description = "v4.1.1 (Beta 3) MPCNC Milling/Laser for Marlin, Grbl, FluidNC, RepRap";
+description = "v4.1.2 (Beta 3) MPCNC Milling/Laser for Marlin, Grbl, FluidNC, RepRap";
 vendor = "flyfisher604";
 vendorUrl = "https://github.com/flyfisher604/mpcnc_post_processor";
 longDescription = "MPCNC post processor for Fusion: milling and laser on Marlin, GRBL, FluidNC and RepRapFirmware, with feed scaling for a slow Z, a machine-frame travel height, multi-part jobs and tool-change hand-over. Beta: review the g-code before running it.";

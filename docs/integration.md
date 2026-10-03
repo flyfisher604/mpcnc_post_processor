@@ -73,7 +73,7 @@ node tools/<name>-matrix.js  <post.exe>  <post.cps>  <job root>  <output dir>
 
 - **`<post.exe>`** — under `%LOCALAPPDATA%\Autodesk\webdeploy\production\<hash>\Applications\CAM360\`.
   `post-run.ps1` locates it by search rather than by a pinned path; a matrix is handed it.
-- **`<post.cps>`** — `MPCNC_v4.1.1_Beta3.cps`, the deliverable.
+- **`<post.cps>`** — `MPCNC_v4.1.2_Beta3.cps`, the deliverable.
 - **`<job root>`** — the `res\CNC files` directory inside the installed **Autodesk HSM Post
   Processor** VS Code extension, except for `wcs-matrix.js`, which takes `tools/wcs-jobs`.
 - **`<output dir>`** — anywhere outside the repo. Each case writes `<id>.gcode` and `<id>.log` there,
@@ -83,16 +83,16 @@ node tools/<name>-matrix.js  <post.exe>  <post.cps>  <job root>  <output dir>
 print, and the last line is the tally.
 
 ```
-node tools/hobbyist-matrix.js        "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/hobbyist
-node tools/professional-matrix.js    "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/professional
-node tools/wcs-matrix.js             "$POST" MPCNC_v4.1.1_Beta3.cps tools/wcs-jobs out/wcs
-node tools/personal-matrix.js        "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/personal
-node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/correct-gcode
-node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1.1_Beta3.cps "$CNC" out/gcode-structure
+node tools/hobbyist-matrix.js        "$POST" MPCNC_v4.1.2_Beta3.cps "$CNC" out/hobbyist
+node tools/professional-matrix.js    "$POST" MPCNC_v4.1.2_Beta3.cps "$CNC" out/professional
+node tools/wcs-matrix.js             "$POST" MPCNC_v4.1.2_Beta3.cps tools/wcs-jobs out/wcs
+node tools/personal-matrix.js        "$POST" MPCNC_v4.1.2_Beta3.cps "$CNC" out/personal
+node tools/correct-gcode-matrix.js   "$POST" MPCNC_v4.1.2_Beta3.cps "$CNC" out/correct-gcode
+node tools/gcode-structure-matrix.js "$POST" MPCNC_v4.1.2_Beta3.cps "$CNC" out/gcode-structure
 ```
 
-**227 cases — 46 hobbyist, 53 professional, 39 WCS, 11 personal, 59 CorrectGcode, 19 GCodeStructure —
-over 43 job files, and all 227 pass as of 2026-10-02.** The whole run is under a minute.
+**228 cases — 46 hobbyist, 54 professional, 39 WCS, 11 personal, 59 CorrectGcode, 19 GCodeStructure —
+over 43 job files, and all 228 pass as of 2026-10-02.** The whole run is under a minute.
 
 **The six are independent by design and stay that way.** The first four encode personas that disagree
 about what the factory defaults should do, so a shared baseline would have to pick one; the last two
@@ -502,7 +502,7 @@ matrices build the literal with three one-line helpers (`S`, `N`, `B`) for the s
 The schema is the authority on what exists:
 
 ```
-post.exe --interrogate --noheader --nointeraction MPCNC_v4.1.1_Beta3.cps > schema.json
+post.exe --interrogate --noheader --nointeraction MPCNC_v4.1.2_Beta3.cps > schema.json
 ```
 
 **And a fourth failure, which belongs to the shell rather than to the post.** PowerShell 5.1 will not
@@ -517,7 +517,7 @@ the quoting Node's problem; anything else driving `post.exe` has to solve it one
 Measured against that schema, across all six matrices, by `tools/property-coverage.js`:
 
 ```
-post.exe --interrogate --noheader --nointeraction MPCNC_v4.1.1_Beta3.cps > schema.json
+post.exe --interrogate --noheader --nointeraction MPCNC_v4.1.2_Beta3.cps > schema.json
 node tools/property-coverage.js schema.json
 ```
 
