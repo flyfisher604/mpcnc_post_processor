@@ -44,7 +44,7 @@ the file's output units.
 > **Comment Level is a safety setting on GRBL.** gSender ignores an `M0` in the first ten lines it
 > sends — a workaround for CAM that opens its files with a meaningless one — and it comments the
 > `M0` out either way, so an early prompt is not postponed, it is **deleted**. At `Info` the
-> property dump puts about seventy lines ahead of every prompt in the preamble. The post warns in
+> property dump puts more than a hundred lines ahead of the first prompt. The post warns in
 > the post dialog when a lower level leaves a real prompt inside that window, and names the
 > prompts at risk.
 
@@ -111,7 +111,7 @@ full](guide-pro.md#origin-modes-in-full), or the
 | Probe with G38.2 | Probe with `G38.2` (on) or `G28` (off). Read on Marlin and RepRap only — GRBL always uses `G38.2`. Turn it **off** for a Marlin build without probe support, and for **RepRapFirmware 3.1.1 and earlier**, where `G38.2` takes a machine-coordinate target and so probes to the wrong height. | **true** |
 | G38 Target | **How far down from the tool a probe may search** — a distance, not a height. `-10` searches 10 mm below wherever the tool starts. On the `Use WCS …` modes the probe starts at *Machine Travel Z*, so it must reach the stock from there. A probe that never touches stops the job with an alarm. | **-10** |
 | G38 Speed | Probe feedrate, mm/min. Slow is accurate. | **30** |
-| Safe Z | A height that clears the work, in the part's work coordinates — measured from the touch-off Z0 at the stock top, never from machine zero. **Read by two groups:** the tool retracts to it after probing, and group 3 treats a Z at or above it as safe air. A plain number in mm, or `Feed:`/`Retract:`/`Clearance:<fallback>` to use that operation's own Fusion level when it defines one. A value the post cannot read falls back to 15 mm, and it warns once for the file. | **Retract:15** |
+| Safe Z | A height that clears the work, in the part's work coordinates — measured from the touch-off Z0 at the stock top, never from machine zero. **Read by two groups:** the tool retracts to it after probing, and group 3 treats a Z at or above it as safe air. A plain number in mm, or `Feed:`/`Retract:`/`Clearance:<fallback>` to use that operation's own Fusion level when it defines one — `Retract:15` is the retract level, or 15 mm where the operation has none. Spaces around the value and after the colon are ignored, and `.5` reads as 0.5. **A value the post cannot read is refused** — a sign, a unit suffix such as `15mm`, or a level with no number after it. | **Retract:15** |
 | Plate Thickness | Your touch plate's thickness in mm, subtracted after the probe touches so Z0 lands on the stock top. **Measure your own** — an error here shifts every cut depth in the job. | **0.8** |
 
 **The origin modes.** *WCS* is the work offset the Setup names, which the post selects — not

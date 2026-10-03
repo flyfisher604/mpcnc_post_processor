@@ -6,17 +6,28 @@ than one part on its own fixture — the things a full Fusion licence lets you b
 you are comfortable with CNC terms; the [hobbyist guide](guide-hobbyist.md) covers the one-part
 job in plainer language, and everything in it still applies here.
 
+**Start here** — what the post assumes, and what it leaves to you
+
 - [What a work offset is, and what this post does with it](#what-a-work-offset-is-and-what-this-post-does-with-it)
 - [What the operator owes the job](#what-the-operator-owes-the-job)
+
+**Setting up a job** — by the shape of the job
+
 - [Many operations, one part](#many-operations-one-part)
 - [Several parts in one job](#several-parts-in-one-job)
+- [Tool changes](#tool-changes)
+
+**How each piece works** — read the one your job touches
+
 - [Origin modes in full](#origin-modes-in-full)
 - [What a stored origin means](#what-a-stored-origin-means)
 - [The machine frame, and the travel height](#the-machine-frame-and-the-travel-height)
 - [Probing](#probing)
-- [Tool changes](#tool-changes)
 - [External include files](#external-include-files)
-- [Validation guards](#validation-guards)
+
+**When something goes wrong, and how far to trust these pages**
+
+- [Validation guards](#validation-guards) — what the post refuses, and what it warns about
 - [What is verified, and what is not](#what-is-verified-and-what-is-not)
 
 ---
@@ -524,10 +535,13 @@ is written. **A refusal from `onOpen()` writes no file at all;** the one excepti
   a GRBL job that carries a jet tool.** GRBL has neither command and answers it with `error:20`,
   stopping with the tool in the cut. A GRBL *milling* job is not refused for a `Mrln:` laser value,
   because no laser code is emitted there at all — it warns. The coolant channels also warn rather
-  than refuse: the `Mrln:`/`Grbl:` label on a coolant value says which firmware the post shipped it
-  for, not that no other firmware takes it.
+  than refuse: the `Mrln:` label on a coolant value says which firmware the post shipped it for,
+  not that no other firmware takes it.
 - **A pin (`M42`) output whose `Pin/Fan #` is still 0**, in any of the three groups that offer one.
   Pin 0 names no output anyone wired deliberately, and Marlin protects it on most boards.
+- **A *Safe Z* the post cannot read** — a sign, a unit suffix such as `15mm`, or `Retract:` with no
+  number. It is both the retract after a probe and group 3's rapid threshold, so no fixed height
+  can stand in for it.
 - **Multi-axis toolpaths**, **cutter compensation in the control**, and **CAM probing operations**.
 - **A Setup whose Z is not the machine Z**, with the tilt named. *(This one fires after output has
   begun, so it leaves a truncated file — discard it.)*
@@ -551,17 +565,19 @@ around thirty; the ones worth knowing:
   before homing, so the move runs against whatever machine zero the board holds.
 - **`Machine Travel Z` on Marlin**, which needs `CNC_COORDINATE_SYSTEMS`; and **at or above zero on
   GRBL**, which is above the top of travel on a stock build.
-- **A coolant code, or a *Laser Output* value, from the wrong firmware's dialect**, and **`M7`/`M8`
-  on GRBL at all**, whose build and configuration conditions the post cannot read. The laser warning
-  also names the power scale, which goes with the dialect: `0`–`1000` against `$30` on GRBL, a
-  `0`–`255` byte on Marlin and RepRapFirmware.
+- **A `Mrln:` coolant code on a GRBL job, or a *Laser Output* value from the wrong firmware's
+  dialect.** The laser warning also names the power scale, which goes with the dialect: `0`–`1000`
+  against `$30` on GRBL, a `0`–`255` byte on Marlin and RepRapFirmware.
+- **`M7` or `M8` coolant on any firmware**, stating that firmware's own condition, which the post
+  cannot read: `ENABLE_M7` for `M7` on Grbl, a `mist_pin` or `flood_pin` in FluidNC's `config.yaml`,
+  `COOLANT_MIST` or `COOLANT_FLOOD` on Marlin, and the `/sys/M7.g`–`M9.g` macros on RepRapFirmware.
 - **A coolant a tool asks for that no channel is configured for** — the job runs those operations
   dry, and the post names them.
-- **A Safe Z expression, an X Y pair or a machine coordinate the post cannot parse.** A bad Safe Z
-  falls back to 15 mm and is reported once for the file, not once per section; a bad *Probe X Y
-  Offset* falls back to `0, 0`; a bad machine coordinate is read as **empty**, which means *not set*,
-  so the motion it controls is simply not emitted. The one exception is *Manual Position X Y* on a
-  job that actually reaches a manual change, which is refused rather than silently dropped.
+- **An X Y pair or a machine coordinate the post cannot parse.** A bad *Probe X Y Offset* falls
+  back to `0, 0`; a bad machine coordinate is read as **empty**, which means *not set*, so the
+  motion it controls is simply not emitted. The one exception is *Manual Position X Y* on a job that
+  actually reaches a manual change, which is refused rather than silently dropped. *(A bad Safe Z is
+  refused — see above.)*
 
 Warnings reach two channels and it is worth knowing which: a line in **Fusion's post dialog**, read
 by whoever posts, and a `>>> WARNING:` line **in the g-code**, read by whoever opens the file — often
@@ -599,9 +615,9 @@ contain. That reaches something no code review can: whether the post runs at all
   is an operator's Setup, and a file posted from Fusion is still owed.
 - **Some paths no job file on disk can reach at all**, stated as bounds rather than tested: a rapid
   that moves in X/Y and Z at once, a tool numbered 0, a dwell, and the vaporize laser power.
-- **Every property runs at its default on every run, but 11 are never *varied*** — the four custom
-  coolant filenames, the four include-file names, and the three laser power levels. Their
-  alternative values have not been posted.
+- **Every property runs at its default on every run, but 10 are never *varied*** — the four custom
+  coolant filenames, the *Stop GCode File* and the two tool-change include files, and the three
+  laser power levels. Their alternative values have not been posted.
 
 **And a green run is not a verified post.** Every finding this machinery has returned came from
 **reading the passing output**, not from a red case; two of its own checks were passing while
