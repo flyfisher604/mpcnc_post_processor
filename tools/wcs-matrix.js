@@ -25,6 +25,8 @@
 */
 const { spawnSync } = require('child_process');
 const fs = require('fs'), path = require('path');
+// Warnings are matched by wording, so the post's wrapped comments are read back as one line each.
+const { unwrapComments } = require('./unwrap-comments.js');
 
 const POST = process.argv[2];
 const CPS  = process.argv[3];
@@ -545,7 +547,7 @@ for (const c of cases) {
 
   const r = spawnSync(POST, args, { encoding:'utf8' });
   const posted = r.status === 0 && fs.existsSync(gcode);
-  const text = posted ? fs.readFileSync(gcode,'utf8') : '';
+  const text = posted ? unwrapComments(fs.readFileSync(gcode,'utf8')) : '';
   const logText = (fs.existsSync(log) ? fs.readFileSync(log,'utf8') : '')
                 + (r.stdout || '') + (r.stderr || '');
 

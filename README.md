@@ -4,11 +4,11 @@ Fusion 360 CAM Post Processor for GRBL, Marlin, RepRap & FluidNC
 A Fusion 360 CAM post processor for hobby-class 3-axis CNC machines running GRBL, FluidNC, Marlin
 or RepRapFirmware — including the V1 Engineering MPCNC and LowRider, and similar builds.
 
-**Current release: v4.1.2 Beta 3**, distributed as the single file `MPCNC_v4.1.2_Beta3.cps`.
+**Current release: v4.1.3 Beta 3**, distributed as the single file `MPCNC_v4.1.3_Beta3.cps`.
 
 **[Download the post](https://github.com/flyfisher604/mpcnc_post_processor/releases/latest)** ·
 [What changed](CHANGELOG.md) ·
-[Release notes](docs/release-notes-v4.1.2-beta3.md)
+[Release notes](docs/release-notes-v4.1.3-beta3.md)
 
 This is a modified fork of
 [guffy1234/mpcnc_posts_processor](https://github.com/guffy1234/mpcnc_posts_processor),
@@ -40,7 +40,7 @@ Choose your firmware with **CNC Firmware**, the first setting in group **1 - Job
 
 # Installation
 
-The post is a single file. Download `MPCNC_v4.1.2_Beta3.cps` from the
+The post is a single file. Download `MPCNC_v4.1.3_Beta3.cps` from the
 [latest release](https://github.com/flyfisher604/mpcnc_post_processor/releases/latest), then:
 
 1. In Fusion, choose **Manage → Post Library**.
@@ -48,7 +48,7 @@ The post is a single file. Download `MPCNC_v4.1.2_Beta3.cps` from the
 3. **If an older copy is installed, select it and delete it** with the trash-can icon. Every
    release has a different filename, so an old copy would sit beside the new one rather than being
    replaced, and the two are hard to tell apart in the picker.
-4. Use the **Import** icon to import `MPCNC_v4.1.2_Beta3.cps`.
+4. Use the **Import** icon to import `MPCNC_v4.1.3_Beta3.cps`.
 5. Close the dialog.
 6. When posting, choose **Choose from library…** and select this post.
 7. Review the properties — start with the guide for your kind of job, below.
