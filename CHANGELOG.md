@@ -9,7 +9,8 @@ kept at the tag they describe.
 installs *beside* the old one rather than replacing it. Remove the old copy from the Post Library
 first — see [Installation](README.md#installation).
 
-- [v4.1.2 Beta 3](#v412-beta-3--current) — current
+- [v4.1.3 Beta 3](#v413-beta-3--current) — current
+- [v4.1.2 Beta 3](#v412-beta-3)
 - [v4.1.1 Beta 3](#v411-beta-3)
 - [v4.1 Beta 3](#v41-beta-3)
 - [v4.0 Beta 3](#v40-beta-3)
@@ -19,7 +20,25 @@ first — see [Installation](README.md#installation).
 
 ---
 
-## v4.1.2 Beta 3 — current
+## v4.1.3 Beta 3 — current
+
+A correction release for FluidNC users. **No g-code command changed:** only how comments are laid
+out in the file.
+
+- **FluidNC runs the file.** FluidNC refused files from this post with *error 14, line too long*,
+  because some warnings ran to over 600 characters on one comment line and FluidNC counts comment
+  text toward its 255-character limit. Classic Grbl does not, which is why only FluidNC failed.
+  Long comments and warnings are now split over several lines of at most about 100 characters.
+
+**Before your first v4.1.3 job:** remove `MPCNC_v4.1.2_Beta3.cps` from the Post Library. **Your
+saved settings carry over**, since no property key or value id moved. If you were deleting comments
+by hand to get FluidNC to load a file, post the job again instead.
+
+**[→ Full release notes for v4.1.3 Beta 3](docs/release-notes-v4.1.3-beta3.md)**
+
+---
+
+## v4.1.2 Beta 3
 
 A correction release. **One fix changes the g-code a job emits:** a tool change to a tool that runs
 at the same speed and direction as the one before left the spindle stopped, so the new tool cut
@@ -47,7 +66,7 @@ saved settings carry over** — no property key or value id moved. If you have S
 something unusual, post once and read the dialog: a value earlier releases replaced with 15 mm is
 now refused.
 
-**[→ Full release notes for v4.1.2 Beta 3](docs/release-notes-v4.1.2-beta3.md)**
+**[→ Full release notes for v4.1.2 Beta 3](https://github.com/flyfisher604/mpcnc_post_processor/blob/v4.1.2_Beta3/docs/release-notes-v4.1.2-beta3.md)**
 
 ---
 
