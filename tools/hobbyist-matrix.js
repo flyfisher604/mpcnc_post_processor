@@ -25,6 +25,8 @@
 */
 const { spawnSync } = require('child_process');
 const fs = require('fs'), path = require('path');
+// Warnings are matched by wording, so the post's wrapped comments are read back as one line each.
+const { unwrapComments } = require('./unwrap-comments.js');
 
 const POST = process.argv[2];
 const CPS  = process.argv[3];
@@ -383,10 +385,10 @@ for (const c of cases) {
     for (const [k,v] of Object.entries(c.compare.props)) ra.push('--property', k, v);
     ra.push(CPS, path.join(CNCR, c.compare.cnc), rg);
     spawnSync(POST, ra, { encoding:'utf8' });
-    reference = fs.existsSync(rg) ? fs.readFileSync(rg,'utf8') : '';
+    reference = fs.existsSync(rg) ? unwrapComments(fs.readFileSync(rg,'utf8')) : '';
   }
   const ok = r.status === 0 && fs.existsSync(gcode);
-  const text = ok ? fs.readFileSync(gcode,'utf8') : '';
+  const text = ok ? unwrapComments(fs.readFileSync(gcode,'utf8')) : '';
   // Read the same way wcs-matrix.js reads it, and for the same reason: the post's warning() stream
   // reaches the log, and --log does not capture what the harness itself prints on the way past.
   const logText = (fs.existsSync(log) ? fs.readFileSync(log,'utf8') : '')

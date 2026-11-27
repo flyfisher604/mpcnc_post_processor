@@ -4125,17 +4125,59 @@ function writeWcsOnStart() {
 }
 
 // The emit half of writeComment(), shared with writeWarning() below so the two cannot come to differ
-// on how a comment is delimited or sanitized.
+// on how a comment is delimited, sanitized or wrapped.
+// Wrapped because FluidNC counts comment bytes against its line buffer and stops a file job on
+// overflow: InputFile::readLine() returns Error::LineLengthExceeded once a line reaches
+// Channel::maxLine = 255 (FluidNC/src/InputFile.cpp, Channel.h, main). Grbl 1.1 drops comment bytes
+// before its own check (grbl/protocol.c, protocol_main_loop()), so only FluidNC refused the file.
+var maxCommentText = 100;
+
 function writeCommentLine(text) {
   // Collapse parentheses (comment markers) and newlines to a space so a multi-line
   // value can't split the comment into a second, uncommented (active G-code) line.
   var safeText = sanitizeMessageText(text, "()");
-  if (fw == eFirmware.GRBL) {
-    writeln("(" + safeText + ")");
+  var lines = wrapCommentText(safeText, maxCommentText);
+  for (var i = 0; i < lines.length; ++i) {
+    if (fw == eFirmware.GRBL) {
+      writeln("(" + lines[i] + ")");
+    }
+    else {
+      writeln(";" + lines[i]);
+    }
   }
-  else {
-    writeln(";" + safeText);
+}
+
+// Word-wraps text to at most width characters a line. Continuation lines take the first line's
+// leading spaces plus three, so a wrapped warning reads as one. A word longer than the room left
+// is split hard rather than let through long.
+function wrapCommentText(text, width) {
+  if (text.length <= width) {
+    return [text];
   }
+  var lead = text.match(/^ */)[0];
+  var indent = lead + "   ";
+  var words = text.substring(lead.length).split(/ +/);
+  var lines = [];
+  var line = lead;
+  for (var w = 0; w < words.length; ++w) {
+    var word = words[w];
+    var sep = (line == lead || line == indent) ? "" : " ";
+    if (line.length + sep.length + word.length <= width) {
+      line += sep + word;
+      continue;
+    }
+    if (line != lead && line != indent) {
+      lines.push(line);
+      line = indent;
+    }
+    while (indent.length + word.length > width) {
+      lines.push(indent + word.substring(0, width - indent.length));
+      word = word.substring(width - indent.length);
+    }
+    line = indent + word;
+  }
+  lines.push(line);
+  return lines;
 }
 
 // Every ">>> WARNING:" goes through here, ignoring Comment Level -- Off means less commentary, not

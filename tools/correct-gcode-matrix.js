@@ -16,7 +16,8 @@
     engine and records what it was asked for; `gcode-model.js` is what re-reads the g-code as g-code.
 
     SPELLING -- every block tokenizes, every number is inside the declared precision, comments are the
-    dialect's own, no two codes from one modal group share a block, no arc lacks a centre. A defect
+    dialect's own, no two codes from one modal group share a block, no arc lacks a centre, no line
+    is longer than FluidNC reads -- comment text included -- before it stops the job. A defect
     here is a defect on any firmware under any property set, which is why `lint()` runs on every case
     in this file rather than being one case of its own.
 
@@ -212,6 +213,16 @@ function spelling(ctx) {
   const bad = M.lint(ctx.lines, ctx.fw);
   return bad.length ? [false, `${bad.length} malformed block(s): ${bad.slice(0, 4).join(' ;; ')}`]
                     : [true, `all ${M.blocks(ctx.lines).length} blocks are well formed ${ctx.fw} g-code`];
+}
+
+// LINE LENGTH. Runs beside spelling(). FluidNC counts every byte but CR/LF, comments included, and a
+// file job stops with error 14 at 255: InputFile::readLine(), maxlen = Channel::maxLine = 255
+// (FluidNC/src/InputFile.cpp, Channel.h, main). Checked on every dialect: the post wraps comments for all.
+const MAX_LINE = 254;
+function lineLength(ctx) {
+  const long = ctx.text.split('\n').map((l, i) => [i + 1, l.replace(/\r$/, '').length]).filter(([, n]) => n > MAX_LINE);
+  return long.length ? [false, `${long.length} line(s) over ${MAX_LINE} characters, first at line ${long[0][0]} (${long[0][1]})`]
+                     : [true, `no line over ${MAX_LINE} characters`];
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -836,6 +847,7 @@ for (const c of cases) {
 
     // Spelling is not a case, it is a standing claim about every file this suite produces.
     checks.push(spelling(ctx));
+    checks.push(lineLength(ctx));
 
     if (c.custom) {
       if (c.trace) {
